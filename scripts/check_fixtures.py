@@ -43,12 +43,18 @@ def main() -> int:
         source_info: tuple[int, int, int, int]
         with wave.open(str(src), "rb") as wav:
             source_info = (
-                wav.getnchannels(), wav.getsampwidth(), wav.getframerate(), wav.getnframes()
+                wav.getnchannels(),
+                wav.getsampwidth(),
+                wav.getframerate(),
+                wav.getnframes(),
             )
             source_pcm = wav.readframes(wav.getnframes())
         with wave.open(str(pos), "rb") as wav:
             positive_info = (
-                wav.getnchannels(), wav.getsampwidth(), wav.getframerate(), wav.getnframes()
+                wav.getnchannels(),
+                wav.getsampwidth(),
+                wav.getframerate(),
+                wav.getnframes(),
             )
             positive_pcm = wav.readframes(wav.getnframes())
         if source_info != (1, 2, RATE, DURATION_SECONDS * RATE):
@@ -60,9 +66,10 @@ def main() -> int:
         for path in (src, pos):
             rel = path.relative_to(DATA).as_posix()
             expected.add(rel)
-            if not path.is_file() or hashes.get(rel) != hashlib.sha256(
-                path.read_bytes()
-            ).hexdigest():
+            if (
+                not path.is_file()
+                or hashes.get(rel) != hashlib.sha256(path.read_bytes()).hexdigest()
+            ):
                 raise ValueError(f"Missing or incorrect SHA256: {rel}")
     actual = {p.relative_to(DATA).as_posix() for p in EXAMPLE.rglob("*.wav")}
     if expected != actual or expected != set(hashes):

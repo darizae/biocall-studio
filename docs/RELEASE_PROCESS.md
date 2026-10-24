@@ -1,5 +1,7 @@
 # Controlled native releases — planned gates, not current outputs
 
+**Mandatory UI acceptance:** [Prototype fidelity gate](design/PROTOTYPE_ACCEPTANCE.md) applies to every spec that changes visible UI (including packaged installers). A missing screen/state, rearranged primary action, wrong navigation, unlabeled visual deviation or absent native screenshot evidence blocks that spec; using `alp-ui` alone is not proof of parity. Read only the active spec’s screen rows.
+
 **Owner:** specs [06 macOS](specs/06-macos-release-and-installer.md) and [07 Windows](specs/07-windows-release-and-installer.md). These are acceptance **plans**; the current ZIP is source/scaffold, **not** an installed app, `.dmg`, notarized Mac download, `.exe`, or completed release. Never mark a gate passed from a documentation checklist.
 
 ## Release candidate chain

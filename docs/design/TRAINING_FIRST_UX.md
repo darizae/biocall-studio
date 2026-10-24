@@ -1,5 +1,7 @@
 # alpaca Desktop Trainer — Collection-first UX contract
 
+**Mandatory UI acceptance:** [Prototype fidelity gate](PROTOTYPE_ACCEPTANCE.md) applies to every spec that changes visible UI (including packaged installers). A missing screen/state, rearranged primary action, wrong navigation, unlabeled visual deviation or absent native screenshot evidence blocks that spec; using `alp-ui` alone is not proof of parity. Read only the active spec’s screen rows.
+
 **Target product:** native PySide6 application. **Design reference:** [interactive HTML prototype](prototypes/training-first/index.html) and screenshot assets in its folder. **Important:** the browser prototype validates selected WAV headers/names in its own limited sandbox but *simulates* Dataset Build, Training, Run progress, Dataset/Model publication and persisted collection metadata. The design does not establish scientific or native integration-test coverage. Requirements for actual behavior are in the canonical docs and numbered specs.
 
 ## 1. Primary journey

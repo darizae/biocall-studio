@@ -1,63 +1,161 @@
 import subprocess
 import sys
-from importlib.metadata import version
 from textwrap import dedent
 
 import pytest
-from alp_ui.components import Alert, Badge, Button, Card, DataTable, Divider, EmptyState, Text
-from alp_ui.theme import ALPACA_LIGHT
+from alp_ui.components import DataTable, FolderPicker, HelpHint
 from PySide6.QtCore import QAbstractItemModel, Qt
-from PySide6.QtGui import QColor, QPalette
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QLabel
 
+from alpaca_desktop.application.workspace import WorkspaceController
 from alpaca_desktop.gui.app import create_application
-from alpaca_desktop.gui.models import DirectoryPageModel
 from alpaca_desktop.gui.window import MainWindow
-from alpaca_desktop.persistence.settings import ROOT_LABELS
 
 pytestmark = [pytest.mark.integration, pytest.mark.qt]
 
 
-def test_local_theme_navigation_and_caller_owned_model(qapp, qtbot, workspace):
-    """Scaffold boundary smoke; not an indexed Trainer acceptance case."""
+def test_native_shell_routes_between_select_and_wiki(qapp, qtbot, workspace):
+    """Case: IT-UI-001."""
     app = create_application()
     assert create_application() is app is qapp is QApplication.instance()
-    assert version("alp-ui") == "0.1.0a0"
-    assert app.palette().color(QPalette.ColorRole.Window) == QColor(ALPACA_LIGHT.colors.background)
-    assert app.font().family() == ALPACA_LIGHT.typography.body_family
     window = MainWindow(workspace)
     qtbot.addWidget(window)
     window.show()
-    for component in (Text, Button, Card, Divider, Badge, Alert, EmptyState, DataTable):
-        assert window.findChildren(component)
-    tree = window.navigation
-    assert tree.accessibleName() == "Artifact navigation"
-    assert tree.topLevelItem(0).text(0) == "Data"
-    assert [tree.topLevelItem(0).child(i).text(0) for i in range(2)] == ["Collections", "Datasets"]
-    tree.setFocus()
-    qtbot.waitUntil(tree.hasFocus)
-    qtbot.keyClick(tree, Qt.Key.Key_Down)
-    assert window.pages.currentWidget().accessibleName() == "Datasets"
-    for index, name in enumerate(("Models", "Corpora", "Runs", "Settings"), start=1):
-        tree.setCurrentItem(tree.topLevelItem(index))
-        assert window.pages.currentWidget().accessibleName() == name
-    for root_id, label in ROOT_LABELS.items():
-        field = window.settings_page.root_fields[root_id]
-        assert field.control.accessibleName() == label
-        field.setFocus()
-        qtbot.waitUntil(field.control.hasFocus)
-    table = window.artifact_pages["Collections"].findChild(DataTable)
-    assert isinstance(table.model(), QAbstractItemModel)
-    assert isinstance(table.model(), DirectoryPageModel)
-    assert type(table.model()).__module__ == "alpaca_desktop.gui.models"
-    assert table.accessibleName() == "Collections table"
-    assert table.model().rowCount() == 0
-    for page in window.artifact_pages.values():
-        for button in page.findChildren(Button):
-            assert not button.isEnabled()
-            assert button.accessibleName()
-            assert "unavailable" in button.accessibleDescription()
-    assert QApplication.instance() is app
+    window.activateWindow()
+    assert window.current_route == "select"
+    assert all(not button.icon().isNull() for button in window._navigation.values())
+    assert window._navigation["select"].isChecked()
+    assert window._navigation["select"].accessibleDescription() == "Current page"
+    window.navigate("wiki")
+    assert window.current_route == "wiki"
+    assert window._navigation["wiki"].isChecked()
+    assert not window._navigation["select"].isChecked()
+    assert window.wiki_select_button.focusPolicy() != Qt.FocusPolicy.NoFocus
+    window.wiki_select_button.setFocus()
+    if QApplication.platformName() != "offscreen":
+        qtbot.waitUntil(window.wiki_select_button.hasFocus)
+    window.wiki_select_button.click()
+    assert window.current_route == "select"
+    picker_button = window.select_page.folder_picker.choose_button
+    assert picker_button.focusPolicy() != Qt.FocusPolicy.NoFocus
+    if QApplication.platformName() != "offscreen":
+        qtbot.waitUntil(picker_button.hasFocus)
+
+
+def test_folder_picker_keeps_pending_selection_when_native_dialog_is_cancelled(
+    qtbot, workspace, tmp_path, monkeypatch
+):
+    """Case: IT-UI-003."""
+    window = MainWindow(workspace)
+    qtbot.addWidget(window)
+    window.show()
+    picker = window.select_page.folder_picker
+    assert isinstance(picker, FolderPicker)
+    selected = tmp_path / "chosen-collection"
+    selected.mkdir()
+    picker.setFolderPath(str(selected))
+    assert workspace.pending_collection_path == selected
+    assert picker.control.accessibleDescription() == str(selected)
+
+    monkeypatch.setattr(
+        "alp_ui.components.inputs.QFileDialog.getExistingDirectory", lambda *args: ""
+    )
+    picker.choose_button.click()
+    assert picker.folderPath() == str(selected)
+    assert workspace.pending_collection_path == selected
+    assert workspace.collection_path is None
+    assert not workspace.settings_file.exists()
+
+
+def test_verified_collection_binding_reopens_and_explicitly_rebinds_without_touching_wavs(
+    workspace, qtbot, tmp_path
+):
+    """Case: IT-UI-002."""
+    first = tmp_path / "first-collection"
+    second = tmp_path / "second-collection"
+    for collection in (first, second):
+        (collection / "recordings").mkdir(parents=True)
+        (collection / "positives").mkdir()
+    wav = first / "recordings" / "REC_A.wav"
+    wav.write_bytes(b"source bytes must not change")
+    before = wav.read_bytes()
+
+    workspace.bind_verified_collection(first)
+    reopened = WorkspaceController(workspace.settings_file.parent)
+    assert reopened.collection_path == first
+    reopened.bind_verified_collection(second)
+    assert WorkspaceController(workspace.settings_file.parent).collection_path == second
+    assert wav.read_bytes() == before
+
+    window = MainWindow(reopened)
+    qtbot.addWidget(window)
+    window.show()
+    window.navigate("settings")
+    assert str(second) in window.settings_page.binding_value.text()
+
+
+def test_empty_routes_help_and_qt_screenshot_are_real_native_widgets(qtbot, workspace, tmp_path):
+    """Case: IT-UI-004."""
+    window = MainWindow(workspace)
+    qtbot.addWidget(window)
+    window.show()
+    picker = window.select_page.folder_picker
+    assert picker.choose_button.text() == "Select folder"
+    assert picker.choose_button.variant == "primary"
+    assert window.select_page.wiki_button.accessibleName() == "How should my folder look?"
+    assert window.select_page.structure_title.text() == "One folder, two subfolders"
+    assert window.select_page.card.width() >= 700
+    window.select_page.wiki_button.setFocus()
+    qtbot.keyClick(window.select_page.wiki_button, Qt.Key.Key_Space)
+    assert window.current_route == "wiki"
+    window.wiki_select_button.click()
+    assert window.current_route == "select"
+    select_image = tmp_path / "select.png"
+    assert window.grab().save(str(select_image))
+    for route in ("collections", "datasets", "models", "runs"):
+        window.navigate(route)
+        assert window.empty_pages[route].isVisible()
+        assert "No " in window.empty_pages[route].title_widget.text()
+        table = window._pages[route].findChild(DataTable)
+        assert isinstance(table.model(), QAbstractItemModel)
+        assert table.model().rowCount() == 0
+        window.empty_pages[route].action_widget.click()
+        assert window.current_route == "select"
+    window.navigate("wiki")
+    hint = window.wiki_page.findChild(HelpHint)
+    assert hint is not None
+    hint.setFocus()
+    qtbot.keyClick(hint, Qt.Key.Key_Space)
+    assert "Milliseconds are integers" in hint.accessibleDescription()
+    screenshot = window.grab()
+    image_path = tmp_path / "wiki.png"
+    assert screenshot.save(str(image_path))
+    assert select_image.stat().st_size > 0
+    assert image_path.stat().st_size > 0
+    assert all("demo" not in label.text().lower() for label in window.findChildren(QLabel))
+
+    window.navigate("runs")
+    window.resize(700, 780)
+    qtbot.waitUntil(lambda: window.is_compact)
+    window.navigate("select")
+    qtbot.waitUntil(lambda: window.select_page.horizontalScrollBar().maximum() == 0)
+    assert window.select_page.horizontalScrollBar().maximum() == 0
+    assert window.select_page.card.width() >= window.select_page.viewport().width() - 80
+    assert window.select_page.card.geometry().right() < window.select_page.viewport().width()
+    assert window.select_page.folder_picker.choose_button.isVisible()
+
+
+def test_corrupt_application_settings_are_actionable_in_settings(qtbot, tmp_path):
+    """Case: IT-UI-002."""
+    settings_dir = tmp_path / "application-settings"
+    settings_dir.mkdir()
+    (settings_dir / "settings.json").write_text('{"schema_version":')
+    window = MainWindow(WorkspaceController(settings_dir))
+    qtbot.addWidget(window)
+    window.show()
+    window.navigate("settings")
+    assert window.settings_page.error_alert.isVisible()
+    assert "Application Settings" in window.settings_page.error_alert.accessibleName()
 
 
 def test_console_startup_passes_isolated_settings_to_the_real_gui(tmp_path):
@@ -75,7 +173,7 @@ def test_console_startup_passes_isolated_settings_to_the_real_gui(tmp_path):
             try:
                 window = next(w for w in app.topLevelWidgets() if isinstance(w, MainWindow))
                 assert window.isVisible()
-                assert window.controller.settings_file == Path(sys.argv[1]) / 'workspace.json'
+                assert window.controller.settings_file == Path(sys.argv[1]) / 'settings.json'
                 assert QApplication.instance() is app
                 print('GUI startup uses isolated Application Settings')
             finally:

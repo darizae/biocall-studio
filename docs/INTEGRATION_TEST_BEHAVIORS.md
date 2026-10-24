@@ -8,9 +8,8 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 |---|---|---|
 | `IT-UI-001` | Native Qt/`alp-ui` launches, Select Collection primary action and Wiki navigate; theme/resources render and back/focus navigation survives page changes. | TD-UI |
 | `IT-UI-002` | Test-isolated Application Settings retain valid Collection binding across restart and support explicit rebind; original input WAV bytes remain untouched. | TD-COL, TD-PATH |
-
 | `IT-UI-003` | Updated public `alp-ui` `FolderPicker` is used in actual native Select UI: folderChanged routes pending selection, cancellation leaves previous path/verification unchanged and does not start scan; accessible full path and keyboard operate. | TD-UI, TD-COL |
-| `IT-UI-004` | Prototype landing/Wiki/empty-state screen structure is exercised with installed `alp-ui` native Widgets, HelpHint accessible hover/keyboard help and actual Qt screenshots/route/Tab order compared with bundled previews and sibling Showcase (document deviations). No demo scientific completions. | TD-UI |
+| `IT-UI-004` | Prototype Select/Wiki/empty-state structure is exercised with real `alp-ui` Widgets, an accessible inline Wiki action, keyboard Tab/Space and HelpHint, and no demo scientific completions. **Separately required native macOS evidence:** persist real Trainer screenshots (not only pytest tmp files), compare side by side with both bundled prototype and sibling Showcase, log deviations and update README with truthful native shots before claiming UI acceptance. | TD-UI |
 
 ## 2. Collection Scan and metadata (spec 02)
 
@@ -23,6 +22,7 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-COL-005` | Cancel, permission failure or interrupted metadata replacement cannot publish a false valid cache; next scan recovers; input bytes remain unchanged. | TD-CACHE, TD-FAIL |
 | `IT-COL-006` | Symlink escape/path containment and a moved/rebound Collection cannot bypass checks on read or cache hit; portable references contain no host-absolute path. | TD-PATH, TD-CACHE |
 | `IT-COL-007` | A generated large Collection index is paged through real Qt model; responsive navigation and bounded metadata/header I/O without full-recording decoding. | TD-SCALE |
+| `IT-COL-008` | Native Qt Reading/Collection/Validation UI matches prototype section hierarchy, progress/cancel, issue guidance, CTA gating, navigation and resized view with real WAV scan state. `alp-ui` Showcase style, screenshots and six-dimension manual review are evidenced; no unapproved deviations. | TD-UI, TD-COL, TD-WAV |
 
 ## 3. Dataset Build (spec 03)
 
@@ -32,6 +32,7 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-DB-002` | Same inputs/config/seed produce equivalent Snippets/Splits/provenance (excluding new IDs); changed settings publish an independent Dataset and never rewrite the original. | TD-MINE, TD-SPLIT |
 | `IT-DB-003` | No eligible negatives, changed/missing source or invalid config fails cleanly; no completed Dataset appears, staged leftovers are safely identified, and originals remain byte-identical. | TD-MINE, TD-FAIL |
 | `IT-DB-004` | Dataset detail reopens complete immutable manifest, split counts and materialized files; deletion is explicit, rejects active input reservation and does not erase any existing Model. | TD-SPLIT, TD-RUN |
+| `IT-DB-005` | Native Builder/Dataset views match prototype recording selection, controls/hints, count preview, disabled/underfill and Dataset detail/list flows; real config/Run state, accessible Qt interactions and native evidence pass six-dimension review. | TD-UI, TD-MINE, TD-SPLIT |
 
 ## 4. Run and Worker boundary (spec 04)
 
@@ -41,6 +42,7 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-RUN-002` | Second requested Run conflicts while one active; locked input deletion/rebind conflicts; read-only browsing proceeds; terminal state releases reservation. | TD-RUN |
 | `IT-RUN-003` | Real cancellation and forced process loss produce cancelled/interrupted state after bounded reconciliation, no false published artifact and no eternal Active Run after restart. | TD-RUN, TD-FAIL |
 | `IT-RUN-004` | Artifact/staging name collision, corrupt publication or worker nonzero exit fails without overwriting a published Dataset/Model or promoting a stale output pointer. | TD-RUN, TD-FAIL |
+| `IT-RUN-005` | Native Run detail/history/Active Run sidebar reflect prototype section ordering, progress, cancel, conflict and terminal states through real Worker events; keyboard navigation and native evidence pass six-dimension review. | TD-UI, TD-RUN, TD-FAIL |
 
 ## 5. CNN and RF Training (spec 05)
 
@@ -52,6 +54,7 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-TRAIN-004` | Bad Dataset Split/feature mismatch, missing input or undefined metric is blocked/reported accurately; failed Run does not publish a Model or fabricated metric. | TD-TRAIN, TD-FAIL |
 | `IT-TRAIN-005` | Actual CNN epoch loss and actual RF ordered feature importance values reach `alp-ui` `Plot` using correct line/bar public APIs; plotted values/axes agree with saved real model/run metrics, with accessible numeric alternatives and family-specific meaning. | TD-TRAIN, TD-UI |
 | `IT-TRAIN-006` | Undefined/NaN/missing metric or importance is not passed to Plot as fictitious zero; no RF epoch loss graph, HelpHint and family controls remain accessible; Model detail explains unavailability. | TD-TRAIN, TD-UI, TD-FAIL |
+| `IT-TRAIN-007` | Native CNN/RF configuration, training charts, Model list/detail faithfully follow prototype structure/hints/actions with current `alp-ui` Showcase styling, real metrics and accessible Plot alternatives; native screenshots and reviewed exception ledger pass. | TD-UI, TD-TRAIN |
 
 ## 6. Native macOS installer and release gates (spec 06)
 
@@ -61,6 +64,7 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-MAC-001` | Versioned signed `.app` and installer `.dmg` verify correct bundle ID/embedded Qt and `alp-ui` resources, Developer ID signature/hardened runtime, notarization + stapling, Gatekeeper/quarantine first launch on supported Mac architecture. | TD-OS, TD-UI |
 | `IT-MAC-002` | Clean Mac installed-app launches its **bundled** Worker (not system Python), survives cancellation/restart and writes user state outside sealed app; folder chooser/help/plots/theme/resources work. | TD-OS, TD-RUN, TD-UI |
 | `IT-MAC-003` | Controlled release from exact tagged/approved commit emits installer with checksums/recorded dependency/SHA provenance and tested native E2E scientific outputs; missing signing/approval blocks promotion rather than advertising a public installer. | TD-OS, TD-TRAIN |
+| `IT-MAC-004` | Installed `.app` retains prototype route/state layout and pinned `alp-ui` styling, icons, themes, picker/help/plot at normal and narrow sizes; actual installed screenshots and six-dimension review pass before DMG promotion. | TD-OS, TD-UI |
 
 ## 7. Windows installer/qualification gates (spec 07)
 
@@ -70,6 +74,7 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-WIN-002` | Windows native Qt/`alp-ui` file picker/scan and packaged QProcess/Worker launch, cancel, recovery and theme/assets function. | TD-OS, TD-RUN |
 | `IT-WIN-003` | **Installed** Windows native package builds and reopens one real Dataset and both CNN/RF Models; verified portable relative provenance. | TD-OS, TD-TRAIN |
 | `IT-WIN-004` | Clean Windows installation/uninstallation of versioned `.exe` retains user Collection; packaged resources, release digest/security/signing and native Windows keyboard/DPI help/plot parity are verified. | TD-OS, TD-UI |
+| `IT-WIN-005` | Installed Windows app retains prototype layout/interaction and native `alp-ui` styling at 100%/150% DPI plus keyboard/focus, with screenshots and explicit owner-reviewed native exceptions before installer promotion. | TD-OS, TD-UI |
 
 ## Audit rules
 

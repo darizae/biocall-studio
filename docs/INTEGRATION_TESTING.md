@@ -1,5 +1,7 @@
 # Integration testing strategy — native Trainer
 
+**Mandatory UI acceptance:** [Prototype fidelity gate](design/PROTOTYPE_ACCEPTANCE.md) applies to every spec that changes visible UI (including packaged installers). A missing screen/state, rearranged primary action, wrong navigation, unlabeled visual deviation or absent native screenshot evidence blocks that spec; using `alp-ui` alone is not proof of parity. Read only the active spec’s screen rows.
+
 ## Purpose and evidence levels
 
 Each vertical must prove its **real owning boundary** and observable published outcome, not merely that pure logic or a mock GUI worked. Index integration cases in [`INTEGRATION_TEST_BEHAVIORS.md`](INTEGRATION_TEST_BEHAVIORS.md); choose equivalence classes in [`INTEGRATION_TEST_DATA.md`](INTEGRATION_TEST_DATA.md). The test-level choice precedes writing code: a complete answer from in-memory values belongs in [`UNIT_TESTING.md`](UNIT_TESTING.md).

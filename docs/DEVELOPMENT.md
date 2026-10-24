@@ -12,6 +12,7 @@ A scaffold-level local setup from repository root:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
+python -m pip install --upgrade pip
 python -m pip install -e '.[gui,test,integration]'
 # When available, install/build the sibling PySide6 Widgets library:
 python -m pip install -e ../alp-ui

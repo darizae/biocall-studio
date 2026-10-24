@@ -1,5 +1,7 @@
 # Review principles — Trainer specs and implementation
 
+**Mandatory UI acceptance:** [Prototype fidelity gate](../design/PROTOTYPE_ACCEPTANCE.md) applies to every spec that changes visible UI (including packaged installers). A missing screen/state, rearranged primary action, wrong navigation, unlabeled visual deviation or absent native screenshot evidence blocks that spec; using `alp-ui` alone is not proof of parity. Read only the active spec’s screen rows.
+
 These are **operational checks**, not a demand for generic infrastructure. Apply only to task-owning seam; do not build unneeded abstractions to satisfy a checklist. Start from [`../GLOSSARY.md`](../GLOSSARY.md), [`../ARCHITECTURE.md`](../ARCHITECTURE.md), active spec and owned tests.
 
 ## 1. Identify authoritative producer and consumer
@@ -61,6 +63,8 @@ Read [`../UNIT_TESTING.md`](../UNIT_TESTING.md) before declaring a case integrat
 - [ ] Verify stage → validated immutable publish, failure recovery, input unchanged and no silent overwrite.
 - [ ] Run focused `UT-*` and real macOS `IT-*`, audit exact IDs with `scripts/audit_test_ids.py`, report actual commands/results and uncovered/native-deferred gaps.
 - [ ] Maintain generated/fixed fixture policy, SHA-256/LFS provenance and the active spec in same PR.
+- [ ] For UX changes, persist native app screenshots and a prototype + `alp-ui` Showcase parity ledger, then update README with **truthful** native shots and `.venv` run commands.
+- [ ] Deliver a real branch/commit SHA with clean Git status, verified ignored private files and Git LFS; see [`GIT_DELIVERY.md`](GIT_DELIVERY.md).
 
 ## Context efficiency and release obligations
 

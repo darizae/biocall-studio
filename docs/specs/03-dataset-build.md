@@ -19,7 +19,11 @@ Change in source during Build, insufficient eligible noise, invalid split, missi
 
 ## UI and source-data acceptance
 
-Use `alp-ui` `NumberInput`, `SelectInput`, `HelpHint` for margin, counts, seed and split explanation, with source selection via `DataTable` Qt model. The prototype Builder preview is the content/interaction reference, not scientific computation. Consult `../alpaca-pipelines` scientific source per `docs/agent/SOURCE_MAP.md` **only where there is a relevant algorithm**; record source SHA and adaptation rules. Exercise tiny checked-in synthetic Collection before adding an anonymized HPC exemplar through the explicit staged approval/fixture register.
+Use `alp-ui` `NumberInput`, `SelectInput`, `HelpHint` for margin, counts, seed and split explanation, with source selection via `DataTable` Qt model. The prototype Builder preview is the content/interaction reference, not scientific computation. Consult `../alpaca-pipelines` scientific source per `docs/agent/SOURCE_MAP.md` **only where there is a relevant algorithm**; record source SHA and adaptation rules. Exercise a tiny real synthetic Collection (checked-in Git LFS fixture if present; otherwise generate in a temp directory) before adding an anonymized HPC exemplar through the explicit staged approval/fixture register.
+
+## Blocking prototype parity (native UI)
+
+**`IT-DB-005`:** Match the actual prototype Builder interaction (`builder-preview.png`, `app.js`) including recording selection, grouped settings, labels/hints, source preview, target/noise estimate, underfill/disabled status, primary Build action and Dataset list/detail navigation. Do not implement a generic wizard or hide the prototype's breakdowns. Exercise real config changes, invalid/no-space cases, source-grouped splits and completed Dataset views with native `alp-ui` controls and `pytest-qt`; capture `spec-03-native/` views from the [Prototype acceptance](../design/PROTOTYPE_ACCEPTANCE.md) inventory. Keep scientific outcomes real rather than imitating JS demo values. Unapproved parity gaps block the spec. Any required fixture can be generated locally if omitted from ZIP.
 
 ## Tests / exit
 

@@ -12,6 +12,10 @@ On a clean supported Windows x86-64 machine, the user installs a **versioned `.e
 4. Run installed app and real Worker cancellation/restart, Dataset and both Models through same contract. Validate clean install/upgrades/uninstall, no deleted user Collection, installer permissions and dependency licensing/security.
 5. Sign installer and executables if distribution policy requires, verify digest, record dependency/source SHAs, release manifest, Windows-specific tests/logs and approval; if signing/build infrastructure absent, report blocker and withhold public distribution. No automatic promotion from macOS build.
 
+## Blocking installed-app UX parity
+
+**`IT-WIN-005`:** Run the actual installed app on supported native Windows. Check all navigation/action patterns, `FolderPicker`, HelpHint, plots and numeric alternatives, empty/invalid/progress/done states and 100%/150% DPI + narrow width against the prototype and current pinned `alp-ui` Showcase. Save `docs/design/evidence/spec-07-installed/` screenshots plus keyboard/DPI report and use the [Prototype acceptance](../design/PROTOTYPE_ACCEPTANCE.md) review. Explicitly document native-platform differences and seek owner acceptance; a changed main layout/CTA or missing screen **blocks** installer release even if the package launches.
+
 ## Tests / exit
 
-`IT-WIN-001`…`IT-WIN-004`, `TD-OS/UI/PATH/RUN/TRAIN`; capture native run IDs, installer hash, OS build/arch/DPI/privileges, signing outcome. At least one clean Windows installed-app run produces real Dataset and both Model formats and leaves input WAVs byte-identical. This spec follows completed Mac release as the next numbered vertical unless the owner changes platform priority.
+`IT-WIN-001`…`IT-WIN-005`, `TD-OS/UI/PATH/RUN/TRAIN`; capture native run IDs, installer hash, OS build/arch/DPI/privileges, signing outcome. At least one clean Windows installed-app run produces real Dataset and both Model formats and leaves input WAVs byte-identical. This spec follows completed Mac release as the next numbered vertical unless the owner changes platform priority.

@@ -3,22 +3,15 @@
 import json
 import os
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-
-ROOT_LABELS = {
-    "collection_root": "Collection Root",
-    "datasets_root": "Datasets Root",
-    "runs_root": "Runs Root",
-}
 
 
 @dataclass
-class WorkspaceSettings:
-    """Facts persisted in one Application Settings document."""
+class ApplicationSettings:
+    """Only a verified Collection binding belongs in machine-local settings."""
 
-    roots: dict[str, Path] = field(default_factory=dict)
-    source_bindings: dict[str, Path] = field(default_factory=dict)
+    collection_path: Path | None = None
 
 
 class SettingsStore:
@@ -27,37 +20,28 @@ class SettingsStore:
     def __init__(self, path: Path):
         self.path = path
 
-    def load(self) -> WorkspaceSettings:
+    def load(self) -> ApplicationSettings:
         try:
             with self.path.open(encoding="utf-8") as stream:
                 raw = json.load(stream)
         except FileNotFoundError:
-            return WorkspaceSettings()
+            return ApplicationSettings()
         except json.JSONDecodeError as exc:
             raise ValueError(f"Invalid Application Settings at {self.path}: {exc}") from exc
-        if not isinstance(raw, dict) or raw.get("schema_version") != 1:
+        if not isinstance(raw, dict) or set(raw) != {"schema_version", "collection_path"}:
             raise ValueError(f"Unsupported Application Settings at {self.path}")
-        mappings = []
-        for name in ("roots", "source_bindings"):
-            values = raw.get(name)
-            if not isinstance(values, dict) or any(
-                not isinstance(key, str)
-                or not key.strip()
-                or not isinstance(value, str)
-                or not Path(value).is_absolute()
-                for key, value in values.items()
-            ):
-                raise ValueError(f"Invalid {name} in Application Settings at {self.path}")
-            mappings.append({key: Path(value) for key, value in values.items()})
-        if mappings[0].keys() - ROOT_LABELS.keys():
-            raise ValueError(f"Unknown Workspace root in Application Settings at {self.path}")
-        return WorkspaceSettings(*mappings)
+        collection_path = raw.get("collection_path")
+        if raw.get("schema_version") != 1 or (
+            collection_path is not None
+            and (not isinstance(collection_path, str) or not Path(collection_path).is_absolute())
+        ):
+            raise ValueError(f"Invalid Application Settings at {self.path}")
+        return ApplicationSettings(Path(collection_path) if collection_path else None)
 
-    def save(self, settings: WorkspaceSettings) -> None:
+    def save(self, settings: ApplicationSettings) -> None:
         raw = {
             "schema_version": 1,
-            "roots": {key: str(value) for key, value in settings.roots.items()},
-            "source_bindings": {key: str(value) for key, value in settings.source_bindings.items()},
+            "collection_path": str(settings.collection_path) if settings.collection_path else None,
         }
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = None

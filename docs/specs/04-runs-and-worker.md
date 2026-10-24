@@ -16,6 +16,10 @@ Dataset Build and Training show dedicated **Run** progress/detail screens and hi
 
 Progress display uses `alp-ui` `ProgressBar`/`Badge`/`Alert`/`Button`, with **actual** Worker events, not the prototype timer. QProcess launch must be designed for frozen `.app`/`.exe` `--worker` as well as dev Python, without a global interpreter dependency. Compare Run/active-sidebar prototype states to the native Qt UI.
 
+## Blocking prototype parity (native UI)
+
+**`IT-RUN-005`:** The native Run detail, Active Run/sidebar indicator and Runs history must follow the prototype's visible hierarchy, status labels, stage progress, cancel action, terminal states and navigation, not a text-only log window. Use real `QProcess` status/events (not JS animation); make cancellation/conflict/failure visibly distinct. Write failing `pytest-qt` interaction checks, capture `spec-04-native/` screenshots of active/cancelling/failed/history and check all six [Prototype acceptance](../design/PROTOTYPE_ACCEPTANCE.md) dimensions against the Run prototype states plus current `alp-ui` Showcase. Unapproved gaps block the spec even if process-level tests pass.
+
 ## Tests / exit
 
 - Unit: `UT-RUN-001`, `UT-RUN-002` with deterministic transition/reservation examples (`TD-RUN`).

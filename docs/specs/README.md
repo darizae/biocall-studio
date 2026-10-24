@@ -1,10 +1,12 @@
 # Specs — indexed task router (7 sequential verticals)
 
-**First agent session = [Spec 01](01-shell-and-test-foundation.md), nothing else.** If unsure which reference to read, use [`docs/agent/ROUTING.md`](../agent/ROUTING.md). One branch/PR per spec; tests and real fixture changes are part of the same work, never postponed to an unindexed general cleanup.
+**Mandatory UI acceptance:** [Prototype fidelity gate](../design/PROTOTYPE_ACCEPTANCE.md) applies to every spec that changes visible UI (including packaged installers). A missing screen/state, rearranged primary action, wrong navigation, unlabeled visual deviation or absent native screenshot evidence blocks that spec; using `alp-ui` alone is not proof of parity. Read only the active spec’s screen rows.
+
+**Current next agent session = [Spec 01 closeout](SPEC_01_CLOSEOUT.md), no Spec 02 work until accepted.** On an untouched repository the first task is [Spec 01](01-shell-and-test-foundation.md). If unsure which reference to read, use [`docs/agent/ROUTING.md`](../agent/ROUTING.md). One branch/PR per spec; tests and real fixture changes are part of the same work, never postponed to an unindexed general cleanup.
 
 | Order | Owning spec | Outcome |
 |---|---|---|
-| 01 | [Shell, `alp-ui` and test foundation](01-shell-and-test-foundation.md) | prototype-equivalent native Select and Wiki; FolderPicker/HelpHint, Qt testing |
+| 01 | [Shell, `alp-ui` and test foundation](01-shell-and-test-foundation.md) + [acceptance closeout](SPEC_01_CLOSEOUT.md) | **OPEN:** screenshot/Showcase parity, README native evidence, `.venv` setup, Git/LFS/commit proof before 02 |
 | 02 | [Collection Scan & metadata](02-collection-scan-and-metadata.md) | real WAV checks, actionable errors and rebuildable `.alpaca/` cache |
 | 03 | [Dataset Build](03-dataset-build.md) | noise/target Snippets, grouped train/val and immutable artifact |
 | 04 | [Worker & Runs](04-runs-and-worker.md) | real QProcess lifecycle, reservation, cancellation/recovery |

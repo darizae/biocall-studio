@@ -13,10 +13,14 @@ REQUIRED = (
     "AGENTS.md",
     "docs/HANDOFF.md",
     "docs/agent/ROUTING.md",
+    "docs/agent/GIT_DELIVERY.md",
+    "docs/specs/SPEC_01_CLOSEOUT.md",
+    "docs/design/evidence/README.md",
     "docs/agent/SOURCE_MAP.md",
     "docs/agent/SPEC_WRITING_AND_IMPLEMENTATION_PRINCIPLES.md",
     "docs/design/ALP_UI_CONSUMER_CONTRACT.md",
     "docs/design/UX_PARITY_MATRIX.md",
+    "docs/design/PROTOTYPE_ACCEPTANCE.md",
     "docs/design/references/alp-ui-showcase.png",
     "docs/design/prototypes/training-first/index.html",
     "docs/design/prototypes/training-first/app.js",
@@ -25,8 +29,6 @@ REQUIRED = (
     "docs/design/prototypes/training-first/wiki-preview.png",
     "docs/INTEGRATION_TEST_DATA.md",
     "docs/RELEASE_PROCESS.md",
-    "tests/data/README.md",
-    "tests/data/SHA256SUMS",
 )
 
 
@@ -42,6 +44,11 @@ def main() -> int:
     parser.add_argument(
         "--require-private", action="store_true", help="Assert private ZIP-only HPC files included"
     )
+    parser.add_argument(
+        "--require-native-ux",
+        action="store_true",
+        help="Require checked-in native macOS UI shots and README references (Spec 01 closeout)",
+    )
     args = parser.parse_args()
     errors: list[str] = []
     if args.require_private:
@@ -55,6 +62,47 @@ def main() -> int:
         specs = list((ROOT / "docs" / "specs").glob(f"{i:02d}-*.md"))
         if len(specs) != 1:
             errors.append(f"Expected exactly one spec {i:02d}; found {specs}")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    # Static docs validation only. Native provenance, UX parity and Git commits require
+    # human/CI evidence.
+    image_paths = re.findall(r"!\[[^\]]+\]\(([^)]+)\)", readme)
+    if len(image_paths) < 2:
+        errors.append("README must embed at least two truthful screenshot/design preview images")
+    for rel in image_paths:
+        if rel.startswith(("http://", "https://")):
+            continue
+        if not (ROOT / rel).is_file():
+            errors.append(f"README screenshot image missing: {rel}")
+    for command in (
+        "python3 -m venv .venv",
+        ".venv/bin/python -m pip install -e ../alp-ui",
+        ".venv/bin/python -m alpaca_desktop",
+    ):
+        if command not in readme:
+            errors.append(f"README missing expected local setup/run command: {command}")
+    if args.require_native_ux:
+        directory = ROOT / "docs/design/evidence/spec-01-native"
+        for name in (
+            "select.png",
+            "wiki.png",
+            "settings.png",
+            "empty-collections.png",
+            "empty-datasets.png",
+            "empty-models.png",
+            "empty-runs.png",
+            "select-narrow.png",
+        ):
+            shot = directory / name
+            if not shot.is_file() or shot.stat().st_size < 1024:
+                errors.append(f"Missing valid-sized persistent macOS Trainer screenshot: {shot}")
+            elif shot.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
+                errors.append(f"Not a real PNG: {shot}")
+            if f"docs/design/evidence/spec-01-native/{name}" not in readme and name == "select.png":
+                errors.append(
+                    "README must prominently embed real native Select Collection screenshot"
+                )
+        if "**Missing" in (ROOT / "docs/design/evidence/README.md").read_text(encoding="utf-8"):
+            errors.append("Native UX evidence ledger still contains Missing entries")
     ignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
     if not re.search(r"(?m)^docs/priv/$", ignore):
         errors.append("docs/priv/ must be ignored by Git")
@@ -85,7 +133,8 @@ def main() -> int:
         print(item, file=sys.stderr)
     print(
         f"Handoff audit: {len(REQUIRED)} tracked required files; 7 specs; "
-        f"private ZIP mode={args.require_private}; {len(errors)} errors."
+        f"private ZIP mode={args.require_private}; native UX gate={args.require_native_ux}; "
+        f"{len(errors)} errors."
     )
     return 1 if errors else 0
 
