@@ -1,0 +1,9 @@
+# All checked-in binary scientific fixtures use Git LFS, including the demo Collection.
+tests/data/**/*.wav filter=lfs diff=lfs merge=lfs -text
+tests/data/**/*.WAV filter=lfs diff=lfs merge=lfs -text
+tests/data/**/*.pt filter=lfs diff=lfs merge=lfs -text
+tests/data/**/*.pth filter=lfs diff=lfs merge=lfs -text
+tests/data/**/*.onnx filter=lfs diff=lfs merge=lfs -text
+tests/data/**/*.joblib filter=lfs diff=lfs merge=lfs -text
+tests/data/**/*.pkl filter=lfs diff=lfs merge=lfs -text
+tests/data/**/*.safetensors filter=lfs diff=lfs merge=lfs -text

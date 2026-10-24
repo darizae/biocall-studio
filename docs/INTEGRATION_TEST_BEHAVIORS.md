@@ -1,0 +1,78 @@
+# Indexed integration-test behaviors — Trainer
+
+All rows are **target acceptance criteria**, not claims of implementation or a passing test. Test functions that establish a row must contain its exact `IT-*` ID in the test-function docstring, cover each observable assertion, and execute successfully on the required real boundary. Detailed pure variants live in [`UNIT_TESTING.md`](UNIT_TESTING.md). Minimum differentiating resources are listed in [`INTEGRATION_TEST_DATA.md`](INTEGRATION_TEST_DATA.md).
+
+## 1. Shell and native UI (spec 01)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-UI-001` | Native Qt/`alp-ui` launches, Select Collection primary action and Wiki navigate; theme/resources render and back/focus navigation survives page changes. | TD-UI |
+| `IT-UI-002` | Test-isolated Application Settings retain valid Collection binding across restart and support explicit rebind; original input WAV bytes remain untouched. | TD-COL, TD-PATH |
+
+| `IT-UI-003` | Updated public `alp-ui` `FolderPicker` is used in actual native Select UI: folderChanged routes pending selection, cancellation leaves previous path/verification unchanged and does not start scan; accessible full path and keyboard operate. | TD-UI, TD-COL |
+| `IT-UI-004` | Prototype landing/Wiki/empty-state screen structure is exercised with installed `alp-ui` native Widgets, HelpHint accessible hover/keyboard help and actual Qt screenshots/route/Tab order compared with bundled previews and sibling Showcase (document deviations). No demo scientific completions. | TD-UI |
+
+## 2. Collection Scan and metadata (spec 02)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-COL-001` | Selecting a real valid folder starts nonblocking Reading Collection activity; progress and cancel are observable; overview shows correct counts/durations/source→positives mapping. | TD-COL, TD-WAV |
+| `IT-COL-002` | Missing folder, unsupported/nested entry, malformed positive/time/source mapping, duplicate/collision, unreadable WAV each yields exact relative-path error and blocks Build; no source files modified. | TD-COL, TD-WAV, TD-PATH |
+| `IT-COL-003` | Successful scan writes versioned `.alpaca/collection.json` and bounded JSONL partition metadata; reopens in a new app process/controller with identical validated facts. | TD-CACHE |
+| `IT-COL-004` | Add/remove/change positive or recording invalidates only affected cached entries; changed headers are reread, removed facts disappear, and Build refuses stale inputs. | TD-CACHE, TD-WAV |
+| `IT-COL-005` | Cancel, permission failure or interrupted metadata replacement cannot publish a false valid cache; next scan recovers; input bytes remain unchanged. | TD-CACHE, TD-FAIL |
+| `IT-COL-006` | Symlink escape/path containment and a moved/rebound Collection cannot bypass checks on read or cache hit; portable references contain no host-absolute path. | TD-PATH, TD-CACHE |
+| `IT-COL-007` | A generated large Collection index is paged through real Qt model; responsive navigation and bounded metadata/header I/O without full-recording decoding. | TD-SCALE |
+
+## 3. Dataset Build (spec 03)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-DB-001` | From validated Collection/config, actual Source Recording audio is seek-read into target/noise Dataset Snippets, with exact source intervals, labels, protected margins, manifest and reproducible grouped Splits. | TD-MINE, TD-SPLIT, TD-WAV |
+| `IT-DB-002` | Same inputs/config/seed produce equivalent Snippets/Splits/provenance (excluding new IDs); changed settings publish an independent Dataset and never rewrite the original. | TD-MINE, TD-SPLIT |
+| `IT-DB-003` | No eligible negatives, changed/missing source or invalid config fails cleanly; no completed Dataset appears, staged leftovers are safely identified, and originals remain byte-identical. | TD-MINE, TD-FAIL |
+| `IT-DB-004` | Dataset detail reopens complete immutable manifest, split counts and materialized files; deletion is explicit, rejects active input reservation and does not erase any existing Model. | TD-SPLIT, TD-RUN |
+
+## 4. Run and Worker boundary (spec 04)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-RUN-001` | Real QProcess Worker for Dataset Build moves through persisted starting/running/completed and valid final Artifact; Active Run remains navigable. | TD-RUN |
+| `IT-RUN-002` | Second requested Run conflicts while one active; locked input deletion/rebind conflicts; read-only browsing proceeds; terminal state releases reservation. | TD-RUN |
+| `IT-RUN-003` | Real cancellation and forced process loss produce cancelled/interrupted state after bounded reconciliation, no false published artifact and no eternal Active Run after restart. | TD-RUN, TD-FAIL |
+| `IT-RUN-004` | Artifact/staging name collision, corrupt publication or worker nonzero exit fails without overwriting a published Dataset/Model or promoting a stale output pointer. | TD-RUN, TD-FAIL |
+
+## 5. CNN and RF Training (spec 05)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-TRAIN-001` | Real CPU CNN Training via Worker on a published Dataset produces a loadable CNN Model/checkpoint, resolved config, train/val loss and valid Dataset provenance. | TD-TRAIN, TD-RUN |
+| `IT-TRAIN-002` | Real RF Training via Worker on the **same** Dataset produces loadable estimator, ordered/versioned features, actual validation metrics and meaningful family-specific progress. | TD-TRAIN, TD-RUN |
+| `IT-TRAIN-003` | Both Models reopen from manifests with stable IDs, readable labels, family display, Dataset reference, configurations and metrics; no inferred prediction support. | TD-TRAIN |
+| `IT-TRAIN-004` | Bad Dataset Split/feature mismatch, missing input or undefined metric is blocked/reported accurately; failed Run does not publish a Model or fabricated metric. | TD-TRAIN, TD-FAIL |
+| `IT-TRAIN-005` | Actual CNN epoch loss and actual RF ordered feature importance values reach `alp-ui` `Plot` using correct line/bar public APIs; plotted values/axes agree with saved real model/run metrics, with accessible numeric alternatives and family-specific meaning. | TD-TRAIN, TD-UI |
+| `IT-TRAIN-006` | Undefined/NaN/missing metric or importance is not passed to Plot as fictitious zero; no RF epoch loss graph, HelpHint and family controls remain accessible; Model detail explains unavailability. | TD-TRAIN, TD-UI, TD-FAIL |
+
+## 6. Native macOS installer and release gates (spec 06)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-E2E-001` | **Installed** native macOS package launches bundled UI/Worker, selects folder, builds Dataset, trains CNN/RF, restarts and opens published artifacts while leaving inputs intact. | TD-TRAIN, TD-UI |
+| `IT-MAC-001` | Versioned signed `.app` and installer `.dmg` verify correct bundle ID/embedded Qt and `alp-ui` resources, Developer ID signature/hardened runtime, notarization + stapling, Gatekeeper/quarantine first launch on supported Mac architecture. | TD-OS, TD-UI |
+| `IT-MAC-002` | Clean Mac installed-app launches its **bundled** Worker (not system Python), survives cancellation/restart and writes user state outside sealed app; folder chooser/help/plots/theme/resources work. | TD-OS, TD-RUN, TD-UI |
+| `IT-MAC-003` | Controlled release from exact tagged/approved commit emits installer with checksums/recorded dependency/SHA provenance and tested native E2E scientific outputs; missing signing/approval blocks promotion rather than advertising a public installer. | TD-OS, TD-TRAIN |
+
+## 7. Windows installer/qualification gates (spec 07)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-WIN-001` | Real Windows input paths, case/Unicode collision, reparse containment, file locks and atomic updates honor same Collection contract. | TD-OS, TD-PATH |
+| `IT-WIN-002` | Windows native Qt/`alp-ui` file picker/scan and packaged QProcess/Worker launch, cancel, recovery and theme/assets function. | TD-OS, TD-RUN |
+| `IT-WIN-003` | **Installed** Windows native package builds and reopens one real Dataset and both CNN/RF Models; verified portable relative provenance. | TD-OS, TD-TRAIN |
+| `IT-WIN-004` | Clean Windows installation/uninstallation of versioned `.exe` retains user Collection; packaged resources, release digest/security/signing and native Windows keyboard/DPI help/plot parity are verified. | TD-OS, TD-UI |
+
+## Audit rules
+
+- Do not claim any `IT-*` row covered merely because it appears in documentation, a mock UX, test docstring, scaffold test or CI report.
+- Report **covered / planned / blocked / deferred-native** by ID in implementation PRs, based on actual test assertions/results. Keep indexes stable; when adding behavior, first decide whether it is pure `UT-*` or real `IT-*`.
+- Run `python scripts/audit_test_ids.py` to locate undocumented IDs; inspect the tests and run them to establish coverage. Requirements for each spec are linked from [`specs/README.md`](specs/README.md).

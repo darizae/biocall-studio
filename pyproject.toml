@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "alpaca-desktop"
+version = "0.1.0a0"
+description = "Local Collection-first bioacoustics Dataset and Model trainer"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = []
+
+[project.optional-dependencies]
+gui = ["PySide6-Essentials>=6.11,<6.12"]
+test = ["pytest>=8.4,<10", "ruff>=0.14,<1"]
+integration = ["pytest-qt>=4.5,<5"]
+
+[project.scripts]
+alpaca-desktop = "alpaca_desktop.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/alpaca_desktop"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit", "tests/integration"]
+addopts = "-ra --strict-markers"
+markers = [
+  "integration: real filesystem or component boundary",
+  "qt: real Qt widget/model integration",
+  "packaged: native packaged executable",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["tests/data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
