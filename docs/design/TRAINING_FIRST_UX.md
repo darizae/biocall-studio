@@ -1,7 +1,5 @@
 # alpaca Desktop Trainer — Collection-first UX contract
 
-**Mandatory UI acceptance:** [Prototype fidelity gate](PROTOTYPE_ACCEPTANCE.md) applies to every spec that changes visible UI (including packaged installers). A missing screen/state, rearranged primary action, wrong navigation, unlabeled visual deviation or absent native screenshot evidence blocks that spec; using `alp-ui` alone is not proof of parity. Read only the active spec’s screen rows.
-
 **Target product:** native PySide6 application. **Design reference:** [interactive HTML prototype](prototypes/training-first/index.html) and screenshot assets in its folder. **Important:** the browser prototype validates selected WAV headers/names in its own limited sandbox but *simulates* Dataset Build, Training, Run progress, Dataset/Model publication and persisted collection metadata. The design does not establish scientific or native integration-test coverage. Requirements for actual behavior are in the canonical docs and numbered specs.
 
 ## 1. Primary journey
@@ -47,7 +45,7 @@ From validated sources, Dataset Build materializes immutable `target`/`noise` **
 - **CNN**: device, epochs, batch size, learning rate, architecture/transform settings and measured train/validation loss. Begin with a bounded CPU smoke path.
 - **Random Forest**: real acoustic feature extraction, tree count, minimum leaf count, max depth, threshold, deterministic seed and validation metrics; show feature importance and actual stage progress. Reuse/verify current `alpaca-pipelines` feature schema and fitting code rather than inventing an RF training API.
 
-Model details distinguish family-specific format, feature/transform schema, Dataset provenance, actual metrics (including not-defined reasons), stable artifact ID and editable display label only where the storage contract explicitly supports such editing. A Model is a reusable trained artifact **for this training application**; publication alone is not a promise of a prediction workflow.
+Model details distinguish family-specific format, feature/transform schema, Dataset provenance, actual metrics (including not-defined reasons), stable artifact ID and editable display label only where the storage contract explicitly supports such editing. A Model is an immutable trained artifact and MUST preserve complete future-consumer configuration and pass trusted structural reload validation for both CNN and RF. [Model export contract](../science/MODEL_EXPORT_CONTRACT.md) owns this Trainer requirement; **real audio inference/scoring is deferred** to the separate future [Prediction application](../PREDICTION.md). The native UX remains exactly the prototype.
 
 ## 5. Native interaction and architecture constraints
 
@@ -55,15 +53,6 @@ Use native local `alp-ui` Widgets components on PySide6: **`FolderPicker`** wrap
 
 The prototype demonstrates layout and copy, not a one-to-one native widget tree. It cannot save arbitrary `.alpaca/` files, access local directories outside user file-pick permissions, train either model family or guarantee OS process/permission semantics. Implement these at the native owners with tests.
 
-## 6. Acceptance evidence routing
+## Per-spec acceptance
 
-| Scope | Required docs/tests |
-|---|---|
-| Navigation, empty states, Settings | spec 01; `IT-UI-*`, `TD-UI` |
-| Real folder selection, fast validation, cache | spec 02; `UT-COL-*`, `IT-COL-*`, `TD-COL`/`TD-WAV`/`TD-CACHE`/`TD-SCALE` |
-| Protected mining, reproducible immutable Dataset | spec 03; `UT-DB-*`, `IT-DB-*`, `TD-MINE`/`TD-SPLIT` |
-| One Active Run, real Worker, recovery | spec 04; `UT-RUN-*`, `IT-RUN-*`, `TD-RUN` |
-| Real CNN/RF on identical Dataset, accurate metrics | spec 05; `UT-TRAIN-*`, `IT-TRAIN-*`, `TD-TRAIN` |
-| Native packaged macOS and Windows gates | spec 06; `IT-E2E-*`, `IT-WIN-*`, `TD-OS` |
-
-The browser smoke can confirm sample states and basic interaction flow, but every claimed scientific result must be independently produced by a passing real native test. The behavior ID indexes are a **plan** until such tests exist.
+Use the [screen ownership matrix](UX_PARITY_MATRIX.md) and [native evidence gate](PROTOTYPE_ACCEPTANCE.md). Spec 05's native-only **More settings** and Saved configurations are defined by the [configuration extension](SPEC05_CONFIGURATION_EXTENSION.md), [field catalog](../science/TRAINING_CONFIGURATION_CATALOG.md) and [preset contract](../science/TRAINING_PRESETS.md). The checked-in HTML prototype remains unchanged.

@@ -2,6 +2,29 @@
 
 **Mandatory, not advisory.** The executable [Trainer prototype](prototypes/training-first/index.html), its `app.js` interaction states, `styles.css` hierarchy and bundled `*-preview.png` screenshots define the **target user journey and screen composition**. The *current installed* sibling [`alp-ui` Showcase](ALP_UI_CONSUMER_CONTRACT.md) defines native Qt styling/component conventions. The [parity matrix](UX_PARITY_MATRIX.md) assigns individual screens/states to specs and test IDs. A coding agent may not replace the prototype with its own preferred layout, remove visible content, substitute a generic form, or declare "close enough" because it used `alp-ui` classes.
 
+Prototype inspection is source-first. Follow the active spec's UX matrix rows and search only relevant functions, states, CSS selectors and previews in docs/design/prototypes/training-first/. Do not launch browser automation by default. Use it only when an important interaction cannot be established from the bundled source and references. Native Qt screenshot capture and visual acceptance remain mandatory.
+
+## Focused prototype lookup — all implementation specs
+
+The table provides **optional starting points**, not prescribed inspection paths. The active [UX matrix row](UX_PARITY_MATRIX.md) can help identify a relevant view; the listed `app.js` symbols, approximate lines, matching `styles.css` selectors and bundled previews can help locate its behavior and appearance. For example, `rg -n '^function runPage\(' docs/design/prototypes/training-first/app.js` may be useful, but agents are free to inspect other functions, surrounding code or entire files whenever needed to understand and implement the interface faithfully. Line numbers are approximate and may move.
+
+| Spec | `app.js` starting points (approximate lines) |
+|---|---|
+| 01 — shell / empty views | `renderNav` (81), `empty` (96), `home` (97), `wikiPage` (274), `settingsPage` (275), `render` (282) |
+| 02 — scan / Collections | `showScan` (100), `cancelScan` (101), `scanSample` (103), `validateCollectionFiles` (123), `collectionsPage` / `collectionPage` (177–178) |
+| 03 — Dataset Build | `buildPage` (186), `setBuild` (190), `refreshBuildSummary` (191), `runBuild` (214), `datasetPage` / `datasetsPage` (244/248) |
+| 04 — Runs / Worker UX | `globalRun` (83), `createRun` (196), `advanceRun` (204), `cancelRun` / `confirmCancel` (225/228), `runPage` (230), `runsPage` (273) |
+| 05a — training config / presets | `openTraining` (253), `trainPage` (254), `setTrain` (257), `startTraining` (258); native-only extension is specified separately below |
+| 05b — CNN / shared Model | `trainPage` (254), `startTraining` (258), `lossChart` (239), `nameModel` / `saveModel` (262/266), `modelPage` (269) |
+| 05c — RF / both-family UX | `trainPage` (254), `rfChart` (238), `startTraining` (258), `modelPage` (269), `modelsPage` (272) |
+| 06–07 — installed releases | No separate prototype route; recheck only the implemented views/states from the applicable rows above in the **installed native app**. |
+
+**No Run-specific preview PNGs exist in this bundle.** For Spec 04, infer Run detail, active/cancelling/failed/completed states and Runs history from the relevant `app.js` functions and `styles.css`; use the existing preview PNGs only for the shared visual language. Do not search for or invent Run preview images. Spec 04.5 is upstream audio extraction and has no separate prototype view.
+
+## Native-only Spec 05 extension
+
+The HTML prototype remains unchanged and governs the baseline Training view. The **compact primary roster**, collapsed **More settings**, saved presets, current/default/recommended values and additive-state review are owned in [Spec 05 native configuration extension](SPEC05_CONFIGURATION_EXTENSION.md). For the new controls review the written brief and actual native evidence, **not imaginary prototype screens**. Material layout changes to the baseline require owner acceptance.
+
 ## Priority and acceptable differences
 
 1. **Prototype wins** for page structure, navigation destinations, section ordering, user-facing labels, hierarchy, state-dependent CTAs, empty/error/progress/finished views, contextual hints and feedback. Use the actual HTML/JS to inspect interactions, not just the landing PNG. A screen's reference includes its reachable states.
@@ -29,7 +52,7 @@
 | 02 | Reading/Scan, Collection overview, validation issues, corrected/rescanned valid state | `scanning.png`, `collection-valid.png`, `validation-errors.png`, `collection-narrow.png` | `IT-COL-008` |
 | 03 | Build config, estimate/underfill, Dataset list/detail, disabled/busy Build | `builder.png`, `builder-underfill.png`, `dataset-detail.png`, `builder-narrow.png` | `IT-DB-005` |
 | 04 | Active Run and sidebar, Run detail while working/cancelling/failed/completed, Runs history | `run-active.png`, `run-cancelling.png`, `run-failed.png`, `runs-history.png` | `IT-RUN-005` |
-| 05 | CNN/RF configuration, real training progress/plots, Model list/detail | `train-cnn.png`, `train-rf.png`, `run-cnn-plot.png`, `run-rf-plot.png`, `model-detail.png` | `IT-TRAIN-007` |
+| 05 | CNN/RF configuration, real training progress/plots, Model list/detail | `train-cnn.png`, `train-rf.png`, `train-cnn-advanced.png`, `train-rf-advanced.png`, `presets-list.png`, `presets-unsaved.png`, `presets-confirm-delete.png`, `run-cnn-plot.png`, `run-rf-plot.png`, `model-detail.png` | `IT-TRAIN-007` |
 | 06 | Installed macOS app reproduces all implemented screen groups, native dialogs/theme/fonts/resources and narrow sizes | `spec-06-installed/` comparison set of representative screens plus installed smoke log | `IT-MAC-004` |
 | 07 | Installed Windows app reproduces all implemented screens within native platform constraints (including DPI variants) | `spec-07-installed/` comparison set and DPI+keyboard review | `IT-WIN-005` |
 

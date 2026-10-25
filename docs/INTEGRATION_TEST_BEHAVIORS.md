@@ -28,7 +28,7 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 
 | Case ID | Public seam / expected result | Data |
 |---|---|---|
-| `IT-DB-001` | From validated Collection/config, actual Source Recording audio is seek-read into target/noise Dataset Snippets, with exact source intervals, labels, protected margins, manifest and reproducible grouped Splits. | TD-MINE, TD-SPLIT, TD-WAV |
+| `IT-DB-001` | From validated Collection/config, actual Source Recording audio is seek-read into **single-label** target/noise Dataset Snippets (exactly one of the two labels per Snippet), with exact source intervals, labels, protected margins, manifest and reproducible grouped Splits. | TD-MINE, TD-SPLIT, TD-WAV |
 | `IT-DB-002` | Same inputs/config/seed produce equivalent Snippets/Splits/provenance (excluding new IDs); changed settings publish an independent Dataset and never rewrite the original. | TD-MINE, TD-SPLIT |
 | `IT-DB-003` | No eligible negatives, changed/missing source or invalid config fails cleanly; no completed Dataset appears, staged leftovers are safely identified, and originals remain byte-identical. | TD-MINE, TD-FAIL |
 | `IT-DB-004` | Dataset detail reopens complete immutable manifest, split counts and materialized files; deletion is explicit, rejects active input reservation and does not erase any existing Model. | TD-SPLIT, TD-RUN |
@@ -50,23 +50,46 @@ cancellation/recovery and every `IT-RUN-*` case.
 | `IT-RUN-004` | Artifact/staging name collision, corrupt publication or worker nonzero exit fails without overwriting a published Dataset/Model or promoting a stale output pointer. | TD-RUN, TD-FAIL |
 | `IT-RUN-005` | Native Run detail/history/Active Run sidebar reflect prototype section ordering, progress, cancel, conflict and terminal states through real Worker events; keyboard navigation and native evidence pass six-dimension review. | TD-UI, TD-RUN, TD-FAIL |
 
-## 5. CNN and RF Training (spec 05)
+## 4.5 Upstream PCM/WAV extraction — **Spec 04.5**
+
+`IT-AUDIO-001`–`IT-AUDIO-004` are defined in [Spec 04.5](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md): real-WAV byte equivalence, cancel/error cleanup, already-published Dataset compatibility and actual Worker import from the committed sibling toolbox. The spec is their **single detailed acceptance owner**; do not duplicate its cases here. Use `TD-WAV`, `TD-PATH`, `TD-SPLIT`, `TD-FAIL`.
+
+## 5. CNN and RF Training + structurally reloadable Model exports (spec 05)
 
 | Case ID | Public seam / expected result | Data |
 |---|---|---|
-| `IT-TRAIN-001` | Real CPU CNN Training via Worker on a published Dataset produces a loadable CNN Model/checkpoint, resolved config, train/val loss and valid Dataset provenance. | TD-TRAIN, TD-RUN |
-| `IT-TRAIN-002` | Real RF Training via Worker on the **same** Dataset produces loadable estimator, ordered/versioned features, actual validation metrics and meaningful family-specific progress. | TD-TRAIN, TD-RUN |
+| `IT-TRAIN-001` | Real CPU **binary single-label two-class** CNN Training via Worker on a published Dataset produces a loadable CNN Model/checkpoint, resolved config, train/val loss and valid Dataset provenance. | TD-TRAIN, TD-RUN |
+| `IT-TRAIN-002` | Real two-class single-output RF Training via Worker on the **same** Dataset produces loadable estimator, ordered/versioned features, actual validation metrics and meaningful family-specific progress. | TD-TRAIN, TD-RUN |
 | `IT-TRAIN-003` | Both Models reopen from manifests with stable IDs, readable labels, family display, Dataset reference, configurations and metrics; no inferred prediction support. | TD-TRAIN |
 | `IT-TRAIN-004` | Bad Dataset Split/feature mismatch, missing input or undefined metric is blocked/reported accurately; failed Run does not publish a Model or fabricated metric. | TD-TRAIN, TD-FAIL |
 | `IT-TRAIN-005` | Actual CNN epoch loss and actual RF ordered feature importance values reach `alp-ui` `Plot` using correct line/bar public APIs; plotted values/axes agree with saved real model/run metrics, with accessible numeric alternatives and family-specific meaning. | TD-TRAIN, TD-UI |
 | `IT-TRAIN-006` | Undefined/NaN/missing metric or importance is not passed to Plot as fictitious zero; no RF epoch loss graph, HelpHint and family controls remain accessible; Model detail explains unavailability. | TD-TRAIN, TD-UI, TD-FAIL |
 | `IT-TRAIN-007` | Native CNN/RF configuration, training charts, Model list/detail faithfully follow prototype structure/hints/actions with current `alp-ui` Showcase styling, real metrics and accessible Plot alternatives; native screenshots and reviewed exception ledger pass. | TD-UI, TD-TRAIN |
 
+### Model export integrity (same Spec 05; no inference)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-TRAIN-008` | From **genuinely trained binary single-label CNN and RF** artifacts, require both exactly-two-class export declarations/checkpoint-or-estimator cardinality and explicit class order; a fresh process reads each published manifest and structurally reloads only trusted local checkpoint/estimator bytes; saved resolved CNN architecture/state/class/spectrogram config and RF feature names/order/config/`classes_` match actual training; contents remain portable and intact. If the toolbox was changed upstream, exercise the **reinstalled, correctly resolved toolbox revision** in the Trainer `.venv` and record its SHA alongside both repo test results. **No new-WAV inference/scoring.** | TD-TRAIN, TD-EXPORT, TD-RUN |
+| `IT-TRAIN-009` | Corrupt/omitted binary, changed hash, wrong model version, extra class, multi-label output/target schema, missing CNN transform/class, mismatched RF schema/class/feature order and unsafe path are rejected before publication or on reopening; no completed Model on failed Run and inputs unchanged. Packaged runtime never requires sibling source checkout; package-scoped tests use the wheel built from the recorded, committed toolbox SHA, not an editable developer install. | TD-EXPORT, TD-FAIL, TD-PATH |
+
+### Extended training configuration and saved presets — Spec 05
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-TRAIN-010` | Real native Train Model page first shows **only** documented primary CNN/RF fields and Run name (no 67-field dashboard); keyboard-accessible **More settings** starts collapsed and reveals **all** other CNN/RF catalog sections as small expandable family-specific groups. For every detailed editable field it displays current, default and suggested starting values with honest recommendation basis; derived fields say “Automatically determined”, and reset/modified indicators work. Closing/reopening preserves non-default edits. Real native Train Model page displays every supported CNN/RF catalog section; each field has functional focusable `alp-ui.HelpHint`, readable per-field tooltip, matching training-Wiki anchor and typed value. Select Dataset/Start Training placement preserves the existing prototype; advanced sections follow the documented **native-only extension** in `docs/design/SPEC05_CONFIGURATION_EXTENSION.md`. Native screenshots of collapsed/advanced forms and keyboard traversal are committed; **no altered HTML prototype** is used as fake evidence for these additions. | TD-CONFIG, TD-UI |
+| `IT-TRAIN-011` | Validate defaults that become unsuitable for a Dataset/device, and reject unsupported selections without silently changing suggested/current values. Confirm reset-to-default per field and for details, with controlled unsaved-edit feedback. Enter invalid numeric/cross-field/device/feature choices through native controls; error shown next to field, Worker cannot launch, typed values preserved for correction; no legacy source/data/model/noise path controls appear. | TD-CONFIG, TD-FAIL |
+| `IT-TRAIN-012` | Advanced/nondefault CNN and RF settings are passed to real supervised Workers and observed in the scientific executor, immutable Run spec, and Model export; unsupported/derived options neither silently change behavior nor misreport support. | TD-CONFIG, TD-TRAIN, TD-EXPORT |
+| `IT-TRAIN-013` | Save/load full detailed overrides while **More settings** is closed; after restart and switching families the overrides are retained and reappear on expansion. Qt create/load/rename/duplicate/overwrite/delete saved config, confirm destructive action, restart and restore actual user-settings files in isolated OS test directory, handle invalid/corrupt/incompatible config; current Dataset and family drafts remain correctly isolated. | TD-PRESET, TD-UI, TD-FAIL |
+| `IT-TRAIN-014` | Start genuine training from loaded preset; snapshot resolved config into Run independently of later preset edits/deletion, confirm scientific execution and immutable Model export remain unchanged after restart. | TD-PRESET, TD-TRAIN, TD-EXPORT |
+
+Future Prediction inference cases are **reserved exclusively** in [PREDICTION](PREDICTION.md), outside this Trainer test index or any Trainer release gate.
+
 ## 6. Native macOS installer and release gates (spec 06)
 
 | Case ID | Public seam / expected result | Data |
 |---|---|---|
-| `IT-E2E-001` | **Installed** native macOS package launches bundled UI/Worker, selects folder, builds Dataset, trains CNN/RF, restarts and opens published artifacts while leaving inputs intact. | TD-TRAIN, TD-UI |
+| `IT-E2E-001` | **Installed** native macOS package launches bundled UI/Worker, selects folder, builds Dataset, trains CNN/RF, restarts, opens published artifacts and **structurally reloads both Model formats using trusted local binary files** while leaving inputs intact. | TD-TRAIN, TD-UI |
 | `IT-MAC-001` | Versioned signed `.app` and installer `.dmg` verify correct bundle ID/embedded Qt and `alp-ui` resources, Developer ID signature/hardened runtime, notarization + stapling, Gatekeeper/quarantine first launch on supported Mac architecture. | TD-OS, TD-UI |
 | `IT-MAC-002` | Clean Mac installed-app launches its **bundled** Worker (not system Python), survives cancellation/restart and writes user state outside sealed app; folder chooser/help/plots/theme/resources work. | TD-OS, TD-RUN, TD-UI |
 | `IT-MAC-003` | Controlled release from exact tagged/approved commit emits installer with checksums/recorded dependency/SHA provenance and tested native E2E scientific outputs; missing signing/approval blocks promotion rather than advertising a public installer. | TD-OS, TD-TRAIN |
@@ -78,7 +101,7 @@ cancellation/recovery and every `IT-RUN-*` case.
 |---|---|---|
 | `IT-WIN-001` | Real Windows input paths, case/Unicode collision, reparse containment, file locks and atomic updates honor same Collection contract. | TD-OS, TD-PATH |
 | `IT-WIN-002` | Windows native Qt/`alp-ui` file picker/scan and packaged QProcess/Worker launch, cancel, recovery and theme/assets function. | TD-OS, TD-RUN |
-| `IT-WIN-003` | **Installed** Windows native package builds and reopens one real Dataset and both CNN/RF Models; verified portable relative provenance. | TD-OS, TD-TRAIN |
+| `IT-WIN-003` | **Installed** Windows native package builds and reopens one real Dataset and both CNN/RF Models, **structurally reloads both Model formats**; verified portable relative provenance. | TD-OS, TD-TRAIN |
 | `IT-WIN-004` | Clean Windows installation/uninstallation of versioned `.exe` retains user Collection; packaged resources, release digest/security/signing and native Windows keyboard/DPI help/plot parity are verified. | TD-OS, TD-UI |
 | `IT-WIN-005` | Installed Windows app retains prototype layout/interaction and native `alp-ui` styling at 100%/150% DPI plus keyboard/focus, with screenshots and explicit owner-reviewed native exceptions before installer promotion. | TD-OS, TD-UI |
 

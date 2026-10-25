@@ -1,0 +1,12 @@
+# Binary single-label classification — Trainer invariant
+
+**Scope:** every Dataset, Training configuration, CNN/RF Model export and user preset in **alpaca Desktop Trainer**. The scientific toolbox may implement richer classification modes; they are not enabled or exposed in this app. [Future Prediction](../PREDICTION.md) plans a consumer of these binary artifacts, not an inference feature in the Trainer.
+
+- **Exactly two mutually exclusive labels:** `target` (positive) and `noise` (candidate negative). Each materialized Snippet has exactly **one** hard class. No multi-hot vector, multiple class names per Snippet, third class, multi-output or multi-label task mode.
+- **Dataset:** persist stable, bijective class-to-index mapping for exactly these two labels, partition membership and source-time provenance. Reject malformed labels, missing mapping or class-order ambiguity before training.
+- **CNN:** configure a categorical **two-output, single-label** classifier/objective; `classifier.num_classes = 2` is derived and noneditable. Reject multi-label loss/activation/targets and unsupported toolbox modes. Persist output-column meaning in the Model.
+- **RF:** train a single-output binary `RandomForestClassifier`; estimator `classes_` must be exactly two labels with a documented mapping to the Dataset class indices and any probability columns. Reject multi-output or extra-class estimators. Persist ordered features, preprocessing and class order.
+- **Training UI and presets:** do not offer class count, task type, extra classes, multi-label toggles or alternate heads. Reject incompatible presets rather than silently converting them. Per-field validation and HelpHint/Wiki explanations must not imply these modes work.
+- **Model publication:** validate class cardinality, mapping consistency, trained head/estimator shape, serialized configuration and structural reload before publication. Saved artifacts must be usable by a future binary Prediction consumer without implicit class-order assumptions, **but no scoring on new audio is required now**.
+
+**Ownership and tests:** Dataset behavior belongs to [Spec 03](../specs/03-dataset-build.md) (`UT-DB-004` and relevant `IT-DB-*`); training, preset and export validation belongs to [Spec 05](../specs/05-cnn-and-rf-training.md) (`UT-TRAIN-001/005/006/009`, `IT-TRAIN-001/002/008/009`). These indexes define cases; the contract defines the invariant. Do not repeat this text in each test definition.

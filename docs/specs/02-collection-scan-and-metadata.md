@@ -1,5 +1,7 @@
 # 02 — Collection Scan, source-time validation and metadata
 
+**Scoped references:** [Collection/input rules](../models/WORKFLOW_RULES.md) §1; [Collection Wiki](../wiki/SELECTING_A_COLLECTION.md); [screen matrix](../design/UX_PARITY_MATRIX.md) (02 rows); [test IDs](../UNIT_TESTING.md) `UT-COL-*`, [integration IDs](../INTEGRATION_TEST_BEHAVIORS.md) `IT-COL-*`; [fixture classes](../INTEGRATION_TEST_DATA.md) as needed.
+
 ## User behavior
 
 **Select Collection → Reading Collection → Collection overview.** The chosen user folder contains direct `recordings/` and `positives/`. Display counts/durations, Source Recording-to-positive association, progress/cancel, and per-path **fixable** validation messages. The user can correct existing WAVs then rescan; Build Dataset is disabled unless the currently scanned inputs validate. Cache is stored at `Collection/.alpaca/`, not in a copied input tree.

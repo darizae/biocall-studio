@@ -1,27 +1,13 @@
-# 05 — CNN and Random Forest Training, Models
+# 05 — CNN and Random Forest training (phase router)
 
-## User behavior
+**Scoped references:** [05a — Configuration and presets](05a-training-configuration-and-presets.md) → [05b — CNN training and Model foundation](05b-cnn-training-and-model-foundation.md) → [05c — RF training and cross-family acceptance](05c-rf-training-and-cross-family-acceptance.md). **Prerequisite:** Start only after [04.5 — upstream audio extraction](SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) has **verified** acceptance; assess the actual checkout rather than inferring completion from this roadmap.
 
-Choose a published immutable Dataset and either **CNN** or **Random Forest** in one Train Model screen. Provide **family-specific** controls, show real progress/validation data, and after completion navigate to a Model detail page with readable label, stable ID, family, Dataset, resolved parameters, metrics and provenance. Reopen Models independently from their immutable directories. Do **not** expose inference/prediction as a target workflow.
+This file is a **stable entry point** for older Spec 05 links, not an additional implementation assignment. Route an agent to **only the first unaccepted sub-spec**, then follow that sub-spec's scoped references. Finish its tests, evidence and commit before starting the next; do not read all three as a default startup bundle.
 
-## Implement in order
+| Stage | Independent handoff | Deferred until later |
+|---|---|---|
+| [05a](05a-training-configuration-and-presets.md) | Native binary CNN/RF configuration, fully resolved typed drafts, detailed settings and user presets | Real training, Model publication, end-to-end preset-to-Worker checks |
+| [05b](05b-cnn-training-and-model-foundation.md) | Real CPU CNN through the Worker; common versioned Model publication and trusted CNN structural reload | RF execution and **joint** CNN/RF acceptance IDs |
+| [05c](05c-rf-training-and-cross-family-acceptance.md) | Real RF, complete both-family Model contract, plots, preset/Worker integration and Spec 05 qualification | Nothing in Spec 05 may be marked accepted until all applicable indexed gates pass |
 
-1. Resolve the intended **sibling** `../alpaca-pipelines` (exact lowercase, hyphenated sibling) using [`docs/agent/SOURCE_MAP.md`](../agent/SOURCE_MAP.md). Inspect **actual** present paths for audio input/channel/sample conversion, CNN trainer/checkpoint and RF features/ordered schema/estimator serialization; do not assume illustrative historical file paths exist. Pin source SHA, integration API/adapter and test scientific assumptions; never treat the reference pipeline Dataset format as identical to Trainer Snippets without proof.
-2. Make Dataset reader validate complete Snippet/Split manifests, existence, labels and grouping. Define one family-neutral immutable training input handoff plus family-specific transform contracts. Train only from `train`, validate on `val`; reject missing/incompatible input up front.
-3. CNN: bounded CPU baseline, optional actual GPU device, epoch count, batch size, learning rate, seed, architecture/preprocessing version; persist real checkpoint, loader metadata and **measured** per-epoch train/val losses.
-4. RF: fixed ordered, versioned acoustic-feature vector derived from the Dataset's WAV Snippets; tree count, minimum leaf count, maximum depth, classification threshold, seed. Persist estimator, feature schema/config, real validation metrics and feature importances where supported. Do not simulate CNN-style epoch loss for RF. Avoid loading untrusted pickles/joblib without explicit trust boundary; Models produced locally are trusted only according to app policy.
-5. Both family outputs use existing Run Worker/atomic publication and a portable `model.json` schema: `model_id`, label, `family` (`cnn`/`random_forest`), Dataset ID/portable relative refs, transformation schema/version, seed, exact resolved settings, class mapping, metrics (nullable undefined entries + reasons), model files/checksums and tool provenance. Test **actual reload** by the application's loader.
-6. Prevent leaking private absolute paths, undefined metrics and fabricated accuracies. Undefined ROC-AUC when `val` has only one class is reported as unavailable, never `0.0` by fiat.
-
-## Prototype-equivalent visual evidence with new `alp-ui` Plot
-
-Use sibling library public `Plot(kind="line")` and `.setLines()` for **measured finite** CNN epoch train/validation loss (x = epoch, y = loss) and `Plot(kind="bar")`/`.setBars()` for RF feature importances in actual feature-schema order. Neither Plot computes metrics nor performs training. Show an accessible numeric summary/DataTable of exact values alongside each plot; represent missing/undefined/NaN/infinite values with explicit text and no fabricated bars or zeroes. RF progress is fit/validate stages, **not** CNN-style epochs. Compose `HelpHint` beside difficult hyperparameters, use `NumberInput` and `SelectInput` for validated family-specific settings. Compare `rf-config-preview.png`, Training and `model-preview.png` with real Qt screenshots and Showcase styling. Assert `IT-TRAIN-005`, `IT-TRAIN-006` with real training outputs; synthetic in-memory plot values may only be used for isolated presentation-component tests.
-
-## Blocking prototype parity (native UI)
-
-**`IT-TRAIN-007`:** Match the prototype's CNN and RF configuration sections, parameter help and defaults/bounds, start action, training Run hierarchy, graph locations/labels, Model list and Model detail provenance, while using real `alp-ui` `Plot` and scientifically real outputs. RF must retain family-specific UI (no CNN-style epochs/loss); missing metrics remain explicitly unavailable. Write red `pytest-qt` route/section/field/help/plot-alternative tests and capture `spec-05-native/` shots `train-cnn.png`, `train-rf.png`, `run-cnn-plot.png`, `run-rf-plot.png`, `model-detail.png`. Compare against `rf-config-preview.png`, `model-preview.png` and the interactive prototype routes per [Prototype acceptance](../design/PROTOTYPE_ACCEPTANCE.md). Unapproved deviation blocks the spec even if both trainers produce valid model files.
-
-## Tests / exit
-
-- Unit: `UT-TRAIN-001`…`UT-TRAIN-004` for bounds, ordered feature shape, label metrics and manifest formats (`TD-TRAIN`).
-- Integration: `IT-TRAIN-001`…`IT-TRAIN-007`, with **one real published Dataset feeding both** real CPU CNN and real RF via QProcess; verify checkpoints/estimator reload, family-specific progress/metrics, error no-publish behavior and Model detail after restart. No mocked fit/Model artifact qualifies as these cases.
+**Global boundary:** exactly two mutually exclusive `target`/`noise` classes, single-label CNN/RF Training only. Preserve the HTML UX prototype; native additions use `alp-ui`. Published Models must retain the complete scientific configuration for **future** Prediction, but this phase performs **no new-WAV inference/scoring**; see [future Prediction](../PREDICTION.md). Canonical field, UX, export, science and test requirements are linked by the **owning sub-spec**, not repeated here.

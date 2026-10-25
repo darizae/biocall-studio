@@ -1,5 +1,7 @@
 # 04 — Scientific Runs and supervised Worker Process
 
+**Scoped references:** [Architecture](../ARCHITECTURE.md) §4; [Run state rules](../models/WORKFLOW_RULES.md) §4; [Run UX row](../design/UX_PARITY_MATRIX.md); indexed `UT-RUN-*` in [unit](../UNIT_TESTING.md), `IT-RUN-*` in [integration](../INTEGRATION_TEST_BEHAVIORS.md).
+
 ## User behavior
 
 Dataset Build and Training show dedicated **Run** progress/detail screens and history. The active task is visible from navigation; user can request cancellation. Running a second scientific operation or deleting/rebinding active inputs reports a conflict instead of corrupting data. On restart, interrupted work is reconciled with accurate persisted status.

@@ -56,4 +56,4 @@ The diagram describes canonical logical files, not preapproved Python class name
 
 ## Implementation separation
 
-`gui` displays selections and progress; `application` controls scan activity and one Active Run; `domain` decides identity/interval/validation/split rules; `computation` reads audio and trains; `workflows` constructs immutable outputs; `persistence` owns cache and atomic publications. Worker receives explicit versioned validated inputs, returns a staged/published result and does not reach into Qt widgets. No additional top-level scientific workflow exists.
+`gui` displays selections and progress; `application` controls scan activity and one Active Run; `domain` decides identity/interval/validation/split rules; installed `bioacoustics_dl_toolbox` owns reusable PCM/audio extraction and CNN algorithms; Trainer Qt-free workflows adapt these and verified RF scientific libraries; `workflows` constructs immutable outputs; `persistence` owns cache and atomic publications. Worker receives explicit versioned validated inputs, returns a staged/published result and does not reach into Qt widgets. No additional top-level scientific workflow exists.

@@ -31,6 +31,9 @@ The HPC is a **permissioned archive and scientific compatibility reference**, no
 | **TD-RUN** | startup/running/cancelled/failed/crashed/orphaned process; second Run; active input delete and stale output; collision | 03–06 |
 | **TD-FAIL** | permissions, disk full/injected write error, corrupt manifest, missing/deleted source, worker exit code, interruption at staging boundary | 02–05 |
 | **TD-TRAIN** | real small Dataset with train and val source groups, both `target` and `noise`; RF feature shape/schema mismatch; undefined val metric; minimal CPU CNN and RF with loadable outputs | 05–06 |
+| **TD-CONFIG** | complete typed CNN and RF configurations, all legacy non-path mapping assertions, default and advanced nondefault settings, unsupported/derived options, invalid FFT/bands/ranges, unavailable device, per-field Wiki anchors and HelpHint inventory; no reference filesystem paths | 05–07 |
+| **TD-PRESET** | temporary user preset store, two named CNN/RF presets, saved vs unsaved draft, conflicting names, rename/duplicate/delete/overwrite, invalid/obsolete schema, atomic write failure, reload after app restart and no original Dataset path in files | 05–07 |
+| **TD-EXPORT** | genuinely fit small CNN and RF Model binaries, fresh-process trusted deserialization, wrong artifact digest/version, missing spectrogram/normalization or class map, RF ordered feature names/config/`classes_` mismatch and portability; generated real WAV-backed Dataset as training input. No inference or unseen-audio scoring. | 05–07 |
 | **TD-OS** | actual native Windows/macOS paths, filesystem behavior, Qt/QProcess/installed native libs and signed/installed packaged resources | 06–07 |
 
 ## Concrete minimum generated Collection
@@ -46,7 +49,7 @@ case-study/
     REC_B__start-03000ms__end-04000ms__callB.wav
 ```
 
-Generate each positive WAV with matching source-time duration and appropriately distinguishable samples; `Collection Scan` itself does not compare samples, but scientific Dataset materialization tests **must** detect selection of wrong source/time. Use known sample counts and correct clipped intervals. For Training, add enough valid recording groups and balanced snippets to satisfy the family trainer and source-group split contract; tiny audio accuracy is not a model-quality claim. Use separate invalid-data tests to establish failures. No bulk real recording in version control just to test scan pagination; generate index data.
+Generate each positive WAV with matching source-time duration and appropriately distinguishable samples; `Collection Scan` itself does not compare samples, but scientific Dataset materialization tests **must** detect selection of wrong source/time. Use known sample counts and correct clipped intervals. For Training, add enough valid recording groups and balanced snippets to satisfy the family trainer and source-group split contract; tiny audio accuracy is not a model-quality claim. For **IT-TRAIN-008/009**, use the actual small WAV-backed training Dataset to produce real checkpoint/estimator bytes, then verify saved metadata and structural deserialization in a fresh process. Do not add inference-on-unseen-WAV tests to Trainer. Use separate invalid-artifact tests to establish failures. No bulk real recording in version control just to test scan pagination; generate index data.
 
 ## HPC helper safety and failure handling
 
