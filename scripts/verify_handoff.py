@@ -11,8 +11,9 @@ from urllib.parse import unquote
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = (
     "AGENTS.md",
-    "docs/HANDOFF.md",
     "docs/agent/ROUTING.md",
+    "docs/science/BINARY_CLASSIFICATION_CONTRACT.md",
+    "docs/specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md",
     "docs/agent/GIT_DELIVERY.md",
     "docs/specs/SPEC_01_CLOSEOUT.md",
     "docs/design/evidence/README.md",
@@ -109,9 +110,27 @@ def main() -> int:
     attrs = (ROOT / ".gitattributes").read_text(encoding="utf-8")
     if "tests/data/**/*.wav filter=lfs" not in attrs:
         errors.append("Binary scientific WAVs must be Git LFS tracked")
-    routing = (ROOT / "docs" / "agent" / "ROUTING.md").read_text(encoding="utf-8")
-    if "../alpaca-pipelines" not in routing or "../alp-ui" not in routing:
-        errors.append("Sibling repos not explicitly mapped in routing")
+    source_map = (ROOT / "docs" / "agent" / "SOURCE_MAP.md").read_text(encoding="utf-8")
+    if any(repo not in source_map for repo in ("../alpaca-pipelines", "../alp-ui", "../bioacoustics-dl-toolbox")):
+        errors.append("Sibling repos not explicitly mapped in source map")
+    # Token-budget guard: AGENTS is a universal entrypoint, not a per-spec manual.
+    entry = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    if len(entry.split()) > 450:
+        errors.append("AGENTS.md exceeds 450 words; move scoped requirements into the owning spec")
+    for scoped_name in ("TRAINING_CONFIGURATION_CATALOG", "TRAINING_PRESETS", "SPEC05_CONFIGURATION_EXTENSION"):
+        if scoped_name in entry:
+            errors.append(f"AGENTS.md contains spec-only route: {scoped_name}")
+    for spec_path in (
+        *(ROOT / "docs" / "specs").glob("[0-9][0-9]-*.md"),
+        ROOT / "docs" / "specs" / "SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md",
+    ):
+        if spec_path.exists() and "**Scoped references:**" not in spec_path.read_text(encoding="utf-8"):
+            errors.append(f"Missing spec-local scoped reference entry: {spec_path.relative_to(ROOT)}")
+    # Ensure the intermediate upstream phase is discoverable by the router and sequence.
+    for rel in ("docs/agent/ROUTING.md", "docs/IMPLEMENTATION_SEQUENCE.md"):
+        text = (ROOT / rel).read_text(encoding="utf-8")
+        if "SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md" not in text:
+            errors.append(f"Spec 04.5 is not routed from {rel}")
     # This catches ordinary relative Markdown links, not arbitrary dynamically-created code strings.
     for path in ROOT.rglob("*.md"):
         if "docs/priv" in path.relative_to(ROOT).as_posix():
@@ -132,7 +151,7 @@ def main() -> int:
     for item in errors:
         print(item, file=sys.stderr)
     print(
-        f"Handoff audit: {len(REQUIRED)} tracked required files; 7 specs; "
+        f"Handoff audit: {len(REQUIRED)} tracked required files; 8 phases (including 04.5); "
         f"private ZIP mode={args.require_private}; native UX gate={args.require_native_ux}; "
         f"{len(errors)} errors."
     )

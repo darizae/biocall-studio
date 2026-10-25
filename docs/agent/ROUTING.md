@@ -1,36 +1,33 @@
-# Agent routing — read less, implement one vertical
+# Task router — one spec, scoped references
 
-**Mandatory UI acceptance:** [Prototype fidelity gate](../design/PROTOTYPE_ACCEPTANCE.md) applies to every spec that changes visible UI (including packaged installers). A missing screen/state, rearranged primary action, wrong navigation, unlabeled visual deviation or absent native screenshot evidence blocks that spec; using `alp-ui` alone is not proof of parity. Read only the active spec’s screen rows.
+**Session start:** inspect `git status --short --branch`, latest commit, relevant source, test results and native evidence. Determine the actual next unaccepted phase; never assume the ZIP's timestamp or an old closeout note reflects live progress. Open **one spec** from this table. For phase 05, use [the 05 overview](../specs/05-cnn-and-rf-training.md) only if you need to identify the next unaccepted sub-spec; do not load all three. Each spec lists its additional references; follow those links **only when needed for the part being implemented**.
 
-**Entry point for the current follow-up session:** `AGENTS.md` → this page → [`Spec 01 closeout`](../specs/SPEC_01_CLOSEOUT.md). Spec 01 was attempted; do **not** automatically advance to 02 before native UX, user README, correct fixture policy and commit evidence is accepted. For an untouched project, begin with `docs/specs/01-shell-and-test-foundation.md`. **Do not pre-read every Markdown file.** This page is the short routing index; the active spec selects only the needed reference sections and case IDs.
+| Work being done | Start here |
+|---|---|
+| Native shell, Select Collection, Wiki, Settings, startup, initial empty states | [01](../specs/01-shell-and-test-foundation.md) |
+| Verified outstanding shell acceptance gap only | [01 closeout](../specs/SPEC_01_CLOSEOUT.md) |
+| Collection scan, WAV validation, metadata/cache | [02](../specs/02-collection-scan-and-metadata.md) |
+| Dataset snippets, negative mining, splits | [03](../specs/03-dataset-build.md) |
+| Run lifecycle, QProcess, cancellation/recovery | [04](../specs/04-runs-and-worker.md) |
+| Extract reusable PCM/WAV computation upstream | [04.5](../specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) |
+| Training configuration, detailed native UI, presets (**05a first**) | [05a](../specs/05a-training-configuration-and-presets.md) |
+| Real CNN training, shared Model publication/reload (**after 05a**) | [05b](../specs/05b-cnn-training-and-model-foundation.md) |
+| Real RF training, both-family qualification (**after 05b**) | [05c](../specs/05c-rf-training-and-cross-family-acceptance.md) |
+| macOS app and signed/notarized DMG | [06](../specs/06-macos-release-and-installer.md) |
+| Native Windows qualification and installer | [07](../specs/07-windows-release-and-installer.md) |
 
-| Task trigger / question | Open only | Do not open by default |
-|---|---|---|
-| Spec 01 closeout / README / screenshots / prototype fidelity / Showcase / Git commit | `docs/specs/SPEC_01_CLOSEOUT.md`; `docs/design/PROTOTYPE_ACCEPTANCE.md` (01 row); `docs/design/evidence/README.md`; `docs/agent/GIT_DELIVERY.md`; `README.md`; `IT-UI-001/003/004` | HPC / science specs / full docs tree |
-| First implementation from scratch / shell / folder picker / help / visual foundation | `docs/specs/01-shell-and-test-foundation.md`; `docs/design/PROTOTYPE_ACCEPTANCE.md` (01 row only); `docs/design/UX_PARITY_MATRIX.md` §§ baseline, Select; `docs/design/ALP_UI_CONSUMER_CONTRACT.md`; `IT-UI-*` in `docs/INTEGRATION_TEST_BEHAVIORS.md` | Science pipeline and HPC private material |
-| Collection scanning/errors/cache | Spec 02; `docs/design/PROTOTYPE_ACCEPTANCE.md` (02 row); `docs/models/WORKFLOW_RULES.md` § input; `docs/wiki/SELECTING_A_COLLECTION.md`; relevant `UT-COL-*`, `IT-COL-*` and `TD-COL/WAV/CACHE/PATH` rows | Training, packaging |
-| Dataset/mining/split | Spec 03; `docs/design/PROTOTYPE_ACCEPTANCE.md` (03 row); Workflow Rules § mining/split; `docs/agent/SOURCE_MAP.md` § Pipeline; matching `UT-DB-*`, `IT-DB-*` and `TD-MINE/SPLIT` | Windows release |
-| QProcess Runs/publication | Spec 04; `docs/design/PROTOTYPE_ACCEPTANCE.md` (04 row); `docs/ARCHITECTURE.md` relevant worker/persistence sections; `IT-RUN-*`, `TD-RUN/FAIL` | All visual reference images |
-| Model/training/charts | Spec 05; `docs/design/PROTOTYPE_ACCEPTANCE.md` (05 row); `docs/design/UX_PARITY_MATRIX.md` §§ training/model; `docs/agent/SOURCE_MAP.md` § Pipeline; `IT-TRAIN-*`, `TD-TRAIN` | HPC private access unless a missing example requires it |
-| Mac installer and controlled release | Spec 06; `docs/design/PROTOTYPE_ACCEPTANCE.md` (06 row); `docs/RELEASE_PROCESS.md`; `IT-MAC-*`, `IT-E2E-*` | Windows-specific tests |
-| Windows installer / qualification | Spec 07; `docs/design/PROTOTYPE_ACCEPTANCE.md` (07 row); `docs/RELEASE_PROCESS.md`; `IT-WIN-*` | macOS packaging implementation unless shared need |
-| Need fixed scientific fixture that cannot be synthesized | `docs/INTEGRATION_TEST_DATA.md` § permissioned fixture flow; *then* `docs/priv/hpc-source-access/SKILL.md` locally; relevant source map entry | SSH access or bulk archive browsing by default |
-| New domain term/schema | `docs/GLOSSARY.md`; the relevant model doc | All specs |
-| Test design/ID | `docs/UNIT_TESTING.md` **or** `docs/INTEGRATION_TESTING.md`, exact ID rows, corresponding `TD-*` rows; `docs/agent/indexed-integration-tests/SKILL.md` for indexed integration | Unrelated test classes |
+**Conditional lookups (not startup reading):**
 
-## Minimal session protocol
+| If the active work needs… | Open |
+|---|---|
+| A new domain term or invariant | [Glossary](../GLOSSARY.md) and relevant section of [workflow rules](../models/WORKFLOW_RULES.md) |
+| Cross-layer storage/worker ownership | Relevant section of [Architecture](../ARCHITECTURE.md) |
+| An indexed test, fixture class or HPC source | Exact rows in [unit index](../UNIT_TESTING.md), [integration index](../INTEGRATION_TEST_BEHAVIORS.md) and [fixture guide](../INTEGRATION_TEST_DATA.md); private HPC helper **only if authorized and necessary** |
+| Native UI work | Active spec's row in [UX matrix](../design/UX_PARITY_MATRIX.md) and [prototype acceptance](../design/PROTOTYPE_ACCEPTANCE.md); actual `../alp-ui` Showcase |
+| Scientific sibling implementation/source inspection | [Source map](SOURCE_MAP.md), restricted to affected symbols and tests |
+| Reusable library defect or upstream extraction | [Upstream toolbox workflow](UPSTREAM_TOOLBOX_WORKFLOW.md) |
+| First/last step of a spec or docs-only delivery | [Git delivery](GIT_DELIVERY.md) |
+| Design of a **new** spec (not ordinary implementation) | [Specification principles](SPEC_WRITING_AND_IMPLEMENTATION_PRINCIPLES.md) |
+| Future Prediction application planning only | [PREDICTION](../PREDICTION.md) — never an active Trainer implementation task |
 
-1. Inspect `git status`, active branch, target spec, relevant existing code and current public sibling API. If a ZIP contains no `.git`, report that Git history is unavailable; do not invent commit evidence. [Git delivery](GIT_DELIVERY.md) owns branch/commit/clean tree obligations. Log dependency availability; **do not scan entire docs tree or sibling repositories**.
-2. Consult the short [spec-writing principles](SPEC_WRITING_AND_IMPLEMENTATION_PRINCIPLES.md) as a checklist, not as an invitation to open all docs. Read domain invariants **at the boundary being changed**; use `rg` for a glossary term instead of bulk-loading everything.
-3. Remove stale scaffold UI/tests when they contradict the prototype during spec 01; keep only reusable architectural seams with newly justified assertions. Follow test-first red → green → cleanup for the active vertical, with an observable `IT-*` seam and no mocked substitute for scientific work. Mark missing native/HPC evidence as blocked, not green.
-4. Update owned spec, precise test ID rows and fixture register as needed in the same branch. Record screenshots/prototype parity evidence when UI changes.
-5. Summarize modified files, commands/actual results, native screenshot evidence vs prototype/Showcase (for UI specs), actual Git commit SHA and clean status, remaining gaps and next spec. Do not mark a spec accepted solely from temporary screenshots or a claimed previous test run. Do **not** begin the next numbered spec automatically.
-
-## Reference resolution, no implicit downloads
-
-- `../alp-ui`: checkout of the **current native Qt Widgets library**. Public API: `src/alp_ui/components/__init__.py`, `docs/components.md`; composition exemplar: `gallery/showcase.py` and `docs/images/showcase.png` (one snapshot also bundled at `docs/design/references/alp-ui-showcase.png`). If missing, report a local setup blocker, do not replace with a parallel widget library.
-- `../alpaca-pipelines`: **canonical lowercase hyphenated sibling directory name**. Verify it exists and record its Git SHA when specs 03/05 need it; if missing, report a setup blocker. Do not silently substitute another path, clone automatically or execute training on the HPC.
-- `docs/design/prototypes/training-first/index.html`: checked-in interactive **UX source of truth** for visible journey; its JavaScript simulates scientific work. Screenshot references are stored beside it. Crosswalk in `docs/design/UX_PARITY_MATRIX.md`.
-- `docs/priv/`: included in private handoff ZIP, **ignored by Git**. Never `git add -f docs/priv` or copy a private hostname/path into tracked materials.
-
-**Priority for a conflict:** required user prototype workflow and target specs > stale scaffold; Trainer domain/security rules govern scientific correctness; `alp-ui` public API governs how native controls are composed. Log unavoidable platform-specific visual divergences rather than silently changing the interaction.
+**Execution:** inspect existing behavior → write failing owned test(s) → implement smallest correct change → run real integration where required → update only impacted docs/evidence → commit and report. Do not read non-implicated `UT-*`, `IT-*`, or `TD-*` rows; do not scan entire sibling repos. A missing sibling dependency is a setup blocker, not permission to invent an alternative library.

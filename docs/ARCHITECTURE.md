@@ -14,14 +14,14 @@ Application Controller ─── Application Settings (local bindings/preference
    |                         |
    └──────────────> Qt-free workflows <─────────────
                               |
-                       domain + computation
+                       domain + verified scientific libraries
                               |
                        portable persistence
                               |
                Collection/.alpaca/ artifacts and Run State
 ```
 
-`domain/` defines source-time/identity/validation/negative windows/splits and pure Model Family schemas; `computation/` does bounded WAV reads, transforms and actual fitting; `workflows/` owns Dataset Build and Training transaction handoffs; `persistence/` parses/version-checks/writes portable files and guarantees publication; `application/` owns settings, scan task, Worker supervision, lifecycle, reservations and recovery; `gui/` uses Qt/`alp-ui` but contains no scientific calculations. Create modules on demand; this is a responsibility map, not a request to fabricate an empty package tree.
+`domain/` defines source-time/identity/validation/negative windows/splits and pure Model Family schemas; **reusable bounded audio extraction and CNN primitives are owned by the installed `bioacoustics_dl_toolbox`** after [Spec 04.5](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md); Trainer's Qt-free `workflows/` adapt verified audio/scientific APIs and own Dataset Build and Training transaction handoffs; `persistence/` parses/version-checks/writes portable files and guarantees publication; `application/` owns settings, scan task, Worker supervision, lifecycle, reservations and recovery; `gui/` uses Qt/`alp-ui` but contains no scientific calculations. Create modules on demand; this is a responsibility map, not a request to fabricate an empty package tree.
 
 ## 2. Storage and identity
 
@@ -70,6 +70,6 @@ Use reservations keyed by stable Collection/Dataset ID and paths: refuse second 
 ## 5. Libraries and portability
 
 - **UI:** local sibling `../alp-ui` native PySide6 Qt Widgets package, locally built/installed. Use its public components; QAbstractItemModel, file dialogs, threading/QProcess and navigation remain app responsibilities. No monkeypatching library internals or fetching a similarly named package as a replacement. See [`specs/README.md`](specs/README.md).
-- **Scientific reference:** selectively adapt `alpaca-pipelines` audio windows, Negative Mining, CNN fitting, RF acoustic feature extraction and RF classifier persistence after inspecting real APIs and scientific invariants. The Dataset/Model manifest schemas above are native contracts; a pipeline manifest or historical checkpoint is not automatically compatible.
+- **Scientific ownership:** `../bioacoustics-dl-toolbox` supplies reusable bounded audio extraction (after Spec 04.5), CNN training/model/checkpoint capabilities and any verified reusable scientific helpers. `../alpaca-pipelines` is a behavior/source reference for orchestration and RF features, **not** an automatic runtime dependency. Correct upstream library defects there, rather than leaving duplicated algorithms in Trainer. See [source map](agent/SOURCE_MAP.md). The Dataset/Model manifest schemas above are native contracts; a pipeline manifest or historical checkpoint is not automatically compatible.
 - **Platforms:** macOS is the active development/integration platform. Use `pathlib`, portable relative segments, executable discovery from the actual install, explicit WAV decode decisions and resource-safe shutdown. Windows-native filesystem case/lock, paths, QProcess, audio decoding, local `alp-ui` assets and packaged startup must be tested on a real Windows runner **before distribution**.
 - **Tests:** pure `UT-*` for rule decisions, actual `IT-*` for persistence, Qt, Worker, training and packaging. See the two indexes and `TD-*` class guide; documentation never implies tests have already passed.

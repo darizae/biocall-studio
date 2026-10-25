@@ -2,6 +2,10 @@
 
 **Mandatory, not advisory.** The executable [Trainer prototype](prototypes/training-first/index.html), its `app.js` interaction states, `styles.css` hierarchy and bundled `*-preview.png` screenshots define the **target user journey and screen composition**. The *current installed* sibling [`alp-ui` Showcase](ALP_UI_CONSUMER_CONTRACT.md) defines native Qt styling/component conventions. The [parity matrix](UX_PARITY_MATRIX.md) assigns individual screens/states to specs and test IDs. A coding agent may not replace the prototype with its own preferred layout, remove visible content, substitute a generic form, or declare "close enough" because it used `alp-ui` classes.
 
+## Native-only Spec 05 extension
+
+The HTML prototype remains unchanged and governs the baseline Training view. The **compact primary roster**, collapsed **More settings**, saved presets, current/default/recommended values and additive-state review are owned in [Spec 05 native configuration extension](SPEC05_CONFIGURATION_EXTENSION.md). For the new controls review the written brief and actual native evidence, **not imaginary prototype screens**. Material layout changes to the baseline require owner acceptance.
+
 ## Priority and acceptable differences
 
 1. **Prototype wins** for page structure, navigation destinations, section ordering, user-facing labels, hierarchy, state-dependent CTAs, empty/error/progress/finished views, contextual hints and feedback. Use the actual HTML/JS to inspect interactions, not just the landing PNG. A screen's reference includes its reachable states.
@@ -29,7 +33,7 @@
 | 02 | Reading/Scan, Collection overview, validation issues, corrected/rescanned valid state | `scanning.png`, `collection-valid.png`, `validation-errors.png`, `collection-narrow.png` | `IT-COL-008` |
 | 03 | Build config, estimate/underfill, Dataset list/detail, disabled/busy Build | `builder.png`, `builder-underfill.png`, `dataset-detail.png`, `builder-narrow.png` | `IT-DB-005` |
 | 04 | Active Run and sidebar, Run detail while working/cancelling/failed/completed, Runs history | `run-active.png`, `run-cancelling.png`, `run-failed.png`, `runs-history.png` | `IT-RUN-005` |
-| 05 | CNN/RF configuration, real training progress/plots, Model list/detail | `train-cnn.png`, `train-rf.png`, `run-cnn-plot.png`, `run-rf-plot.png`, `model-detail.png` | `IT-TRAIN-007` |
+| 05 | CNN/RF configuration, real training progress/plots, Model list/detail | `train-cnn.png`, `train-rf.png`, `train-cnn-advanced.png`, `train-rf-advanced.png`, `presets-list.png`, `presets-unsaved.png`, `presets-confirm-delete.png`, `run-cnn-plot.png`, `run-rf-plot.png`, `model-detail.png` | `IT-TRAIN-007` |
 | 06 | Installed macOS app reproduces all implemented screen groups, native dialogs/theme/fonts/resources and narrow sizes | `spec-06-installed/` comparison set of representative screens plus installed smoke log | `IT-MAC-004` |
 | 07 | Installed Windows app reproduces all implemented screens within native platform constraints (including DPI variants) | `spec-07-installed/` comparison set and DPI+keyboard review | `IT-WIN-005` |
 

@@ -1,8 +1,6 @@
 # Review principles — Trainer specs and implementation
 
-**Mandatory UI acceptance:** [Prototype fidelity gate](../design/PROTOTYPE_ACCEPTANCE.md) applies to every spec that changes visible UI (including packaged installers). A missing screen/state, rearranged primary action, wrong navigation, unlabeled visual deviation or absent native screenshot evidence blocks that spec; using `alp-ui` alone is not proof of parity. Read only the active spec’s screen rows.
-
-These are **operational checks**, not a demand for generic infrastructure. Apply only to task-owning seam; do not build unneeded abstractions to satisfy a checklist. Start from [`../GLOSSARY.md`](../GLOSSARY.md), [`../ARCHITECTURE.md`](../ARCHITECTURE.md), active spec and owned tests.
+These are **operational checks**, not a demand for generic infrastructure. Apply only to task-owning seam; do not build unneeded abstractions to satisfy a checklist. For a new cross-cutting specification, consult only affected terms in the [glossary](../GLOSSARY.md), boundaries in [architecture](../ARCHITECTURE.md), and owned tests.
 
 ## 1. Identify authoritative producer and consumer
 
@@ -22,9 +20,9 @@ For a multistage operation choose one typed handoff object with versioned valida
 
 A **scientific Run is not the same as a Scan**. Worker writes and verifies in private staging on the destination volume, then makes a new immutable directory visible atomically. Separately persist Run State and reconcile it with output validity, including crash/cancellation. No overwrite, implicit resume or optimistic success based on a process exit signal alone.
 
-## 4. Keep domain/computation/GUI responsibilities narrow
+## 4. Keep scientific libraries, domain and UI responsibilities narrow
 
-`domain` computes pure parsers, intervals, mining constraints, Split plan/config checks. `computation` loads WAV frames and trains; `workflows` orchestrates scientific outputs; `persistence` publishes and reloads; `application` owns background scan and one Active Run; `gui` renders and navigates. New cross-layer data contract belongs with the interface owner and uses meaningful names/units. Avoid duplicating logic in Qt callbacks, Worker, and test fixtures.
+`domain` computes pure parsers, intervals, mining constraints, Split plan/config checks. Reusable WAV extraction and CNN algorithms belong in `../bioacoustics-dl-toolbox` after Spec 04.5; `workflows` adapt verified scientific libraries and orchestrate app-specific outputs; `persistence` publishes and reloads; `application` owns background scan and one Active Run; `gui` renders and navigates. New cross-layer data contract belongs with the interface owner and uses meaningful names/units. Avoid duplicating logic in Qt callbacks, Worker, and test fixtures.
 
 Do not add repositories, ORM layers, HTTP, web endpoints, database migrations, distributed job/scheduler infrastructure, concurrency queues or decorative compatibility adapters. Specialized backend conventions may inform a principle but do **not** become app implementation requirements. Extract a shared helper on the second real consumer unless strong correctness evidence requires earlier sharing.
 
@@ -54,21 +52,4 @@ Read [`../UNIT_TESTING.md`](../UNIT_TESTING.md) before declaring a case integrat
 - [ ] New UI Components use actual local `alp-ui` API, not imagined library exports.
 - [ ] No unowned dependencies, artifact formats, user-facing workflows or compatibility assumptions slipped into scope.
 
-## Implementing-agent PR checklist
-
-- [ ] Search current project and relevant `alpaca-pipelines` source before adding code; cite inspected versions/signatures in PR.
-- [ ] Use glossary terms and canonical units across code/manifest/UI/test.
-- [ ] Enforce all invariants at the source/output boundary and cache authorization equivalence.
-- [ ] Record measured file-read/memory/page budget where I/O changes.
-- [ ] Verify stage → validated immutable publish, failure recovery, input unchanged and no silent overwrite.
-- [ ] Run focused `UT-*` and real macOS `IT-*`, audit exact IDs with `scripts/audit_test_ids.py`, report actual commands/results and uncovered/native-deferred gaps.
-- [ ] Maintain generated/fixed fixture policy, SHA-256/LFS provenance and the active spec in same PR.
-- [ ] For UX changes, persist native app screenshots and a prototype + `alp-ui` Showcase parity ledger, then update README with **truthful** native shots and `.venv` run commands.
-- [ ] Deliver a real branch/commit SHA with clean Git status, verified ignored private files and Git LFS; see [`GIT_DELIVERY.md`](GIT_DELIVERY.md).
-
-## Context efficiency and release obligations
-
-- Read `docs/agent/ROUTING.md`, **one active spec** and only the `UT-*`/`IT-*`/`TD-*` rows implicated by the work; use targeted searches rather than reading every Markdown or whole sibling repo. In first session, implement spec 01 only.
-- For GUI specs compare native Qt screenshots/interaction with bundled browser prototype and local `alp-ui` Showcase; use public `FolderPicker`, `HelpHint`, `Plot` as specified. Treat prototype fake science as illustrative only.
-- All scientific test-data changes update `tests/data/README.md` + `SHA256SUMS`, `FX-*` registry, Git LFS binary filters and affected case IDs. Never confuse synthetic WAV example with HPC-sourced provenance; use read-only private helper only on an approved gap.
-- Design frozen app/Worker launch for Mac `.dmg` and Windows `.exe` from the outset; only specs 06/07 establish sign/install/clean-machine gates. Never claim an installer exists because a packaging spec exists.
+For ordinary implementation, follow the [active spec](ROUTING.md), exact [test indexes](../INTEGRATION_TESTING.md) and [Git delivery](GIT_DELIVERY.md); do not load this checklist as a mandatory startup reference. Scientific upstream modifications follow the [toolbox workflow](UPSTREAM_TOOLBOX_WORKFLOW.md) only if justified.

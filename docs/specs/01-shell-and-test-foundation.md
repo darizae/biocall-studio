@@ -1,13 +1,8 @@
 # 01 — Prototype-faithful native shell and test foundation
 
-**Completion status (native closeout, 2026-10-24): COMPLETE.** The bounded
-[Spec 01 closeout](SPEC_01_CLOSEOUT.md) supplies prototype-faithful native UX, permanent Cocoa
-screenshots, README onboarding, verified fixtures/tests and Git delivery. This branch deliberately
-contains no Spec 02 implementation.
+**Scoped references:** [native component API](../design/ALP_UI_CONSUMER_CONTRACT.md); [prototype state matrix](../design/UX_PARITY_MATRIX.md) (01 rows); [acceptance procedure](../design/PROTOTYPE_ACCEPTANCE.md) (01 rows); [indexed UI cases](../INTEGRATION_TEST_BEHAVIORS.md) (`IT-UI-*`). [Closeout](SPEC_01_CLOSEOUT.md) only for a verified unresolved defect.
 
-## First session: required, bounded reading
-
-`AGENTS.md` → [`docs/agent/ROUTING.md`](../agent/ROUTING.md) → **this file** → [`docs/design/UX_PARITY_MATRIX.md`](../design/UX_PARITY_MATRIX.md) (Select/Wiki/empty rows) → [`docs/design/ALP_UI_CONSUMER_CONTRACT.md`](../design/ALP_UI_CONSUMER_CONTRACT.md). Inspect `../alp-ui/src/alp_ui/components/__init__.py`, `../alp-ui/gallery/showcase.py`, `../alp-ui/docs/images/showcase.png` and the actual prototype `../design/prototypes/training-first/index.html` and landing/wiki preview. For tests, read exact `IT-UI-*`, `UT-PATH-*` and `TD-UI/PATH/COL` rows. **Do not load alpaca-pipelines, HPC private instructions, all specs or all Markdown files in session one.**
+**Historical evidence (2026-10-24):** [Spec 01 closeout](SPEC_01_CLOSEOUT.md) documents prototype parity and native screenshots from that implementation stage. Verify the current checkout before assuming this remains accepted.
 
 ## User behavior and screen fidelity
 

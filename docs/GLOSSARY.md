@@ -18,9 +18,12 @@ Use these exact capitalized domain nouns in UI, code, docs, spec IDs and test de
 | **Dataset** | Immutable published artifact of Snippets, Split lists, manifest, parameters, seeds and Collection/input provenance. Multiple Models can use the same Dataset. |
 | **Training** | Scientific Run that fits one specified **Model Family** from a Dataset and publishes a Model after validating its output. |
 | **Model Family** | Algorithm category `cnn` or `random_forest`; determines settings, transforms, serializer/loader and appropriate metrics. Not a separate workflow. |
+| **Binary Single-Label Classification** | The **only** Trainer task: each Dataset Snippet is assigned exactly one of two mutually exclusive classes, `target` or `noise`. Model class mappings have exactly two indices. Library multi-label/multi-class capability is not enabled; see [binary scope](science/BINARY_CLASSIFICATION_CONTRACT.md). |
 | **CNN** | Convolutional neural network trained on compatible audio-derived tensors; may have per-epoch train/validation loss and device selection. |
 | **Random Forest (RF)** | Tabular feature classifier trained on a fixed versioned acoustic-feature schema. Report feature extraction, fitting, validation, feature importance and classifier metrics; not CNN loss curves. |
-| **Model** | Immutable published trained family-specific weights/estimator and a portable manifest (ID, human-readable label, Dataset ID, config, schema, metrics, provenance). |
+| **Model** | Immutable published trained family-specific weights/estimator and a portable manifest (ID, human-readable label, Dataset ID, config, schema, metrics, provenance **and versioned settings needed by a later Prediction consumer; structurally reloadable now**). |
+| **Model Export Contract** | Versioned manifest, binary artifacts, exact CNN architecture/transforms or RF ordered features, class map, integrity and provenance; structurally checked during Training. |
+| **Segment Scoring (future)** | Prediction-only operation on supplied bounded audio intervals using saved Model transforms; **not** a Trainer operation or acceptance test. See `docs/PREDICTION.md`. |
 | **Run** | Persisted scientific execution of either Dataset Build or Training with state/progress/logs/input reservations and optional published output pointer. |
 | **Active Run** | The single executing/starting/cancelling Run under Application Controller supervision; no queue. |
 | **Worker Process** | Separate OS process launched by QProcess using the current application environment; does heavy Dataset Build/Training work, not GUI operations. |
@@ -39,3 +42,11 @@ Use these exact capitalized domain nouns in UI, code, docs, spec IDs and test de
 - Use `start_ms`/`end_ms` for integer millisecond boundaries; sample/frame indexing is internal. Define conversions/rounding at the audio boundary.
 - A manifest should use `family: cnn` or `family: random_forest` consistently; user-facing names can be CNN / Random Forest.
 - When a new noun is truly required, add it here and update the producing/consuming docs, data schema and tests in the same change. Avoid speculative synonyms.
+
+## Training configuration terms
+
+- **Training Configuration:** all resolved, typed scientific settings for one model family, including transforms, optimizer/forest features, execution resources and validation rules; defined in [configuration catalog](science/TRAINING_CONFIGURATION_CATALOG.md).
+- **Saved Configuration / Training Preset:** user-named reusable **mutable** family-specific settings stored in OS application data, independent of any Dataset or Collection; [preset rules](science/TRAINING_PRESETS.md). Not a Model or a Run.
+- **Training Draft:** unsaved editable form values; loading or editing a preset does not update an existing Run.
+- **Resolved Run Configuration:** immutable, validated snapshot of all actual training parameters at Worker start; source of future-compatible Model metadata.
+- **Field Help / Wiki Anchor:** focused `alp-ui.HelpHint` plus an exact user-facing [Training Wiki](wiki/TRAINING_CONFIGURATION.md) entry per configuration field.

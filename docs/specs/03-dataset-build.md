@@ -1,5 +1,7 @@
 # 03 — Dataset Build, protected Negative Mining and Splits
 
+**Scoped references:** [Dataset rules](../models/WORKFLOW_RULES.md) §2; [binary labels](../science/BINARY_CLASSIFICATION_CONTRACT.md); [dataset UX row](../design/UX_PARITY_MATRIX.md); [indexed cases](../UNIT_TESTING.md) `UT-DB-*` / [integration](../INTEGRATION_TEST_BEHAVIORS.md) `IT-DB-*`. Use [source map](../agent/SOURCE_MAP.md) only to inspect a relevant upstream implementation.
+
 ## User behavior
 
 From a **currently validated Collection**, configure participating Source Recordings, negative mining count/seed/margin and train/val source-grouped ratio; review estimated target/noise counts and create an immutable Dataset. Dataset page shows actual materialized Snippet counts, split membership, settings and provenance, plus **Train Model** and explicit **Delete**. A build that cannot find eligible negative windows explains why and publishes no Dataset.
@@ -8,7 +10,7 @@ From a **currently validated Collection**, configure participating Source Record
 
 1. Revalidate selected input metadata/fingerprints and source containment at the start of Build. Use the Collection-derived `target` Annotations and selected sources, never interpret positive WAVs as directly reusable Dataset Snippets. Input WAVs remain read-only.
 2. Form protected source-time union of positives with margin clipped to recording bounds. Sample noise windows only outside protected intervals; one deterministic seed/attempt budget, record availability and report underfill without silently lowering requested numbers.
-3. Materialize `target` and `noise` Snippet WAVs using bounded seek/chunk reads of the Source Recording and an explicitly versioned channel/sample conversion policy. Record original source-time intervals, transformations, label, source fingerprint, producing Positive Example reference (targets) and seed/build config.
+3. Materialize `target` and `noise` Snippet WAVs using bounded seek/chunk reads of the Source Recording and an explicitly versioned channel/sample conversion policy. Record original source-time intervals, transformations, label, source fingerprint, producing Positive Example reference (targets) and seed/build config. **Binary single-label invariant:** every Snippet has exactly one of `target` or `noise` (never a class list or multiple labels), following [BINARY_CLASSIFICATION_CONTRACT](../science/BINARY_CLASSIFICATION_CONTRACT.md). Preserve a stable two-class mapping for later CNN/RF use.
 4. Allocate `train` and `val` **by Source Recording** and prevent leakage; reject or honestly explain impossible class/split coverage. Manifest and split CSVs are immutable after publication and use path-contained portable refs.
 5. Use workflow → staged output → verified manifest/Snippet/Split → exclusive publish. Integrate with one Active Run and Worker of spec 04 by a common handoff; do not create an alternate production “sync build” lifecycle.
 6. Dataset deletion is explicit, checks input reservations, never removes Models or user input audio, and reports resulting provenance limitations if a dependent Model remains.
