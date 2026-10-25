@@ -1,4 +1,6 @@
-# Native UX parity evidence — Spec 01
+# Native UX parity evidence
+
+## Spec 01 — shell and test foundation
 
 **Status: COMPLETE — ready for owner review.** The eight required Trainer views were captured
 from a visible native macOS Cocoa window and reviewed against the checked-in interactive
@@ -9,7 +11,7 @@ prototype and current sibling `alp-ui` Showcase. No blocking mismatch or native 
 - Command: `unset QT_QPA_PLATFORM; .venv/bin/python scripts/capture_spec01_screenshots.py`
 - Host: macOS 26.6.2 (25G83), arm64; native Cocoa platform; 1470×956 screen
 - App viewport: 1180×790 logical pixels for desktop views; 700×780 for narrow Select
-- Captured PNGs: 2360×1580 and 1400×1560 at device-pixel ratio 2.0; logical DPI 72
+- Stored PNGs: 1180×790 and 700×780; screen device-pixel ratio 2.0; logical DPI 72
 - Runtime: Python 3.12.7; PySide6/Qt 6.11.2; `alp-ui` 0.1.0a0
 - `alp-ui` sibling SHA: `330aaab96a6b32dd2d83ae84a52a2a238446d264`
 - Data/privacy: isolated temporary Application Settings, no selected Collection, no user paths
@@ -45,6 +47,46 @@ focus, cancel, scroll and resize; **S** empty/scientific state fidelity.
 [The bundled Showcase snapshot](../references/alp-ui-showcase.png) was reviewed for nav icons,
 selected/hover/focus treatment, typography, Cards, control density and Alpaca Light spacing. The
 live sibling `gallery/showcase.py` at the recorded SHA was also inspected.
+
+## Spec 02 — Collection Scan and metadata
+
+**Status: COMPLETE — ready for owner review.** Reading, invalid, corrected/rescanned valid and
+narrow Collection views were captured from a visible native macOS Cocoa window with a generated
+real PCM WAV Collection. No blocking mismatch or native exception remains.
+
+### Capture provenance
+
+- Command: `unset QT_QPA_PLATFORM; .venv/bin/python scripts/capture_spec02_screenshots.py`
+- Host: macOS 26.6.2 (25G83), arm64; native Cocoa platform; 1470×956 screen
+- App viewport/stored PNG: 1180×807 for desktop views; 700×780 for narrow Collection
+- Screen device-pixel ratio 2.0; logical DPI 72
+- Runtime: Python 3.12.7; PySide6/Qt 6.11.2; `alp-ui` 0.1.0a0
+- `alp-ui` sibling SHA: `330aaab96a6b32dd2d83ae84a52a2a238446d264`
+- Data/privacy: generated temporary mono PCM WAVs; isolated Application Settings; no user paths
+- Capture mechanism: visible `QMainWindow` plus Cocoa `QScreen.grabWindow`; not Qt offscreen
+
+The screenshot flow selects an invalid real-WAV Collection, captures Reading and its exact filename
+issue, renames that existing positive WAV to the required source-time grammar, clicks **Rescan
+Collection**, and captures the valid result. `IT-COL-001` and `IT-COL-008` separately assert the
+progress/cancel controls, navigation, CTA gating, keyboard activation, repair/rescan transition and
+compact layout. Screenshot capture is visual evidence, not a pixel-equality test.
+
+### State-by-state review
+
+Six-dimension key: **H** information hierarchy/CTA/panel order; **N** navigation/active state;
+**C** terms/copy/feedback; **A** `alp-ui` components/theme/icons/accessibility; **I** interaction,
+focus, cancel, scroll and resize; **S** empty/error/progress/scientific-state fidelity.
+
+| State | Prototype target | Native evidence | Showcase and interaction evidence | Six dimensions | Difference / disposition |
+|---|---|---|---|---|---|
+| Reading Collection | [Reading target](../prototypes/training-first/scanning-preview.png) | [scanning.png](spec-02-native/scanning.png) | `ProgressBar`, `Badge`, secondary Cancel; `IT-COL-001/005/008` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Native worker progress replaces browser timing; Reading remains a cancellable I/O activity, never an Active Run. |
+| Validation errors | [Validation target](../prototypes/training-first/validation-preview.png) | [summary](spec-02-native/validation-summary.png) · [exact issue detail](spec-02-native/validation-errors.png) | `Card`, warning `Alert`, paged `DataTable`; exact relative path/correction; disabled Build; `IT-COL-002/008` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Native Rescan is explicit beside Choose another folder. A second scrolled capture records the issue row because the native desktop height is shorter than the prototype preview. Browser-only manifest download is omitted because native metadata is published under `.alpaca/`. |
+| Corrected/rescanned valid Collection | [Collection target](../prototypes/training-first/collection-preview.png) | [summary](spec-02-native/collection-valid.png) · [validation detail](spec-02-native/collection-valid-detail.png) | Four-card summary, source→positive table, Folder and Fast reopening cards, Passed rows, primary Build; `IT-COL-001/003/004/008` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Counts/duration come from real WAV headers; cache says Ready only after manifest-last publication. The detail capture records all Passed rows. Waveform identity is expressly not claimed. |
+| Narrow Collection | [Responsive interactive target](../prototypes/training-first/index.html#/collection/c001) | [collection-narrow.png](spec-02-native/collection-narrow.png) | 700×780 viewport; two-by-two summary; stacked content; horizontal navigation and vertical page scroll; `IT-COL-008` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | The native horizontal scrollbar keeps all seven destinations reachable without clipping page content. |
+
+The [bundled Showcase snapshot](../references/alp-ui-showcase.png) and live sibling
+`gallery/showcase.py` were reviewed for Card density, DataTable headers/rows, status colors, focus
+treatment, control sizing and application-shell spacing.
 
 ## Every subsequent spec: mandatory ledger
 

@@ -7,9 +7,11 @@ from alp_ui.components import DataTable, FolderPicker, HelpHint
 from PySide6.QtCore import QAbstractItemModel, Qt
 from PySide6.QtWidgets import QApplication, QLabel
 
+from alpaca_desktop.application.collection_scan import scan_collection
 from alpaca_desktop.application.workspace import WorkspaceController
 from alpaca_desktop.gui.app import create_application
 from alpaca_desktop.gui.window import MainWindow
+from alpaca_desktop.persistence.collection_metadata import publish_collection_metadata
 
 pytestmark = [pytest.mark.integration, pytest.mark.qt]
 
@@ -31,15 +33,15 @@ def test_native_shell_routes_between_select_and_wiki(qapp, qtbot, workspace):
     assert window._navigation["wiki"].isChecked()
     assert not window._navigation["select"].isChecked()
     assert window.wiki_select_button.focusPolicy() != Qt.FocusPolicy.NoFocus
-    window.wiki_select_button.setFocus()
-    if QApplication.platformName() != "offscreen":
-        qtbot.waitUntil(window.wiki_select_button.hasFocus)
+    window.wiki_select_button.setFocus(Qt.FocusReason.OtherFocusReason)
+    qapp.processEvents()
+    assert window.focusWidget() is window.wiki_select_button
     window.wiki_select_button.click()
     assert window.current_route == "select"
     picker_button = window.select_page.folder_picker.choose_button
     assert picker_button.focusPolicy() != Qt.FocusPolicy.NoFocus
-    if QApplication.platformName() != "offscreen":
-        qtbot.waitUntil(picker_button.hasFocus)
+    qapp.processEvents()
+    assert window.focusWidget() is picker_button
 
 
 def test_folder_picker_keeps_pending_selection_when_native_dialog_is_cancelled(
@@ -68,22 +70,20 @@ def test_folder_picker_keeps_pending_selection_when_native_dialog_is_cancelled(
 
 
 def test_verified_collection_binding_reopens_and_explicitly_rebinds_without_touching_wavs(
-    workspace, qtbot, tmp_path
+    workspace, qtbot, tmp_path, collection_factory
 ):
     """Case: IT-UI-002."""
-    first = tmp_path / "first-collection"
-    second = tmp_path / "second-collection"
-    for collection in (first, second):
-        (collection / "recordings").mkdir(parents=True)
-        (collection / "positives").mkdir()
+    first = collection_factory(tmp_path / "first-collection", source_count=1)
+    second = collection_factory(tmp_path / "second-collection", source_count=1)
+    first_metadata = publish_collection_metadata(first, scan_collection(first))
+    second_metadata = publish_collection_metadata(second, scan_collection(second))
     wav = first / "recordings" / "REC_A.wav"
-    wav.write_bytes(b"source bytes must not change")
     before = wav.read_bytes()
 
-    workspace.bind_verified_collection(first)
+    workspace.bind_verified_collection(first, first_metadata.collection_id)
     reopened = WorkspaceController(workspace.settings_file.parent)
     assert reopened.collection_path == first
-    reopened.bind_verified_collection(second)
+    reopened.bind_verified_collection(second, second_metadata.collection_id)
     assert WorkspaceController(workspace.settings_file.parent).collection_path == second
     assert wav.read_bytes() == before
 

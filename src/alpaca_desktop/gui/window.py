@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 )
 
 from alpaca_desktop.application.workspace import WorkspaceController
+from alpaca_desktop.gui.collection import CollectionPage, ReadingCollectionPage
 
 _ROUTES = (
     ("select", "Select Collection", "plus"),
@@ -160,7 +161,14 @@ class SelectCollectionPage(QScrollArea):
         choose_layout.addWidget(local_note)
         card.content_layout.addWidget(choose_panel)
 
-        self.pending_alert = Alert("", title="Selection pending", intent="info")
+        self.retry_scan_button = Button("Scan again", variant="outline", size="small")
+        self.retry_scan_button.clicked.connect(controller.rescan)
+        self.pending_alert = Alert(
+            "",
+            title="Selection pending",
+            intent="info",
+            action=self.retry_scan_button,
+        )
         self.pending_alert.hide()
         card.content_layout.addWidget(self.pending_alert)
         outer.addWidget(card, 0, Qt.AlignmentFlag.AlignHCenter)
@@ -182,9 +190,7 @@ class SelectCollectionPage(QScrollArea):
         if pending is None:
             self.pending_alert.hide()
             return
-        message = (
-            f"{pending} is selected. Collection Scan and validation are unavailable until spec 02."
-        )
+        message = f"{pending.name} is selected and awaiting Collection validation."
         self.pending_alert.text_widget.setText(message)
         self.pending_alert.setAccessibleDescription(message)
         self.pending_alert.show()
@@ -452,7 +458,7 @@ class SettingsPage(QScrollArea):
 
 
 class MainWindow(QMainWindow):
-    """Native shell routes only; Dataset Build and Training remain unavailable."""
+    """Native Collection-first shell with background Scan navigation."""
 
     def __init__(self, controller: WorkspaceController):
         super().__init__()
@@ -479,12 +485,21 @@ class MainWindow(QMainWindow):
         self.body_layout.addWidget(self._build_global_header())
         self.pages = QStackedWidget()
         self.select_page = SelectCollectionPage(controller, lambda: self.navigate("wiki"))
+        self.scan_page = ReadingCollectionPage(controller)
+        self.collection_page = CollectionPage(
+            controller,
+            lambda: self.navigate("select"),
+            lambda: self.navigate("datasets"),
+            lambda: self.navigate("wiki"),
+        )
         self.wiki_page = WikiPage(lambda: self.navigate("select"))
         self.wiki_select_button = self.wiki_page.select_button
         self.settings_page = SettingsPage(controller)
         self.empty_pages: dict[str, EmptyState] = {}
         for route, page in (
             ("select", self.select_page),
+            ("scan", self.scan_page),
+            ("collection", self.collection_page),
             (
                 "collections",
                 self._empty_artifact_page(
@@ -517,7 +532,13 @@ class MainWindow(QMainWindow):
         self.body_layout.addWidget(self.pages, 1)
         self._root_layout.addWidget(body, 1)
         self.setCentralWidget(central)
+        controller.scan_started.connect(self._scan_started)
+        controller.scan_progress_changed.connect(self.scan_page.refresh)
+        controller.scan_completed.connect(self._scan_completed)
+        controller.scan_cancelled.connect(lambda: self.navigate("select"))
+        controller.scan_failed.connect(self._scan_failed)
         self.navigate("select")
+        controller.reopen_bound_collection()
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         super().resizeEvent(event)
@@ -678,14 +699,19 @@ class MainWindow(QMainWindow):
 
     def navigate(self, route: str) -> None:
         """Show a named route and place keyboard focus on its first meaningful action."""
+        if route == "collections" and self.controller.scan_result is not None:
+            route = "collection"
         if route not in self._pages:
             raise ValueError(f"Unknown route: {route}")
         self.current_route = route
         self.pages.setCurrentWidget(self._pages[route])
         colors = ALPACA_LIGHT.colors
         selected = interactions(ALPACA_LIGHT).selected_surface
+        active_route = (
+            "collections" if route == "collection" else "select" if route == "scan" else route
+        )
         for name, button in self._navigation.items():
-            current = name == route
+            current = name == active_route
             button.setChecked(current)
             button.setAccessibleDescription("Current page" if current else "")
             button.setIcon(
@@ -710,3 +736,26 @@ class MainWindow(QMainWindow):
             self.select_page.folder_picker.choose_button.setFocus()
         elif route == "wiki":
             self.wiki_select_button.setFocus()
+        elif route == "scan":
+            self.scan_page.cancel_button.setFocus()
+        elif route == "collection":
+            target = (
+                self.collection_page.build_button
+                if self.collection_page.build_button.isEnabled()
+                else self.collection_page.rescan_button
+            )
+            target.setFocus()
+
+    def _scan_started(self, root: str) -> None:
+        self.scan_page.begin(root)
+        self.navigate("scan")
+
+    def _scan_completed(self, result) -> None:
+        self.collection_page.set_result(result)
+        self.navigate("collection")
+
+    def _scan_failed(self, message: str) -> None:
+        self.navigate("select")
+        self.select_page.pending_alert.text_widget.setText(message)
+        self.select_page.pending_alert.setAccessibleDescription(message)
+        self.select_page.pending_alert.show()

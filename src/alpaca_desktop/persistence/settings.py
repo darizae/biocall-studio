@@ -12,6 +12,7 @@ class ApplicationSettings:
     """Only a verified Collection binding belongs in machine-local settings."""
 
     collection_path: Path | None = None
+    collection_id: str | None = None
 
 
 class SettingsStore:
@@ -28,20 +29,34 @@ class SettingsStore:
             return ApplicationSettings()
         except json.JSONDecodeError as exc:
             raise ValueError(f"Invalid Application Settings at {self.path}: {exc}") from exc
-        if not isinstance(raw, dict) or set(raw) != {"schema_version", "collection_path"}:
+        if not isinstance(raw, dict) or set(raw) != {
+            "schema_version",
+            "collection_path",
+            "collection_id",
+        }:
             raise ValueError(f"Unsupported Application Settings at {self.path}")
         collection_path = raw.get("collection_path")
-        if raw.get("schema_version") != 1 or (
+        collection_id = raw.get("collection_id")
+        if raw.get("schema_version") != 2 or (
             collection_path is not None
             and (not isinstance(collection_path, str) or not Path(collection_path).is_absolute())
+        ) or (
+            collection_id is not None
+            and (not isinstance(collection_id, str) or not collection_id)
         ):
             raise ValueError(f"Invalid Application Settings at {self.path}")
-        return ApplicationSettings(Path(collection_path) if collection_path else None)
+        if (collection_path is None) != (collection_id is None):
+            raise ValueError(f"Incomplete Collection binding at {self.path}")
+        return ApplicationSettings(
+            Path(collection_path) if collection_path else None,
+            collection_id,
+        )
 
     def save(self, settings: ApplicationSettings) -> None:
         raw = {
-            "schema_version": 1,
+            "schema_version": 2,
             "collection_path": str(settings.collection_path) if settings.collection_path else None,
+            "collection_id": settings.collection_id,
         }
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = None

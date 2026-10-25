@@ -28,3 +28,24 @@ Compose Collection overview/error tables with `alp-ui` `Card`, `Badge`, `Alert`,
 
 - Unit `UT-PATH-001`, `UT-PATH-002`, `UT-COL-001`…`UT-COL-006` (`TD-COL`, `TD-WAV`, `TD-CACHE`, `TD-PATH`).
 - Integration `IT-COL-001`…`IT-COL-007` (`TD-SCALE`, `TD-FAIL` additionally), with real WAV files and actual Qt controller/reopen. Demonstrate bounds, cancellation/repair, invalidation of removed entries, `size+mtime` freshness limitations, no input mutation, and paged large metadata, not simply an in-memory parser result.
+
+## Implementation evidence
+
+Implemented on `spec/02-collection-scan-and-metadata` with a typed Scan result shared by the
+application controller and one metadata publisher. The bounded native reader currently accepts
+nonempty mono/stereo PCM WAV with 8/16/24/32-bit samples; unsupported codecs are explicit
+per-path failures. First scan reads one header per encountered WAV. Reopen reuses header facts only
+when relative path, size and `mtime_ns` match; the documented cheap-fingerprint limitation remains
+visible and Dataset Build must add its stronger pre-publication verification.
+
+The application uses a cancellable `QThread` I/O task, manifest-last atomic cache publication,
+10,000-row/16 MiB JSONL partition ceilings, stable Collection identity, verified local binding,
+and paged Qt models. Source and positive WAVs remain unchanged. The scientific sibling was
+inspected at `91af5287dc18313f88902dc9696e8756274736b3`; its full-decode `soundfile` loaders do not
+fit this header-only boundary and were not copied or wrapped.
+
+Native macOS evidence and the six-dimension review are recorded in
+[`docs/design/evidence/README.md`](../design/evidence/README.md). The red import failure, focused
+unit/integration passes, full suite, static checks, fixture verification and screenshot command are
+the executed evidence for this branch; Windows and packaged-app qualification remain Specs 07 and
+06 respectively.

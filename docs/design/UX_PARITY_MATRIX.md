@@ -23,6 +23,11 @@ passed the six-dimension native review at the current sibling `alp-ui` SHA. See 
 [Cocoa screenshots and interaction ledger](evidence/README.md); `IT-UI-004` remains the behavioral
 assertion seam rather than a pixel-similarity claim.
 
+**Spec 02 evidence:** Reading, invalid Collection, corrected/rescanned valid Collection and narrow
+Collection views passed the six-dimension native review at the current sibling `alp-ui` SHA. See
+the tracked [Cocoa screenshots and interaction ledger](evidence/README.md); `IT-COL-008` asserts
+the real-WAV route, CTA, focus, repair/rescan and compact-layout behavior.
+
 ## Acceptance evidence, per UI spec
 
 1. Capture actual Qt screenshots for the screen states **implemented** in the spec using installed `alp-ui` on native macOS; **commit sanitized PNGs** to `docs/design/evidence/spec-01-native/` (or the appropriate spec evidence subdirectory) and update [`evidence ledger`](evidence/README.md). Compare side-by-side to matching prototype preview and Showcase; explicitly record fixed, intentional, and unresolved differences. A screenshot saved under pytest `tmp_path` with nonzero filesize is *not* permanent parity evidence.
