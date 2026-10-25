@@ -34,6 +34,8 @@ from PySide6.QtWidgets import (
 
 from alpaca_desktop.application.workspace import WorkspaceController
 from alpaca_desktop.gui.collection import CollectionPage, ReadingCollectionPage
+from alpaca_desktop.gui.dataset import DatasetBuilderPage, DatasetDetailPage, DatasetListPage
+from alpaca_desktop.persistence.datasets import delete_dataset, load_dataset
 
 _ROUTES = (
     ("select", "Select Collection", "plus"),
@@ -489,8 +491,14 @@ class MainWindow(QMainWindow):
         self.collection_page = CollectionPage(
             controller,
             lambda: self.navigate("select"),
-            lambda: self.navigate("datasets"),
+            self.open_builder,
             lambda: self.navigate("wiki"),
+        )
+        self.builder_page = DatasetBuilderPage(controller)
+        self.dataset_list_page = DatasetListPage(self.open_builder, self.open_dataset)
+        self.dataset_detail_page = DatasetDetailPage(
+            self._delete_dataset,
+            lambda: self.navigate("collection"),
         )
         self.wiki_page = WikiPage(lambda: self.navigate("select"))
         self.wiki_select_button = self.wiki_page.select_button
@@ -506,12 +514,9 @@ class MainWindow(QMainWindow):
                     "Collections", "Folders validated for local training.", "No Collections yet."
                 ),
             ),
-            (
-                "datasets",
-                self._empty_artifact_page(
-                    "Datasets", "Immutable examples built from a Collection.", "No Datasets yet."
-                ),
-            ),
+            ("datasets", self.dataset_list_page),
+            ("builder", self.builder_page),
+            ("dataset-detail", self.dataset_detail_page),
             (
                 "models",
                 self._empty_artifact_page(
@@ -529,6 +534,7 @@ class MainWindow(QMainWindow):
         ):
             self._pages[route] = page
             self.pages.addWidget(page)
+        self.empty_pages["datasets"] = self.dataset_list_page.empty
         self.body_layout.addWidget(self.pages, 1)
         self._root_layout.addWidget(body, 1)
         self.setCentralWidget(central)
@@ -537,6 +543,9 @@ class MainWindow(QMainWindow):
         controller.scan_completed.connect(self._scan_completed)
         controller.scan_cancelled.connect(lambda: self.navigate("select"))
         controller.scan_failed.connect(self._scan_failed)
+        controller.build_started.connect(self._build_started)
+        controller.build_completed.connect(self._dataset_built)
+        controller.build_failed.connect(self._build_failed)
         self.navigate("select")
         controller.reopen_bound_collection()
 
@@ -612,8 +621,7 @@ class MainWindow(QMainWindow):
         self.sidebar_layout.addWidget(self.sidebar_footer)
         return sidebar
 
-    @staticmethod
-    def _build_global_header() -> QFrame:
+    def _build_global_header(self) -> QFrame:
         header = QFrame()
         header.setObjectName("globalHeader")
         header.setStyleSheet(
@@ -628,10 +636,15 @@ class MainWindow(QMainWindow):
         active = QVBoxLayout()
         active.setSpacing(0)
         active.addWidget(Text("ACTIVE RUN", role="overline"))
-        active.addWidget(Text("No Active Run", role="body"))
+        self.active_run_label = Text("No Active Run", role="body")
+        active.addWidget(self.active_run_label)
         layout.addLayout(active)
         layout.addSpacing(18)
-        layout.addWidget(Badge("Idle", intent="neutral"))
+        self.idle_run_badge = Badge("Idle", intent="neutral")
+        self.working_run_badge = Badge("Working", intent="warning")
+        self.working_run_badge.hide()
+        layout.addWidget(self.idle_run_badge)
+        layout.addWidget(self.working_run_badge)
         layout.addStretch()
         return header
 
@@ -708,7 +721,13 @@ class MainWindow(QMainWindow):
         colors = ALPACA_LIGHT.colors
         selected = interactions(ALPACA_LIGHT).selected_surface
         active_route = (
-            "collections" if route == "collection" else "select" if route == "scan" else route
+            "collections"
+            if route == "collection"
+            else "select"
+            if route == "scan"
+            else "datasets"
+            if route in {"builder", "dataset-detail"}
+            else route
         )
         for name, button in self._navigation.items():
             current = name == active_route
@@ -745,6 +764,72 @@ class MainWindow(QMainWindow):
                 else self.collection_page.rescan_button
             )
             target.setFocus()
+        elif route == "datasets":
+            self.dataset_list_page.refresh(self.controller.collection_path)
+            target = (
+                self.dataset_list_page.table
+                if self.dataset_list_page.model.rowCount()
+                else self.dataset_list_page.empty.action_widget
+            )
+            target.setFocus()
+        elif route == "builder":
+            self.builder_page.build_button.setFocus()
+        elif route == "dataset-detail":
+            self.dataset_detail_page.delete_button.setFocus()
+
+    def open_builder(self) -> None:
+        result = self.controller.scan_result
+        if result is None or not result.valid or not self.controller.current_inputs_ready():
+            self.navigate("select")
+            return
+        self.builder_page.set_collection(result)
+        self.navigate("builder")
+
+    def open_dataset(self, dataset_id: str) -> None:
+        root = self.controller.collection_path
+        if root is None:
+            self.navigate("datasets")
+            return
+        try:
+            artifact = load_dataset(root, dataset_id)
+        except (OSError, ValueError) as exc:
+            self.dataset_list_page.error_alert.text_widget.setText(str(exc))
+            self.dataset_list_page.error_alert.show()
+            self.navigate("datasets")
+            return
+        self.dataset_detail_page.set_dataset(root, artifact)
+        self.navigate("dataset-detail")
+
+    def _dataset_built(self, artifact) -> None:
+        self._set_run_header_idle()
+        self.builder_page.set_busy(False)
+        root = self.controller.collection_path
+        if root is None:
+            return
+        self.dataset_list_page.refresh(root)
+        self.dataset_detail_page.set_dataset(root, artifact)
+        self.navigate("dataset-detail")
+
+    def _build_started(self) -> None:
+        self.active_run_label.setText("Dataset Build")
+        self.idle_run_badge.hide()
+        self.working_run_badge.show()
+
+    def _build_failed(self, _message: str) -> None:
+        self._set_run_header_idle()
+
+    def _set_run_header_idle(self) -> None:
+        self.active_run_label.setText("No Active Run")
+        self.working_run_badge.hide()
+        self.idle_run_badge.show()
+
+    def _delete_dataset(self, dataset_id: str) -> None:
+        root = self.controller.collection_path
+        if root is None:
+            return
+        delete_dataset(root, dataset_id)
+        self.dataset_list_page.refresh(root)
+        self.navigate("datasets")
 
     def _scan_started(self, root: str) -> None:
         self.scan_page.begin(root)

@@ -34,6 +34,12 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-DB-004` | Dataset detail reopens complete immutable manifest, split counts and materialized files; deletion is explicit, rejects active input reservation and does not erase any existing Model. | TD-SPLIT, TD-RUN |
 | `IT-DB-005` | Native Builder/Dataset views match prototype recording selection, controls/hints, count preview, disabled/underfill and Dataset detail/list flows; real config/Run state, accessible Qt interactions and native evidence pass six-dimension review. | TD-UI, TD-MINE, TD-SPLIT |
 
+Spec 03 implementation evidence: `tests/integration/test_dataset_build.py` asserts all five rows at
+their real artifact, QProcess and native-widget seams. The tracked Cocoa comparison set and
+six-dimension review are in [`design/evidence/spec-03-native/`](design/evidence/spec-03-native/) and
+the [evidence ledger](design/evidence/README.md). Spec 04 still owns persisted Run lifecycle,
+cancellation/recovery and every `IT-RUN-*` case.
+
 ## 4. Run and Worker boundary (spec 04)
 
 | Case ID | Public seam / expected result | Data |

@@ -503,7 +503,8 @@ def test_collection_ui_repair_rescan_cta_focus_and_narrow_layout(
     assert window.collection_page.build_button.isEnabled()
     assert controller.collection_path == root.resolve()
     window.collection_page.build_button.click()
-    assert window.current_route == "datasets"
+    assert window.current_route == "builder"
+    assert window.builder_page.source_model.selected_count == 1
 
     window.resize(700, 780)
     window.navigate("collections")

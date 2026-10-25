@@ -1,9 +1,13 @@
 """Collection selection, background Scan, and machine-local verified binding."""
 
+import json
+import os
+import sys
+import tempfile
 from pathlib import Path
 from threading import Event
 
-from PySide6.QtCore import QObject, QStandardPaths, QThread, Signal
+from PySide6.QtCore import QObject, QProcess, QStandardPaths, QThread, Signal
 
 from alpaca_desktop.application.collection_scan import (
     CollectionScanCancelled,
@@ -12,11 +16,14 @@ from alpaca_desktop.application.collection_scan import (
     scan_collection,
 )
 from alpaca_desktop.domain.collection import ScanResult
+from alpaca_desktop.domain.dataset import BuildConfig
 from alpaca_desktop.persistence.collection_metadata import (
     load_collection_metadata,
     publish_collection_metadata,
 )
+from alpaca_desktop.persistence.datasets import DatasetArtifact, load_dataset
 from alpaca_desktop.persistence.settings import ApplicationSettings, SettingsStore
+from alpaca_desktop.workflows.dataset_build import DatasetBuildRequest
 
 
 class _CollectionScanThread(QThread):
@@ -66,6 +73,9 @@ class WorkspaceController(QObject):
     scan_completed = Signal(object)
     scan_failed = Signal(str)
     scan_cancelled = Signal()
+    build_started = Signal()
+    build_completed = Signal(object)
+    build_failed = Signal(str)
 
     def __init__(
         self,
@@ -93,6 +103,9 @@ class WorkspaceController(QObject):
         self._scan_root: Path | None = None
         self._replacement_scan_root: Path | None = None
         self._scan_step_delay_seconds = scan_step_delay_seconds
+        self.is_building = False
+        self._build_process: QProcess | None = None
+        self._build_request_path: Path | None = None
         try:
             self._settings = self._store.load()
         except (OSError, ValueError) as exc:
@@ -161,6 +174,109 @@ class WorkspaceController(QObject):
         if self.scan_result is None or not self.scan_result.valid or self._scan_root is None:
             return False
         return inputs_match_scan(self._scan_root, self.scan_result)
+
+    def start_dataset_build(self, config: BuildConfig) -> None:
+        """Launch the typed Dataset Build handoff in the current app environment."""
+        if self.is_building:
+            raise ValueError("Only one Active Run is allowed; no build queue is available.")
+        if (
+            self.scan_result is None
+            or self.collection_path is None
+            or not self.current_inputs_ready()
+        ):
+            raise ValueError("Rescan the Collection before Dataset Build.")
+        request = DatasetBuildRequest(str(self.collection_path), config)
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            prefix="alpaca-dataset-build-",
+            suffix=".json",
+            delete=False,
+        ) as stream:
+            json.dump(request.to_dict(), stream)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+            self._build_request_path = Path(stream.name)
+
+        process = QProcess(self)
+        self._build_process = process
+        process.setProcessChannelMode(QProcess.ProcessChannelMode.SeparateChannels)
+        process.finished.connect(self._on_build_finished)
+        process.errorOccurred.connect(self._on_build_process_error)
+        if getattr(sys, "frozen", False):
+            process.setProgram(sys.executable)
+            process.setArguments(
+                ["--worker", "dataset-build", "--request", str(self._build_request_path)]
+            )
+        else:
+            process.setProgram(sys.executable)
+            process.setArguments(
+                [
+                    "-m",
+                    "alpaca_desktop",
+                    "--worker",
+                    "dataset-build",
+                    "--request",
+                    str(self._build_request_path),
+                ]
+            )
+        self.is_building = True
+        self.build_started.emit()
+        process.start()
+
+    def _on_build_finished(self, exit_code: int, _status) -> None:
+        process = self._build_process
+        if process is None:
+            return
+        stdout = bytes(process.readAllStandardOutput()).decode(errors="replace")
+        stderr = bytes(process.readAllStandardError()).decode(errors="replace").strip()
+        self.is_building = False
+        self._cleanup_build_request()
+        self._build_process = None
+        process.deleteLater()
+        if exit_code != 0:
+            message = stderr.rsplitlines()[-1] if stderr else "Dataset Build Worker failed."
+            self.error_message = message
+            self.build_failed.emit(message)
+            return
+        try:
+            payload = json.loads(
+                next(line for line in reversed(stdout.splitlines()) if line.strip())
+            )
+            artifact: DatasetArtifact = load_dataset(self.collection_path, payload["dataset_id"])
+        except (
+            KeyError,
+            StopIteration,
+            OSError,
+            TypeError,
+            ValueError,
+            json.JSONDecodeError,
+        ) as exc:
+            message = f"Dataset Build Worker returned an invalid published output: {exc}"
+            self.error_message = message
+            self.build_failed.emit(message)
+            return
+        self.error_message = ""
+        self.build_completed.emit(artifact)
+
+    def _on_build_process_error(self, error) -> None:
+        if error != QProcess.ProcessError.FailedToStart or not self.is_building:
+            return
+        self.is_building = False
+        self._cleanup_build_request()
+        process = self._build_process
+        self._build_process = None
+        if process is not None:
+            process.deleteLater()
+        message = "Dataset Build Worker could not start from the current application environment."
+        self.error_message = message
+        self.build_failed.emit(message)
+
+    def _cleanup_build_request(self) -> None:
+        if self._build_request_path is not None:
+            self._build_request_path.unlink(missing_ok=True)
+            self._build_request_path = None
 
     def _start_scan(self, root: Path) -> None:
         if self.is_scanning:

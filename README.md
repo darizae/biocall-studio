@@ -3,16 +3,16 @@
 **A local desktop application for preparing supervised bioacoustics datasets and training CNN or Random Forest models.** Designed for working with existing WAV collections on your computer, without importing or moving your recordings.
 
 > **Development preview:** The PySide6 application implements native Collection selection,
-> cancellable WAV-header scanning, validation, cache publication and reopen. Dataset building,
-> CNN/RF training, and installers are still planned. Never interpret a simulated browser run as
-> scientific output.
+> cancellable WAV-header scanning, validation, cache publication and immutable Dataset Build with
+> protected Negative Mining and source-grouped Splits. CNN/RF training, persisted Run recovery and
+> installers are still planned. Never interpret a simulated browser run as scientific output.
 
 ## What you can do
 
 Choose an existing folder with `recordings/` and `positives/`, scan real WAV headers without
-copying audio, fix per-file validation issues, and reopen published Collection metadata. Once the
-remaining specs are implemented, the app will assemble an immutable Dataset and train a CNN or
-Random Forest locally with traceable artifacts.
+copying audio, fix per-file validation issues, reopen published Collection metadata, and build a
+verified immutable Dataset of real target/noise WAV Snippets. Dataset Build keeps each Source
+Recording wholly in train or val. A later spec will train CNN or Random Forest models locally.
 
 **Input folder example:**
 
@@ -29,8 +29,9 @@ Positive filename timestamps refer to the *original Source Recording* and are ex
 ## Current native application
 
 These are real PySide6 application captures from macOS using the sibling `alp-ui` checkout. They
-show the currently implemented native shell and Collection Scan. No simulated Dataset, Model, Run
-or scientific result is presented.
+show the currently implemented native shell, Collection Scan and Dataset Build. Counts and files in
+the Dataset views come from generated real PCM WAV inputs; no simulated Model or training metric is
+presented.
 
 **Select a Collection — native macOS app**
 
@@ -48,9 +49,17 @@ or scientific result is presented.
 
 ![Native macOS Collection validation errors](docs/design/evidence/spec-02-native/validation-errors.png)
 
+**Dataset Builder with real protected-window estimates — native macOS app**
+
+![Native macOS Dataset Builder](docs/design/evidence/spec-03-native/builder.png)
+
+**Verified immutable Dataset detail — native macOS app**
+
+![Native macOS Dataset detail](docs/design/evidence/spec-03-native/dataset-detail.png)
+
 The complete [native evidence set and parity review](docs/design/evidence/README.md) also covers
-Reading/cancel, Settings, all four initial empty routes, keyboard interactions and narrow resized
-windows.
+Reading/cancel, Settings, all four initial empty routes, Builder underfill/busy states, Dataset
+list/detail navigation, keyboard interactions and narrow resized windows.
 
 ## Interactive design reference
 
@@ -114,8 +123,8 @@ git lfs install
 
 Read [AGENTS.md](AGENTS.md) → [agent routing](docs/agent/ROUTING.md) → **only the active spec** in [specs index](docs/specs/README.md). Do **not** read the entire documentation tree by default.
 
-**Current milestone:** [Spec 02 Collection scanning](docs/specs/02-collection-scan-and-metadata.md)
-is implemented with native evidence and is the review boundary for this branch. Dataset Build,
-Training, macOS and Windows installer specs remain later work.
+**Current milestone:** [Spec 03 Dataset Build](docs/specs/03-dataset-build.md) is implemented with
+real-WAV integration coverage and native evidence. Persisted Run supervision, Training, macOS and
+Windows installer specs remain later work.
 
 Reference map (open only for the task at hand): [vision](docs/VISION.md), [glossary](docs/GLOSSARY.md), [domain workflow](docs/models/USER_WORKFLOWS_AND_DATA_MODEL.md), [workflow rules](docs/models/WORKFLOW_RULES.md), [architecture](docs/ARCHITECTURE.md), [UX parity](docs/design/UX_PARITY_MATRIX.md), [scientific sibling source map](docs/agent/SOURCE_MAP.md), [unit testing](docs/UNIT_TESTING.md), [integration testing](docs/INTEGRATION_TESTING.md), [fixture policy](docs/INTEGRATION_TEST_DATA.md), [Git/branch delivery](docs/agent/GIT_DELIVERY.md). The scientific pipeline is referenced from the verified sibling `../alpaca-pipelines` checkout; it is not vendored here.

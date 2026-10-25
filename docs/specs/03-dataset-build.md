@@ -29,3 +29,37 @@ Use `alp-ui` `NumberInput`, `SelectInput`, `HelpHint` for margin, counts, seed a
 
 - Unit: `UT-DB-001`…`UT-DB-004`, `TD-MINE`, `TD-SPLIT`.
 - Integration: `IT-DB-001`…`IT-DB-004`, real generated distinguishable WAV windows, protected/noise nonintersection, actual Snippet bytes and split CSV, staged publication, reopen, deletion noncascade, failure/underfill. When delivered with spec 04, execute through real Worker; until then report process boundary pending rather than claiming `IT-RUN-*` covered.
+
+## Implementation closeout — 25 October 2026
+
+**Complete and ready for owner review.** The implementation uses Qt-free domain decisions,
+bounded chunked PCM extraction, verified staged publication, a typed QProcess handoff and native
+Builder/list/detail views. `UT-DB-001`…`UT-DB-004` and `IT-DB-001`…`IT-DB-005` are asserting tests,
+not planned IDs. TDD began with missing-module failures for the new Dataset cases before the domain,
+workflow, persistence and UI seams were added.
+
+The scientific review used adjacent `alpaca-pipelines` commit
+`91af5287dc18313f88902dc9696e8756274736b3`. The implementation adapts its seeded bounded-mining
+intent while adding the Trainer's protected integer-millisecond unions, selected-source allocation,
+nonoverlap, grouped Splits, bounded PCM I/O and portable verification. Its orchestration and schemas
+are not reused automatically.
+
+Verified commands on native macOS 26.6.2 arm64, Python 3.12.7 and Qt 6.11.2:
+
+```text
+.venv/bin/pytest -q                                      46 passed
+.venv/bin/ruff check src tests scripts                  passed
+.venv/bin/python scripts/audit_test_ids.py              passed
+.venv/bin/python scripts/check_fixtures.py              passed
+.venv/bin/python scripts/verify_handoff.py              passed
+git lfs fsck                                             passed
+unset QT_QPA_PLATFORM; .venv/bin/python -u scripts/capture_spec03_screenshots.py
+                                                           six Cocoa captures reviewed
+```
+
+The native screenshots and six-dimension comparison are recorded in
+[`../design/evidence/README.md`](../design/evidence/README.md). `IT-DB-005` executes the actual
+QProcess Build and verifies the transient one-build-at-a-time UI boundary. Spec 04 still owns
+persisted Run records, Run navigation, cancellation/recovery and reservation across all scientific
+Runs; this closeout makes no `IT-RUN-*` claim. Native Windows and packaged-app qualification remain
+their later owner specs.

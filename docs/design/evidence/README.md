@@ -93,6 +93,57 @@ The [bundled Showcase snapshot](../references/alp-ui-showcase.png) and live sibl
 `gallery/showcase.py` were reviewed for Card density, DataTable headers/rows, status colors, focus
 treatment, control sizing and application-shell spacing.
 
+## Spec 03 — Dataset Build
+
+**Status: COMPLETE — ready for owner review.** Builder ready, deterministic underfill, busy,
+Dataset list/detail and narrow Builder views were captured from a visible native macOS Cocoa
+window. The flow used generated real PCM WAVs and a real QProcess Dataset Build; no prototype
+science or fabricated artifact was carried into the native app. No blocking mismatch or native
+exception remains.
+
+### Capture provenance
+
+- Command: `unset QT_QPA_PLATFORM; .venv/bin/python -u scripts/capture_spec03_screenshots.py`
+- Host: macOS 26.6.2 (25G83), arm64; native Cocoa platform; 1470×956 screen
+- App viewport/stored PNG: 1280×895 for Builder/detail, 1280×900 for list; 700×780 narrow
+- Screen device-pixel ratio 2.0; logical DPI 72
+- Runtime: Python 3.12.7; PySide6/Qt 6.11.2; `alp-ui` 0.1.0a0
+- `alp-ui` sibling SHA: `330aaab96a6b32dd2d83ae84a52a2a238446d264`
+- Scientific sibling SHA: `91af5287dc18313f88902dc9696e8756274736b3`
+- Data/privacy: three generated 8 s mono PCM Source Recordings plus timestamped Positive WAVs in a
+  temporary Collection; isolated Application Settings; no user paths or HPC data
+- Capture mechanism: visible `QMainWindow` plus Cocoa `QScreen.grabWindow`; not Qt offscreen
+
+The checked-in interactive prototype's `buildPage()`, `refreshBuildSummary()`, `runBuild()`,
+`datasetsPage()` and `datasetPage()` states plus `builder-preview.png` and responsive CSS were
+reviewed against the native flow. The current sibling Showcase source and snapshot were rechecked
+for `DataTable`, `NumberInput`, `SelectInput`, `HelpHint`, `ProgressBar`, Card, disabled/loading and
+focus conventions. The in-app browser runtime had no available browser instance, so this review
+used the actual checked-in HTML/JS/CSS state implementation rather than claiming a live browser
+click-through.
+
+The scientific adaptation retains the sibling's seeded bounded-mining intent and Source Recording
+grouping, while adding protected positive unions, integer-millisecond source time, deterministic
+nonoverlap, bounded chunked PCM extraction and portable verified manifests required here. Sibling
+orchestration/schema were not copied. `IT-DB-001`…`IT-DB-005` cover the public native and artifact
+seams. Persisted Run records, cancel/recovery and Run pages remain Spec 04; no `IT-RUN-*` result is
+claimed by this evidence.
+
+### State-by-state review
+
+Six-dimension key: **H** information hierarchy/CTA/panel order; **N** navigation/active state;
+**C** terms/copy/feedback; **A** `alp-ui` components/theme/icons/accessibility; **I** interaction,
+focus, busy, scroll and resize; **S** error/progress/scientific-state fidelity.
+
+| State | Prototype target | Native evidence | Showcase and interaction evidence | Six dimensions | Difference / disposition |
+|---|---|---|---|---|---|
+| Builder ready | [Builder target](../prototypes/training-first/builder-preview.png) | [builder.png](spec-03-native/builder.png) | Real `DataTable` selection model; `NumberInput`, `SelectInput`, `HelpHint`, class meter and primary Build; `IT-DB-005` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | The native table has three generated Source Recordings instead of twelve demo rows; all counts and feasibility are computed from their actual headers/Annotations. |
+| Underfill and disabled Build | [Interactive Builder state](../prototypes/training-first/index.html#build) | [builder-underfill.png](spec-03-native/builder-underfill.png) | Real config change requests 60 noise Snippets; warning reports 15 available plus per-recording eligible milliseconds; Build is disabled; `UT-DB-002`, `IT-DB-003/005` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Native preflight exposes the exact deterministic shortfall rather than silently reducing the requested count. |
+| Busy Build | [Interactive Build action](../prototypes/training-first/index.html#build) | [builder-busy.png](spec-03-native/builder-busy.png) | Disabled config/table, loading primary action and global Dataset Build/Working state during the real QProcess; `IT-DB-005` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Persistent Run navigation/cancel belongs to Spec 04; the Spec 03-owned busy Builder state remains truthful and blocks a second Build. |
+| Dataset list | [Interactive Datasets route](../prototypes/training-first/index.html#datasets) | [datasets.png](spec-03-native/datasets.png) | Published manifest supplies readable Dataset/Collection, actual Snippet count/date and Open navigation; `IT-DB-004/005` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | The native row is a verified local artifact, not the prototype's in-memory demo Dataset. |
+| Dataset detail | [Interactive Dataset route](../prototypes/training-first/index.html#datasets) | [dataset-detail.png](spec-03-native/dataset-detail.png) | Real counts, class meters, source-grouped Splits, provenance, generated-file tree, explicit Delete; `IT-DB-001/004/005` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | `dataset.json` follows the architecture contract. Train Model is visibly disabled with explanatory copy until Spec 05 supplies real Training, as required by the scientific-safety gate. |
+| Narrow Builder | [Responsive Builder target](../prototypes/training-first/index.html#build) | [builder-narrow.png](spec-03-native/builder-narrow.png) | 700×780 viewport; horizontal navigation remains reachable; Builder cards stack in prototype order with vertical scroll; `IT-DB-005` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Native vertical scrolling exposes the settings below the captured first viewport without horizontal content clipping. |
+
 ## Every subsequent spec: mandatory ledger
 
 Use [Prototype acceptance](../PROTOTYPE_ACCEPTANCE.md) for the full screenshot inventory and six

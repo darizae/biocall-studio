@@ -28,6 +28,12 @@ Collection views passed the six-dimension native review at the current sibling `
 the tracked [Cocoa screenshots and interaction ledger](evidence/README.md); `IT-COL-008` asserts
 the real-WAV route, CTA, focus, repair/rescan and compact-layout behavior.
 
+**Spec 03 evidence:** Builder ready, underfill, disabled/busy, Dataset list/detail and narrow
+Builder views passed the six-dimension native review at the current sibling `alp-ui` SHA. See the
+tracked [Cocoa screenshots and interaction ledger](evidence/README.md); `IT-DB-005` asserts real
+config changes, native controls/help, the QProcess Build handoff and Dataset navigation. Persisted
+Run history/cancel/recovery remains owned by Spec 04 and no `IT-RUN-*` coverage is claimed.
+
 ## Acceptance evidence, per UI spec
 
 1. Capture actual Qt screenshots for the screen states **implemented** in the spec using installed `alp-ui` on native macOS; **commit sanitized PNGs** to `docs/design/evidence/spec-01-native/` (or the appropriate spec evidence subdirectory) and update [`evidence ledger`](evidence/README.md). Compare side-by-side to matching prototype preview and Showcase; explicitly record fixed, intentional, and unresolved differences. A screenshot saved under pytest `tmp_path` with nonzero filesize is *not* permanent parity evidence.
