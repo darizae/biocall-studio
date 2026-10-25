@@ -96,6 +96,12 @@ set and six-dimension review are in
 | `IT-TRAIN-013` | Save/load full detailed overrides while **More settings** is closed; after restart and switching families the overrides are retained and reappear on expansion. Qt create/load/rename/duplicate/overwrite/delete saved config, confirm destructive action, restart and restore actual user-settings files in isolated OS test directory, handle invalid/corrupt/incompatible config; current Dataset and family drafts remain correctly isolated. | TD-PRESET, TD-UI, TD-FAIL |
 | `IT-TRAIN-014` | Start genuine training from loaded preset; snapshot resolved config into Run independently of later preset edits/deletion, confirm scientific execution and immutable Model export remain unchanged after restart. | TD-PRESET, TD-TRAIN, TD-EXPORT |
 
+**Spec 05a execution record (25 October 2026):** `IT-TRAIN-010`, `IT-TRAIN-011` and
+`IT-TRAIN-013` are implemented as asserting real-Qt/real-filesystem tests in
+`tests/integration/test_training_ui.py`. `IT-TRAIN-012` and `IT-TRAIN-014` remain explicitly open
+until both genuine family executors and immutable Model publication exist in 05c; configuration
+snapshotting alone is not counted as either case.
+
 Future Prediction inference cases are **reserved exclusively** in [PREDICTION](PREDICTION.md), outside this Trainer test index or any Trainer release gate.
 
 ## 6. Native macOS installer and release gates (spec 06)

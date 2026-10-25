@@ -38,7 +38,9 @@ from alpaca_desktop.application.workspace import WorkspaceController
 from alpaca_desktop.gui.collection import CollectionPage, ReadingCollectionPage
 from alpaca_desktop.gui.dataset import DatasetBuilderPage, DatasetDetailPage, DatasetListPage
 from alpaca_desktop.gui.run import RunDetailPage, RunListPage
+from alpaca_desktop.gui.training import TrainingPage, TrainingWikiPage
 from alpaca_desktop.persistence.datasets import load_dataset
+from alpaca_desktop.persistence.training_presets import PresetStore
 
 _ROUTES = (
     ("select", "Select Collection", "plus"),
@@ -502,7 +504,14 @@ class MainWindow(QMainWindow):
         self.dataset_detail_page = DatasetDetailPage(
             self._delete_dataset,
             lambda: self.navigate("collection"),
+            self.open_training,
         )
+        self.training_page = TrainingPage(
+            controller,
+            PresetStore(controller.settings_file.parent / "training-presets"),
+            self._open_training_wiki,
+        )
+        self.training_wiki_page = TrainingWikiPage(self._return_from_training_wiki)
         self.run_list_page = RunListPage(self.open_run, lambda: self.navigate("select"))
         self.run_detail_page = RunDetailPage(
             controller.cancel_active_run,
@@ -526,6 +535,8 @@ class MainWindow(QMainWindow):
             ("datasets", self.dataset_list_page),
             ("builder", self.builder_page),
             ("dataset-detail", self.dataset_detail_page),
+            ("training", self.training_page),
+            ("training-wiki", self.training_wiki_page),
             (
                 "models",
                 self._empty_artifact_page(
@@ -752,6 +763,10 @@ class MainWindow(QMainWindow):
             if route == "scan"
             else "datasets"
             if route in {"builder", "dataset-detail"}
+            else "models"
+            if route == "training"
+            else "wiki"
+            if route == "training-wiki"
             else "runs"
             if route == "run-detail"
             else route
@@ -803,6 +818,10 @@ class MainWindow(QMainWindow):
             self.builder_page.build_button.setFocus()
         elif route == "dataset-detail":
             self.dataset_detail_page.delete_button.setFocus()
+        elif route == "training":
+            self.training_page.family_input.control.setFocus()
+        elif route == "training-wiki":
+            self.training_wiki_page.back_button.setFocus()
         elif route == "runs":
             self._refresh_run_surfaces()
             target = (
@@ -853,6 +872,28 @@ class MainWindow(QMainWindow):
             return
         self.run_detail_page.set_run(run)
         self.navigate("run-detail")
+
+    def open_training(self, dataset_id: str) -> None:
+        root = self.controller.collection_path
+        if root is None:
+            self.navigate("datasets")
+            return
+        try:
+            artifact = load_dataset(root, dataset_id)
+        except (OSError, ValueError):
+            self.navigate("datasets")
+            return
+        self.training_page.set_dataset(root, artifact)
+        self.navigate("training")
+
+    def _open_training_wiki(self, field) -> None:
+        self.training_wiki_page.show_field(field)
+        self.navigate("training-wiki")
+
+    def _return_from_training_wiki(self) -> None:
+        field_key = self.training_wiki_page.field_key
+        self.navigate("training")
+        self.training_page.restore_field_focus(field_key)
 
     def _open_active_run(self) -> None:
         if self.controller.active_run is not None:

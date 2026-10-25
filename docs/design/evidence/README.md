@@ -243,6 +243,57 @@ focus, navigation and responsive assertions.
 | Runs history | [Interactive Runs](../prototypes/training-first/index.html#/runs) | [runs-history.png](spec-04.5-native/runs-history.png) | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Completed/failed/cancelled rows and Inspect affordances remain unchanged. |
 | Narrow completed Run | [Responsive interactive Run](../prototypes/training-first/index.html#/run/train-0081) | [run-narrow.png](spec-04.5-native/run-narrow.png) | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Horizontal navigation, stacked panels, primary output action and vertical scroll remain reachable without horizontal content clipping. |
 
+## Spec 05a — Training configuration and saved presets
+
+**Status: COMPLETE — ready for owner review.** The compact CNN/RF baseline, detailed groups,
+saved/unsaved preset states, destructive confirmation and narrow keyboard-focus state were
+captured from the visible native macOS Cocoa app. The Dataset was built from generated real PCM
+WAVs. No training Worker ran, no metric was invented and no Model was published.
+
+### Capture provenance
+
+- Captured 25 October 2026 on macOS 26.6.2 arm64, Python 3.12.7, PySide6/Qt 6.11.2,
+  `alp-ui` 0.1.0a0 at `330aaab96a6b32dd2d83ae84a52a2a238446d264`.
+- Cocoa primary screen: 1470×956 logical pixels, device pixel ratio 2.0, logical DPI 72; normal
+  app capture 1280×807 and compact capture 700×780. PNGs preserve native compositor output.
+- Scientific defaults were checked against `bioacoustics-dl-toolbox`
+  `0fce0d4fa3d0931c5731e8b868f705e0a2120835` and `alpaca-pipelines`
+  `91af5287dc18313f88902dc9696e8756274736b3`.
+- The unchanged prototype was reviewed source-first at `openTraining`, `trainPage`, `setTrain` and
+  `startTraining`, the relevant CSS and `rf-config-preview.png`. No controllable browser session was
+  connected, so no live-browser interaction evidence is claimed. The actual current sibling
+  Showcase was launched and captured as
+  [alp-ui-showcase-current.png](spec-05-native/alp-ui-showcase-current.png).
+
+### State-by-state review
+
+Six-dimension key: **H** information hierarchy/CTA/panel order; **N** navigation/active state;
+**C** terms/copy/feedback; **A** `alp-ui` components/theme/icons/accessibility; **I** interaction,
+focus, scroll and resize; **S** scientific/disabled/error/completed-state fidelity.
+
+| State | Prototype / extension target | Native evidence | Showcase and interaction evidence | Six dimensions | Difference / disposition |
+|---|---|---|---|---|---|
+| Collapsed CNN | [Interactive Training route](../prototypes/training-first/index.html#train) | [train-cnn.png](spec-05-native/train-cnn.png) | Public `SelectInput`, `NumberInput`, `HelpHint`, `Card`, `Alert`, primary `Button`; `IT-TRAIN-010/011` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Dataset left, compact configuration right and Start Training left-bottom match the prototype hierarchy. The primary roster adds Run name and sequence length per the native extension. |
+| Collapsed RF | [RF target](../prototypes/training-first/rf-config-preview.png) | [train-rf.png](spec-05-native/train-rf.png) | Family switch preserves the CNN draft; nullable depth displays Unlimited semantics; `IT-TRAIN-010` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Prototype threshold moves into More settings as explicitly required; fixed feature family remains visible as derived in details instead of a fake editable basic. |
+| Detailed CNN | [Native extension](../SPEC05_CONFIGURATION_EXTENSION.md) | [train-cnn-advanced.png](spec-05-native/train-cnn-advanced.png) | Scrolled Spectrogram group shows current 2048, backend default/suggestion 4096, modified badge, reset and Wiki/help; `UT-TRAIN-007/008`, `IT-TRAIN-010/011` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | The capture intentionally scrolls the in-page detail content; the paired collapsed capture records the baseline header and CTA. Only one subgroup is open. |
+| Detailed RF | [Native extension](../SPEC05_CONFIGURATION_EXTENSION.md) | [train-rf-advanced.png](spec-05-native/train-rf-advanced.png) | Forest group shows decision policy separately from fitting fields and a non-default seed with reset; typed numeric/null feature modes are retained; `UT-TRAIN-008` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | RF threshold is explicitly described as validation/recorded policy, not an estimator fit parameter or future inference control. |
+| Saved configurations | [Preset extension](../../science/TRAINING_PRESETS.md) | [presets-list.png](spec-05-native/presets-list.png) | Native dialog exposes Rename, Duplicate, Overwrite and Delete; user-level storage copy explains that Dataset/Collection paths are absent; `UT-TRAIN-009/010`, `IT-TRAIN-013` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Presets are intentionally native-only and remain inside Model configuration rather than becoming a navigation destination. |
+| Unsaved draft | [Preset extension](../../science/TRAINING_PRESETS.md) | [presets-unsaved.png](spec-05-native/presets-unsaved.png) | Selector reads Unsaved changes after batch-size edit; stored preset is unchanged; Start summary reflects batch 32; `IT-TRAIN-013` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Draft state is explicit and never saves or starts training implicitly. |
+| Confirm delete | [Preset extension](../../science/TRAINING_PRESETS.md) | [presets-confirm-delete.png](spec-05-native/presets-confirm-delete.png) | Native macOS confirmation states Dataset/Run non-effects; cancel preserves the preset; `IT-TRAIN-013` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Platform-native Yes/No button labels are used by `QMessageBox`; the destructive consequence is explicit in the message. |
+| Narrow advanced focus | [Native responsive extension](../SPEC05_CONFIGURATION_EXTENSION.md) | [train-cnn-narrow-focus.png](spec-05-native/train-cnn-narrow-focus.png) | 700×780 stacked page, horizontally reachable nav, focused FFT field, vertical detail scroll and no page horizontal overflow; `IT-TRAIN-010` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | The capture is deliberately scrolled to the focused detailed field; Dataset, configuration and Start cards remain ordered 1→2→3. |
+
+`IT-TRAIN-010` asserts the full CNN/RF field, section, HelpHint and Wiki-anchor inventory plus
+keyboard disclosure and family-draft isolation. `IT-TRAIN-011` asserts non-clamping validation,
+reset, unavailable capabilities and frozen configuration without Worker launch. `IT-TRAIN-013`
+asserts real atomic files and CRUD/restart persistence in an isolated user directory. The successful
+Start action only freezes the future Worker input and shows “No training Run was started”; deferred
+`IT-TRAIN-012/014` remain open until 05c can observe both real executors and immutable Models.
+
+Verified on the capture platform with `4 passed` for the owned unit module, `3 passed` for the
+owned integration module and `73 passed` for the full suite. Ruff check/format, the indexed-ID,
+fixture, native-handoff and Git LFS audits passed. `capture_spec05_screenshots.py` produced the nine
+reviewed Cocoa PNGs, and a no-dependency wheel build contained the packaged 67-field JSON catalog.
+
 ## Every subsequent spec: mandatory ledger
 
 Use [Prototype acceptance](../PROTOTYPE_ACCEPTANCE.md) for the full screenshot inventory and six

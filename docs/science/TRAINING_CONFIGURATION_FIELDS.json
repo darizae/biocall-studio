@@ -794,7 +794,9 @@
     "choices": [
       "sqrt",
       "log2",
-      "all"
+      "all",
+      0.5,
+      1
     ],
     "mode": "editable",
     "help": "Number or proportion of candidate acoustic features considered at each split. Advanced numeric modes require matching validation.",

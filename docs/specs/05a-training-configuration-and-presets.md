@@ -16,3 +16,53 @@
 Start with failing asserting tests for **`UT-TRAIN-007`–`010`** (typed roster, validation/reset, draft/preset storage) and **`IT-TRAIN-010`/`011`/`013`** (real Qt and restart persistence). Use a redirected temporary preset directory, not real user settings; screenshots alone do not establish control behavior. Capture native collapsed/advanced CNN/RF, presets, and narrow/focus states under `docs/design/evidence/spec-05-native/`; record actual prototype/Showcase comparisons in the [evidence ledger](../design/evidence/README.md). Do not invent screenshots or alter the prototype.
 
 **Deferred tests:** `IT-TRAIN-012` (observed real scientific Worker settings) and `IT-TRAIN-014` (preset-origin completed Run/Model) are **not** satisfied by mock dispatch or UI state; execute them after both families exist in 05c. The cross-family training and Model test IDs also remain open. Exit 05a only with its own executable tests, actual native evidence, source-preserving review and a real [Git handoff](../agent/GIT_DELIVERY.md); report missing dependencies/native platform as blockers, not green checks.
+
+## Implementation closeout — 25 October 2026
+
+**Complete and ready for owner review.** A Qt-free configuration boundary loads the authoritative
+67-field roster, preserves independent CNN/RF drafts, rejects invalid numeric, cross-field,
+Dataset, device and unsupported combinations without clamping, and freezes a complete immutable
+binary `target`/`noise` snapshot. User presets are versioned and stored outside Collections with
+atomic replace, restrictive permissions, strict revision/key/type checks and create/load/rename/
+duplicate/overwrite/confirmed-delete behavior.
+
+The native page follows the prototype's Dataset → Model configuration → Start Training hierarchy.
+Only the indexed primary roster appears initially; one keyboard-operable More settings disclosure
+contains the six CNN or three RF groups. Every catalog field has an observable typed value,
+`alp-ui.HelpHint`, specific Training Wiki anchor and explicit default/suggestion provenance;
+derived binary/classifier and RF feature fields are read-only. Family switching, collapsing,
+validation and preset roundtrips preserve drafts. A valid Start Training action freezes the 05b/05c
+handoff and truthfully states that no Run was started in this configuration-only phase.
+
+TDD began with collection failures for missing `domain.training` and `gui.training` modules.
+`UT-TRAIN-007`–`010` and `IT-TRAIN-010/011/013` now pass. `IT-TRAIN-012/014`, genuine fitting,
+measured metrics and Model publication remain deferred exactly as specified. The scientific review
+used `bioacoustics-dl-toolbox` `0fce0d4fa3d0931c5731e8b868f705e0a2120835` and
+`alpaca-pipelines` `91af5287dc18313f88902dc9696e8756274736b3`; the native component review
+used `alp-ui` `330aaab96a6b32dd2d83ae84a52a2a238446d264`.
+
+Native macOS 26.6.2 arm64 captures and the six-dimension review are recorded in the
+[evidence ledger](../design/evidence/README.md). Browser automation was unavailable in the session;
+the unchanged prototype was inspected source-first through its checked-in `trainPage`, transition
+functions, CSS and `rf-config-preview.png`, consistent with the acceptance procedure. No prototype
+file was modified.
+
+Verified commands:
+
+```text
+.venv/bin/python -m pytest -q tests/unit/test_training_config.py
+                                                            4 passed
+.venv/bin/python -m pytest -q tests/integration/test_training_ui.py
+                                                            3 passed
+.venv/bin/python -m pytest -q                              73 passed
+.venv/bin/python -m ruff check src tests scripts           passed
+.venv/bin/python -m ruff format --check src tests scripts  53 files formatted
+.venv/bin/python scripts/audit_test_ids.py                 49 IDs, 0 unknown
+.venv/bin/python scripts/check_fixtures.py                 6 WAVs verified
+.venv/bin/python scripts/verify_handoff.py --require-native-ux
+                                                            0 errors
+git lfs fsck                                                OK
+.venv/bin/python scripts/capture_spec05_screenshots.py     9 Cocoa captures reviewed
+.venv/bin/python -m pip wheel --no-deps --wheel-dir <temp> .
+                                                            packaged catalog verified
+```

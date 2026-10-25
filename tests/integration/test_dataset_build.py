@@ -359,7 +359,9 @@ def test_native_builder_controls_states_worker_and_dataset_navigation(
     assert isinstance(detail, DatasetDetailPage)
     assert detail.dataset is not None
     assert detail.train_button.text() == "Train Model"
-    assert not detail.train_button.isEnabled()
+    assert detail.train_button.isEnabled()
+    detail.train_button.click()
+    assert window.current_route == "training"
     assert detail.delete_button.text() == "Delete"
     assert len(detail.findChildren(ProgressBar)) == 2
     assert window.active_run_label.text() == "No Active Run"

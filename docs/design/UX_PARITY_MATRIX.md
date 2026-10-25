@@ -45,6 +45,13 @@ changing a screen. At the user's request, the Spec 04 Run group and current nati
 Showcase were recaptured after migration; the [evidence ledger](evidence/README.md) records the
 source-first prototype review, real Worker states and six-dimension no-regression result.
 
+**Spec 05a evidence:** collapsed CNN/RF configuration, scrolled detailed groups, saved/unsaved
+presets, delete confirmation and narrow keyboard focus passed the six-dimension native review at
+the current sibling `alp-ui` SHA. [`IT-TRAIN-010/011/013`](evidence/README.md) assert the real
+Dataset route, complete field/help inventory, strict validation, family isolation and persistent
+preset lifecycle. `IT-TRAIN-012/014` remain open for the genuine 05b/05c executors; no Run or Model
+success is inferred from configuration readiness.
+
 ## Acceptance procedure
 
 [Prototype acceptance](PROTOTYPE_ACCEPTANCE.md) owns native screenshot capture, the six-dimension review, exception handling and installed-app gate. [Evidence ledger](evidence/README.md) owns historical reviewed evidence. This matrix owns only **which prototype states/components belong to each spec**; update its rows as scoped behavior changes.

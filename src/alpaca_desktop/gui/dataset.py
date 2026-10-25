@@ -689,10 +689,12 @@ class DatasetDetailPage(QScrollArea):
         self,
         delete_requested: Callable[[str], None],
         open_collection: Callable[[], None],
+        train_requested: Callable[[str], None],
     ):
         super().__init__()
         self.delete_requested = delete_requested
         self.open_collection = open_collection
+        self.train_requested = train_requested
         self.dataset: DatasetArtifact | None = None
         self.collection_root: Path | None = None
         self.is_compact = False
@@ -730,10 +732,8 @@ class DatasetDetailPage(QScrollArea):
         self.delete_button.clicked.connect(self._confirm_delete)
         actions.addWidget(self.delete_button)
         self.train_button = Button("Train Model")
-        self.train_button.setEnabled(False)
-        self.train_button.setAccessibleDescription(
-            "Training configuration becomes available in the Training vertical."
-        )
+        self.train_button.setAccessibleDescription("Configure training for this immutable Dataset.")
+        self.train_button.clicked.connect(lambda: self.train_requested(artifact.dataset_id))
         actions.addWidget(self.train_button)
         header.addLayout(actions)
         self.outer.addLayout(header)
@@ -884,12 +884,10 @@ class DatasetDetailPage(QScrollArea):
                 word_wrap=True,
             )
         )
-        disabled_train = Button("Train Model")
-        disabled_train.setEnabled(False)
-        disabled_train.setAccessibleDescription(
-            "Training configuration becomes available in the Training vertical."
-        )
-        next_card.content_layout.addWidget(disabled_train)
+        next_train = Button("Train Model")
+        next_train.setAccessibleDescription("Configure training for this immutable Dataset.")
+        next_train.clicked.connect(lambda: self.train_requested(artifact.dataset_id))
+        next_card.content_layout.addWidget(next_train)
         right.addWidget(next_card)
         right.addStretch()
         self.columns.addWidget(left_stack, 0, 0)

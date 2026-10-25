@@ -21,6 +21,9 @@ alpaca-desktop = "alpaca_desktop.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/alpaca_desktop"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"docs/science/TRAINING_CONFIGURATION_FIELDS.json" = "alpaca_desktop/data/TRAINING_CONFIGURATION_FIELDS.json"
+
 [tool.pytest.ini_options]
 testpaths = ["tests/unit", "tests/integration"]
 addopts = "-ra --strict-markers"
