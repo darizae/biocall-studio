@@ -34,6 +34,12 @@ tracked [Cocoa screenshots and interaction ledger](evidence/README.md); `IT-DB-0
 config changes, native controls/help, the QProcess Build handoff and Dataset navigation. Persisted
 Run history/cancel/recovery remains owned by Spec 04 and no `IT-RUN-*` coverage is claimed.
 
+**Spec 04 evidence:** Active, cancelling, failed and completed Run detail, persisted Runs history
+and narrow Run detail passed the six-dimension native review at the current sibling `alp-ui` SHA.
+See the tracked [Cocoa screenshots and interaction ledger](evidence/README.md); `IT-RUN-005`
+asserts the real Worker-event hierarchy, Active Run navigation, cancellation, terminal feedback,
+history, keyboard focus and responsive layout.
+
 ## Acceptance procedure
 
 [Prototype acceptance](PROTOTYPE_ACCEPTANCE.md) owns native screenshot capture, the six-dimension review, exception handling and installed-app gate. [Evidence ledger](evidence/README.md) owns historical reviewed evidence. This matrix owns only **which prototype states/components belong to each spec**; update its rows as scoped behavior changes.

@@ -144,6 +144,60 @@ focus, busy, scroll and resize; **S** error/progress/scientific-state fidelity.
 | Dataset detail | [Interactive Dataset route](../prototypes/training-first/index.html#datasets) | [dataset-detail.png](spec-03-native/dataset-detail.png) | Real counts, class meters, source-grouped Splits, provenance, generated-file tree, explicit Delete; `IT-DB-001/004/005` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | `dataset.json` follows the architecture contract. Train Model is visibly disabled with explanatory copy until Spec 05 supplies real Training, as required by the scientific-safety gate. |
 | Narrow Builder | [Responsive Builder target](../prototypes/training-first/index.html#build) | [builder-narrow.png](spec-03-native/builder-narrow.png) | 700×780 viewport; horizontal navigation remains reachable; Builder cards stack in prototype order with vertical scroll; `IT-DB-005` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Native vertical scrolling exposes the settings below the captured first viewport without horizontal content clipping. |
 
+## Spec 04 — Runs and supervised Worker
+
+**Status: COMPLETE — ready for owner review.** Active, cancelling, failed and completed Run detail,
+persisted history and narrow Run detail were captured from a visible native macOS Cocoa window.
+Progress and terminal outcomes came from actual QProcess Worker events and verified Dataset bytes;
+no browser timer, demo record or invented scientific result appears. No blocking mismatch or native
+exception remains.
+
+### Capture provenance
+
+- Command: `unset QT_QPA_PLATFORM; .venv/bin/python -u scripts/capture_spec04_screenshots.py`
+- Host: macOS 26.6.2 (25G83), arm64; native Cocoa platform; 1470×956 screen
+- App viewport/stored PNG: 1280×807 for desktop views; 700×780 for narrow Run detail
+- Screen device-pixel ratio 2.0; logical DPI 72
+- Runtime: Python 3.12.7; PySide6/Qt 6.11.2; `alp-ui` 0.1.0a0
+- `alp-ui` sibling SHA: `330aaab96a6b32dd2d83ae84a52a2a238446d264`
+- Scientific sibling SHA: `91af5287dc18313f88902dc9696e8756274736b3`; its orchestration/schema
+  was not reused for this local Worker lifecycle
+- Data/privacy: three generated mono PCM Source Recordings plus timestamped Positive WAVs in a
+  temporary Collection; isolated Application Settings; no user paths or HPC data
+- Capture mechanism: visible `QMainWindow` plus Cocoa `QScreen.grabWindow(window.winId())`; not Qt
+  offscreen
+
+The prototype has no Run preview PNGs. Its actual `globalRun()`, `createRun()`, `advanceRun()`,
+`cancelRun()`/`confirmCancel()`, `runPage()` and `runsPage()` implementations plus the Run-related
+CSS were therefore the direct content, hierarchy, transition and responsive reference. The current
+sibling Showcase source and component composition were rechecked for icon navigation, Cards,
+`DataTable`, status color, buttons, progress, focus and compact density. The in-app browser runtime
+had no available browser instance, so this review used the normative checked-in interactive source
+instead of claiming a live browser click-through.
+
+The capture flow starts a real delayed Worker, records actual stage progress, requests cancellation
+and captures the durable cancelling state. A separately published Dataset ID forces a real
+no-clobber Worker failure without changing its bytes. A final real Worker publishes and reopens a
+verified Dataset before the completed, history and narrow views are captured. `IT-RUN-001`…`005`
+separately assert persisted transitions, reservations, cancellation/forced loss, restart cleanup,
+failure integrity, keyboard focus, navigation and responsive width. Screenshots are visual
+evidence, not pixel-equality tests.
+
+### State-by-state review
+
+Six-dimension key: **H** information hierarchy/CTA/panel order; **N** navigation/active state;
+**C** terms/copy/feedback; **A** `alp-ui` components/theme/icons/accessibility; **I** interaction,
+focus, cancel, scroll and resize; **S** error/progress/terminal/scientific-state fidelity.
+
+| State | Prototype target | Native evidence | Showcase and interaction evidence | Six dimensions | Difference / disposition |
+|---|---|---|---|---|---|
+| Active Dataset Build Run | [Interactive Run route](../prototypes/training-first/index.html#/run/train-0081) | [run-active.png](spec-04-native/run-active.png) | Actual Worker stage/progress; global Active Run track and View Run; selected Runs navigation; `ProgressBar`, `Badge`, `Alert`, `Button`; `IT-RUN-001/005` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Native progress is persisted structured Worker output rather than the prototype timer. Output remains explicitly unpublished and inputs read-only. |
+| Cancelling Run | [Interactive cancel transition](../prototypes/training-first/index.html#/run/train-0081) | [run-cancelling.png](spec-04-native/run-cancelling.png) | Real cancel marker, persisted `cancelling`, disabled Cancel action, warning output feedback and bounded terminate/kill fallback; `IT-RUN-003/005` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Canonical native status uses “cancelled/cancelling”; no partial Dataset is exposed. |
+| Failed Run | [Interactive terminal Run structure](../prototypes/training-first/index.html#/run/train-0081) | [run-failed.png](spec-04-native/run-failed.png) | Real pre-existing output collision, danger Badge/Alert, 0% stage state and exact portable correction; `IT-RUN-004/005` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | The prototype does not simulate failure; the native view preserves its hierarchy while showing the required truthful no-clobber result. |
+| Completed Run | [Interactive completed Run](../prototypes/training-first/index.html#/run/train-0081) | [run-completed.png](spec-04-native/run-completed.png) | Verified manifest/Snippet/Split reopen precedes completed state; finished stages, Dataset ID and Open Dataset actions; `IT-RUN-001/004/005` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Counts are available on the real Dataset detail rather than repeated as prototype demo values. Completion requires both receipt and validated output. |
+| Runs history | [Interactive Runs route](../prototypes/training-first/index.html#/runs) | [runs-history.png](spec-04-native/runs-history.png) | Real `DataTable` model; semantically colored completed/failed/cancelled status cells; Inspect navigation and keyboard focus; `IT-RUN-002/005` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Status cells use the public `DataTable` model/delegate surface rather than illegal per-row widgets; Run detail uses actual `Badge` components. |
+| Narrow Run detail | [Responsive interactive Run](../prototypes/training-first/index.html#/run/train-0081) | [run-narrow.png](spec-04-native/run-narrow.png) | 700×780 viewport; Runs destination centered in scrollable icon navigation; stacked Run panels, preserved CTA and zero horizontal page overflow; `IT-RUN-005` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Vertical scrolling exposes Output/details below the first captured viewport while all content remains reachable. |
+
 ## Every subsequent spec: mandatory ledger
 
 Use [Prototype acceptance](../PROTOTYPE_ACCEPTANCE.md) for the full screenshot inventory and six

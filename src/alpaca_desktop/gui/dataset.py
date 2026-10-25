@@ -529,7 +529,17 @@ class DatasetBuilderPage(QScrollArea):
                 f"{split.counts['train']['total']} / {split.counts['val']['total']}"
             )
         error = estimate["error"]
-        if error:
+        if self.controller.active_run is not None:
+            title = "Another Run is active"
+            message = (
+                "Only one scientific operation can run at a time. "
+                "Open the Active Run to monitor or cancel it."
+            )
+            self.preview_alert.title_widget.setText(title)
+            self.preview_alert.text_widget.setText(message)
+            self.preview_alert.setAccessibleName(f"Warning alert: {title}: {message}")
+            self.preview_alert.show()
+        elif error:
             title = (
                 "Negative Mining underfill" if "underfill" in error.lower() else "Build unavailable"
             )

@@ -50,6 +50,12 @@ cancellation/recovery and every `IT-RUN-*` case.
 | `IT-RUN-004` | Artifact/staging name collision, corrupt publication or worker nonzero exit fails without overwriting a published Dataset/Model or promoting a stale output pointer. | TD-RUN, TD-FAIL |
 | `IT-RUN-005` | Native Run detail/history/Active Run sidebar reflect prototype section ordering, progress, cancel, conflict and terminal states through real Worker events; keyboard navigation and native evidence pass six-dimension review. | TD-UI, TD-RUN, TD-FAIL |
 
+Spec 04 implementation evidence: `tests/integration/test_run.py` asserts all five rows through real
+QProcess, persistence, restart, reservation and native-widget seams. The tracked Cocoa comparison
+set and six-dimension review are in
+[`design/evidence/spec-04-native/`](design/evidence/spec-04-native/) and the
+[evidence ledger](design/evidence/README.md). Packaged Worker launch remains owned by Spec 06.
+
 ## 4.5 Upstream PCM/WAV extraction — **Spec 04.5**
 
 `IT-AUDIO-001`–`IT-AUDIO-004` are defined in [Spec 04.5](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md): real-WAV byte equivalence, cancel/error cleanup, already-published Dataset compatibility and actual Worker import from the committed sibling toolbox. The spec is their **single detailed acceptance owner**; do not duplicate its cases here. Use `TD-WAV`, `TD-PATH`, `TD-SPLIT`, `TD-FAIL`.

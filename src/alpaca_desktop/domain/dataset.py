@@ -552,6 +552,13 @@ def validate_dataset_manifest(raw: object) -> dict[str, Any]:
         config = BuildConfig.from_dict(raw["config"])
     except (TypeError, ValueError) as exc:
         raise ValueError("Invalid Dataset timestamp or Build config.") from exc
+    run = raw.get("run")
+    if run is not None and (
+        not isinstance(run, dict)
+        or set(run) != {"run_id", "request_id"}
+        or any(not isinstance(value, str) or not value for value in run.values())
+    ):
+        raise ValueError("Invalid Dataset Run provenance.")
     policy = raw["source_policy"]
     if (
         not isinstance(policy, dict)

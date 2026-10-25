@@ -324,9 +324,14 @@ def test_native_builder_controls_states_worker_and_dataset_navigation(
     builder.build_button.click()
     assert controller.is_building
     assert builder.build_button.isLoading()
-    assert window.active_run_label.text() == "Dataset Build"
+    assert window.current_route == "run-detail"
+    assert window.active_run_label.text().startswith("Build ·")
     assert window.working_run_badge.isVisible()
-    qtbot.waitUntil(lambda: window.current_route == "dataset-detail", timeout=20_000)
+    qtbot.waitUntil(lambda: controller.active_run is None, timeout=20_000)
+    assert window.current_route == "run-detail"
+    assert window.run_detail_page.status_badge.text() == "completed"
+    window.run_detail_page.open_output_button.click()
+    assert window.current_route == "dataset-detail"
     detail = window.dataset_detail_page
     assert isinstance(detail, DatasetDetailPage)
     assert detail.dataset is not None

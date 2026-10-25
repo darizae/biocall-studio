@@ -104,6 +104,24 @@ def main() -> int:
                 )
         if "**Missing" in (ROOT / "docs/design/evidence/README.md").read_text(encoding="utf-8"):
             errors.append("Native UX evidence ledger still contains Missing entries")
+        run_directory = ROOT / "docs/design/evidence/spec-04-native"
+        for name in (
+            "run-active.png",
+            "run-cancelling.png",
+            "run-failed.png",
+            "run-completed.png",
+            "runs-history.png",
+            "run-narrow.png",
+        ):
+            shot = run_directory / name
+            if not shot.is_file() or shot.stat().st_size < 1024:
+                errors.append(f"Missing valid-sized persistent Spec 04 screenshot: {shot}")
+            elif shot.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
+                errors.append(f"Not a real PNG: {shot}")
+            if name in {"run-active.png", "runs-history.png"} and (
+                f"docs/design/evidence/spec-04-native/{name}" not in readme
+            ):
+                errors.append(f"README must embed real native Spec 04 screenshot: {name}")
     ignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
     if not re.search(r"(?m)^docs/priv/$", ignore):
         errors.append("docs/priv/ must be ignored by Git")
@@ -111,21 +129,32 @@ def main() -> int:
     if "tests/data/**/*.wav filter=lfs" not in attrs:
         errors.append("Binary scientific WAVs must be Git LFS tracked")
     source_map = (ROOT / "docs" / "agent" / "SOURCE_MAP.md").read_text(encoding="utf-8")
-    if any(repo not in source_map for repo in ("../alpaca-pipelines", "../alp-ui", "../bioacoustics-dl-toolbox")):
+    if any(
+        repo not in source_map
+        for repo in ("../alpaca-pipelines", "../alp-ui", "../bioacoustics-dl-toolbox")
+    ):
         errors.append("Sibling repos not explicitly mapped in source map")
     # Token-budget guard: AGENTS is a universal entrypoint, not a per-spec manual.
     entry = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
     if len(entry.split()) > 450:
         errors.append("AGENTS.md exceeds 450 words; move scoped requirements into the owning spec")
-    for scoped_name in ("TRAINING_CONFIGURATION_CATALOG", "TRAINING_PRESETS", "SPEC05_CONFIGURATION_EXTENSION"):
+    for scoped_name in (
+        "TRAINING_CONFIGURATION_CATALOG",
+        "TRAINING_PRESETS",
+        "SPEC05_CONFIGURATION_EXTENSION",
+    ):
         if scoped_name in entry:
             errors.append(f"AGENTS.md contains spec-only route: {scoped_name}")
     for spec_path in (
         *(ROOT / "docs" / "specs").glob("[0-9][0-9]-*.md"),
         ROOT / "docs" / "specs" / "SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md",
     ):
-        if spec_path.exists() and "**Scoped references:**" not in spec_path.read_text(encoding="utf-8"):
-            errors.append(f"Missing spec-local scoped reference entry: {spec_path.relative_to(ROOT)}")
+        if spec_path.exists() and "**Scoped references:**" not in spec_path.read_text(
+            encoding="utf-8"
+        ):
+            errors.append(
+                f"Missing spec-local scoped reference entry: {spec_path.relative_to(ROOT)}"
+            )
     # Ensure the intermediate upstream phase is discoverable by the router and sequence.
     for rel in ("docs/agent/ROUTING.md", "docs/IMPLEMENTATION_SEQUENCE.md"):
         text = (ROOT / rel).read_text(encoding="utf-8")
