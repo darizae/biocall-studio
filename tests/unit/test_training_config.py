@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import stat
 
 import pytest
 
@@ -174,3 +175,16 @@ def test_preset_store_rejects_corruption_unknown_schema_names_and_atomic_failure
     store.path.write_text("{not json")
     with pytest.raises(ValueError, match="invalid JSON"):
         store.list()
+
+
+def test_preset_store_tightens_existing_storage_permissions(tmp_path):
+    """Case: UT-TRAIN-010."""
+    directory = tmp_path / "presets"
+    directory.mkdir(mode=0o777)
+    directory.chmod(0o777)
+    store = PresetStore(directory)
+
+    store.create("Baseline", TrainingDraft.defaults("cnn"))
+
+    assert stat.S_IMODE(directory.stat().st_mode) == 0o700
+    assert stat.S_IMODE(store.path.stat().st_mode) == 0o600

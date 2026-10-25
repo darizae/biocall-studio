@@ -31,15 +31,22 @@ Only the indexed primary roster appears initially; one keyboard-operable More se
 contains the six CNN or three RF groups. Every catalog field has an observable typed value,
 `alp-ui.HelpHint`, specific Training Wiki anchor and explicit default/suggestion provenance;
 derived binary/classifier and RF feature fields are read-only. Family switching, collapsing,
-validation and preset roundtrips preserve drafts. A valid Start Training action freezes the 05b/05c
-handoff and truthfully states that no Run was started in this configuration-only phase.
+validation and preset roundtrips preserve drafts. Valid low-magnitude learning rates retain their
+typed value in the native decimal control, and disabled accelerator/noise-source choices explain
+their capability gate visibly, accessibly and in option tooltips. A valid Start Training action
+freezes the 05b/05c handoff and truthfully states that no Run was started in this
+configuration-only phase.
 
-TDD began with collection failures for missing `domain.training` and `gui.training` modules.
-`UT-TRAIN-007`–`010` and `IT-TRAIN-010/011/013` now pass. `IT-TRAIN-012/014`, genuine fitting,
-measured metrics and Model publication remain deferred exactly as specified. The scientific review
-used `bioacoustics-dl-toolbox` `0fce0d4fa3d0931c5731e8b868f705e0a2120835` and
-`alpaca-pipelines` `91af5287dc18313f88902dc9696e8756274736b3`; the native component review
-used `alp-ui` `330aaab96a6b32dd2d83ae84a52a2a238446d264`.
+TDD began with collection failures for missing `domain.training` and `gui.training` modules. The
+final acceptance audit added red cases for sub-`1e-8` learning-rate fidelity, disabled-choice
+reasons and restrictive permissions on a pre-existing preset directory before implementing those
+fixes. `UT-TRAIN-007`–`010` and `IT-TRAIN-010/011/013` now pass. `IT-TRAIN-012/014`, genuine
+fitting, measured metrics and Model publication remain deferred exactly as specified. The
+scientific review was repeated against the current `bioacoustics-dl-toolbox`
+`8e2e0528d4ce718005e194d426cde6e62fda0909`; the relevant configuration defaults are unchanged
+from the pinned `0fce0d4fa3d0931c5731e8b868f705e0a2120835` revision. `alpaca-pipelines` remained
+`91af5287dc18313f88902dc9696e8756274736b3`, and the native component review used `alp-ui`
+`330aaab96a6b32dd2d83ae84a52a2a238446d264`.
 
 Native macOS 26.6.2 arm64 captures and the six-dimension review are recorded in the
 [evidence ledger](../design/evidence/README.md). Browser automation was unavailable in the session;
@@ -51,10 +58,10 @@ Verified commands:
 
 ```text
 .venv/bin/python -m pytest -q tests/unit/test_training_config.py
-                                                            4 passed
+                                                            5 passed
 .venv/bin/python -m pytest -q tests/integration/test_training_ui.py
                                                             3 passed
-.venv/bin/python -m pytest -q                              73 passed
+.venv/bin/python -m pytest -q                              74 passed
 .venv/bin/python -m ruff check src tests scripts           passed
 .venv/bin/python -m ruff format --check src tests scripts  53 files formatted
 .venv/bin/python scripts/audit_test_ids.py                 49 IDs, 0 unknown

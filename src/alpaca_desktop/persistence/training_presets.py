@@ -237,6 +237,7 @@ class PresetStore:
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         if self.directory.is_symlink() or not self.directory.is_dir():
             raise OSError("Preset storage directory is unsafe.")
+        self.directory.chmod(0o700)
         payload = {
             "schema_version": PRESET_STORE_SCHEMA_VERSION,
             "catalog_revision": CATALOG_REVISION,

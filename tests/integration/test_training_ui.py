@@ -144,6 +144,30 @@ def test_native_validation_preserves_values_blocks_launch_and_resets(
     page.open_detail_section("Spectrogram")
     assert isinstance(page.field_controls["spectrogram.n_fft"], NumberInput)
 
+    page.set_field_value("training.learning_rate", 1e-10)
+    assert page.field_controls["training.learning_rate"].value() == pytest.approx(1e-10)
+    assert page.field_value("training.learning_rate") == pytest.approx(1e-10)
+
+    device = page.field_controls["device"]
+    mps_index = device.control.findData("mps")
+    mps_item = device.model().item(mps_index)
+    assert not mps_item.isEnabled()
+    assert "MPS is unavailable in the verified training executor" in mps_item.toolTip()
+    assert "MPS unsupported by verified executor" in device.control.accessibleDescription()
+    assert "MPS unsupported by verified executor" in device.descriptionText()
+
+    noise_source = page.field_controls["augmentation.noise_source"]
+    collection_noise_index = noise_source.control.findData("collection-selected")
+    collection_noise_item = noise_source.model().item(collection_noise_index)
+    assert not collection_noise_item.isEnabled()
+    assert "Collection-selected noise is unavailable" in collection_noise_item.toolTip()
+    assert "collection-selected noise lacks verified executor support" in (
+        noise_source.control.accessibleDescription()
+    )
+    assert "collection-selected noise lacks verified executor support" in (
+        noise_source.descriptionText()
+    )
+
     page.set_field_value("spectrogram.n_fft", 1024)
     page.set_field_value("spectrogram.hop_length", 2048)
 

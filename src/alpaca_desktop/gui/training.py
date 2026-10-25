@@ -84,6 +84,13 @@ def _display_value(value: object) -> str:
     return str(value)
 
 
+_FLOAT_DECIMALS = {
+    "training.learning_rate": 12,
+    "training.lr_decay_factor": 12,
+    "feature_config.min_duration_s": 9,
+}
+
+
 class TrainingWikiPage(QScrollArea):
     def __init__(self, back: Callable[[], None]):
         super().__init__()
@@ -694,7 +701,7 @@ class TrainingPage(QScrollArea):
                 kind="decimal",
                 minimum=-1_000_000_000,
                 maximum=1_000_000_000,
-                decimals=8,
+                decimals=_FLOAT_DECIMALS.get(field.key, 8),
                 step=0.01,
                 value=float(value),
             )
@@ -706,20 +713,19 @@ class TrainingPage(QScrollArea):
                 control.addItem(_display_value(choice), choice)
             selected = control.control.findData(value)
             control.setCurrentIndex(max(0, selected))
-            if field.key == "device":
-                for index in range(control.count()):
-                    choice = control.control.itemData(index)
-                    enabled = not (
-                        (choice == "cuda" and not self.capabilities.cuda)
-                        or (choice == "mps" and not self.capabilities.mps)
-                    )
+            unavailable: list[tuple[object, str]] = []
+            for index in range(control.count()):
+                choice = control.control.itemData(index)
+                reason = self._unavailable_choice_reason(field.key, choice)
+                if reason:
+                    unavailable.append((choice, reason))
                     item = control.model().item(index)
                     if item is not None:
-                        item.setEnabled(enabled)
-            if field.key == "augmentation.noise_source":
-                item = control.model().item(control.control.findData("collection-selected"))
-                if item is not None:
-                    item.setEnabled(False)
+                        item.setEnabled(False)
+                        item.setToolTip(reason)
+            if unavailable:
+                description = self._unavailable_field_description(field.key, unavailable)
+                control.setDescriptionText(description)
             control.currentIndexChanged.connect(
                 lambda _index, key=field.key: self._control_changed(key)
             )
@@ -730,6 +736,29 @@ class TrainingPage(QScrollArea):
             control.toggled.connect(lambda _checked, key=field.key: self._control_changed(key))
             return control
         raise ValueError(f"Unsupported training field kind: {field.kind}")
+
+    def _unavailable_choice_reason(self, key: str, choice: object) -> str:
+        if key == "device" and choice == "cuda" and not self.capabilities.cuda:
+            return "CUDA is unavailable because it was not detected in this runtime."
+        if key == "device" and choice == "mps" and not self.capabilities.mps:
+            return "MPS is unavailable in the verified training executor."
+        if key == "augmentation.noise_source" and choice == "collection-selected":
+            return "Collection-selected noise is unavailable until executor support is verified."
+        return ""
+
+    @staticmethod
+    def _unavailable_field_description(key: str, unavailable: list[tuple[object, str]]) -> str:
+        choices = {choice for choice, _reason in unavailable}
+        if key == "device":
+            parts = []
+            if "cuda" in choices:
+                parts.append("CUDA not detected")
+            if "mps" in choices:
+                parts.append("MPS unsupported by verified executor")
+            return "Unavailable: " + "; ".join(parts) + "."
+        if key == "augmentation.noise_source":
+            return "Unavailable: collection-selected noise lacks verified executor support."
+        return "Unavailable: " + "; ".join(reason for _choice, reason in unavailable)
 
     def _control_value(self, key: str) -> object:
         field = next(field for field in fields_for_family(self.family) if field.key == key)
