@@ -40,6 +40,11 @@ See the tracked [Cocoa screenshots and interaction ledger](evidence/README.md); 
 asserts the real Worker-event hierarchy, Active Run navigation, cancellation, terminal feedback,
 history, keyboard focus and responsive layout.
 
+**Spec 04.5 regression evidence:** PCM extraction moved to the separate toolbox without creating or
+changing a screen. At the user's request, the Spec 04 Run group and current native `alp-ui`
+Showcase were recaptured after migration; the [evidence ledger](evidence/README.md) records the
+source-first prototype review, real Worker states and six-dimension no-regression result.
+
 ## Acceptance procedure
 
 [Prototype acceptance](PROTOTYPE_ACCEPTANCE.md) owns native screenshot capture, the six-dimension review, exception handling and installed-app gate. [Evidence ledger](evidence/README.md) owns historical reviewed evidence. This matrix owns only **which prototype states/components belong to each spec**; update its rows as scoped behavior changes.

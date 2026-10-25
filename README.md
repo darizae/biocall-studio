@@ -85,12 +85,17 @@ blocking [prototype acceptance gate](docs/design/PROTOTYPE_ACCEPTANCE.md).
 
 ## Run the current development app (macOS)
 
-Prerequisites: Python **3.11–3.13**, an adjacent native [`alp-ui`](docs/design/ALP_UI_CONSUMER_CONTRACT.md) checkout at `../alp-ui`, and Git LFS for the versioned audio example. Use the repository root as your working directory. These instructions install to a **project-local `.venv`**; no global Python packages are needed.
+Prerequisites: Python **3.11–3.13**, adjacent `../bioacoustics-dl-toolbox` at committed
+revision `0fce0d4fa3d0931c5731e8b868f705e0a2120835`, the native
+[`alp-ui`](docs/design/ALP_UI_CONSUMER_CONTRACT.md) checkout at `../alp-ui`, and Git LFS for the
+versioned audio example. Use the repository root as your working directory. These instructions
+install to a **project-local `.venv`**; no global Python packages are needed.
 
 ```bash
 # From your repos/alpacaDesktopTrainer directory
 python3 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -e ../bioacoustics-dl-toolbox
 .venv/bin/python -m pip install -e '.[gui,test,integration]'
 .venv/bin/python -m pip install -e ../alp-ui
 

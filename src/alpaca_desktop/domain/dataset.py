@@ -567,6 +567,19 @@ def validate_dataset_manifest(raw: object) -> dict[str, Any]:
         or not policy["scientific_reference"]
     ):
         raise ValueError("Invalid Dataset source policy.")
+    audio_extraction = policy.get("audio_extraction")
+    if audio_extraction is not None and (
+        not isinstance(audio_extraction, dict)
+        or set(audio_extraction) != {"distribution", "version", "revision", "api"}
+        or audio_extraction.get("distribution") != "bioacoustics-dl-toolbox"
+        or not isinstance(audio_extraction.get("version"), str)
+        or not audio_extraction["version"]
+        or not isinstance(audio_extraction.get("revision"), str)
+        or len(audio_extraction["revision"]) != 40
+        or any(character not in "0123456789abcdef" for character in audio_extraction["revision"])
+        or audio_extraction.get("api") != "bioacoustics_dl_toolbox.audio.extract_pcm_wav_segment"
+    ):
+        raise ValueError("Invalid Dataset audio extraction provenance.")
     sources = raw["selected_sources"]
     if not isinstance(sources, list) or not sources:
         raise ValueError("Dataset must contain selected Source Recording provenance.")

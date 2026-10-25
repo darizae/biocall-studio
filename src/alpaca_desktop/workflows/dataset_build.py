@@ -14,11 +14,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from alpaca_desktop.computation.audio import (
-    AUDIO_TRANSFORM_POLICY,
-    extract_pcm_segment,
-    sha256_file,
-)
 from alpaca_desktop.domain.collection import (
     Fingerprint,
     PositiveExample,
@@ -41,6 +36,12 @@ from alpaca_desktop.persistence.datasets import (
     DatasetArtifact,
     load_dataset,
     load_dataset_directory,
+)
+from alpaca_desktop.persistence.integrity import sha256_file
+from alpaca_desktop.workflows.audio import (
+    AUDIO_TRANSFORM_POLICY,
+    audio_extraction_provenance,
+    extract_dataset_audio,
 )
 
 SCIENTIFIC_REFERENCE = "alpaca-pipelines@91af5287dc18313f88902dc9696e8756274736b3"
@@ -493,7 +494,7 @@ def build_dataset(
                 raise DatasetBuildError("Positive Example is missing source-time provenance.")
             record = records_by_id[positive.source_recording_id]
             relative = f"snippets/target/target-{index:06d}.wav"
-            transform = extract_pcm_segment(
+            transform = extract_dataset_audio(
                 paths[record.relative_path],
                 stage / relative,
                 start_ms=positive.start_ms,
@@ -520,7 +521,7 @@ def build_dataset(
             _check_cancelled(cancelled)
             record = records_by_id[window.source_recording_id]
             relative = f"snippets/noise/noise-{index:06d}.wav"
-            transform = extract_pcm_segment(
+            transform = extract_dataset_audio(
                 paths[record.relative_path],
                 stage / relative,
                 start_ms=window.start_ms,
@@ -592,6 +593,7 @@ def build_dataset(
             "config": config.to_dict(),
             "source_policy": {
                 "audio_transform": AUDIO_TRANSFORM_POLICY,
+                "audio_extraction": audio_extraction_provenance(),
                 "scientific_reference": SCIENTIFIC_REFERENCE,
                 "adaptation": (
                     "Protected integer-ms source windows and Source Recording grouped Splits; "

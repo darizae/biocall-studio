@@ -8,7 +8,7 @@ version = "0.1.0a0"
 description = "Local Collection-first bioacoustics Dataset and Model trainer"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
-dependencies = []
+dependencies = ["bioacoustics-dl-toolbox==0.1.1"]
 
 [project.optional-dependencies]
 gui = ["PySide6-Essentials>=6.11,<6.12"]
@@ -37,3 +37,7 @@ extend-exclude = ["tests/data"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+
+[tool.alpaca-desktop.science]
+bioacoustics-dl-toolbox-version = "0.1.1"
+bioacoustics-dl-toolbox-revision = "0fce0d4fa3d0931c5731e8b868f705e0a2120835"

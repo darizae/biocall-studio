@@ -9,9 +9,9 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from alpaca_desktop.computation.audio import sha256_file
 from alpaca_desktop.domain.dataset import validate_dataset_manifest, validate_snippet_record
 from alpaca_desktop.domain.paths import validate_relative_path
+from alpaca_desktop.persistence.integrity import sha256_file
 
 MAX_ENTRY_ROWS = 10_000
 MAX_ENTRY_BYTES = 16 * 1024 * 1024

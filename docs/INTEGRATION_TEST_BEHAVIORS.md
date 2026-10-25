@@ -60,6 +60,13 @@ set and six-dimension review are in
 
 `IT-AUDIO-001`–`IT-AUDIO-004` are defined in [Spec 04.5](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md): real-WAV byte equivalence, cancel/error cleanup, already-published Dataset compatibility and actual Worker import from the committed sibling toolbox. The spec is their **single detailed acceptance owner**; do not duplicate its cases here. Use `TD-WAV`, `TD-PATH`, `TD-SPLIT`, `TD-FAIL`.
 
+| Case ID | Detailed owner | Data |
+|---|---|---|
+| `IT-AUDIO-001` | [Spec 04.5 exact acceptance case](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) | TD-WAV |
+| `IT-AUDIO-002` | [Spec 04.5 exact acceptance case](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) | TD-WAV, TD-FAIL |
+| `IT-AUDIO-003` | [Spec 04.5 exact acceptance case](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) | TD-WAV, TD-SPLIT, TD-FAIL |
+| `IT-AUDIO-004` | [Spec 04.5 exact acceptance case](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) | TD-PATH, TD-FAIL |
+
 ## 5. CNN and RF Training + structurally reloadable Model exports (spec 05)
 
 | Case ID | Public seam / expected result | Data |

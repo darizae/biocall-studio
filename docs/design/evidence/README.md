@@ -198,6 +198,51 @@ focus, cancel, scroll and resize; **S** error/progress/terminal/scientific-state
 | Runs history | [Interactive Runs route](../prototypes/training-first/index.html#/runs) | [runs-history.png](spec-04-native/runs-history.png) | Real `DataTable` model; semantically colored completed/failed/cancelled status cells; Inspect navigation and keyboard focus; `IT-RUN-002/005` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Status cells use the public `DataTable` model/delegate surface rather than illegal per-row widgets; Run detail uses actual `Badge` components. |
 | Narrow Run detail | [Responsive interactive Run](../prototypes/training-first/index.html#/run/train-0081) | [run-narrow.png](spec-04-native/run-narrow.png) | 700×780 viewport; Runs destination centered in scrollable icon navigation; stacked Run panels, preserved CTA and zero horizontal page overflow; `IT-RUN-005` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Vertical scrolling exposes Output/details below the first captured viewport while all content remains reachable. |
 
+## Spec 04.5 — upstream PCM extraction regression review
+
+**Status: COMPLETE — ready for owner review.** Spec 04.5 owns no new screen or prototype state.
+At the user's request, the accepted Run surface was recaptured from real post-migration QProcess
+Dataset Builds to prove that the scientific ownership change did not alter visible behavior. The
+current native `alp-ui` Showcase was also captured and reviewed; no HTML, Qt layout, component or
+copy change was made for this backend-only spec.
+
+### Capture provenance
+
+- Trainer command: `unset QT_QPA_PLATFORM; .venv/bin/python -u scripts/capture_spec04_screenshots.py --output-dir docs/design/evidence/spec-04.5-native`
+- Showcase: current sibling `gallery/showcase.py` composition, captured from visible Cocoa at
+  1180×790 logical / 2360×1580 device pixels
+- Host: macOS 26.6.2, arm64; native Cocoa; screen device-pixel ratio 2.0; logical DPI 72
+- Trainer viewport/stored PNG: 1280×807 desktop; 700×780 narrow
+- Runtime: Python 3.12.7; PySide6/Qt 6.11.2; `alp-ui` 0.1.0a0
+- `alp-ui` SHA: `330aaab96a6b32dd2d83ae84a52a2a238446d264`
+- toolbox SHA/version: `0fce0d4fa3d0931c5731e8b868f705e0a2120835` / `0.1.1`
+- unshipped verification wheel: `bioacoustics_dl_toolbox-0.1.1-py3-none-any.whl`, SHA-256
+  `472769c9567e01ed5e009b5faaeca501c87c9d508f16f04586593f398b2d8e7c`; release gates
+  must build and record their own candidate wheel from the same committed revision
+- scientific reference SHA: `alpaca-pipelines@91af5287dc18313f88902dc9696e8756274736b3`
+- Data/privacy: generated mono PCM recordings and timestamped positives in a temporary Collection;
+  no user Collection or HPC data
+- Capture mechanism: visible Cocoa windows; Trainer uses `QScreen.grabWindow`, Showcase uses
+  `QWidget.grab`; neither uses the Qt offscreen platform
+
+The in-app browser had no available instance. Per the source-first acceptance contract, the actual
+bundled `globalRun()`, `runPage()`, cancellation transition, `runsPage()` and Run CSS remained the
+normative prototype review. No live-browser interaction evidence is claimed. `IT-AUDIO-003/004`
+exercise the real post-migration Dataset Build and Worker while `IT-RUN-001/005` retain interaction,
+focus, navigation and responsive assertions.
+
+### State-by-state review
+
+| State | Prototype target | Post-migration native evidence | Six dimensions | Review result |
+|---|---|---|---|---|
+| Current `alp-ui` composition | [Showcase contract](../ALP_UI_CONSUMER_CONTRACT.md) | [alp-ui-showcase-current.png](spec-04.5-native/alp-ui-showcase-current.png) | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Compact density, focus ring, selected navigation, Card/form/table hierarchy, Badge and button styling are intact at the current sibling SHA. |
+| Active Build | [Interactive Run](../prototypes/training-first/index.html#/run/train-0081) | [run-active.png](spec-04.5-native/run-active.png) | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Real Worker reports input validation and an unpublished output; the toolbox extraction path is reached later in the same Run. |
+| Cancelling Build | [Interactive cancel transition](../prototypes/training-first/index.html#/run/train-0081) | [run-cancelling.png](spec-04.5-native/run-cancelling.png) | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Disabled Cancel, warning output and no-publication promise remain visible; cancellation cleanup is asserted at the toolbox, adapter and workflow boundaries. |
+| Failed Build | [Run terminal hierarchy](../prototypes/training-first/index.html#/run/train-0081) | [run-failed.png](spec-04.5-native/run-failed.png) | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Real no-clobber collision produces a truthful failed Run and preserves the existing Dataset. |
+| Completed Build | [Interactive completed Run](../prototypes/training-first/index.html#/run/train-0081) | [run-completed.png](spec-04.5-native/run-completed.png) | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Completion follows toolbox-backed PCM extraction, staged checksum validation, immutable publication and reopen. |
+| Runs history | [Interactive Runs](../prototypes/training-first/index.html#/runs) | [runs-history.png](spec-04.5-native/runs-history.png) | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Completed/failed/cancelled rows and Inspect affordances remain unchanged. |
+| Narrow completed Run | [Responsive interactive Run](../prototypes/training-first/index.html#/run/train-0081) | [run-narrow.png](spec-04.5-native/run-narrow.png) | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Horizontal navigation, stacked panels, primary output action and vertical scroll remain reachable without horizontal content clipping. |
+
 ## Every subsequent spec: mandatory ledger
 
 Use [Prototype acceptance](../PROTOTYPE_ACCEPTANCE.md) for the full screenshot inventory and six

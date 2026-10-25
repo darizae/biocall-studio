@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import shutil
 import wave
 from dataclasses import replace
 from pathlib import Path
@@ -69,7 +70,7 @@ def _wav_frames(path: Path) -> bytes:
 def test_real_source_audio_is_materialized_with_protected_windows_and_grouped_splits(
     tmp_path, wav_factory
 ):
-    """Case: IT-DB-001."""
+    """Cases: IT-DB-001, IT-AUDIO-003."""
     root = _collection(tmp_path / "collection", wav_factory)
     result = _published(root)
     source_bytes = {path: path.read_bytes() for path in root.glob("recordings/*.wav")}
@@ -96,6 +97,7 @@ def test_real_source_audio_is_materialized_with_protected_windows_and_grouped_sp
         output = artifact.root / snippet["relative_path"]
         assert output.is_file()
         assert _wav_frames(output)
+        assert snippet["transform"]["policy"] == "pcm-preserve-nearest-frame-v1"
         if snippet["label"] == "target":
             assert snippet["producing_positive_ref"].startswith("positives/")
         else:
@@ -136,6 +138,10 @@ def test_real_source_audio_is_materialized_with_protected_windows_and_grouped_sp
         }
     assert {path: path.read_bytes() for path in source_bytes} == source_bytes
     assert {path: path.read_bytes() for path in positive_bytes} == positive_bytes
+    assert load_dataset(root, artifact.dataset_id).manifest == artifact.manifest
+    extraction = artifact.manifest["source_policy"]["audio_extraction"]
+    assert extraction["revision"] == "0fce0d4fa3d0931c5731e8b868f705e0a2120835"
+    assert str(root) not in json.dumps(artifact.manifest)
 
 
 def test_repeat_build_is_equivalent_and_changed_config_publishes_independently(
@@ -178,7 +184,7 @@ def test_repeat_build_is_equivalent_and_changed_config_publishes_independently(
 
 
 def test_underfill_changed_source_and_collision_publish_no_partial_dataset(tmp_path, wav_factory):
-    """Case: IT-DB-003."""
+    """Cases: IT-DB-003, IT-AUDIO-002."""
     root = _collection(tmp_path / "collection", wav_factory)
     result = _published(root)
     source = root / "recordings" / "REC_A.wav"
@@ -238,7 +244,7 @@ def test_underfill_changed_source_and_collision_publish_no_partial_dataset(tmp_p
 
 
 def test_dataset_reopens_and_explicit_delete_preserves_models_and_inputs(tmp_path, wav_factory):
-    """Case: IT-DB-004."""
+    """Cases: IT-DB-004, IT-AUDIO-003."""
     root = _collection(tmp_path / "collection", wav_factory)
     result = _published(root)
     inputs_before = {path: path.read_bytes() for path in root.glob("*/*.wav")}
@@ -246,7 +252,24 @@ def test_dataset_reopens_and_explicit_delete_preserves_models_and_inputs(tmp_pat
     reopened = load_dataset(root, built.dataset_id)
     assert reopened.manifest == built.manifest
     assert reopened.snippets == built.snippets
-    assert [item.dataset_id for item in list_datasets(root)] == ["dataset-delete"]
+
+    legacy_id = "dataset-pre-migration"
+    legacy_root = built.root.parent / legacy_id
+    shutil.copytree(built.root, legacy_root)
+    legacy_manifest_path = legacy_root / "dataset.json"
+    legacy_manifest = json.loads(legacy_manifest_path.read_text())
+    legacy_manifest["dataset_id"] = legacy_id
+    legacy_manifest["source_policy"].pop("audio_extraction")
+    legacy_manifest_path.write_text(json.dumps(legacy_manifest, indent=2) + "\n")
+    legacy_manifest_bytes = legacy_manifest_path.read_bytes()
+    legacy = load_dataset(root, legacy_id)
+    assert legacy.manifest["source_policy"]["audio_transform"] == ("pcm-preserve-nearest-frame-v1")
+    assert "audio_extraction" not in legacy.manifest["source_policy"]
+    assert legacy_manifest_path.read_bytes() == legacy_manifest_bytes
+    assert {item.dataset_id for item in list_datasets(root)} == {
+        "dataset-delete",
+        "dataset-pre-migration",
+    }
 
     model = root / ".alpaca" / "models" / "model-kept"
     model.mkdir(parents=True)

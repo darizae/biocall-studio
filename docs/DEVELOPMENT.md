@@ -5,6 +5,10 @@
 - Python **3.11–3.13** with a project-local `.venv`, PySide6 and `pytest`, `pytest-qt`, `ruff` as defined by `pyproject.toml`.
 - macOS is the day-to-day native implementation and integration-test platform. Windows is a target **only after a separate native qualification gate**.
 - Install `../alp-ui` from its **native PySide6 sibling checkout or locally built wheel**. Do not substitute a PyPI package or the similarly named web UI project. Verify installed public Components/API from the checkout.
+- Install the separate `../bioacoustics-dl-toolbox` checkout from committed revision
+  `0fce0d4fa3d0931c5731e8b868f705e0a2120835`. Its distribution version remains
+  `0.1.1`; the revision pin distinguishes the required PCM extraction API from
+  other builds carrying that version. Editable installation is development-only.
 - When implementing CNN/RF, inspect the intended sibling `../alpaca-pipelines` after confirming its exact directory and commit; if unavailable, report it and resolve an owner-approved local checkout rather than silently assuming remote code. Install only the real training dependencies needed for that integration, pinned/tested as part of the Training spec. Do not assume the reference repository's CLI or output manifests are application contracts.
 
 A scaffold-level local setup from repository root:
@@ -13,9 +17,11 @@ A scaffold-level local setup from repository root:
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
+python -m pip install -e ../bioacoustics-dl-toolbox
 python -m pip install -e '.[gui,test,integration]'
 # When available, install/build the sibling PySide6 Widgets library:
 python -m pip install -e ../alp-ui
+python -c "import bioacoustics_dl_toolbox as m; print(m.__file__)"
 python -m alpaca_desktop
 ```
 
