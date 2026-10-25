@@ -120,7 +120,7 @@ def test_empty_routes_help_and_qt_screenshot_are_real_native_widgets(qtbot, work
         assert isinstance(table.model(), QAbstractItemModel)
         assert table.model().rowCount() == 0
         window.empty_pages[route].action_widget.click()
-        assert window.current_route == "select"
+        assert window.current_route == ("datasets" if route == "models" else "select")
     window.navigate("wiki")
     hint = window.wiki_page.findChild(HelpHint)
     assert hint is not None

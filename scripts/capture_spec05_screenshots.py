@@ -1,4 +1,4 @@
-"""Capture Spec 05a Training configuration and preset views from native macOS Cocoa."""
+"""Capture Spec 05 Training, Run, and Model views from native macOS Cocoa."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from PySide6 import __version__ as pyside_version
 from PySide6.QtCore import QElapsedTimer, QPoint, Qt, QTimer
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QMessageBox, QWidget
+from PySide6.QtWidgets import QInputDialog, QMessageBox, QWidget
 
 from alpaca_desktop.application.workspace import WorkspaceController
 from alpaca_desktop.domain.dataset import BuildConfig
@@ -136,6 +136,35 @@ def _capture_delete_confirmation(
         raise RuntimeError("Preset delete confirmation was not captured.")
 
 
+def _name_and_start_model(
+    app,
+    window: MainWindow,
+    output: Path,
+    settle_ms: int,
+) -> str:
+    captured = False
+
+    def capture_and_accept() -> None:
+        nonlocal captured
+        dialog = next(
+            (widget for widget in app.topLevelWidgets() if isinstance(widget, QInputDialog)),
+            None,
+        )
+        if dialog is None:
+            QTimer.singleShot(50, capture_and_accept)
+            return
+        dialog.setTextValue("Field evidence CNN")
+        _capture(window, output, settle_ms=settle_ms, foreground=dialog)
+        captured = True
+        dialog.accept()
+
+    QTimer.singleShot(100, capture_and_accept)
+    window.training_page.start_button.click()
+    if not captured or window.controller.active_run is None:
+        raise RuntimeError("Model naming or CNN Training launch was not captured.")
+    return window.controller.active_run.run_id
+
+
 def _capture_showcase(output: Path, settle_ms: int) -> None:
     gallery = Path(__file__).resolve().parents[2] / "alp-ui" / "gallery"
     sys.path.insert(0, str(gallery))
@@ -228,6 +257,67 @@ def main(argv: list[str] | None = None) -> int:
         _capture(
             window,
             args.output_dir / "train-cnn-narrow-focus.png",
+            settle_ms=args.settle_ms,
+        )
+
+        window.resize(1280, 900)
+        _wait_until(lambda: not window.is_compact and not page._compact)
+        for key, value in {
+            "sequence_length_ms": 250,
+            "training.max_epochs": 1,
+            "training.batch_size": 2,
+            "training.learning_rate": 0.0001,
+            "device": "cpu",
+            "spectrogram.sample_rate": 16_000,
+            "spectrogram.n_fft": 256,
+            "spectrogram.hop_length": 64,
+            "spectrogram.n_freq_bins": 64,
+            "spectrogram.f_min": 100,
+            "spectrogram.f_max": 7_000,
+            "training.num_workers": 0,
+            "training.early_stopping_patience_epochs": 2,
+            "training.epochs_per_eval": 1,
+            "training.pin_memory": False,
+        }.items():
+            page.set_field_value(key, value)
+        page.more_settings.setChecked(False)
+        page.verticalScrollBar().setValue(0)
+        run_id = _name_and_start_model(
+            app,
+            window,
+            args.output_dir / "model-name.png",
+            args.settle_ms,
+        )
+        _wait_until(
+            lambda: any(run.run_id == run_id and run.terminal for run in controller.runs),
+            timeout_ms=180_000,
+        )
+        completed = next(run for run in controller.runs if run.run_id == run_id)
+        if completed.status.value != "completed":
+            raise RuntimeError(f"CNN Training evidence Run failed: {completed.error}")
+
+        window.open_run(run_id)
+        window.run_detail_page.ensureWidgetVisible(
+            window.run_detail_page.training_plot,
+            20,
+            180,
+        )
+        _capture(
+            window,
+            args.output_dir / "run-cnn-plot.png",
+            settle_ms=args.settle_ms,
+        )
+        window.navigate("models")
+        _capture(window, args.output_dir / "models.png", settle_ms=args.settle_ms)
+        window.open_model(completed.output_id)
+        _capture(window, args.output_dir / "model-detail.png", settle_ms=args.settle_ms)
+        window.resize(700, 780)
+        _wait_until(
+            lambda: window.is_compact and window.model_detail_page.is_compact,
+        )
+        _capture(
+            window,
+            args.output_dir / "model-detail-narrow.png",
             settle_ms=args.settle_ms,
         )
         window.close()

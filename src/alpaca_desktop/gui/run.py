@@ -4,7 +4,17 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from alp_ui.components import Alert, Badge, Button, Card, DataTable, EmptyState, ProgressBar, Text
+from alp_ui.components import (
+    Alert,
+    Badge,
+    Button,
+    Card,
+    DataTable,
+    EmptyState,
+    Plot,
+    ProgressBar,
+    Text,
+)
 from alp_ui.theme import ALPACA_LIGHT, interactions, make_icon
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtGui import QColor, QFontDatabase, QResizeEvent
@@ -185,7 +195,7 @@ class RunListPage(QScrollArea):
 
 
 class RunDetailPage(QScrollArea):
-    section_order = ("progress", "activity", "output", "details")
+    section_order = ("progress", "measurements", "activity", "output", "details")
 
     def __init__(
         self,
@@ -305,6 +315,58 @@ class RunDetailPage(QScrollArea):
             row.addWidget(label, 1)
             self.progress_card.content_layout.addLayout(row)
         left.addWidget(self.progress_card)
+
+        if run.kind.value == "training":
+            measurements_card = Card(shadow=False)
+            measurements_card.content_layout.addWidget(Text("Training loss", role="subheading"))
+            measurements_card.content_layout.addWidget(
+                Text(
+                    "Measured train and validation loss reported by the supervised Worker.",
+                    role="caption",
+                    word_wrap=True,
+                )
+            )
+            lines: dict[str, list[tuple[float, float]]] = {}
+            for phase in ("train", "val"):
+                points = [
+                    (float(item["epoch"]), float(item["loss"]))
+                    for item in run.measurements
+                    if item.get("phase") == phase
+                ]
+                if points:
+                    lines[f"{phase} loss"] = points
+            self.training_plot = Plot(kind="line", x_label="Epoch", y_label="Loss")
+            self.training_plot.setAccessibleName("CNN train and validation loss")
+            self.training_plot.setLines(lines)
+            self.training_plot.setMinimumHeight(230)
+            measurements_card.content_layout.addWidget(self.training_plot)
+            by_epoch: dict[int, dict[str, float]] = {}
+            for item in run.measurements:
+                phase = item.get("phase")
+                epoch = item.get("epoch")
+                loss = item.get("loss")
+                if phase in {"train", "val"} and isinstance(epoch, int):
+                    by_epoch.setdefault(epoch, {})[str(phase)] = float(loss)
+            summaries = []
+            for epoch, phases in sorted(by_epoch.items())[-6:]:
+                values = " · ".join(
+                    f"{phase} loss {phases[phase]:.4f}"
+                    for phase in ("train", "val")
+                    if phase in phases
+                )
+                summaries.append(f"Epoch {epoch} · {values}")
+            self.training_values = QLabel(
+                "\n".join(summaries)
+                if summaries
+                else "Measured loss appears after the first completed training phase."
+            )
+            self.training_values.setWordWrap(True)
+            self.training_values.setTextInteractionFlags(
+                Qt.TextInteractionFlag.TextSelectableByMouse
+            )
+            self.training_values.setAccessibleName("Numeric CNN loss measurements")
+            measurements_card.content_layout.addWidget(self.training_values)
+            left.addWidget(measurements_card)
 
         activity_card = Card(shadow=False)
         activity_card.content_layout.addWidget(Text("Run activity", role="subheading"))

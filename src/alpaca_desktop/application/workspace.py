@@ -21,6 +21,7 @@ from alpaca_desktop.domain.run import (
     RunReservation,
     RunState,
     RunStatus,
+    append_run_measurement,
     assert_collection_rebind_allowed,
     assert_dataset_mutable,
     assert_run_start_allowed,
@@ -28,6 +29,7 @@ from alpaca_desktop.domain.run import (
     transition_run,
     update_run_progress,
 )
+from alpaca_desktop.domain.training import FrozenTrainingConfig, TrainingDataset
 from alpaca_desktop.persistence.collection_metadata import (
     load_collection_metadata,
     publish_collection_metadata,
@@ -37,6 +39,11 @@ from alpaca_desktop.persistence.datasets import (
     DatasetDeletion,
     delete_dataset,
     load_dataset,
+)
+from alpaca_desktop.persistence.models import (
+    ModelArtifact,
+    discard_uncommitted_model,
+    load_model,
 )
 from alpaca_desktop.persistence.runs import (
     create_run,
@@ -48,6 +55,7 @@ from alpaca_desktop.persistence.runs import (
     write_run_request,
 )
 from alpaca_desktop.persistence.settings import ApplicationSettings, SettingsStore
+from alpaca_desktop.workflows.cnn_training import CnnTrainingRequest
 from alpaca_desktop.workflows.dataset_build import DatasetBuildRequest
 
 
@@ -102,6 +110,10 @@ class WorkspaceController(QObject):
     build_completed = Signal(object)
     build_failed = Signal(str)
     build_cancelled = Signal()
+    training_started = Signal()
+    training_completed = Signal(object)
+    training_failed = Signal(str)
+    training_cancelled = Signal()
     run_changed = Signal(object)
     runs_changed = Signal()
     run_conflict = Signal(str)
@@ -336,9 +348,99 @@ class WorkspaceController(QObject):
             self.build_failed.emit(failed.error)
             raise
 
+        self._start_worker("dataset-build", self._build_request_path)
+        return run_id
+
+    def start_training(
+        self,
+        config: FrozenTrainingConfig,
+        *,
+        model_label: str,
+        model_id: str | None = None,
+    ) -> str:
+        """Persist and supervise one genuine CNN Training Run."""
+        if self.collection_path is None or self.collection_id is None:
+            raise ValueError("Select a validated Collection before Training.")
+        if config.family != "cnn":
+            raise ValueError("Spec 05b starts genuine CNN Training only.")
+        try:
+            dataset = load_dataset(self.collection_path, config.dataset_id)
+            TrainingDataset.from_artifact(dataset)
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"Selected Dataset is missing or unsafe: {exc}") from exc
+        run_id = f"run-{uuid.uuid4()}"
+        request_id = f"request-{uuid.uuid4()}"
+        model_id = model_id or f"model-{uuid.uuid4()}"
+        reservation = RunReservation(
+            RunKind.TRAINING,
+            self.collection_id,
+            dataset.dataset_id,
+            "model",
+            model_id,
+        )
+        assert_run_start_allowed(self._runs, reservation)
+        candidate = CnnTrainingRequest(
+            run_id,
+            request_id,
+            str(self.collection_path),
+            self.collection_id,
+            config,
+            model_id,
+            model_label,
+        )
+        request = CnnTrainingRequest.from_dict(candidate.to_dict())
+        final = self.collection_path / ".alpaca" / "models" / request.model_id
+        if final.exists():
+            raise RunConflictError(f"The prospective model output already exists: {model_id}")
+        run_name = str(config.effective_values["run_name"]).strip()
+        state = new_run(
+            run_id=run_id,
+            request_id=request_id,
+            kind=RunKind.TRAINING,
+            title=run_name or f"Train CNN · {dataset.label}",
+            collection_id=self.collection_id,
+            input_dataset_id=dataset.dataset_id,
+            output_kind="model",
+            output_id=model_id,
+            stages=(
+                "Validate immutable Dataset",
+                "Prepare spectrogram batches",
+                "Train and validate CNN",
+                "Verify and publish Model",
+            ),
+            now=utc_now(),
+        )
+        create_run(self.collection_path, state)
+        self._set_run(state)
+        try:
+            self._build_request_path = write_run_request(
+                self.collection_path, run_id, request.to_dict()
+            )
+            state = transition_run(
+                state,
+                RunStatus.STARTING,
+                now=utc_now(),
+                message="Starting CNN Training Worker",
+            )
+            self._set_run(state)
+        except Exception as exc:
+            failed = transition_run(
+                state,
+                RunStatus.FAILED,
+                now=utc_now(),
+                error=self._portable_error(str(exc)),
+                message="CNN Worker request could not be prepared",
+            )
+            self._set_run(failed)
+            self.training_failed.emit(failed.error)
+            raise
+        self._start_worker("cnn-training", self._build_request_path)
+        return run_id
+
+    def _start_worker(self, worker: str, request_path: Path) -> None:
         process = QProcess(self)
         self._run_process = process
-        self._current_run_id = run_id
+        self._current_run_id = self._active_run.run_id if self._active_run is not None else None
         self._run_stdout_buffer = b""
         self._worker_error = ""
         self._protocol_error = ""
@@ -347,35 +449,23 @@ class WorkspaceController(QObject):
         process.readyReadStandardOutput.connect(self._on_run_stdout)
         process.finished.connect(self._on_run_finished)
         process.errorOccurred.connect(self._on_run_process_error)
-        if getattr(sys, "frozen", False):
-            process.setProgram(sys.executable)
-            process.setArguments(
-                [
-                    "--worker",
-                    "dataset-build",
-                    "--request",
-                    str(self._build_request_path),
-                    "--worker-step-delay",
-                    str(self._worker_step_delay_seconds),
-                ]
-            )
+        arguments = [
+            "--worker",
+            worker,
+            "--request",
+            str(request_path),
+            "--worker-step-delay",
+            str(self._worker_step_delay_seconds),
+        ]
+        process.setProgram(sys.executable)
+        process.setArguments(
+            arguments if getattr(sys, "frozen", False) else ["-m", "alpaca_desktop", *arguments]
+        )
+        if worker == "dataset-build":
+            self.build_started.emit()
         else:
-            process.setProgram(sys.executable)
-            process.setArguments(
-                [
-                    "-m",
-                    "alpaca_desktop",
-                    "--worker",
-                    "dataset-build",
-                    "--request",
-                    str(self._build_request_path),
-                    "--worker-step-delay",
-                    str(self._worker_step_delay_seconds),
-                ]
-            )
-        self.build_started.emit()
+            self.training_started.emit()
         process.start()
-        return run_id
 
     def cancel_active_run(self) -> None:
         state = self._active_run
@@ -465,7 +555,11 @@ class WorkspaceController(QObject):
                 state,
                 RunStatus.RUNNING,
                 now=utc_now(),
-                message="Dataset Build Worker started",
+                message=(
+                    "Dataset Build Worker started"
+                    if state.kind is RunKind.DATASET_BUILD
+                    else "CNN Training Worker started"
+                ),
             )
         )
 
@@ -513,8 +607,18 @@ class WorkspaceController(QObject):
                 self._protocol_error = f"Worker progress was invalid: {exc}"
             else:
                 self._set_run(updated)
+        elif event_name == "measurement" and state.status is RunStatus.RUNNING:
+            try:
+                measurement = {
+                    key: value
+                    for key, value in event.items()
+                    if key not in {"schema_version", "event", "message"}
+                }
+                self._set_run(append_run_measurement(state, measurement, now=utc_now()))
+            except (TypeError, ValueError) as exc:
+                self._protocol_error = f"Worker measurement was invalid: {exc}"
         elif event_name == "error":
-            self._worker_error = message or "Dataset Build Worker failed."
+            self._worker_error = message or "Worker failed."
         elif event_name not in {"started", "completed", "cancelled"}:
             self._protocol_error = "Worker sent an unknown progress event."
 
@@ -526,11 +630,15 @@ class WorkspaceController(QObject):
             return
         self._on_run_stdout()
         stderr = bytes(process.readAllStandardError()).decode(errors="replace").strip()
-        artifact: DatasetArtifact | None = None
+        artifact: DatasetArtifact | ModelArtifact | None = None
         result_error = ""
         try:
             load_completion_receipt(root, state)
-            artifact = load_dataset(root, state.output_id)
+            artifact = (
+                load_dataset(root, state.output_id)
+                if state.output_kind == "dataset"
+                else load_model(root, state.output_id)
+            )
         except (OSError, ValueError) as exc:
             result_error = str(exc)
 
@@ -544,7 +652,10 @@ class WorkspaceController(QObject):
             )
             self.error_message = ""
             self._set_run(state)
-            self.build_completed.emit(artifact)
+            if state.kind is RunKind.DATASET_BUILD:
+                self.build_completed.emit(artifact)
+            else:
+                self.training_completed.emit(artifact)
         elif state.status is RunStatus.CANCELLING:
             state = transition_run(
                 state,
@@ -553,9 +664,16 @@ class WorkspaceController(QObject):
                 message="Cancelled · staged output not published",
             )
             self._set_run(state)
-            self.build_cancelled.emit()
+            if state.kind is RunKind.DATASET_BUILD:
+                self.build_cancelled.emit()
+            else:
+                self.training_cancelled.emit()
         elif exit_status == QProcess.ExitStatus.CrashExit:
-            message = "The Dataset Build Worker stopped unexpectedly."
+            message = (
+                "The Dataset Build Worker stopped unexpectedly."
+                if state.kind is RunKind.DATASET_BUILD
+                else "The CNN Training Worker stopped unexpectedly."
+            )
             state = transition_run(
                 state,
                 RunStatus.INTERRUPTED,
@@ -565,28 +683,53 @@ class WorkspaceController(QObject):
             )
             self.error_message = message
             self._set_run(state)
-            self.build_failed.emit(message)
+            if state.kind is RunKind.DATASET_BUILD:
+                self.build_failed.emit(message)
+            else:
+                self.training_failed.emit(message)
         else:
             message = self._protocol_error or self._worker_error
             if not message and stderr:
                 message = stderr.rsplitlines()[-1]
             if not message:
                 message = (
-                    f"Dataset Build Worker returned an invalid published output: {result_error}"
+                    f"Worker returned an invalid published output: {result_error}"
                     if result_error
-                    else "Dataset Build Worker failed."
+                    else "Worker failed."
                 )
             message = self._portable_error(message)
             state = transition_run(
                 state,
                 RunStatus.FAILED,
                 now=utc_now(),
-                message="Dataset Build failed",
+                message=(
+                    "Dataset Build failed"
+                    if state.kind is RunKind.DATASET_BUILD
+                    else "CNN Training failed"
+                ),
                 error=message,
             )
             self.error_message = message
             self._set_run(state)
-            self.build_failed.emit(message)
+            if state.kind is RunKind.DATASET_BUILD:
+                self.build_failed.emit(message)
+            else:
+                self.training_failed.emit(message)
+        if state.status is not RunStatus.COMPLETED and state.output_kind == "model":
+            try:
+                discard_uncommitted_model(
+                    root,
+                    state.output_id,
+                    run_id=state.run_id,
+                    request_id=state.request_id,
+                )
+            except FileNotFoundError:
+                pass
+            except (OSError, ValueError) as exc:
+                self.error_message = (
+                    f"{self.error_message} Uncommitted Model cleanup needs attention: "
+                    f"{self._portable_error(str(exc))}"
+                ).strip()
         self._load_runs(root)
         self.runs_changed.emit()
         self._run_process = None
@@ -598,7 +741,11 @@ class WorkspaceController(QObject):
         if error != QProcess.ProcessError.FailedToStart or self._active_run is None:
             return
         state = self._active_run
-        message = "Dataset Build Worker could not start from the current application environment."
+        message = (
+            "Dataset Build Worker could not start from the current application environment."
+            if state.kind is RunKind.DATASET_BUILD
+            else "CNN Training Worker could not start from the current application environment."
+        )
         state = transition_run(
             state,
             RunStatus.FAILED,
@@ -613,7 +760,10 @@ class WorkspaceController(QObject):
         self._current_run_id = None
         if process is not None:
             process.deleteLater()
-        self.build_failed.emit(message)
+        if state.kind is RunKind.DATASET_BUILD:
+            self.build_failed.emit(message)
+        else:
+            self.training_failed.emit(message)
 
     def _terminate_run(self, run_id: str) -> None:
         if (

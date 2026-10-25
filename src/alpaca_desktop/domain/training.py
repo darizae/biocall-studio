@@ -446,6 +446,78 @@ class FrozenTrainingConfig:
             "preset_origin": self.preset_origin,
         }
 
+    @classmethod
+    def from_worker_snapshot(cls, raw: object) -> FrozenTrainingConfig:
+        if not isinstance(raw, dict) or raw.get("schema_version") != 1:
+            raise ValueError("Unsupported resolved Training configuration schema.")
+        if set(raw) != {
+            "schema_version",
+            "family",
+            "dataset_id",
+            "requested_values",
+            "effective_values",
+            "class_mapping",
+            "preset_origin",
+        }:
+            raise ValueError("Resolved Training configuration fields do not match its schema.")
+        family = _normalize_family(raw.get("family"))
+        dataset_id = raw.get("dataset_id")
+        requested = raw.get("requested_values")
+        effective = raw.get("effective_values")
+        mapping = raw.get("class_mapping")
+        preset_origin = raw.get("preset_origin")
+        if not isinstance(dataset_id, str) or not dataset_id:
+            raise ValueError("Resolved Training configuration requires a Dataset ID.")
+        if not isinstance(requested, dict) or not isinstance(effective, dict):
+            raise ValueError("Resolved Training configuration values must be objects.")
+        draft = TrainingDraft(family, requested)
+        expected_keys = {field.key for field in fields_for_family(family)}
+        if set(effective) != expected_keys:
+            raise ValueError("Effective Training configuration does not match the field catalog.")
+        if mapping != {"noise": 0, "target": 1}:
+            raise ValueError("Resolved Training configuration requires the binary class mapping.")
+        if preset_origin is not None and (
+            not isinstance(preset_origin, str) or not preset_origin.strip()
+        ):
+            raise ValueError("Resolved Training preset origin is invalid.")
+        for field in fields_for_family(family):
+            if field.mode == "editable":
+                error = _type_error(field, draft.value(field.key))
+            else:
+                error = _type_error(field, effective[field.key])
+            if error:
+                raise ValueError(f"{field.key}: {error}")
+        return cls(
+            schema_version=1,
+            family=family,
+            dataset_id=dataset_id,
+            requested_values=MappingProxyType(dict(requested)),
+            effective_values=MappingProxyType(dict(effective)),
+            class_mapping=MappingProxyType(dict(mapping)),
+            preset_origin=preset_origin,
+        )
+
+
+def verify_frozen_training_config(
+    frozen: FrozenTrainingConfig,
+    dataset: TrainingDataset,
+    capabilities: DeviceCapabilities,
+) -> None:
+    """Re-resolve the persisted request in the Worker and reject any disagreement."""
+    draft = TrainingDraft(frozen.family, frozen.requested_values)
+    expected = freeze_training_config(
+        draft,
+        dataset,
+        capabilities,
+        preset_origin=frozen.preset_origin,
+    )
+    if (
+        expected.dataset_id != frozen.dataset_id
+        or dict(expected.effective_values) != dict(frozen.effective_values)
+        or dict(expected.class_mapping) != dict(frozen.class_mapping)
+    ):
+        raise ValueError("Resolved Training configuration disagrees with Worker capabilities.")
+
 
 def freeze_training_config(
     draft: TrainingDraft,

@@ -12,6 +12,7 @@ from pathlib import Path
 from alpaca_desktop.domain.paths import validate_relative_path
 from alpaca_desktop.domain.run import RunState, RunStatus, reconcile_run
 from alpaca_desktop.persistence.datasets import load_dataset
+from alpaca_desktop.persistence.models import discard_uncommitted_model, load_model
 
 MAX_RUN_JSON_BYTES = 1_000_000
 WORKER_RESULT_SCHEMA_VERSION = 1
@@ -206,14 +207,15 @@ def _valid_output(collection_root: Path, state: RunState) -> bool:
         if state.output_kind == "dataset":
             load_dataset(collection_root, state.output_id)
             return True
+        if state.output_kind == "model":
+            load_model(collection_root, state.output_id)
+            return True
     except (OSError, ValueError):
         return False
     return False
 
 
 def _cleanup_staging(collection_root: Path, state: RunState) -> None:
-    if state.output_kind != "dataset":
-        return
     staging = _alpaca_root(collection_root) / ".staging"
     if not staging.exists() or staging.is_symlink() or not staging.is_dir():
         return
@@ -239,11 +241,24 @@ def reconcile_runs(collection_root: Path) -> tuple[RunState, ...]:
             receipt = False
         else:
             receipt = True
+        output_valid = _valid_output(collection_root, state)
+        if (
+            state.output_kind == "model"
+            and output_valid
+            and (not receipt or (state.terminal and state.status is not RunStatus.COMPLETED))
+        ):
+            discard_uncommitted_model(
+                collection_root,
+                state.output_id,
+                run_id=state.run_id,
+                request_id=state.request_id,
+            )
+            output_valid = False
         updated = reconcile_run(
             state,
             now=utc_now(),
             completion_receipt=receipt,
-            published_output_valid=_valid_output(collection_root, state),
+            published_output_valid=output_valid,
         )
         if updated != state:
             save_run(collection_root, updated)

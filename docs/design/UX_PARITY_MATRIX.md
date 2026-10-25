@@ -52,6 +52,13 @@ Dataset route, complete field/help inventory, strict validation, family isolatio
 preset lifecycle. `IT-TRAIN-012/014` remain open for the genuine 05b/05c executors; no Run or Model
 success is inferred from configuration readiness.
 
+**Spec 05b evidence:** native Model naming, the completed CNN Run with genuine measured loss,
+published Model list/detail and narrow Model detail passed the six-dimension review at the current
+sibling `alp-ui` SHA. The [evidence ledger](evidence/README.md) records the safety-mandated naming
+timing and no-Prediction boundary; `IT-TRAIN-001` is fully covered and CNN assertions for the shared
+`IT-TRAIN-004/005/007/008/009/012/014` behaviors pass. Shared family cases stay open for 05c rather
+than treating one CNN or its screenshots as complete RF evidence.
+
 ## Acceptance procedure
 
 [Prototype acceptance](PROTOTYPE_ACCEPTANCE.md) owns native screenshot capture, the six-dimension review, exception handling and installed-app gate. [Evidence ledger](evidence/README.md) owns historical reviewed evidence. This matrix owns only **which prototype states/components belong to each spec**; update its rows as scoped behavior changes.

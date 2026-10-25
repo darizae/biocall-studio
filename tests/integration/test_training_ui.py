@@ -5,7 +5,7 @@ import json
 import pytest
 from alp_ui.components import HelpHint, NumberInput, SelectInput
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QInputDialog, QMessageBox
 
 from alpaca_desktop.application.collection_scan import scan_collection
 from alpaca_desktop.application.workspace import WorkspaceController
@@ -135,7 +135,7 @@ def test_native_training_page_primary_disclosure_family_drafts_and_wiki(
 
 @pytest.mark.qt
 def test_native_validation_preserves_values_blocks_launch_and_resets(
-    qapp, qtbot, tmp_path, wav_factory
+    qapp, qtbot, tmp_path, wav_factory, monkeypatch
 ):
     """Case: IT-TRAIN-011."""
     window, _dataset = _window(qtbot, tmp_path, wav_factory)
@@ -188,11 +188,28 @@ def test_native_validation_preserves_values_blocks_launch_and_resets(
         & page.editable_field_keys()
     )
 
+    started: dict[str, object] = {}
+    monkeypatch.setattr(
+        QInputDialog,
+        "getText",
+        lambda *_args, **_kwargs: ("UI verified CNN", True),
+    )
+    monkeypatch.setattr(
+        window.controller,
+        "start_training",
+        lambda config, *, model_label: started.update(
+            config=config,
+            model_label=model_label,
+        ),
+    )
     page.start_button.click()
     assert page.last_frozen_config is not None
     assert page.last_frozen_config.dataset_id == "dataset-training-ui"
+    assert started == {
+        "config": page.last_frozen_config,
+        "model_label": "UI verified CNN",
+    }
     assert window.controller.active_run is None
-    assert "No training Run was started" in page.launch_alert.text_widget.text()
 
 
 @pytest.mark.qt

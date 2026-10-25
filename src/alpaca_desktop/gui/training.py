@@ -1,4 +1,4 @@
-"""Native Dataset → Model configuration → Start Training surface for Spec 05a."""
+"""Native Dataset → Model configuration → Start Training surface."""
 
 from __future__ import annotations
 
@@ -322,6 +322,11 @@ class TrainingPage(QScrollArea):
         self._place_cards(False)
         self._rebuild_form()
         self.verticalScrollBar().setValue(0)
+        controller.run_changed.connect(lambda _run: self._validate_and_refresh())
+        controller.training_started.connect(lambda: self.start_button.setLoading(True))
+        controller.training_completed.connect(lambda _model: self.start_button.setLoading(False))
+        controller.training_failed.connect(lambda _message: self.start_button.setLoading(False))
+        controller.training_cancelled.connect(lambda: self.start_button.setLoading(False))
 
     @property
     def draft(self) -> TrainingDraft:
@@ -899,9 +904,14 @@ class TrainingPage(QScrollArea):
         else:
             self.error_alert.hide()
         active = self.controller.active_run is not None
-        self.start_button.setEnabled(not errors and not active)
+        supported = self.family == "cnn"
+        self.start_button.setEnabled(not errors and not active and supported)
         self.run_availability.setText(
-            "Another Run is active." if active else "One Active Run at a time."
+            "Another Run is active."
+            if active
+            else "Random Forest execution is implemented in Spec 05c."
+            if not supported
+            else "One Active Run at a time."
         )
         modified_details = sum(
             field.key in self.draft.modified_keys()
@@ -948,11 +958,26 @@ class TrainingPage(QScrollArea):
                 getattr(control, "control", control).setFocus()
             self._validate_and_refresh()
             return
-        self.launch_alert.text_widget.setText(
-            "The complete configuration snapshot is ready for the family executor. "
-            "No training Run was started in this configuration-only phase."
+        if self.family != "cnn" or self.artifact is None:
+            return
+        default_label = f"{self.artifact.label} · CNN"
+        label, accepted = QInputDialog.getText(
+            self,
+            "Name your Model",
+            "Model display name",
+            text=default_label[:80],
         )
-        self.launch_alert.show()
+        if not accepted:
+            return
+        try:
+            self.controller.start_training(
+                self.last_frozen_config,
+                model_label=label,
+            )
+        except (OSError, ValueError) as exc:
+            self.launch_alert.title_widget.setText("Training could not start")
+            self.launch_alert.text_widget.setText(str(exc))
+            self.launch_alert.show()
 
     def _refresh_preset_selector(self) -> None:
         records = [record for record in self._preset_records() if record.family == self.family]

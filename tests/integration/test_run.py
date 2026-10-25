@@ -306,7 +306,13 @@ def test_native_run_detail_cancellation_failure_completion_and_history(
     assert isinstance(detail.cancel_button, Button)
     assert isinstance(detail.output_alert, Alert)
     assert detail.cancel_button.text() == "Cancel Run"
-    assert detail.section_order == ("progress", "activity", "output", "details")
+    assert detail.section_order == (
+        "progress",
+        "measurements",
+        "activity",
+        "output",
+        "details",
+    )
     assert window._navigation["runs"].isChecked()
     assert window.active_run_label.text().startswith("Build ·")
     assert window.active_run_progress.isVisible()

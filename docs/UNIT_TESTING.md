@@ -35,9 +35,9 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-TRAIN-009` | User saved presets: reject multi-label/multi-class/extra class settings; per-family values, create/load/duplicate/rename/delete/overwrite, draft vs stored vs immutable Run spec, no Collection/Dataset paths, stable IDs | TD-PRESET, TD-CONFIG | 05 |
 | `UT-TRAIN-010` | Preset schema migration/incompatible toolbox revision, corrupt JSON, unsafe/duplicate names, atomic failure and no silent field loss | TD-PRESET, TD-FAIL | 05 |
 
-**Spec 05a execution record (25 October 2026):** `UT-TRAIN-007`–`010` are implemented as
-asserting tests in `tests/unit/test_training_config.py`, including the complete 67-field roster,
-strict no-clamp resolution, immutable binary snapshot, full-family preset roundtrip and injected
-atomic-replace failure.
+**Reported status:** 05a covers `UT-TRAIN-007`–`010`; 05b covers `001`/`004`/`005` and the CNN side of shared `003`.
+See the [05a closeout](specs/05a-training-configuration-and-presets.md) and
+[05b evidence](design/evidence/README.md#spec-05b--real-cnn-training-and-common-model-foundation).
+Shared cases require 05c; reported results are not fresh verification.
 
 Do not add unit tests that instantiate a fake repository/GUI just to mirror an `IT-*` case. Conversely, if the algorithm truly depends on WAV decoder/frame reads, include a minimal actual WAV integration test for that boundary. See [`INTEGRATION_TESTING.md`](INTEGRATION_TESTING.md) and its indexed behavior plan.

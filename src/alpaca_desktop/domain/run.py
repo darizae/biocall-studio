@@ -8,9 +8,10 @@ from typing import Any
 
 from alpaca_desktop.domain.paths import validate_relative_path
 
-RUN_STATE_SCHEMA_VERSION = 1
+RUN_STATE_SCHEMA_VERSION = 2
 MAX_ACTIVITY_ENTRIES = 200
 MAX_ACTIVITY_MESSAGE_LENGTH = 1_000
+MAX_MEASUREMENTS = 200
 
 
 class RunKind(StrEnum):
@@ -115,6 +116,7 @@ class RunState:
     activity: tuple[str, ...]
     error: str
     published_artifact_id: str | None
+    measurements: tuple[dict[str, Any], ...] = ()
 
     @property
     def active(self) -> bool:
@@ -160,6 +162,7 @@ class RunState:
             "activity": list(self.activity),
             "error": self.error,
             "published_artifact_id": self.published_artifact_id,
+            "measurements": [dict(item) for item in self.measurements],
         }
 
     @classmethod
@@ -185,6 +188,7 @@ class RunState:
             "activity",
             "error",
             "published_artifact_id",
+            "measurements",
         }
         if set(raw) != expected:
             raise ValueError("Run State fields do not match its schema.")
@@ -209,6 +213,7 @@ class RunState:
                 published_artifact_id=_optional_id(
                     raw["published_artifact_id"], "published artifact ID"
                 ),
+                measurements=_measurements(raw["measurements"]),
             )
         except (KeyError, TypeError) as exc:
             raise ValueError("Run State contains invalid values.") from exc
@@ -268,6 +273,35 @@ def _activity(value: object) -> tuple[str, ...]:
     ):
         raise ValueError("Run activity exceeds its bounded storage limit.")
     return entries
+
+
+def _measurements(value: object) -> tuple[dict[str, Any], ...]:
+    if not isinstance(value, (list, tuple)) or len(value) > MAX_MEASUREMENTS:
+        raise ValueError("Run measurements must be a bounded list.")
+    prepared: list[dict[str, Any]] = []
+    allowed = {"phase", "epoch", "loss", "accuracy", "precision", "recall", "f1"}
+    for raw in value:
+        if (
+            not isinstance(raw, dict)
+            or not {"phase", "epoch", "loss"}.issubset(raw)
+            or not set(raw).issubset(allowed)
+            or raw["phase"] not in {"train", "val"}
+            or type(raw["epoch"]) is not int
+            or raw["epoch"] < 1
+        ):
+            raise ValueError("Run measurement shape is invalid.")
+        row: dict[str, Any] = {"phase": raw["phase"], "epoch": raw["epoch"]}
+        for key, item in raw.items():
+            if key in {"phase", "epoch"}:
+                continue
+            if isinstance(item, bool) or not isinstance(item, (int, float)):
+                raise ValueError("Run measurement values must be finite numeric data.")
+            number = float(item)
+            if number != number or number in {float("inf"), float("-inf")}:
+                raise ValueError("Run measurement values must be finite numeric data.")
+            row[key] = number
+        prepared.append(row)
+    return tuple(prepared)
 
 
 def _validate_state(state: RunState) -> None:
@@ -331,6 +365,7 @@ def new_run(
         activity=("Run created",),
         error="",
         published_artifact_id=None,
+        measurements=(),
     )
     _validate_state(state)
     return state
@@ -398,6 +433,24 @@ def update_run_progress(
         stage_index=stage_index,
         updated_at=_required_text(now, "Run update time"),
         activity=_append_activity(state.activity, message),
+    )
+    _validate_state(updated)
+    return updated
+
+
+def append_run_measurement(
+    state: RunState,
+    measurement: dict[str, Any],
+    *,
+    now: str,
+) -> RunState:
+    if state.kind is not RunKind.TRAINING or not state.active:
+        raise RunTransitionError("Only an Active Training Run accepts measurements.")
+    row = _measurements([measurement])[0]
+    updated = replace(
+        state,
+        measurements=(*state.measurements, row)[-MAX_MEASUREMENTS:],
+        updated_at=_required_text(now, "Run update time"),
     )
     _validate_state(updated)
     return updated

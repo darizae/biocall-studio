@@ -17,3 +17,9 @@
 Write failing tests first; **`UT-TRAIN-001`/`004`/`005`** and **`IT-TRAIN-001`** are the primary fully owned IDs. Use a genuine small two-class source-WAV-backed published Dataset for CPU training, inspect the frozen Worker spec vs effective library settings, validate real persisted loss/metrics, verify destructive-path failures and structurally reopen the exact locally generated checkpoint in a fresh subprocess. Capture real CNN Train/Run/Model screenshots and update the [native evidence ledger](../design/evidence/README.md).
 
 CNN assertions for the **shared** IDs (`UT-TRAIN-003`, `IT-TRAIN-004`–`009`, `012`, `014`) are useful incremental tests but **do not close those IDs**: the indexed behaviors require both families and/or real preset-to-Model checks. No RF result, full Spec 05 acceptance, packaging independence or Prediction claim belongs to 05b. Finish with verified tests/evidence and a scoped [Git handoff](../agent/GIT_DELIVERY.md); report separate upstream SHA if applicable.
+
+## Snapshot handoff — 25 October 2026
+
+**Implemented, awaiting owner acceptance:** CNN Worker, common Model publication/reload, owned tests and native evidence are present in this ZIP. The [05b evidence ledger](../design/evidence/README.md#spec-05b--real-cnn-training-and-common-model-foundation) records previous macOS test results and screenshots; these are not independent verification of the present checkout.
+
+Before closing 05b, rerun affected tests on the native checkout and verify the active toolbox import, visual evidence, Trainer/upstream commit SHAs and clean Git status. The transfer ZIP lacks `.git` and sibling/native dependencies, so those gates remain **unverified here**. Shared cross-family and package-independence gates stay with 05c.

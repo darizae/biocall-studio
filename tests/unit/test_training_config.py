@@ -61,7 +61,7 @@ def test_catalog_roster_is_complete_typed_and_binary_only():
 
 
 def test_drafts_validate_without_clamping_and_freeze_complete_values():
-    """Case: UT-TRAIN-008."""
+    """Cases: UT-TRAIN-001, UT-TRAIN-008."""
     capabilities = DeviceCapabilities(cuda=False, mps=False, cpu_count=8)
     cnn = TrainingDraft.defaults("cnn")
     cnn.set("training.batch_size", 24)
@@ -88,6 +88,23 @@ def test_drafts_validate_without_clamping_and_freeze_complete_values():
     assert len(frozen.effective_values) == 47
     with pytest.raises(TypeError):
         frozen.effective_values["training.batch_size"] = 99
+
+    assert frozen.class_mapping == {"noise": 0, "target": 1}
+    with pytest.raises(ValueError, match="exactly the binary"):
+        TrainingDataset(
+            dataset_id="dataset-multiclass",
+            labels=("noise", "target", "other"),
+            split_counts=_dataset().split_counts,
+        )
+    with pytest.raises(ValueError, match="val Split"):
+        TrainingDataset(
+            dataset_id="dataset-no-validation-target",
+            labels=("noise", "target"),
+            split_counts={
+                "train": {"target": 4, "noise": 4},
+                "val": {"target": 0, "noise": 2},
+            },
+        )
 
     cnn.reset("training.batch_size")
     assert cnn.value("training.batch_size") == 16

@@ -258,8 +258,8 @@ WAVs. No training Worker ran, no metric was invented and no Model was published.
   app capture 1280×807 and compact capture 700×780. PNGs preserve native compositor output.
 - Scientific defaults were rechecked against the current `bioacoustics-dl-toolbox`
   `8e2e0528d4ce718005e194d426cde6e62fda0909` and `alpaca-pipelines`
-  `91af5287dc18313f88902dc9696e8756274736b3`. The applicable toolbox configuration defaults are
-  unchanged from the Trainer's pinned `0fce0d4fa3d0931c5731e8b868f705e0a2120835` revision.
+  `91af5287dc18313f88902dc9696e8756274736b3`. Spec 05b advances the Trainer's recorded toolbox
+  revision to that exact inspected sibling commit.
 - The unchanged prototype was reviewed source-first at `openTraining`, `trainPage`, `setTrain` and
   `startTraining`, the relevant CSS and `rf-config-preview.png`. No controllable browser session was
   connected, so no live-browser interaction evidence is claimed. The actual current sibling
@@ -287,13 +287,77 @@ focus, scroll and resize; **S** scientific/disabled/error/completed-state fideli
 keyboard disclosure and family-draft isolation. `IT-TRAIN-011` asserts non-clamping validation,
 reset, unavailable capabilities and frozen configuration without Worker launch. `IT-TRAIN-013`
 asserts real atomic files and CRUD/restart persistence in an isolated user directory. The successful
-Start action only freezes the future Worker input and shows “No training Run was started”; deferred
-`IT-TRAIN-012/014` remain open until 05c can observe both real executors and immutable Models.
+At the 05a closeout the Start action only froze the future Worker input. Spec 05b supersedes that
+temporary boundary for CNN while `IT-TRAIN-012/014` remain cross-family-open until 05c.
 
 Verified on the capture platform with `5 passed` for the owned unit module, `3 passed` for the
 owned integration module and `74 passed` for the full suite. Ruff check/format, the indexed-ID,
 fixture, native-handoff and Git LFS audits passed. `capture_spec05_screenshots.py` produced the nine
 reviewed Cocoa PNGs, and a no-dependency wheel build contained the packaged 67-field JSON catalog.
+
+## Spec 05b — Real CNN training and common Model foundation
+
+**Status: implementation recorded; owner acceptance pending.** The macOS record reports a real
+CPU CNN Worker, measured train/validation loss, immutable checksummed Model, trusted fresh-process
+structural reload and native naming/Run/Model screens. No inference was implemented or claimed.
+
+### Capture provenance
+
+- Command: `unset QT_QPA_PLATFORM; .venv/bin/python -u scripts/capture_spec05_screenshots.py`
+- Captured 25 October 2026 on macOS 26.6.2 arm64; native Cocoa; 1470×956 logical primary screen,
+  device pixel ratio 2.0 and logical DPI 72
+- Runtime: Python 3.12.7; PySide6/Qt 6.11.2; `alp-ui` 0.1.0a0 at
+  `330aaab96a6b32dd2d83ae84a52a2a238446d264`
+- Stored PNGs: 1280×807 desktop, 700×780 narrow Model detail, and 1180×790 current Showcase
+- Direct scientific dependency: editable `bioacoustics-dl-toolbox` 0.1.1 imported from
+  `../bioacoustics-dl-toolbox/src` at `8e2e0528d4ce718005e194d426cde6e62fda0909`, not the package
+  copy inside `../alpaca-pipelines`; targeted pipeline reference
+  `91af5287dc18313f88902dc9696e8756274736b3`
+- Data/privacy: generated mono PCM Source Recordings, timestamped positives and a real published
+  target/noise Dataset in an isolated temporary Collection; no user or HPC data
+- Capture mechanism: visible `QMainWindow`, native `QInputDialog` and Cocoa `QScreen.grabWindow`;
+  the command rejects Qt offscreen/non-Cocoa rendering
+
+Prototype functions and CSS were inspected source-first; the sibling Showcase was captured as
+[alp-ui-showcase-current.png](spec-05-native/alp-ui-showcase-current.png). The native Run uses
+public `Plot.setLines` with selectable numeric loss values.
+
+Scientific publication requires a final Model label inside the immutable, exclusively published
+manifest. The native app therefore collects the same 80-character display name immediately after
+**Start Training**, before the Worker begins, instead of holding completed but unpublished weights
+for the prototype's later **Name and save Model** action. This is the smallest safety-driven timing
+change: the modal content, stable ID/readable-label result and Run→Model journey remain intact, and
+cancellation/failure never exposes partial weights. Likewise, the prototype's illustrative
+Prediction link is replaced by an explicit **Prediction not included** boundary as required by the
+Trainer scope.
+
+### State-by-state review
+
+Six-dimension key: **H** information hierarchy/CTA/panel order; **N** navigation/active state;
+**C** terms/copy/feedback; **A** `alp-ui` components/theme/icons/accessibility; **I** interaction,
+focus, scroll and resize; **S** real scientific/disabled/error/completed-state fidelity.
+
+| State | Prototype target | Native evidence | Showcase and interaction evidence | Six dimensions | Difference / disposition |
+|---|---|---|---|---|---|
+| Model naming | `nameModel()` / `saveModel()` | [model-name.png](spec-05-native/model-name.png) | Native modal, focused bounded label, validated frozen config and one-Active-Run gate; `IT-TRAIN-001/012/014` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Naming occurs immediately after Start so the supervised Worker can publish one final immutable Model; no orphan trained weights or later manifest rewrite is introduced. |
+| Completed CNN Run and Plot | `runPage()` / `lossChart()` | [run-cnn-plot.png](spec-05-native/run-cnn-plot.png) | Real QProcess completion; two measured series via public `Plot`, exact selectable numeric alternative, Model output CTA; `IT-TRAIN-001/005/007` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Browser mock curves/metrics are replaced by the one real bounded epoch captured here; the chart is sparse because no values are invented. |
+| Model list | `modelsPage()` | [models.png](spec-05-native/models.png) | Real `DataTable` model populated only after verified publication; label, stable ID, family, Dataset/date and Inspect navigation; `IT-TRAIN-007` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | “Available to Prediction” copy is omitted because this Trainer does not establish inference support. |
+| Model detail | `modelPage()` / `model-preview.png` | [model-detail.png](spec-05-native/model-detail.png) | Real validation metrics, Dataset/Run links, immutable file tree, package/SHA provenance and explicit no-Prediction boundary; `UT-TRAIN-004/005`, `IT-TRAIN-007/008` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Real checksum-verified `model.json` + `model.pt` replace proposed/demo files; the browser's external Prediction CTA is intentionally absent. |
+| Narrow Model detail | responsive `modelPage()` | [model-detail-narrow.png](spec-05-native/model-detail-narrow.png) | 700×780 viewport, horizontally reachable navigation, readable four-stat row, vertical detail stack and preserved Run/Dataset actions | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Content remains vertically reachable without horizontal page clipping; the navigation strip scrolls by design. |
+
+**Recorded 05b checks (macOS, 25 October 2026):**
+
+- `.venv/bin/pytest -q tests/unit/test_training_config.py tests/unit/test_model.py` — **9 passed**.
+- `.venv/bin/pytest -q tests/integration/test_cnn_training.py` — **2 passed**.
+
+These are prior-session reports, not reruns from this ZIP. Tests exercise Dataset → QProcess →
+CNN → Model, preset independence, trusted fresh-process reload, cancellation/no-publication,
+measured numeric Plot values and native navigation.
+
+**Open gates:** shared `UT-TRAIN-003`, `IT-TRAIN-004`–`009`/`012`/`014` require RF-side and/or
+package-independence verification in 05c; installed releases remain in 06/07. The transfer ZIP
+has no Git metadata or sibling checkout: confirm both commit SHAs and clean trees in the original
+repositories before accepting 05b.
 
 ## Every subsequent spec: mandatory ledger
 

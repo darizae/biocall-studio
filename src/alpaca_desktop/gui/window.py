@@ -37,9 +37,11 @@ from PySide6.QtWidgets import (
 from alpaca_desktop.application.workspace import WorkspaceController
 from alpaca_desktop.gui.collection import CollectionPage, ReadingCollectionPage
 from alpaca_desktop.gui.dataset import DatasetBuilderPage, DatasetDetailPage, DatasetListPage
+from alpaca_desktop.gui.model import ModelDetailPage, ModelListPage
 from alpaca_desktop.gui.run import RunDetailPage, RunListPage
 from alpaca_desktop.gui.training import TrainingPage, TrainingWikiPage
 from alpaca_desktop.persistence.datasets import load_dataset
+from alpaca_desktop.persistence.models import load_model
 from alpaca_desktop.persistence.training_presets import PresetStore
 
 _ROUTES = (
@@ -518,6 +520,15 @@ class MainWindow(QMainWindow):
             self._open_run_output,
             lambda: self.navigate("runs"),
         )
+        self.model_list_page = ModelListPage(
+            self.open_model,
+            lambda: self.navigate("datasets"),
+        )
+        self.model_detail_page = ModelDetailPage(
+            self.open_dataset,
+            self.open_run,
+            lambda: self.navigate("models"),
+        )
         self.wiki_page = WikiPage(lambda: self.navigate("select"))
         self.wiki_select_button = self.wiki_page.select_button
         self.settings_page = SettingsPage(controller)
@@ -537,12 +548,8 @@ class MainWindow(QMainWindow):
             ("dataset-detail", self.dataset_detail_page),
             ("training", self.training_page),
             ("training-wiki", self.training_wiki_page),
-            (
-                "models",
-                self._empty_artifact_page(
-                    "Models", "Trained classifiers from published Datasets.", "No Models yet."
-                ),
-            ),
+            ("models", self.model_list_page),
+            ("model-detail", self.model_detail_page),
             ("runs", self.run_list_page),
             ("run-detail", self.run_detail_page),
             ("wiki", self.wiki_page),
@@ -551,6 +558,7 @@ class MainWindow(QMainWindow):
             self._pages[route] = page
             self.pages.addWidget(page)
         self.empty_pages["datasets"] = self.dataset_list_page.empty
+        self.empty_pages["models"] = self.model_list_page.empty
         self.empty_pages["runs"] = self.run_list_page.empty
         self.body_layout.addWidget(self.pages, 1)
         self._root_layout.addWidget(body, 1)
@@ -564,6 +572,10 @@ class MainWindow(QMainWindow):
         controller.build_completed.connect(self._dataset_built)
         controller.build_failed.connect(self._build_failed)
         controller.build_cancelled.connect(self._build_cancelled)
+        controller.training_started.connect(self._training_started)
+        controller.training_completed.connect(self._model_trained)
+        controller.training_failed.connect(self._training_failed)
+        controller.training_cancelled.connect(self._training_cancelled)
         controller.run_changed.connect(self._run_changed)
         controller.runs_changed.connect(self._refresh_run_surfaces)
         controller.run_conflict.connect(self._show_run_conflict)
@@ -764,7 +776,7 @@ class MainWindow(QMainWindow):
             else "datasets"
             if route in {"builder", "dataset-detail"}
             else "models"
-            if route == "training"
+            if route in {"training", "model-detail"}
             else "wiki"
             if route == "training-wiki"
             else "runs"
@@ -822,6 +834,17 @@ class MainWindow(QMainWindow):
             self.training_page.family_input.control.setFocus()
         elif route == "training-wiki":
             self.training_wiki_page.back_button.setFocus()
+        elif route == "models":
+            self.model_list_page.refresh(self.controller.collection_path)
+            target = (
+                self.model_list_page.table
+                if self.model_list_page.model.rowCount()
+                else self.model_list_page.empty
+            )
+            target.setFocus()
+        elif route == "model-detail":
+            if self.model_detail_page.artifact is not None:
+                self.model_detail_page.review_run_button.setFocus()
         elif route == "runs":
             self._refresh_run_surfaces()
             target = (
@@ -873,6 +896,21 @@ class MainWindow(QMainWindow):
         self.run_detail_page.set_run(run)
         self.navigate("run-detail")
 
+    def open_model(self, model_id: str) -> None:
+        root = self.controller.collection_path
+        if root is None:
+            self.navigate("models")
+            return
+        try:
+            artifact = load_model(root, model_id)
+        except (OSError, ValueError) as exc:
+            self.model_list_page.error_alert.text_widget.setText(str(exc))
+            self.model_list_page.error_alert.show()
+            self.navigate("models")
+            return
+        self.model_detail_page.set_model(artifact)
+        self.navigate("model-detail")
+
     def open_training(self, dataset_id: str) -> None:
         root = self.controller.collection_path
         if root is None:
@@ -904,6 +942,8 @@ class MainWindow(QMainWindow):
             return
         if run.output_kind == "dataset":
             self.open_dataset(run.output_id)
+        else:
+            self.open_model(run.output_id)
 
     def _dataset_built(self, artifact) -> None:
         self.builder_page.set_busy(False)
@@ -923,6 +963,21 @@ class MainWindow(QMainWindow):
 
     def _build_cancelled(self) -> None:
         self.builder_page.set_busy(False)
+        self._refresh_run_surfaces()
+
+    def _training_started(self) -> None:
+        self._refresh_run_surfaces()
+        self._open_active_run()
+
+    def _model_trained(self, artifact) -> None:
+        self.model_list_page.refresh(self.controller.collection_path)
+        self._refresh_run_surfaces()
+        self.open_model(artifact.model_id)
+
+    def _training_failed(self, _message: str) -> None:
+        self._refresh_run_surfaces()
+
+    def _training_cancelled(self) -> None:
         self._refresh_run_surfaces()
 
     def _set_run_header_idle(self) -> None:

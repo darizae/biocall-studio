@@ -96,11 +96,10 @@ set and six-dimension review are in
 | `IT-TRAIN-013` | Save/load full detailed overrides while **More settings** is closed; after restart and switching families the overrides are retained and reappear on expansion. Qt create/load/rename/duplicate/overwrite/delete saved config, confirm destructive action, restart and restore actual user-settings files in isolated OS test directory, handle invalid/corrupt/incompatible config; current Dataset and family drafts remain correctly isolated. | TD-PRESET, TD-UI, TD-FAIL |
 | `IT-TRAIN-014` | Start genuine training from loaded preset; snapshot resolved config into Run independently of later preset edits/deletion, confirm scientific execution and immutable Model export remain unchanged after restart. | TD-PRESET, TD-TRAIN, TD-EXPORT |
 
-**Spec 05a execution record (25 October 2026):** `IT-TRAIN-010`, `IT-TRAIN-011` and
-`IT-TRAIN-013` are implemented as asserting real-Qt/real-filesystem tests in
-`tests/integration/test_training_ui.py`. `IT-TRAIN-012` and `IT-TRAIN-014` remain explicitly open
-until both genuine family executors and immutable Model publication exist in 05c; configuration
-snapshotting alone is not counted as either case.
+**Reported status:** 05a covers `IT-TRAIN-010/011/013`; 05b covers `001` and CNN-only
+assertions for shared cases. `002/003` and the cross-family `004`–`009`/`012`/`014` (including
+package independence) remain for 05c. See [05b native evidence](design/evidence/README.md#spec-05b--real-cnn-training-and-common-model-foundation).
+Historical results do not establish current acceptance.
 
 Future Prediction inference cases are **reserved exclusively** in [PREDICTION](PREDICTION.md), outside this Trainer test index or any Trainer release gate.
 

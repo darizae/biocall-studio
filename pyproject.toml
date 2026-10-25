@@ -43,4 +43,4 @@ select = ["E", "F", "I", "UP"]
 
 [tool.alpaca-desktop.science]
 bioacoustics-dl-toolbox-version = "0.1.1"
-bioacoustics-dl-toolbox-revision = "0fce0d4fa3d0931c5731e8b868f705e0a2120835"
+bioacoustics-dl-toolbox-revision = "8e2e0528d4ce718005e194d426cde6e62fda0909"
