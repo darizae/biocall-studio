@@ -37,12 +37,18 @@ class SettingsStore:
             raise ValueError(f"Unsupported Application Settings at {self.path}")
         collection_path = raw.get("collection_path")
         collection_id = raw.get("collection_id")
-        if raw.get("schema_version") != 2 or (
-            collection_path is not None
-            and (not isinstance(collection_path, str) or not Path(collection_path).is_absolute())
-        ) or (
-            collection_id is not None
-            and (not isinstance(collection_id, str) or not collection_id)
+        if (
+            raw.get("schema_version") != 2
+            or (
+                collection_path is not None
+                and (
+                    not isinstance(collection_path, str) or not Path(collection_path).is_absolute()
+                )
+            )
+            or (
+                collection_id is not None
+                and (not isinstance(collection_id, str) or not collection_id)
+            )
         ):
             raise ValueError(f"Invalid Application Settings at {self.path}")
         if (collection_path is None) != (collection_id is None):

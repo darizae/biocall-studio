@@ -20,9 +20,7 @@ def _header(*, frames=16_000, rate=16_000, channels=1, width=2, codec="PCM"):
 
 def test_positive_filename_parser_is_anchored_and_preserves_complete_source_stem():
     """Case: UT-COL-001."""
-    parsed = parse_positive_filename(
-        "SITE__north__start-012500ms__end-014900ms__call-01.wav"
-    )
+    parsed = parse_positive_filename("SITE__north__start-012500ms__end-014900ms__call-01.wav")
     assert (parsed.source_stem, parsed.start_ms, parsed.end_ms, parsed.label) == (
         "SITE__north",
         12_500,
@@ -104,7 +102,7 @@ def test_inventory_change_decision_distinguishes_all_cache_states():
 def test_collection_manifest_rejects_versions_and_unsafe_partition_refs():
     """Case: UT-COL-006."""
     valid = {
-        "schema_version": 1,
+        "schema_version": 2,
         "collection_id": "collection-123",
         "collection_name": "Example",
         "scanned_at": "2026-10-24T10:00:00+00:00",
@@ -113,9 +111,20 @@ def test_collection_manifest_rejects_versions_and_unsafe_partition_refs():
         "inventory": [],
         "record_partitions": ["records/scan-part-00001.jsonl"],
         "positive_partitions": ["positives/scan-part-00001.jsonl"],
+        "partition_sha256": {
+            "records/scan-part-00001.jsonl": "a" * 64,
+            "positives/scan-part-00001.jsonl": "b" * 64,
+        },
+        "header_reads": 2,
     }
     assert validate_collection_manifest(valid)["collection_id"] == "collection-123"
     with pytest.raises(ValueError, match="schema"):
-        validate_collection_manifest({**valid, "schema_version": 2})
+        validate_collection_manifest({**valid, "schema_version": 1})
     with pytest.raises(ValueError, match="partition"):
         validate_collection_manifest({**valid, "record_partitions": ["../escape.jsonl"]})
+    with pytest.raises(ValueError, match="digest"):
+        validate_collection_manifest({**valid, "partition_sha256": {}})
+    with pytest.raises(ValueError, match="manifest facts"):
+        validate_collection_manifest({**valid, "collection_name": None})
+    with pytest.raises(ValueError, match="manifest facts"):
+        validate_collection_manifest({**valid, "scanned_at": "not-a-timestamp"})

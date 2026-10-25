@@ -51,9 +51,7 @@ def collection_factory(wav_factory):
             stem = f"REC_{chr(ord('A') + index)}"
             wav_factory(root / "recordings" / f"{stem}.wav", frames=32_000)
             wav_factory(
-                root
-                / "positives"
-                / f"{stem}__start-00500ms__end-01000ms__call{index + 1}.wav",
+                root / "positives" / f"{stem}__start-00500ms__end-01000ms__call{index + 1}.wav",
                 frames=8_000,
             )
         return root

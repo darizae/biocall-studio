@@ -132,6 +132,7 @@ class ReadingCollectionPage(QScrollArea):
             )
         )
         card = Card()
+        self.card = card
         heading = QHBoxLayout()
         self.stage = Text("Listing files", role="subheading")
         heading.addWidget(self.stage)
@@ -176,6 +177,10 @@ class ReadingCollectionPage(QScrollArea):
         outer.addWidget(self.narrow, 0, Qt.AlignmentFlag.AlignHCenter)
         outer.addStretch()
         self.setWidget(content)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self.narrow.setFixedWidth(max(320, min(780, self.viewport().width() - 80)))
 
     def begin(self, root: str) -> None:
         self.title.setText(f"Reading {root.rsplit('/', 1)[-1]}")

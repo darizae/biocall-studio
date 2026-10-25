@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import stat as stat_module
 import struct
 import time
 import unicodedata
@@ -128,7 +129,9 @@ def _check_cancel(cancel: Event | Callable[[], bool] | None) -> None:
         raise CollectionScanCancelled()
 
 
-def _enumerate_entries(root: Path) -> tuple[list[Path], list[CollectionIssue]]:
+def _enumerate_entries(
+    root: Path, cancel: Event | Callable[[], bool] | None = None
+) -> tuple[list[Path], list[CollectionIssue]]:
     entries: list[Path] = []
     issues: list[CollectionIssue] = []
     for folder_name in ("recordings", "positives"):
@@ -166,7 +169,11 @@ def _enumerate_entries(root: Path) -> tuple[list[Path], list[CollectionIssue]]:
             )
             continue
         try:
-            children = sorted(folder.iterdir(), key=lambda item: item.name)
+            children = []
+            for child in folder.iterdir():
+                _check_cancel(cancel)
+                children.append(child)
+            children.sort(key=lambda item: item.name)
         except OSError as exc:
             issues.append(
                 _issue(
@@ -231,7 +238,7 @@ def scan_collection(
             (),
         )
     root = root.resolve(strict=True)
-    entries, issues = _enumerate_entries(root)
+    entries, issues = _enumerate_entries(root, cancel)
     inventory: list[InventoryEntry] = []
     old_inventory = {entry.relative_path: entry for entry in cached.inventory} if cached else {}
     old_facts: dict[str, Fingerprint] = {}
@@ -245,6 +252,7 @@ def scan_collection(
             }
         )
     headers: dict[str, Fingerprint] = {}
+    positive_candidates: set[str] = set()
     header_reads = 0
     portable: dict[str, str] = {}
     total = len(entries)
@@ -304,9 +312,7 @@ def scan_collection(
             )
             continue
         if not resolved.is_relative_to(root):
-            inventory.append(
-                InventoryEntry(relative, path_stat.st_size, path_stat.st_mtime_ns)
-            )
+            inventory.append(InventoryEntry(relative, path_stat.st_size, path_stat.st_mtime_ns))
             issues.append(
                 _issue(
                     "symlink_escape",
@@ -316,20 +322,8 @@ def scan_collection(
                 )
             )
             continue
-        if entry.is_dir():
-            stat = entry.stat()
-            inventory.append(InventoryEntry(relative, stat.st_size, stat.st_mtime_ns))
-            issues.append(
-                _issue(
-                    "unexpected_entry",
-                    relative,
-                    "Nested folders are not scanned.",
-                    "Place WAV files directly in recordings/ or positives/.",
-                )
-            )
-            continue
         try:
-            stat = entry.stat()
+            entry_stat = entry.stat()
         except OSError as exc:
             issues.append(
                 _issue(
@@ -340,7 +334,29 @@ def scan_collection(
                 )
             )
             continue
-        current = InventoryEntry(relative, stat.st_size, stat.st_mtime_ns)
+        if stat_module.S_ISDIR(entry_stat.st_mode):
+            inventory.append(InventoryEntry(relative, entry_stat.st_size, entry_stat.st_mtime_ns))
+            issues.append(
+                _issue(
+                    "unexpected_entry",
+                    relative,
+                    "Nested folders are not scanned.",
+                    "Place WAV files directly in recordings/ or positives/.",
+                )
+            )
+            continue
+        if not stat_module.S_ISREG(entry_stat.st_mode):
+            inventory.append(InventoryEntry(relative, entry_stat.st_size, entry_stat.st_mtime_ns))
+            issues.append(
+                _issue(
+                    "unexpected_entry",
+                    relative,
+                    "Only regular files are scanned.",
+                    "Remove this special filesystem entry from the Collection input folder.",
+                )
+            )
+            continue
+        current = InventoryEntry(relative, entry_stat.st_size, entry_stat.st_mtime_ns)
         inventory.append(current)
         if entry.suffix.casefold() != ".wav":
             issues.append(
@@ -356,6 +372,7 @@ def scan_collection(
             recordings_seen += 1
         else:
             positives_seen += 1
+            positive_candidates.add(relative)
         cached_entry = old_inventory.get(relative)
         if cached_entry == current and relative in old_facts:
             headers[relative] = old_facts[relative]
@@ -363,7 +380,7 @@ def scan_collection(
             header_reads += 1
             try:
                 header = _read_wav_header(entry)
-                headers[relative] = Fingerprint(stat.st_size, stat.st_mtime_ns, header)
+                headers[relative] = Fingerprint(entry_stat.st_size, entry_stat.st_mtime_ns, header)
             except (OSError, ValueError) as exc:
                 issues.append(
                     _issue(
@@ -385,7 +402,11 @@ def scan_collection(
                 )
             )
         if step_delay_seconds:
-            time.sleep(step_delay_seconds)
+            if isinstance(cancel, Event):
+                cancel.wait(step_delay_seconds)
+                _check_cancel(cancel)
+            else:
+                time.sleep(step_delay_seconds)
 
     _check_cancel(cancel)
     records = [
@@ -416,7 +437,7 @@ def scan_collection(
     seen_intervals: set[tuple[str, int, int]] = set()
     positives: list[PositiveExample] = []
     positive_paths = sorted(
-        (entry for entry in inventory if entry.relative_path.startswith("positives/")),
+        (entry for entry in inventory if entry.relative_path in positive_candidates),
         key=lambda entry: entry.relative_path,
     )
     # Iterate from the inventory rather than headers so malformed WAVs still receive name guidance.
@@ -427,14 +448,18 @@ def scan_collection(
         fingerprint = headers.get(relative)
         parsed = None
         source_id = None
+        basename = relative.rsplit("/", 1)[-1]
         try:
-            parsed = parse_positive_filename(relative.rsplit("/", 1)[-1])
+            parsed = parse_positive_filename(basename)
         except ValueError as exc:
+            message = str(exc)
+            if "__start-" not in basename.casefold() or "__end-" not in basename.casefold():
+                message = "Positive has no timestamps."
             issues.append(
                 _issue(
                     "malformed_positive_name",
                     relative,
-                    str(exc),
+                    message,
                     "Rename it to SOURCE__start-Nms__end-Nms__LABEL.wav.",
                 )
             )

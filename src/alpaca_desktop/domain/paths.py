@@ -14,7 +14,7 @@ _RESERVED_WINDOWS_NAMES = {
     *(f"LPT{number}" for number in range(1, 10)),
 }
 _DRIVE_PATH = re.compile(r"^[A-Za-z]:")
-_INVALID_SEGMENT = re.compile(r'[<>:"\\|?*\x00]')
+_INVALID_SEGMENT = re.compile(r'[<>:"\\|?*\x00-\x1f]')
 
 
 def validate_relative_path(value: str) -> str:

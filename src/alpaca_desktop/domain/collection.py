@@ -130,8 +130,7 @@ def parse_positive_filename(filename: str) -> PositiveName:
     match = _POSITIVE_NAME.fullmatch(filename)
     if match is None:
         raise ValueError(
-            "Positive WAV name must match "
-            "<source>__start-<integer>ms__end-<integer>ms__<label>.wav"
+            "Positive WAV name must match <source>__start-<integer>ms__end-<integer>ms__<label>.wav"
         )
     source = match.group("source")
     label = match.group("label")

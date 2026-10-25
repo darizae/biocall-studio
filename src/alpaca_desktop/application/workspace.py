@@ -91,6 +91,7 @@ class WorkspaceController(QObject):
         self.is_scanning = False
         self._scan_thread: _CollectionScanThread | None = None
         self._scan_root: Path | None = None
+        self._replacement_scan_root: Path | None = None
         self._scan_step_delay_seconds = scan_step_delay_seconds
         try:
             self._settings = self._store.load()
@@ -116,6 +117,11 @@ class WorkspaceController(QObject):
         self._pending_collection_path = Path(directory) if directory else None
         self.pending_changed.emit()
         if self._pending_collection_path is not None:
+            if self.is_scanning:
+                if self._pending_collection_path != self._scan_root:
+                    self._replacement_scan_root = self._pending_collection_path
+                    self.cancel_scan()
+                return
             self._start_scan(self._pending_collection_path)
 
     def bind_verified_collection(
@@ -181,6 +187,8 @@ class WorkspaceController(QObject):
 
     def _on_result(self, result: ScanResult) -> None:
         self.is_scanning = False
+        if self._restart_replacement_scan():
+            return
         self.scan_result = result
         if not self._settings_error_message:
             self.error_message = ""
@@ -196,13 +204,25 @@ class WorkspaceController(QObject):
     def _on_failure(self, message: str) -> None:
         self.is_scanning = False
         self.scan_result = None
+        if self._restart_replacement_scan():
+            return
         self.error_message = message
         self.scan_failed.emit(message)
 
     def _on_cancelled(self) -> None:
         self.is_scanning = False
         self.scan_result = None
+        if self._restart_replacement_scan():
+            return
         self.scan_cancelled.emit()
+
+    def _restart_replacement_scan(self) -> bool:
+        root = self._replacement_scan_root
+        if root is None:
+            return False
+        self._replacement_scan_root = None
+        self._start_scan(root)
+        return True
 
     def _release_thread(self) -> None:
         thread = self.sender()

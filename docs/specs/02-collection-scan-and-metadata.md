@@ -40,12 +40,19 @@ visible and Dataset Build must add its stronger pre-publication verification.
 
 The application uses a cancellable `QThread` I/O task, manifest-last atomic cache publication,
 10,000-row/16 MiB JSONL partition ceilings, stable Collection identity, verified local binding,
-and paged Qt models. Source and positive WAVs remain unchanged. The scientific sibling was
-inspected at `91af5287dc18313f88902dc9696e8756274736b3`; its full-decode `soundfile` loaders do not
-fit this header-only boundary and were not copied or wrapped.
+and paged Qt models. Metadata schema 2 records SHA-256 for every bounded partition, validates the
+typed Scan handoff again on load, and compares the complete cheap input inventory both before
+staging and immediately before manifest replacement. A changed input therefore cannot publish a
+false valid cache; JSON-valid partition corruption is rejected and rebuilt. Replacing a folder
+choice while a Scan is active cancels and transfers to the newest choice without binding the old
+folder. Source and positive WAVs remain unchanged. The scientific sibling was inspected at
+`91af5287dc18313f88902dc9696e8756274736b3`; its full-decode `soundfile` loaders do not fit this
+header-only boundary and were not copied or wrapped.
 
 Native macOS evidence and the six-dimension review are recorded in
-[`docs/design/evidence/README.md`](../design/evidence/README.md). The red import failure, focused
-unit/integration passes, full suite, static checks, fixture verification and screenshot command are
-the executed evidence for this branch; Windows and packaged-app qualification remain Specs 07 and
-06 respectively.
+[`docs/design/evidence/README.md`](../design/evidence/README.md). Focused red failures were recorded
+for stale publication, cache corruption, scan replacement, portable control characters and Reading
+width before their green passes. The full suite, static checks, fixture verification and screenshot
+command are the executed evidence for this branch. `IT-COL-007` now scans 10,002 real generated PCM
+WAVs before publishing and paging two record partitions rather than constructing an in-memory Scan
+result. Windows and packaged-app qualification remain Specs 07 and 06 respectively.

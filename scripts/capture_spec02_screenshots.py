@@ -86,9 +86,7 @@ def main(argv: list[str] | None = None) -> int:
         _wait_until(lambda: window.current_route == "scan")
         _wait_until(lambda: controller.scan_progress.total == 2)
         _capture(window, args.output_dir / "scanning.png", settle_ms=120)
-        _wait_until(
-            lambda: controller.scan_result is not None and not controller.is_scanning
-        )
+        _wait_until(lambda: controller.scan_result is not None and not controller.is_scanning)
         _capture(window, args.output_dir / "validation-summary.png", settle_ms=args.settle_ms)
         window.collection_page.verticalScrollBar().setValue(
             window.collection_page.verticalScrollBar().maximum()
@@ -99,9 +97,11 @@ def main(argv: list[str] | None = None) -> int:
         window.collection_page.rescan_button.click()
         _wait_until(lambda: window.current_route == "scan")
         _wait_until(
-            lambda: controller.scan_result is not None
-            and controller.scan_result.valid
-            and not controller.is_scanning
+            lambda: (
+                controller.scan_result is not None
+                and controller.scan_result.valid
+                and not controller.is_scanning
+            )
         )
         window.collection_page.verticalScrollBar().setValue(0)
         _capture(window, args.output_dir / "collection-valid.png", settle_ms=args.settle_ms)

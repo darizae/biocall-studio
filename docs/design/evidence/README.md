@@ -65,6 +65,11 @@ real PCM WAV Collection. No blocking mismatch or native exception remains.
 - Data/privacy: generated temporary mono PCM WAVs; isolated Application Settings; no user paths
 - Capture mechanism: visible `QMainWindow` plus Cocoa `QScreen.grabWindow`; not Qt offscreen
 
+This closure recapture was reviewed at original resolution on 25 Oct 2026 after widening the
+Reading panel to the prototype's comparable desktop hierarchy. The checked-in prototype
+`showScan()` / `collectionPage()` state functions, their reachable valid/invalid transitions and
+the current sibling Showcase composition were re-inspected before capture.
+
 The screenshot flow selects an invalid real-WAV Collection, captures Reading and its exact filename
 issue, renames that existing positive WAV to the required source-time grammar, clicks **Rescan
 Collection**, and captures the valid result. `IT-COL-001` and `IT-COL-008` separately assert the
@@ -79,7 +84,7 @@ focus, cancel, scroll and resize; **S** empty/error/progress/scientific-state fi
 
 | State | Prototype target | Native evidence | Showcase and interaction evidence | Six dimensions | Difference / disposition |
 |---|---|---|---|---|---|
-| Reading Collection | [Reading target](../prototypes/training-first/scanning-preview.png) | [scanning.png](spec-02-native/scanning.png) | `ProgressBar`, `Badge`, secondary Cancel; `IT-COL-001/005/008` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Native worker progress replaces browser timing; Reading remains a cancellable I/O activity, never an Active Run. |
+| Reading Collection | [Reading target](../prototypes/training-first/scanning-preview.png) | [scanning.png](spec-02-native/scanning.png) | `ProgressBar`, `Badge`, secondary Cancel; full-width 780 px content bound; `IT-COL-001/005/008` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Native worker progress replaces browser timing; Reading remains a cancellable I/O activity, never an Active Run. |
 | Validation errors | [Validation target](../prototypes/training-first/validation-preview.png) | [summary](spec-02-native/validation-summary.png) · [exact issue detail](spec-02-native/validation-errors.png) | `Card`, warning `Alert`, paged `DataTable`; exact relative path/correction; disabled Build; `IT-COL-002/008` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Native Rescan is explicit beside Choose another folder. A second scrolled capture records the issue row because the native desktop height is shorter than the prototype preview. Browser-only manifest download is omitted because native metadata is published under `.alpaca/`. |
 | Corrected/rescanned valid Collection | [Collection target](../prototypes/training-first/collection-preview.png) | [summary](spec-02-native/collection-valid.png) · [validation detail](spec-02-native/collection-valid-detail.png) | Four-card summary, source→positive table, Folder and Fast reopening cards, Passed rows, primary Build; `IT-COL-001/003/004/008` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Counts/duration come from real WAV headers; cache says Ready only after manifest-last publication. The detail capture records all Passed rows. Waveform identity is expressly not claimed. |
 | Narrow Collection | [Responsive interactive target](../prototypes/training-first/index.html#/collection/c001) | [collection-narrow.png](spec-02-native/collection-narrow.png) | 700×780 viewport; two-by-two summary; stacked content; horizontal navigation and vertical page scroll; `IT-COL-008` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | The native horizontal scrollbar keeps all seven destinations reachable without clipping page content. |

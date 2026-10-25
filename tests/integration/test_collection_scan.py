@@ -6,7 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from alp_ui.components import Alert, Card, DataTable, ProgressBar
+from alp_ui.components import Alert, Card, DataTable, HelpHint, ProgressBar, Text
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QBoxLayout
 
@@ -15,13 +15,7 @@ from alpaca_desktop.application.collection_scan import (
     scan_collection,
 )
 from alpaca_desktop.application.workspace import WorkspaceController
-from alpaca_desktop.domain.collection import (
-    Fingerprint,
-    InventoryEntry,
-    ScanResult,
-    SourceRecording,
-    WavHeader,
-)
+from alpaca_desktop.domain.collection import ScanResult
 from alpaca_desktop.gui.collection import PagedRecordingModel
 from alpaca_desktop.gui.window import MainWindow
 from alpaca_desktop.persistence.collection_metadata import (
@@ -45,9 +39,7 @@ def test_real_folder_scan_is_nonblocking_and_renders_progress_and_mapping(
 ):
     """Case: IT-COL-001."""
     root = collection_factory(tmp_path / "Wetland-dusk")
-    controller = WorkspaceController(
-        tmp_path / "settings", scan_step_delay_seconds=0.03
-    )
+    controller = WorkspaceController(tmp_path / "settings", scan_step_delay_seconds=0.03)
     window = MainWindow(controller)
     qtbot.addWidget(window)
     window.show()
@@ -56,6 +48,7 @@ def test_real_folder_scan_is_nonblocking_and_renders_progress_and_mapping(
     qtbot.waitUntil(lambda: window.current_route == "scan")
     assert window.scan_page.findChild(ProgressBar).isVisible()
     assert window.scan_page.cancel_button.isEnabled()
+    assert window.scan_page.narrow.width() >= 700
     result = _wait_for_scan(qtbot, controller)
 
     assert window.current_route == "collection"
@@ -65,9 +58,12 @@ def test_real_folder_scan_is_nonblocking_and_renders_progress_and_mapping(
     assert result.duration_seconds == 4.0
     assert [record.positive_count for record in result.records] == [1, 1]
     assert window.collection_page.recording_model.rowCount() == 2
-    assert window.collection_page.recording_model.data(
-        window.collection_page.recording_model.index(0, 2)
-    ) == 1
+    assert (
+        window.collection_page.recording_model.data(
+            window.collection_page.recording_model.index(0, 2)
+        )
+        == 1
+    )
 
 
 def test_invalid_inputs_report_relative_paths_corrections_and_never_mutate_sources(
@@ -80,6 +76,8 @@ def test_invalid_inputs_report_relative_paths_corrections_and_never_mutate_sourc
     (root / "positives" / "notes.mp3").write_bytes(b"not audio")
     (root / "positives" / "nested").mkdir()
     (root / "positives" / "nested" / "clip.wav").write_bytes(b"nested")
+    wav_named_folder = root / "positives" / "REC_A__start-00000ms__end-00500ms__folder.wav"
+    wav_named_folder.mkdir()
     (root / "positives" / "REC_A__call2.wav").write_bytes(b"bad header")
     wav_factory(
         root / "positives" / "UNKNOWN__start-00000ms__end-00500ms__call.wav",
@@ -102,9 +100,7 @@ def test_invalid_inputs_report_relative_paths_corrections_and_never_mutate_sourc
         frames=1,
     )
     wav_factory(
-        root
-        / "positives"
-        / "REC_A__start-00000ms__end-9223372036854775808ms__overflow.wav",
+        root / "positives" / "REC_A__start-00000ms__end-9223372036854775808ms__overflow.wav",
         frames=8_000,
     )
     unsupported = wav_factory(root / "recordings" / "UNSUPPORTED.wav", frames=16_000)
@@ -114,9 +110,15 @@ def test_invalid_inputs_report_relative_paths_corrections_and_never_mutate_sourc
 
     result = scan_collection(root)
     issues = {(issue.code, issue.relative_path): issue.correction for issue in result.issues}
+    issue_messages = {(issue.code, issue.relative_path): issue.message for issue in result.issues}
     assert ("unexpected_entry", "positives/nested") in issues
+    assert ("unexpected_entry", wav_named_folder.relative_to(root).as_posix()) in issues
     assert ("unsupported_file", "positives/notes.mp3") in issues
     assert ("malformed_positive_name", "positives/REC_A__call2.wav") in issues
+    assert (
+        issue_messages[("malformed_positive_name", "positives/REC_A__call2.wav")]
+        == "Positive has no timestamps."
+    )
     assert ("invalid_wav", "positives/REC_A__call2.wav") in issues
     assert ("invalid_wav", "recordings/UNSUPPORTED.wav") in issues
     assert (
@@ -144,6 +146,9 @@ def test_invalid_inputs_report_relative_paths_corrections_and_never_mutate_sourc
         "positives/REC_A__start-00000ms__end-9223372036854775808ms__overflow.wav",
     ) in issues
     assert all(correction for correction in issues.values())
+    assert wav_named_folder.relative_to(root).as_posix() not in {
+        positive.relative_path for positive in result.positives
+    }
     assert not result.valid
     assert source.read_bytes() == before
     assert not (root / ".alpaca").exists()
@@ -154,6 +159,25 @@ def test_invalid_inputs_report_relative_paths_corrections_and_never_mutate_sourc
     assert {(issue.code, issue.relative_path) for issue in missing_result.issues} >= {
         ("missing_folder", "recordings/"),
         ("missing_folder", "positives/"),
+    }
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="POSIX special-file coverage")
+def test_special_input_file_is_rejected_without_opening_it(tmp_path, collection_factory):
+    """Case: IT-COL-002."""
+    root = collection_factory(tmp_path / "SpecialInput", source_count=1)
+    special_path = root / "positives" / "fifo.wav"
+    os.mkfifo(special_path)
+
+    result = scan_collection(root)
+
+    assert any(
+        issue.code == "unexpected_entry"
+        and issue.relative_path == special_path.relative_to(root).as_posix()
+        for issue in result.issues
+    )
+    assert special_path.relative_to(root).as_posix() not in {
+        positive.relative_path for positive in result.positives
     }
 
 
@@ -189,7 +213,10 @@ def test_valid_metadata_publishes_partitions_and_reopens_with_identical_facts(
 
     manifest = json.loads((root / ".alpaca" / "collection.json").read_text())
     record_partition = root / ".alpaca" / manifest["record_partitions"][0]
-    record_partition.write_text("not-json\n")
+    rows = record_partition.read_text()
+    corrupted_rows = rows.replace('"positive_count":1', '"positive_count":0')
+    assert corrupted_rows != rows
+    record_partition.write_text(corrupted_rows)
     with pytest.raises(ValueError, match="Invalid Collection metadata"):
         load_collection_metadata(root)
     rebuilt = publish_collection_metadata(root, scan_collection(root))
@@ -218,13 +245,34 @@ def test_cache_refresh_reads_only_changed_headers_and_removed_entries_disappear(
     removed_relative = "positives/REC_B__start-00500ms__end-01000ms__call2.wav"
     assert removed_relative not in after_remove.relative_paths
 
+    source_b = root / "recordings" / "REC_B.wav"
+    source_b.unlink()
+    assert not inputs_match_scan(root, after_remove)
+    after_source_remove = scan_collection(root, cached=after_remove)
+    assert after_source_remove.header_reads == 0
+    assert "recordings/REC_B.wav" not in after_source_remove.relative_paths
+
+    added = wav_factory(root / "recordings" / "REC_C.wav", frames=32_000)
+    assert not inputs_match_scan(root, after_source_remove)
+    after_add = scan_collection(root, cached=after_source_remove)
+    assert after_add.header_reads == 1
+    assert added.relative_to(root).as_posix() in after_add.relative_paths
+
+    source_a = root / "recordings" / "REC_A.wav"
+    source_stat = source_a.stat()
+    wav_factory(source_a, frames=32_000)
+    os.utime(source_a, ns=(source_stat.st_atime_ns, source_stat.st_mtime_ns + 1_000_000))
+    assert not inputs_match_scan(root, after_add)
+    after_recording_change = scan_collection(root, cached=after_add)
+    assert after_recording_change.header_reads == 1
+
     # Cheap size+mtime freshness is intentionally not proof of byte identity.
     original_stat = positive.stat()
     payload = bytearray(positive.read_bytes())
     payload[-1] ^= 1
     positive.write_bytes(payload)
     os.utime(positive, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
-    assert inputs_match_scan(root, after_remove)
+    assert inputs_match_scan(root, after_recording_change)
 
 
 @pytest.mark.qt
@@ -256,9 +304,51 @@ def test_cancel_and_interrupted_publication_keep_old_cache_valid_and_inputs_unch
 
     monkeypatch.setattr(os, "replace", fail_manifest)
     with pytest.raises(PermissionError, match="injected"):
-        publish_collection_metadata(root, replace(old, scanned_at="later"))
+        publish_collection_metadata(root, replace(old, scanned_at="2026-10-25T11:00:00+00:00"))
     assert (root / ".alpaca" / "collection.json").read_bytes() == old_manifest
     assert {path: path.read_bytes() for path in root.glob("*/*.wav")} == before
+
+    monkeypatch.undo()
+    recovered = publish_collection_metadata(
+        root, replace(old, scanned_at="2026-10-25T12:00:00+00:00")
+    )
+    assert load_collection_metadata(root).collection_id == recovered.collection_id
+
+
+def test_stale_scan_cannot_publish_a_valid_cache(tmp_path, collection_factory):
+    """Case: IT-COL-005."""
+    root = collection_factory(tmp_path / "ChangedDuringPublication", source_count=1)
+    result = scan_collection(root)
+    source = root / "recordings" / "REC_A.wav"
+    source.write_bytes(source.read_bytes() + b"changed")
+
+    with pytest.raises(ValueError, match="changed after the Collection Scan"):
+        publish_collection_metadata(root, result)
+
+    assert not (root / ".alpaca" / "collection.json").exists()
+
+
+@pytest.mark.qt
+def test_new_folder_choice_replaces_an_active_scan(qapp, qtbot, tmp_path, collection_factory):
+    """Case: IT-COL-005."""
+    first = collection_factory(tmp_path / "FirstChoice", source_count=3)
+    second = collection_factory(tmp_path / "SecondChoice", source_count=1)
+    controller = WorkspaceController(tmp_path / "settings", scan_step_delay_seconds=0.04)
+
+    controller.request_collection(str(first))
+    qtbot.waitUntil(lambda: controller.is_scanning)
+    controller.request_collection(str(second))
+    qtbot.waitUntil(
+        lambda: (
+            controller.scan_result is not None
+            and controller.collection_path == second.resolve()
+            and not controller.is_scanning
+        )
+    )
+
+    assert controller.scan_result.root_name == second.name
+    assert controller.scan_result.recording_count == 1
+    qtbot.waitUntil(lambda: controller._scan_thread is None)
 
 
 def test_symlink_escape_and_wrong_collection_identity_cannot_rebind(
@@ -274,6 +364,17 @@ def test_symlink_escape_and_wrong_collection_identity_cannot_rebind(
         issue.code == "symlink_escape" and issue.relative_path == "recordings/escape.wav"
         for issue in result.issues
     )
+    cached_root = collection_factory(tmp_path / "CachedEscape", source_count=1)
+    cached = publish_collection_metadata(cached_root, scan_collection(cached_root))
+    cached_source = cached_root / "recordings" / "REC_A.wav"
+    cached_source.unlink()
+    cached_source.symlink_to(outside)
+    cached_escape = scan_collection(cached_root, cached=cached)
+    assert any(
+        issue.code == "symlink_escape" and issue.relative_path == "recordings/REC_A.wav"
+        for issue in cached_escape.issues
+    )
+    assert all(record.relative_path != "recordings/REC_A.wav" for record in cached_escape.records)
     outside_folder = tmp_path / "outside-recordings"
     outside_folder.mkdir()
     escaped_folder = tmp_path / "EscapedFolder"
@@ -312,29 +413,22 @@ def test_symlink_escape_and_wrong_collection_identity_cannot_rebind(
 
 
 @pytest.mark.qt
-def test_large_metadata_partitions_and_real_qt_model_page_rows(tmp_path, qtbot):
+def test_large_metadata_partitions_and_real_qt_model_page_rows(tmp_path, qtbot, wav_factory):
     """Case: IT-COL-007."""
     root = tmp_path / "Large"
-    root.mkdir()
-    header = WavHeader("PCM", 1, 1_000, 2, 1_000)
-    records = tuple(
-        SourceRecording(
-            f"source-{index:05d}",
-            f"recordings/REC_{index:05d}.wav",
-            Fingerprint(2_044, index + 1, header),
-            0,
-        )
-        for index in range(10_001)
-    )
-    inventory = tuple(
-        InventoryEntry(
-            record.relative_path,
-            record.fingerprint.size_bytes,
-            record.fingerprint.mtime_ns,
-        )
-        for record in records
-    )
-    result = ScanResult("Large", records, (), (), inventory, header_reads=10_001)
+    recordings = root / "recordings"
+    positives = root / "positives"
+    recordings.mkdir(parents=True)
+    positives.mkdir()
+    template_path = wav_factory(tmp_path / "one-frame.wav", frames=1, rate=1_000)
+    template = template_path.read_bytes()
+    for index in range(10_001):
+        (recordings / f"REC_{index:05d}.wav").write_bytes(template)
+    (positives / "REC_00000__start-0ms__end-1ms__call.wav").write_bytes(template)
+
+    result = scan_collection(root)
+    assert result.valid
+    assert result.header_reads == 10_002
     published = publish_collection_metadata(root, result)
     manifest = json.loads((root / ".alpaca" / "collection.json").read_text())
     assert len(manifest["record_partitions"]) == 2
@@ -373,6 +467,25 @@ def test_collection_ui_repair_rescan_cta_focus_and_narrow_layout(
     assert isinstance(window.collection_page.summary_cards[0], Card)
     assert isinstance(window.collection_page.status_alert, Alert)
     assert isinstance(window.collection_page.recordings_table, DataTable)
+    page_text = {label.text() for label in window.collection_page.findChildren(Text)}
+    assert {
+        "COLLECTION",
+        root.name,
+        "Recordings",
+        "Validation details",
+        "Folder",
+        "Fast reopening",
+    } <= page_text
+    assert window._navigation["collections"].isChecked()
+    assert window._navigation["collections"].accessibleDescription() == "Current page"
+    hints = window.collection_page.findChildren(HelpHint)
+    assert {hint.accessibleName() for hint in hints} >= {
+        "More about Source and positive mapping",
+        "More about Collection storage",
+    }
+    hints[0].setFocus()
+    qtbot.keyClick(hints[0], Qt.Key.Key_Space)
+    assert hints[0].accessibleDescription()
     assert "positives/REC_A__call1.wav" in window.collection_page.issue_model.data(
         window.collection_page.issue_model.index(0, 1)
     )
@@ -396,8 +509,5 @@ def test_collection_ui_repair_rescan_cta_focus_and_narrow_layout(
     window.navigate("collections")
     qtbot.waitUntil(lambda: window.is_compact and window.collection_page.is_compact)
     assert window.collection_page.header_layout.direction() == QBoxLayout.Direction.TopToBottom
-    assert (
-        window.collection_page.content_layout.direction()
-        == QBoxLayout.Direction.TopToBottom
-    )
+    assert window.collection_page.content_layout.direction() == QBoxLayout.Direction.TopToBottom
     assert window.collection_page.build_button.focusPolicy() != Qt.FocusPolicy.NoFocus

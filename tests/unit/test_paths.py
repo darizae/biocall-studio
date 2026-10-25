@@ -13,6 +13,7 @@ from alpaca_desktop.domain.paths import ensure_unique_portable_paths, validate_r
         "recordings//double.wav",
         "recordings/CON.wav",
         "recordings/name?.wav",
+        "recordings/control\x1f.wav",
     ],
 )
 def test_portable_relative_paths_reject_unsafe_segments(value):
