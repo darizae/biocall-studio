@@ -12,11 +12,12 @@ from alp_ui.components import (
     EmptyState,
     FolderPicker,
     HelpHint,
+    ProgressBar,
     Text,
 )
 from alp_ui.theme import ALPACA_LIGHT, interactions, make_icon
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
-from PySide6.QtGui import QFontDatabase, QResizeEvent
+from PySide6.QtGui import QCloseEvent, QFontDatabase, QResizeEvent
 from PySide6.QtWidgets import (
     QBoxLayout,
     QFrame,
@@ -24,6 +25,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -35,7 +37,8 @@ from PySide6.QtWidgets import (
 from alpaca_desktop.application.workspace import WorkspaceController
 from alpaca_desktop.gui.collection import CollectionPage, ReadingCollectionPage
 from alpaca_desktop.gui.dataset import DatasetBuilderPage, DatasetDetailPage, DatasetListPage
-from alpaca_desktop.persistence.datasets import delete_dataset, load_dataset
+from alpaca_desktop.gui.run import RunDetailPage, RunListPage
+from alpaca_desktop.persistence.datasets import load_dataset
 
 _ROUTES = (
     ("select", "Select Collection", "plus"),
@@ -500,6 +503,12 @@ class MainWindow(QMainWindow):
             self._delete_dataset,
             lambda: self.navigate("collection"),
         )
+        self.run_list_page = RunListPage(self.open_run, lambda: self.navigate("select"))
+        self.run_detail_page = RunDetailPage(
+            controller.cancel_active_run,
+            self._open_run_output,
+            lambda: self.navigate("runs"),
+        )
         self.wiki_page = WikiPage(lambda: self.navigate("select"))
         self.wiki_select_button = self.wiki_page.select_button
         self.settings_page = SettingsPage(controller)
@@ -523,18 +532,15 @@ class MainWindow(QMainWindow):
                     "Models", "Trained classifiers from published Datasets.", "No Models yet."
                 ),
             ),
-            (
-                "runs",
-                self._empty_artifact_page(
-                    "Runs", "Dataset Build and Training history.", "No Runs yet."
-                ),
-            ),
+            ("runs", self.run_list_page),
+            ("run-detail", self.run_detail_page),
             ("wiki", self.wiki_page),
             ("settings", self.settings_page),
         ):
             self._pages[route] = page
             self.pages.addWidget(page)
         self.empty_pages["datasets"] = self.dataset_list_page.empty
+        self.empty_pages["runs"] = self.run_list_page.empty
         self.body_layout.addWidget(self.pages, 1)
         self._root_layout.addWidget(body, 1)
         self.setCentralWidget(central)
@@ -546,12 +552,21 @@ class MainWindow(QMainWindow):
         controller.build_started.connect(self._build_started)
         controller.build_completed.connect(self._dataset_built)
         controller.build_failed.connect(self._build_failed)
+        controller.build_cancelled.connect(self._build_cancelled)
+        controller.run_changed.connect(self._run_changed)
+        controller.runs_changed.connect(self._refresh_run_surfaces)
+        controller.run_conflict.connect(self._show_run_conflict)
         self.navigate("select")
+        self._refresh_run_surfaces()
         controller.reopen_bound_collection()
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         super().resizeEvent(event)
         self._apply_responsive_layout(event.size().width() < 820)
+
+    def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
+        self.controller.shutdown()
+        super().closeEvent(event)
 
     def _build_sidebar(self) -> QFrame:
         sidebar = QFrame()
@@ -631,7 +646,7 @@ class MainWindow(QMainWindow):
         layout = QHBoxLayout(header)
         layout.setContentsMargins(38, 16, 38, 16)
         icon = QLabel()
-        icon.setPixmap(make_icon("info", color=ALPACA_LIGHT.colors.primary).pixmap(22, 22))
+        icon.setPixmap(make_icon("list", color=ALPACA_LIGHT.colors.primary).pixmap(22, 22))
         layout.addWidget(icon)
         active = QVBoxLayout()
         active.setSpacing(0)
@@ -645,6 +660,16 @@ class MainWindow(QMainWindow):
         self.working_run_badge.hide()
         layout.addWidget(self.idle_run_badge)
         layout.addWidget(self.working_run_badge)
+        self.active_run_progress = ProgressBar()
+        self.active_run_progress.setFixedWidth(135)
+        self.active_run_progress.setTextVisible(False)
+        self.active_run_progress.setAccessibleName("Active Run progress")
+        self.active_run_progress.hide()
+        layout.addWidget(self.active_run_progress)
+        self.view_run_button = Button("View Run →", variant="outline", size="small")
+        self.view_run_button.clicked.connect(self._open_active_run)
+        self.view_run_button.hide()
+        layout.addWidget(self.view_run_button)
         layout.addStretch()
         return header
 
@@ -727,6 +752,8 @@ class MainWindow(QMainWindow):
             if route == "scan"
             else "datasets"
             if route in {"builder", "dataset-detail"}
+            else "runs"
+            if route == "run-detail"
             else route
         )
         for name, button in self._navigation.items():
@@ -776,6 +803,25 @@ class MainWindow(QMainWindow):
             self.builder_page.build_button.setFocus()
         elif route == "dataset-detail":
             self.dataset_detail_page.delete_button.setFocus()
+        elif route == "runs":
+            self._refresh_run_surfaces()
+            target = (
+                self.run_list_page.table
+                if self.run_list_page.model.rowCount()
+                else self.run_list_page.empty
+            )
+            target.setFocus()
+        elif route == "run-detail":
+            run = self.run_detail_page.run
+            if run is not None:
+                target = (
+                    self.run_detail_page.cancel_button
+                    if run.active
+                    else self.run_detail_page.open_output_button
+                    if run.status.value == "completed"
+                    else self._navigation["runs"]
+                )
+                target.setFocus()
 
     def open_builder(self) -> None:
         result = self.controller.scan_result
@@ -800,34 +846,93 @@ class MainWindow(QMainWindow):
         self.dataset_detail_page.set_dataset(root, artifact)
         self.navigate("dataset-detail")
 
+    def open_run(self, run_id: str) -> None:
+        run = next((item for item in self.controller.runs if item.run_id == run_id), None)
+        if run is None:
+            self.navigate("runs")
+            return
+        self.run_detail_page.set_run(run)
+        self.navigate("run-detail")
+
+    def _open_active_run(self) -> None:
+        if self.controller.active_run is not None:
+            self.open_run(self.controller.active_run.run_id)
+
+    def _open_run_output(self, run) -> None:
+        if run.status.value != "completed":
+            return
+        if run.output_kind == "dataset":
+            self.open_dataset(run.output_id)
+
     def _dataset_built(self, artifact) -> None:
-        self._set_run_header_idle()
         self.builder_page.set_busy(False)
         root = self.controller.collection_path
         if root is None:
             return
         self.dataset_list_page.refresh(root)
-        self.dataset_detail_page.set_dataset(root, artifact)
-        self.navigate("dataset-detail")
+        self._refresh_run_surfaces()
 
     def _build_started(self) -> None:
-        self.active_run_label.setText("Dataset Build")
-        self.idle_run_badge.hide()
-        self.working_run_badge.show()
+        self._refresh_run_surfaces()
+        self._open_active_run()
 
     def _build_failed(self, _message: str) -> None:
-        self._set_run_header_idle()
+        self.builder_page.set_busy(False)
+        self._refresh_run_surfaces()
+
+    def _build_cancelled(self) -> None:
+        self.builder_page.set_busy(False)
+        self._refresh_run_surfaces()
 
     def _set_run_header_idle(self) -> None:
         self.active_run_label.setText("No Active Run")
         self.working_run_badge.hide()
         self.idle_run_badge.show()
+        self.active_run_progress.hide()
+        self.view_run_button.hide()
+
+    def _run_changed(self, run) -> None:
+        self._refresh_run_surfaces()
+        if self.current_route == "run-detail" and self.run_detail_page.run is not None:
+            if self.run_detail_page.run.run_id == run.run_id:
+                self.run_detail_page.set_run(run)
+
+    def _refresh_run_surfaces(self) -> None:
+        active = self.controller.active_run
+        self.run_list_page.set_runs(self.controller.runs, active)
+        runs_button = self._navigation.get("runs")
+        if runs_button is not None:
+            runs_button.setText("Runs  •" if active is not None else "Runs")
+            runs_button.setAccessibleName(
+                "Runs navigation; Active Run" if active is not None else "Runs navigation"
+            )
+        if active is None:
+            self._set_run_header_idle()
+            return
+        self.active_run_label.setText(active.title)
+        self.idle_run_badge.hide()
+        self.working_run_badge.setText(active.status.value)
+        self.working_run_badge.show()
+        self.active_run_progress.setValue(active.progress)
+        self.active_run_progress.setAccessibleName(f"Active Run progress {active.progress} percent")
+        self.active_run_progress.show()
+        self.view_run_button.show()
+
+    def _show_run_conflict(self, message: str) -> None:
+        self.select_page.pending_alert.title_widget.setText("Active Run conflict")
+        self.select_page.pending_alert.text_widget.setText(message)
+        self.select_page.pending_alert.setAccessibleName(f"Warning alert: {message}")
+        self.select_page.pending_alert.show()
 
     def _delete_dataset(self, dataset_id: str) -> None:
         root = self.controller.collection_path
         if root is None:
             return
-        delete_dataset(root, dataset_id)
+        try:
+            self.controller.delete_dataset(dataset_id)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Active Run conflict", str(exc))
+            return
         self.dataset_list_page.refresh(root)
         self.navigate("datasets")
 

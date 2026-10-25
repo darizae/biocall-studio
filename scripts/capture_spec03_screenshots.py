@@ -120,6 +120,8 @@ def main(argv: list[str] | None = None) -> int:
         if not builder.build_button.isLoading():
             raise RuntimeError("Dataset Build did not enter the native busy state.")
         _capture(window, args.output_dir / "builder-busy.png", settle_ms=20)
+        _wait_until(lambda: controller.active_run is None)
+        window.run_detail_page.open_output_button.click()
         _wait_until(lambda: window.current_route == "dataset-detail")
         _capture(window, args.output_dir / "dataset-detail.png", settle_ms=args.settle_ms)
 

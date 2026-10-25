@@ -60,31 +60,56 @@ class DatasetBuildCancelled(DatasetBuildError):
 
 @dataclass(frozen=True)
 class DatasetBuildRequest:
+    run_id: str
+    request_id: str
     collection_root: str
+    collection_id: str
     config: BuildConfig
-    dataset_id: str | None = None
+    dataset_id: str
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "schema_version": 1,
+            "schema_version": 2,
+            "run_id": self.run_id,
+            "request_id": self.request_id,
             "collection_root": self.collection_root,
+            "collection_id": self.collection_id,
             "config": self.config.to_dict(),
             "dataset_id": self.dataset_id,
         }
 
     @classmethod
     def from_dict(cls, raw: object) -> DatasetBuildRequest:
-        if not isinstance(raw, dict) or raw.get("schema_version") != 1:
+        if not isinstance(raw, dict) or raw.get("schema_version") != 2:
             raise ValueError("Unsupported Dataset Build request schema.")
-        root = raw.get("collection_root")
-        dataset_id = raw.get("dataset_id")
-        if (
-            not isinstance(root, str)
-            or not root
-            or (dataset_id is not None and not isinstance(dataset_id, str))
-        ):
+        expected = {
+            "schema_version",
+            "run_id",
+            "request_id",
+            "collection_root",
+            "collection_id",
+            "config",
+            "dataset_id",
+        }
+        if set(raw) != expected:
+            raise ValueError("Dataset Build request fields do not match its schema.")
+        identity = (
+            raw.get("run_id"),
+            raw.get("request_id"),
+            raw.get("collection_root"),
+            raw.get("collection_id"),
+            raw.get("dataset_id"),
+        )
+        if any(not isinstance(value, str) or not value for value in identity):
             raise ValueError("Invalid Dataset Build request identity.")
-        return cls(root, BuildConfig.from_dict(raw.get("config")), dataset_id)
+        return cls(
+            raw["run_id"],
+            raw["request_id"],
+            raw["collection_root"],
+            raw["collection_id"],
+            BuildConfig.from_dict(raw.get("config")),
+            raw["dataset_id"],
+        )
 
 
 def _check_cancelled(cancelled: Callable[[], bool] | None) -> None:
@@ -399,6 +424,9 @@ def build_dataset(
     *,
     dataset_id: str | None = None,
     cancelled: Callable[[], bool] | None = None,
+    progress: Callable[[int, int, str], None] | None = None,
+    run_id: str | None = None,
+    request_id: str | None = None,
 ) -> DatasetArtifact:
     """Materialize, verify, and exclusively publish one immutable Dataset."""
     root = collection_root.resolve(strict=True)
@@ -417,10 +445,14 @@ def build_dataset(
     stage = staging_root / f"{dataset_id}-{uuid.uuid4().hex}"
     stage.mkdir()
     try:
+        if progress is not None:
+            progress(0, 2, "Validating Collection inputs")
         _check_cancelled(cancelled)
         records, positives, paths, source_hashes, positive_hashes = _selected_inputs(
             root, scan, config, cancelled
         )
+        if progress is not None:
+            progress(0, 18, "Validated Collection inputs")
         noise_plan = _mining_plan(records, positives, config)
         noise_counts = Counter(window.source_recording_id for window in noise_plan.windows)
         target_counts = Counter(positive.source_recording_id for positive in positives)
@@ -434,8 +466,12 @@ def build_dataset(
             seed=config.seed,
             balance_classes=config.balance_classes,
         )
+        if progress is not None:
+            progress(1, 35, "Mined negative Snippet windows")
         records_by_id = {record.id: record for record in records}
         snippets: list[dict] = []
+        if progress is not None:
+            progress(2, 45, "Writing target and noise Snippets")
         for index, positive in enumerate(
             sorted(
                 positives,
@@ -508,6 +544,9 @@ def build_dataset(
                 }
             )
 
+        if progress is not None:
+            progress(2, 75, "Wrote train and val Snippets")
+
         entries = _write_entry_partitions(stage, snippets)
         split_refs = {name: _write_split(stage, name, snippets) for name in ("train", "val")}
         selected_sources = [
@@ -566,6 +605,10 @@ def build_dataset(
             "source_groups": split.assignments,
             "counts": counts,
         }
+        if run_id is not None or request_id is not None:
+            if not run_id or not request_id:
+                raise ValueError("Dataset Run provenance requires Run and request IDs.")
+            manifest["run"] = {"run_id": run_id, "request_id": request_id}
         validate_dataset_manifest(manifest)
         _write_bytes(
             stage / "dataset.json",
@@ -580,8 +623,13 @@ def build_dataset(
             source_hashes | positive_hashes,
             cancelled,
         )
+        if progress is not None:
+            progress(3, 88, "Verifying staged Dataset")
         _check_cancelled(cancelled)
         load_dataset_directory(stage, dataset_id)
+        if progress is not None:
+            progress(3, 96, "Publishing verified Dataset")
+        _check_cancelled(cancelled)
         _publish(stage, final)
         return load_dataset(root, dataset_id)
     except InterruptedError as exc:

@@ -3,6 +3,7 @@
 import argparse
 import json
 import sys
+import time
 from importlib.metadata import version
 from pathlib import Path
 
@@ -17,36 +18,82 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--worker", choices=("dataset-build",), help=argparse.SUPPRESS)
     parser.add_argument("--request", type=Path, help=argparse.SUPPRESS)
+    parser.add_argument("--worker-step-delay", type=float, default=0.0, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
 
     if args.worker == "dataset-build":
         if args.request is None:
             parser.error("--request is required for the Dataset Build Worker")
-        return _run_dataset_build_worker(args.request)
+        if not 0 <= args.worker_step_delay <= 5:
+            parser.error("--worker-step-delay must be between 0 and 5 seconds")
+        return _run_dataset_build_worker(args.request, args.worker_step_delay)
 
     from alpaca_desktop.gui.app import run
 
     return run(args.settings_dir)
 
 
-def _run_dataset_build_worker(request_path: Path) -> int:
+def _run_dataset_build_worker(request_path: Path, step_delay_seconds: float = 0.0) -> int:
     from alpaca_desktop.persistence.collection_metadata import load_collection_metadata
-    from alpaca_desktop.workflows.dataset_build import DatasetBuildRequest, build_dataset
+    from alpaca_desktop.persistence.runs import (
+        WORKER_RESULT_SCHEMA_VERSION,
+        cancellation_requested,
+        write_completion_receipt,
+    )
+    from alpaca_desktop.workflows.dataset_build import (
+        DatasetBuildCancelled,
+        DatasetBuildRequest,
+        build_dataset,
+    )
 
+    def emit(event: str, **payload) -> None:
+        print(json.dumps({"schema_version": 1, "event": event, **payload}), flush=True)
+        if step_delay_seconds:
+            time.sleep(step_delay_seconds)
+
+    root: Path | None = None
     try:
         if request_path.stat().st_size > 1_000_000:
             raise ValueError("Dataset Build request exceeds 1 MiB.")
         with request_path.open(encoding="utf-8") as stream:
             request = DatasetBuildRequest.from_dict(json.load(stream))
         root = Path(request.collection_root)
+        scan = load_collection_metadata(root)
+        if scan.collection_id != request.collection_id:
+            raise ValueError("Dataset Build request Collection binding no longer matches.")
+        emit("started", message="Dataset Build Worker started")
         artifact = build_dataset(
             root,
-            load_collection_metadata(root),
+            scan,
             request.config,
             dataset_id=request.dataset_id,
+            cancelled=lambda: cancellation_requested(request_path),
+            progress=lambda stage_index, progress, message: emit(
+                "progress",
+                stage_index=stage_index,
+                progress=progress,
+                message=message,
+            ),
+            run_id=request.run_id,
+            request_id=request.request_id,
         )
+        receipt = {
+            "schema_version": WORKER_RESULT_SCHEMA_VERSION,
+            "run_id": request.run_id,
+            "request_id": request.request_id,
+            "output_kind": "dataset",
+            "output_id": artifact.dataset_id,
+        }
+        write_completion_receipt(request_path, receipt)
+    except DatasetBuildCancelled as exc:
+        emit("cancelled", message=str(exc))
+        return 2
     except Exception as exc:
-        print(str(exc), file=sys.stderr)
+        message = str(exc)
+        if root is not None:
+            message = message.replace(str(root), "<Collection>")
+        emit("error", message=message)
+        print(message, file=sys.stderr)
         return 1
-    print(json.dumps({"dataset_id": artifact.dataset_id}))
+    emit("completed", output_id=artifact.dataset_id, message="Output verified and published")
     return 0

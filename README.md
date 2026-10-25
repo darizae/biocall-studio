@@ -4,15 +4,17 @@
 
 > **Development preview:** The PySide6 application implements native Collection selection,
 > cancellable WAV-header scanning, validation, cache publication and immutable Dataset Build with
-> protected Negative Mining and source-grouped Splits. CNN/RF training, persisted Run recovery and
-> installers are still planned. Never interpret a simulated browser run as scientific output.
+> protected Negative Mining and source-grouped Splits, plus persisted supervised Worker Runs,
+> cancellation, recovery and history. CNN/RF training and installers are still planned. Never
+> interpret a simulated browser run as scientific output.
 
 ## What you can do
 
 Choose an existing folder with `recordings/` and `positives/`, scan real WAV headers without
 copying audio, fix per-file validation issues, reopen published Collection metadata, and build a
 verified immutable Dataset of real target/noise WAV Snippets. Dataset Build keeps each Source
-Recording wholly in train or val. A later spec will train CNN or Random Forest models locally.
+Recording wholly in train or val. Follow actual stage progress, cancel safely, inspect failures and
+reopen Run history after restart. A later spec will train CNN or Random Forest models locally.
 
 **Input folder example:**
 
@@ -57,9 +59,18 @@ presented.
 
 ![Native macOS Dataset detail](docs/design/evidence/spec-03-native/dataset-detail.png)
 
+**Active Dataset Build Run — native macOS app**
+
+![Native macOS active Dataset Build Run](docs/design/evidence/spec-04-native/run-active.png)
+
+**Persisted Run history — native macOS app**
+
+![Native macOS Dataset Build Run history](docs/design/evidence/spec-04-native/runs-history.png)
+
 The complete [native evidence set and parity review](docs/design/evidence/README.md) also covers
 Reading/cancel, Settings, all four initial empty routes, Builder underfill/busy states, Dataset
-list/detail navigation, keyboard interactions and narrow resized windows.
+list/detail navigation, Worker cancellation/failure/completion/history, keyboard interactions and
+narrow resized windows.
 
 ## Interactive design reference
 

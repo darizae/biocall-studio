@@ -1,13 +1,11 @@
 """Collection selection, background Scan, and machine-local verified binding."""
 
-import json
-import os
 import sys
-import tempfile
+import uuid
 from pathlib import Path
 from threading import Event
 
-from PySide6.QtCore import QObject, QProcess, QStandardPaths, QThread, Signal
+from PySide6.QtCore import QObject, QProcess, QStandardPaths, QThread, QTimer, Signal
 
 from alpaca_desktop.application.collection_scan import (
     CollectionScanCancelled,
@@ -17,11 +15,38 @@ from alpaca_desktop.application.collection_scan import (
 )
 from alpaca_desktop.domain.collection import ScanResult
 from alpaca_desktop.domain.dataset import BuildConfig
+from alpaca_desktop.domain.run import (
+    RunConflictError,
+    RunKind,
+    RunReservation,
+    RunState,
+    RunStatus,
+    assert_collection_rebind_allowed,
+    assert_dataset_mutable,
+    assert_run_start_allowed,
+    new_run,
+    transition_run,
+    update_run_progress,
+)
 from alpaca_desktop.persistence.collection_metadata import (
     load_collection_metadata,
     publish_collection_metadata,
 )
-from alpaca_desktop.persistence.datasets import DatasetArtifact, load_dataset
+from alpaca_desktop.persistence.datasets import (
+    DatasetArtifact,
+    DatasetDeletion,
+    delete_dataset,
+    load_dataset,
+)
+from alpaca_desktop.persistence.runs import (
+    create_run,
+    load_completion_receipt,
+    reconcile_runs,
+    request_cancellation,
+    save_run,
+    utc_now,
+    write_run_request,
+)
 from alpaca_desktop.persistence.settings import ApplicationSettings, SettingsStore
 from alpaca_desktop.workflows.dataset_build import DatasetBuildRequest
 
@@ -76,12 +101,19 @@ class WorkspaceController(QObject):
     build_started = Signal()
     build_completed = Signal(object)
     build_failed = Signal(str)
+    build_cancelled = Signal()
+    run_changed = Signal(object)
+    runs_changed = Signal()
+    run_conflict = Signal(str)
 
     def __init__(
         self,
         settings_dir: Path | None = None,
         *,
         scan_step_delay_seconds: float = 0.0,
+        worker_step_delay_seconds: float = 0.0,
+        cancel_grace_ms: int = 1_500,
+        kill_grace_ms: int = 3_000,
     ):
         super().__init__()
         if settings_dir is None:
@@ -103,8 +135,16 @@ class WorkspaceController(QObject):
         self._scan_root: Path | None = None
         self._replacement_scan_root: Path | None = None
         self._scan_step_delay_seconds = scan_step_delay_seconds
-        self.is_building = False
-        self._build_process: QProcess | None = None
+        self._runs: tuple[RunState, ...] = ()
+        self._active_run: RunState | None = None
+        self._run_process: QProcess | None = None
+        self._current_run_id: str | None = None
+        self._run_stdout_buffer = b""
+        self._worker_error = ""
+        self._protocol_error = ""
+        self._worker_step_delay_seconds = worker_step_delay_seconds
+        self._cancel_grace_ms = cancel_grace_ms
+        self._kill_grace_ms = kill_grace_ms
         self._build_request_path: Path | None = None
         try:
             self._settings = self._store.load()
@@ -112,6 +152,8 @@ class WorkspaceController(QObject):
             self.error_message = str(exc)
             self._settings_error_message = self.error_message
             self._settings = ApplicationSettings()
+        if self.collection_path is not None:
+            self._load_runs(self.collection_path)
 
     @property
     def collection_path(self) -> Path | None:
@@ -125,9 +167,44 @@ class WorkspaceController(QObject):
     def pending_collection_path(self) -> Path | None:
         return self._pending_collection_path
 
+    @property
+    def runs(self) -> tuple[RunState, ...]:
+        return self._runs
+
+    @property
+    def active_run(self) -> RunState | None:
+        return self._active_run
+
+    @property
+    def is_building(self) -> bool:
+        return self._active_run is not None and self._active_run.kind is RunKind.DATASET_BUILD
+
+    @property
+    def reserved_dataset_ids(self) -> frozenset[str]:
+        if self._active_run is None:
+            return frozenset()
+        reserved = {
+            identifier
+            for identifier in (
+                self._active_run.input_dataset_id,
+                self._active_run.output_id if self._active_run.output_kind == "dataset" else None,
+            )
+            if identifier is not None
+        }
+        return frozenset(reserved)
+
     def request_collection(self, directory: str) -> None:
         """Keep picker intent pending until its background Scan validates and publishes."""
-        self._pending_collection_path = Path(directory) if directory else None
+        requested = Path(directory) if directory else None
+        if (
+            requested is not None
+            and self._active_run is not None
+            and (self.collection_path is None or requested.resolve() != self.collection_path)
+        ):
+            self.error_message = "Cannot rebind the Collection while an Active Run reserves it."
+            self.run_conflict.emit(self.error_message)
+            return
+        self._pending_collection_path = requested
         self.pending_changed.emit()
         if self._pending_collection_path is not None:
             if self.is_scanning:
@@ -148,11 +225,25 @@ class WorkspaceController(QObject):
         path = Path(directory)
         if not path.is_absolute() or not path.is_dir():
             raise ValueError("A verified Collection must be an existing absolute folder.")
+        resolved_path = path.resolve(strict=True)
+        if (
+            self._active_run is not None
+            and self.collection_path is not None
+            and resolved_path != self.collection_path
+        ):
+            raise RunConflictError(
+                "Cannot rebind the Collection path while an Active Run reserves it."
+            )
         metadata = load_collection_metadata(path)
         expected_id = collection_id or metadata.collection_id
         if metadata.collection_id != expected_id:
             raise ValueError("Collection identity does not match the verified binding.")
-        self._save(ApplicationSettings(path.resolve(strict=True), expected_id))
+        assert_collection_rebind_allowed(self._runs, expected_id)
+        self._save(ApplicationSettings(resolved_path, expected_id))
+        # A same-identity refresh may finish while this Controller still owns a
+        # live Worker. Startup reconciliation is only valid without a supervisor.
+        if self._active_run is None:
+            self._load_runs(path)
         self._pending_collection_path = None
         self.pending_changed.emit()
 
@@ -175,39 +266,98 @@ class WorkspaceController(QObject):
             return False
         return inputs_match_scan(self._scan_root, self.scan_result)
 
-    def start_dataset_build(self, config: BuildConfig) -> None:
-        """Launch the typed Dataset Build handoff in the current app environment."""
-        if self.is_building:
-            raise ValueError("Only one Active Run is allowed; no build queue is available.")
+    def start_dataset_build(self, config: BuildConfig, *, dataset_id: str | None = None) -> str:
+        """Persist and supervise one Dataset Build in the current app environment."""
         if (
             self.scan_result is None
             or self.collection_path is None
+            or self.collection_id is None
             or not self.current_inputs_ready()
         ):
             raise ValueError("Rescan the Collection before Dataset Build.")
-        request = DatasetBuildRequest(str(self.collection_path), config)
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            prefix="alpaca-dataset-build-",
-            suffix=".json",
-            delete=False,
-        ) as stream:
-            json.dump(request.to_dict(), stream)
-            stream.write("\n")
-            stream.flush()
-            os.fsync(stream.fileno())
-            self._build_request_path = Path(stream.name)
+        run_id = f"run-{uuid.uuid4()}"
+        request_id = f"request-{uuid.uuid4()}"
+        dataset_id = dataset_id or f"dataset-{uuid.uuid4()}"
+        reservation = RunReservation(
+            RunKind.DATASET_BUILD,
+            self.collection_id,
+            None,
+            "dataset",
+            dataset_id,
+        )
+        assert_run_start_allowed(self._runs, reservation)
+        state = new_run(
+            run_id=run_id,
+            request_id=request_id,
+            kind=RunKind.DATASET_BUILD,
+            title=f"Build · {self.scan_result.root_name}",
+            collection_id=self.collection_id,
+            input_dataset_id=None,
+            output_kind="dataset",
+            output_id=dataset_id,
+            stages=(
+                "Validate inputs",
+                "Mine negative Snippets",
+                "Write train / val Splits",
+                "Verify and publish Dataset",
+            ),
+            now=utc_now(),
+        )
+        create_run(self.collection_path, state)
+        self._set_run(state)
+        request = DatasetBuildRequest(
+            run_id,
+            request_id,
+            str(self.collection_path),
+            self.collection_id,
+            config,
+            dataset_id,
+        )
+        try:
+            self._build_request_path = write_run_request(
+                self.collection_path, run_id, request.to_dict()
+            )
+            state = transition_run(
+                state,
+                RunStatus.STARTING,
+                now=utc_now(),
+                message="Starting Dataset Build Worker",
+            )
+            self._set_run(state)
+        except Exception as exc:
+            failed = transition_run(
+                state,
+                RunStatus.FAILED,
+                now=utc_now(),
+                error=self._portable_error(str(exc)),
+                message="Worker request could not be prepared",
+            )
+            self._set_run(failed)
+            self.build_failed.emit(failed.error)
+            raise
 
         process = QProcess(self)
-        self._build_process = process
+        self._run_process = process
+        self._current_run_id = run_id
+        self._run_stdout_buffer = b""
+        self._worker_error = ""
+        self._protocol_error = ""
         process.setProcessChannelMode(QProcess.ProcessChannelMode.SeparateChannels)
-        process.finished.connect(self._on_build_finished)
-        process.errorOccurred.connect(self._on_build_process_error)
+        process.started.connect(self._on_run_process_started)
+        process.readyReadStandardOutput.connect(self._on_run_stdout)
+        process.finished.connect(self._on_run_finished)
+        process.errorOccurred.connect(self._on_run_process_error)
         if getattr(sys, "frozen", False):
             process.setProgram(sys.executable)
             process.setArguments(
-                ["--worker", "dataset-build", "--request", str(self._build_request_path)]
+                [
+                    "--worker",
+                    "dataset-build",
+                    "--request",
+                    str(self._build_request_path),
+                    "--worker-step-delay",
+                    str(self._worker_step_delay_seconds),
+                ]
             )
         else:
             process.setProgram(sys.executable)
@@ -219,64 +369,277 @@ class WorkspaceController(QObject):
                     "dataset-build",
                     "--request",
                     str(self._build_request_path),
+                    "--worker-step-delay",
+                    str(self._worker_step_delay_seconds),
                 ]
             )
-        self.is_building = True
         self.build_started.emit()
         process.start()
+        return run_id
 
-    def _on_build_finished(self, exit_code: int, _status) -> None:
-        process = self._build_process
+    def cancel_active_run(self) -> None:
+        state = self._active_run
+        root = self.collection_path
+        if state is None or root is None or state.status is RunStatus.CANCELLING:
+            return
+        state = transition_run(
+            state,
+            RunStatus.CANCELLING,
+            now=utc_now(),
+            message="Cancellation requested",
+        )
+        request_cancellation(root, state.run_id)
+        self._set_run(state)
+        run_id = state.run_id
+        QTimer.singleShot(self._cancel_grace_ms, lambda: self._terminate_run(run_id))
+        QTimer.singleShot(self._kill_grace_ms, lambda: self._kill_run(run_id))
+
+    def delete_dataset(self, dataset_id: str) -> DatasetDeletion:
+        if self.collection_path is None:
+            raise ValueError("No Collection is bound.")
+        assert_dataset_mutable(self._runs, dataset_id)
+        return delete_dataset(
+            self.collection_path,
+            dataset_id,
+            reserved_dataset_ids=self.reserved_dataset_ids,
+        )
+
+    def shutdown(self) -> None:
+        """Stop a supervised Worker before the GUI process exits."""
+        process = self._run_process
+        state = self._active_run
+        root = self.collection_path
+        if process is None or state is None or root is None:
+            return
+        process.blockSignals(True)
+        request_cancellation(root, state.run_id)
+        if process.state() != QProcess.ProcessState.NotRunning:
+            process.terminate()
+            if not process.waitForFinished(500):
+                process.kill()
+                process.waitForFinished(500)
+        self._run_process = None
+        self._current_run_id = None
+        self._build_request_path = None
+        process.deleteLater()
+        self._load_runs(root)
+        self.runs_changed.emit()
+
+    def _set_run(self, state: RunState) -> None:
+        if self.collection_path is None:
+            raise ValueError("No Collection is bound for Run State.")
+        save_run(self.collection_path, state)
+        by_id = {run.run_id: run for run in self._runs}
+        by_id[state.run_id] = state
+        self._runs = tuple(
+            sorted(by_id.values(), key=lambda run: (run.created_at, run.run_id), reverse=True)
+        )
+        active = [run for run in self._runs if run.active]
+        if len(active) > 1:
+            raise RunConflictError("Persisted Run State contains more than one Active Run.")
+        self._active_run = active[0] if active else None
+        self.run_changed.emit(state)
+        self.runs_changed.emit()
+
+    def _load_runs(self, root: Path) -> None:
+        try:
+            self._runs = reconcile_runs(root)
+        except (OSError, ValueError) as exc:
+            self._runs = ()
+            self._active_run = None
+            self.error_message = f"Run history could not be loaded: {exc}"
+            return
+        active = [run for run in self._runs if run.active]
+        if active:
+            self.error_message = "Run reconciliation left an unexpected Active Run."
+            self._active_run = None
+        else:
+            self._active_run = None
+
+    def _on_run_process_started(self) -> None:
+        state = self._active_run
+        if state is None or state.status is not RunStatus.STARTING:
+            return
+        self._set_run(
+            transition_run(
+                state,
+                RunStatus.RUNNING,
+                now=utc_now(),
+                message="Dataset Build Worker started",
+            )
+        )
+
+    def _on_run_stdout(self) -> None:
+        import json
+
+        process = self._run_process
         if process is None:
             return
-        stdout = bytes(process.readAllStandardOutput()).decode(errors="replace")
-        stderr = bytes(process.readAllStandardError()).decode(errors="replace").strip()
-        self.is_building = False
-        self._cleanup_build_request()
-        self._build_process = None
-        process.deleteLater()
-        if exit_code != 0:
-            message = stderr.rsplitlines()[-1] if stderr else "Dataset Build Worker failed."
-            self.error_message = message
-            self.build_failed.emit(message)
+        self._run_stdout_buffer += bytes(process.readAllStandardOutput())
+        if len(self._run_stdout_buffer) > 1_000_000:
+            self._protocol_error = "Worker progress exceeded its 1 MiB bound."
+            process.kill()
             return
-        try:
-            payload = json.loads(
-                next(line for line in reversed(stdout.splitlines()) if line.strip())
-            )
-            artifact: DatasetArtifact = load_dataset(self.collection_path, payload["dataset_id"])
-        except (
-            KeyError,
-            StopIteration,
-            OSError,
-            TypeError,
-            ValueError,
-            json.JSONDecodeError,
-        ) as exc:
-            message = f"Dataset Build Worker returned an invalid published output: {exc}"
-            self.error_message = message
-            self.build_failed.emit(message)
-            return
-        self.error_message = ""
-        self.build_completed.emit(artifact)
+        while b"\n" in self._run_stdout_buffer:
+            line, self._run_stdout_buffer = self._run_stdout_buffer.split(b"\n", 1)
+            if not line.strip():
+                continue
+            try:
+                event = json.loads(line)
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                self._protocol_error = "Worker sent invalid structured progress."
+                continue
+            self._apply_worker_event(event)
 
-    def _on_build_process_error(self, error) -> None:
-        if error != QProcess.ProcessError.FailedToStart or not self.is_building:
+    def _apply_worker_event(self, event: object) -> None:
+        if not isinstance(event, dict) or event.get("schema_version") != 1:
+            self._protocol_error = "Worker sent an unsupported progress event."
             return
-        self.is_building = False
-        self._cleanup_build_request()
-        process = self._build_process
-        self._build_process = None
+        state = self._active_run
+        if state is None:
+            return
+        event_name = event.get("event")
+        message = self._portable_error(event.get("message", ""))
+        if event_name == "progress" and state.status is RunStatus.RUNNING:
+            try:
+                updated = update_run_progress(
+                    state,
+                    progress=event["progress"],
+                    stage_index=event["stage_index"],
+                    message=message,
+                    now=utc_now(),
+                )
+            except (KeyError, TypeError, ValueError) as exc:
+                self._protocol_error = f"Worker progress was invalid: {exc}"
+            else:
+                self._set_run(updated)
+        elif event_name == "error":
+            self._worker_error = message or "Dataset Build Worker failed."
+        elif event_name not in {"started", "completed", "cancelled"}:
+            self._protocol_error = "Worker sent an unknown progress event."
+
+    def _on_run_finished(self, exit_code: int, exit_status) -> None:
+        process = self._run_process
+        state = self._active_run
+        root = self.collection_path
+        if process is None or state is None or root is None:
+            return
+        self._on_run_stdout()
+        stderr = bytes(process.readAllStandardError()).decode(errors="replace").strip()
+        artifact: DatasetArtifact | None = None
+        result_error = ""
+        try:
+            load_completion_receipt(root, state)
+            artifact = load_dataset(root, state.output_id)
+        except (OSError, ValueError) as exc:
+            result_error = str(exc)
+
+        if exit_code == 0 and not self._protocol_error and artifact is not None:
+            state = transition_run(
+                state,
+                RunStatus.COMPLETED,
+                now=utc_now(),
+                message="Completed · output verified and published",
+                published_artifact_id=state.output_id,
+            )
+            self.error_message = ""
+            self._set_run(state)
+            self.build_completed.emit(artifact)
+        elif state.status is RunStatus.CANCELLING:
+            state = transition_run(
+                state,
+                RunStatus.CANCELLED,
+                now=utc_now(),
+                message="Cancelled · staged output not published",
+            )
+            self._set_run(state)
+            self.build_cancelled.emit()
+        elif exit_status == QProcess.ExitStatus.CrashExit:
+            message = "The Dataset Build Worker stopped unexpectedly."
+            state = transition_run(
+                state,
+                RunStatus.INTERRUPTED,
+                now=utc_now(),
+                message="Worker process was interrupted",
+                error=message,
+            )
+            self.error_message = message
+            self._set_run(state)
+            self.build_failed.emit(message)
+        else:
+            message = self._protocol_error or self._worker_error
+            if not message and stderr:
+                message = stderr.rsplitlines()[-1]
+            if not message:
+                message = (
+                    f"Dataset Build Worker returned an invalid published output: {result_error}"
+                    if result_error
+                    else "Dataset Build Worker failed."
+                )
+            message = self._portable_error(message)
+            state = transition_run(
+                state,
+                RunStatus.FAILED,
+                now=utc_now(),
+                message="Dataset Build failed",
+                error=message,
+            )
+            self.error_message = message
+            self._set_run(state)
+            self.build_failed.emit(message)
+        self._load_runs(root)
+        self.runs_changed.emit()
+        self._run_process = None
+        self._current_run_id = None
+        self._build_request_path = None
+        process.deleteLater()
+
+    def _on_run_process_error(self, error) -> None:
+        if error != QProcess.ProcessError.FailedToStart or self._active_run is None:
+            return
+        state = self._active_run
+        message = "Dataset Build Worker could not start from the current application environment."
+        state = transition_run(
+            state,
+            RunStatus.FAILED,
+            now=utc_now(),
+            message="Worker could not start",
+            error=message,
+        )
+        self.error_message = message
+        self._set_run(state)
+        process = self._run_process
+        self._run_process = None
+        self._current_run_id = None
         if process is not None:
             process.deleteLater()
-        message = "Dataset Build Worker could not start from the current application environment."
-        self.error_message = message
         self.build_failed.emit(message)
 
-    def _cleanup_build_request(self) -> None:
-        if self._build_request_path is not None:
-            self._build_request_path.unlink(missing_ok=True)
-            self._build_request_path = None
+    def _terminate_run(self, run_id: str) -> None:
+        if (
+            self._active_run is not None
+            and self._active_run.run_id == run_id
+            and self._active_run.status is RunStatus.CANCELLING
+            and self._run_process is not None
+            and self._run_process.state() != QProcess.ProcessState.NotRunning
+        ):
+            self._run_process.terminate()
+
+    def _kill_run(self, run_id: str) -> None:
+        if (
+            self._active_run is not None
+            and self._active_run.run_id == run_id
+            and self._active_run.status is RunStatus.CANCELLING
+            and self._run_process is not None
+            and self._run_process.state() != QProcess.ProcessState.NotRunning
+        ):
+            self._run_process.kill()
+
+    def _portable_error(self, message: object) -> str:
+        text = str(message)
+        if self.collection_path is not None:
+            text = text.replace(str(self.collection_path), "<Collection>")
+        return text[:2_000]
 
     def _start_scan(self, root: Path) -> None:
         if self.is_scanning:
