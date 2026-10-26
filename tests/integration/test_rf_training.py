@@ -7,7 +7,7 @@ from importlib.metadata import version
 
 import pytest
 from alp_ui.components import Plot
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QInputDialog, QLabel
 
 from alpaca_desktop.application.collection_scan import scan_collection
 from alpaca_desktop.application.workspace import WorkspaceController
@@ -105,7 +105,7 @@ def _fast_cnn_draft():
 
 @pytest.mark.qt
 def test_real_rf_worker_publishes_reloadable_model_and_native_views(
-    qapp, qtbot, tmp_path, wav_factory
+    qapp, qtbot, tmp_path, wav_factory, monkeypatch
 ):
     """Cases: IT-TRAIN-002, IT-TRAIN-003, IT-TRAIN-005, IT-TRAIN-006, IT-TRAIN-007,
     IT-TRAIN-008, IT-TRAIN-012, IT-TRAIN-014, IT-LOG-002.
@@ -120,17 +120,34 @@ def test_real_rf_worker_publishes_reloadable_model_and_native_views(
     }
     controller = WorkspaceController(tmp_path / "settings")
     controller.bind_verified_collection(root, scan.collection_id)
-
-    cnn_frozen = freeze_training_config(
-        _fast_cnn_draft(),
-        TrainingDataset.from_artifact(dataset),
-        DeviceCapabilities(cuda=False, mps=False, cpu_count=8),
+    preset_store = PresetStore(tmp_path / "settings" / "training-presets")
+    cnn_preset = preset_store.create("Tiny CNN", _fast_cnn_draft())
+    rf_preset = preset_store.create("Tiny RF", _fast_rf_draft())
+    window = MainWindow(controller)
+    qtbot.addWidget(window)
+    window.show()
+    window.open_training(dataset.dataset_id)
+    page = window.training_page
+    monkeypatch.setattr(
+        QInputDialog,
+        "getText",
+        lambda *_args, **_kwargs: (
+            "Tiny verified CNN" if page.family == "cnn" else "Tiny verified RF",
+            True,
+        ),
     )
-    cnn_run_id = controller.start_training(
-        cnn_frozen,
-        model_label="Tiny verified CNN",
-        model_id="model-cnn-shared-dataset",
-    )
+    page.load_preset(cnn_preset.preset_id)
+    page.start_button.click()
+    assert page.last_frozen_config is not None
+    cnn_snapshot = page.last_frozen_config.to_worker_snapshot()
+    assert controller.active_run is not None
+    cnn_run_id = controller.active_run.run_id
+    cnn_model_id = controller.active_run.output_id
+    cnn_request = json.loads((root / ".alpaca" / "runs" / cnn_run_id / "request.json").read_text())
+    assert cnn_request["config"] == cnn_snapshot
+    assert window.current_route == "run-detail"
+    preset_store.overwrite(cnn_preset.preset_id, TrainingDraft.defaults("cnn"))
+    preset_store.delete(cnn_preset.preset_id)
     qtbot.waitUntil(
         lambda: any(run.run_id == cnn_run_id and run.terminal for run in controller.runs),
         timeout=180_000,
@@ -138,25 +155,22 @@ def test_real_rf_worker_publishes_reloadable_model_and_native_views(
     cnn_run = next(run for run in controller.runs if run.run_id == cnn_run_id)
     assert cnn_run.status is RunStatus.COMPLETED
     assert cnn_run.training_family == "cnn"
+    assert cnn_run.published_artifact_id == cnn_model_id
 
-    preset_store = PresetStore(tmp_path / "presets")
-    preset = preset_store.create("Tiny RF", _fast_rf_draft())
-    loaded = preset_store.load(preset.preset_id)
-    frozen = freeze_training_config(
-        loaded.draft,
-        TrainingDataset.from_artifact(dataset),
-        DeviceCapabilities(cuda=False, mps=False, cpu_count=8),
-        preset_origin=loaded.record.preset_id,
-    )
-    frozen_snapshot = frozen.to_worker_snapshot()
-
-    run_id = controller.start_training(
-        frozen,
-        model_label="Tiny verified RF",
-        model_id="model-rf-integration",
-    )
-    preset_store.overwrite(preset.preset_id, TrainingDraft.defaults("rf"))
-    preset_store.delete(preset.preset_id)
+    window.open_training(dataset.dataset_id)
+    page.load_preset(rf_preset.preset_id)
+    page.start_button.click()
+    assert page.last_frozen_config is not None
+    frozen_snapshot = page.last_frozen_config.to_worker_snapshot()
+    assert controller.active_run is not None
+    run_id = controller.active_run.run_id
+    model_id = controller.active_run.output_id
+    request = json.loads((root / ".alpaca" / "runs" / run_id / "request.json").read_text())
+    assert request["config"] == frozen_snapshot
+    assert request["model_label"] == "Tiny verified RF"
+    assert window.current_route == "run-detail"
+    preset_store.overwrite(rf_preset.preset_id, TrainingDraft.defaults("rf"))
+    preset_store.delete(rf_preset.preset_id)
     qtbot.waitUntil(
         lambda: any(run.run_id == run_id and run.terminal for run in controller.runs),
         timeout=180_000,
@@ -165,7 +179,7 @@ def test_real_rf_worker_publishes_reloadable_model_and_native_views(
 
     assert run.status is RunStatus.COMPLETED
     assert run.training_family == "rf"
-    assert run.published_artifact_id == "model-rf-integration"
+    assert run.published_artifact_id == model_id
     assert run.stages == (
         "Validate immutable Dataset",
         "Extract acoustic features",
@@ -185,16 +199,16 @@ def test_real_rf_worker_publishes_reloadable_model_and_native_views(
     }
     models = list_models(root)
     assert {model.model_id for model in models} == {
-        "model-cnn-shared-dataset",
-        "model-rf-integration",
+        cnn_model_id,
+        model_id,
     }
     assert {model.manifest["dataset_id"] for model in models} == {dataset.dataset_id}
     assert {model.manifest["family"] for model in models} == {"cnn", "random_forest"}
-    cnn_model = next(model for model in models if model.model_id == "model-cnn-shared-dataset")
-    model = next(model for model in models if model.model_id == "model-rf-integration")
+    cnn_model = next(model for model in models if model.model_id == cnn_model_id)
+    model = next(model for model in models if model.model_id == model_id)
     assert model.manifest["family"] == "random_forest"
     assert model.manifest["resolved_config"] == frozen_snapshot
-    assert model.manifest["resolved_config"]["preset_origin"] == preset.preset_id
+    assert model.manifest["resolved_config"]["preset_origin"] == rf_preset.preset_id
     assert model.manifest["random_forest"]["decision_policy"]["threshold"] == 0.55
     assert model.manifest["random_forest"]["estimator"]["classes"] == [0, 1]
     assert model.manifest["random_forest"]["estimator"]["target_probability_column"] == 1
@@ -236,9 +250,6 @@ def test_real_rf_worker_publishes_reloadable_model_and_native_views(
     )
     assert json.loads(completed.stdout)["classes"] == [0, 1]
 
-    window = MainWindow(controller)
-    qtbot.addWidget(window)
-    window.show()
     window.open_run(run_id)
     assert isinstance(window.run_detail_page.training_plot, Plot)
     assert window.run_detail_page.training_plot.kind == "bar"
@@ -287,8 +298,35 @@ def test_real_rf_worker_publishes_reloadable_model_and_native_views(
         "value": None,
         "reason": "F1 is undefined without target true positives.",
     }
-    window.open_model(undefined_model.model_id)
-    undefined_model_text = "\n".join(label.text() for label in window.findChildren(QLabel))
+
+    window.close()
+    reopened_controller = WorkspaceController(tmp_path / "settings")
+    reopened = MainWindow(reopened_controller)
+    qtbot.addWidget(reopened)
+    reopened.show()
+    reopened.navigate("models")
+    assert reopened.model_list_page.model.rowCount() == 3
+    restarted_rows = {
+        reopened.model_list_page.model.model_artifact(row).model_id: (
+            reopened.model_list_page.model.index(row, 1).data(),
+            reopened.model_list_page.model.index(row, 2).data(),
+        )
+        for row in range(reopened.model_list_page.model.rowCount())
+    }
+    assert restarted_rows == {
+        cnn_model_id: ("CNN", dataset.dataset_id),
+        model_id: ("Random Forest", dataset.dataset_id),
+        undefined_model.model_id: ("Random Forest", dataset.dataset_id),
+    }
+    for artifact in (cnn_model, model):
+        reopened.open_model(artifact.model_id)
+        assert reopened.current_route == "model-detail"
+        assert reopened.model_detail_page.model_id.text() == artifact.model_id
+        detail_text = "\n".join(label.text() for label in reopened.findChildren(QLabel))
+        assert artifact.manifest["dataset_id"] in detail_text
+        assert f"{artifact.manifest['results']['metrics']['accuracy']['value']:.3f}" in detail_text
+    reopened.open_model(undefined_model.model_id)
+    undefined_model_text = "\n".join(label.text() for label in reopened.findChildren(QLabel))
     assert "F1 is undefined without target true positives." in undefined_model_text
 
     manifest_path = model.root / "model.json"
@@ -332,9 +370,142 @@ def test_real_rf_worker_publishes_reloadable_model_and_native_views(
 
 
 @pytest.mark.qt
-def test_info_and_debug_diagnostics_do_not_change_rf_science(
+def test_both_training_families_recover_from_worker_loss_and_publication_failure(
     qapp, qtbot, tmp_path, wav_factory
 ):
+    """Cases: IT-TRAIN-004, IT-TRAIN-009, IT-RUN-003, IT-RUN-004."""
+    create_application()
+    root = tmp_path / "collection"
+    scan, dataset = _dataset(root, wav_factory)
+    source_bytes = {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for folder in ("recordings", "positives")
+        for path in (root / folder).iterdir()
+    }
+    settings = tmp_path / "settings"
+    controller = WorkspaceController(
+        settings,
+        worker_step_delay_seconds=0.2,
+        cancel_grace_ms=100,
+        kill_grace_ms=200,
+    )
+    controller.bind_verified_collection(root, scan.collection_id)
+
+    baseline_config = freeze_training_config(
+        _fast_rf_draft(),
+        TrainingDataset.from_artifact(dataset),
+        DeviceCapabilities(cuda=False, mps=False, cpu_count=8),
+    )
+    baseline_id = controller.start_training(
+        baseline_config,
+        model_label="Preserved baseline RF",
+        model_id="model-preserved-baseline",
+    )
+    qtbot.waitUntil(
+        lambda: any(run.run_id == baseline_id and run.terminal for run in controller.runs),
+        timeout=180_000,
+    )
+    assert load_model(root, "model-preserved-baseline")
+    baseline_bytes = {
+        path.relative_to(root): path.read_bytes()
+        for path in (root / ".alpaca" / "models" / "model-preserved-baseline").rglob("*")
+        if path.is_file()
+    }
+
+    configs = {
+        "cnn": freeze_training_config(
+            _fast_cnn_draft(),
+            TrainingDataset.from_artifact(dataset),
+            DeviceCapabilities(cuda=False, mps=False, cpu_count=8),
+        ),
+        "rf": baseline_config,
+    }
+    for family, config in configs.items():
+        model_id = f"model-{family}-worker-loss"
+        run_id = controller.start_training(
+            config,
+            model_label=f"Interrupted {family}",
+            model_id=model_id,
+        )
+        qtbot.waitUntil(
+            lambda: (
+                controller.active_run is not None
+                and controller.active_run.run_id == run_id
+                and controller.active_run.status is RunStatus.RUNNING
+            ),
+            timeout=20_000,
+        )
+        assert controller._run_process is not None
+        controller._run_process.kill()
+        qtbot.waitUntil(
+            lambda: any(run.run_id == run_id and run.terminal for run in controller.runs),
+            timeout=60_000,
+        )
+        interrupted = next(run for run in controller.runs if run.run_id == run_id)
+        assert interrupted.status is RunStatus.INTERRUPTED
+        assert interrupted.published_artifact_id is None
+        assert controller.active_run is None
+        assert not (root / ".alpaca" / "models" / model_id).exists()
+
+        controller.shutdown()
+        controller = WorkspaceController(
+            settings,
+            worker_step_delay_seconds=0.2,
+            cancel_grace_ms=100,
+            kill_grace_ms=200,
+        )
+        assert controller.active_run is None
+        restarted = next(run for run in controller.runs if run.run_id == run_id)
+        assert restarted.status is RunStatus.INTERRUPTED
+        assert restarted.published_artifact_id is None
+
+    models_root = root / ".alpaca" / "models"
+    models_root.mkdir(exist_ok=True)
+    publication_lock = models_root / ".publish.lock"
+    for family, config in configs.items():
+        publication_lock.write_text("occupied by deterministic test\n")
+        model_id = f"model-{family}-publication-failure"
+        run_id = controller.start_training(
+            config,
+            model_label=f"Publication failure {family}",
+            model_id=model_id,
+        )
+        qtbot.waitUntil(
+            lambda: any(run.run_id == run_id and run.terminal for run in controller.runs),
+            timeout=180_000,
+        )
+        failed = next(run for run in controller.runs if run.run_id == run_id)
+        assert failed.status is RunStatus.FAILED
+        assert failed.published_artifact_id is None
+        assert controller.active_run is None
+        assert not (models_root / model_id).exists()
+        staging = root / ".alpaca" / ".staging"
+        assert not staging.exists() or not any(
+            path.name.startswith(f"{model_id}-") for path in staging.iterdir()
+        )
+        publication_lock.unlink()
+
+        controller.shutdown()
+        controller = WorkspaceController(settings)
+        assert controller.active_run is None
+        restarted = next(run for run in controller.runs if run.run_id == run_id)
+        assert restarted.status is RunStatus.FAILED
+        assert restarted.published_artifact_id is None
+
+    assert {
+        path.relative_to(root): path.read_bytes()
+        for path in (root / ".alpaca" / "models" / "model-preserved-baseline").rglob("*")
+        if path.is_file()
+    } == baseline_bytes
+    assert source_bytes == {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for folder in ("recordings", "positives")
+        for path in (root / folder).iterdir()
+    }
+
+
+@pytest.mark.qt
+def test_info_and_debug_diagnostics_do_not_change_rf_science(qapp, qtbot, tmp_path, wav_factory):
     """Case: IT-LOG-002."""
     create_application()
     root = tmp_path / "collection"
@@ -371,9 +542,7 @@ def test_info_and_debug_diagnostics_do_not_change_rf_science(
     info_model = models["model-rf-info-diagnostics"]
     debug_model = models["model-rf-debug-diagnostics"]
     assert info_model.manifest["results"] == debug_model.manifest["results"]
-    assert info_model.manifest["artifact"]["sha256"] == debug_model.manifest["artifact"][
-        "sha256"
-    ]
+    assert info_model.manifest["artifact"]["sha256"] == debug_model.manifest["artifact"]["sha256"]
     info_records, _ = read_diagnostic_records(worker_log_path(root, runs["info"].run_id))
     debug_records, _ = read_diagnostic_records(worker_log_path(root, runs["debug"].run_id))
     assert not any(record["event"] == "measurement_available" for record in info_records)

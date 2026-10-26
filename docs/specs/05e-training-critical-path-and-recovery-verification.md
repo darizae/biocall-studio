@@ -1,6 +1,9 @@
 # 05e — Critical training-path and failure-recovery verification
 
-**Status: planned verification hardening, not a new training feature.** Run **after 05d** and **before 05f**. Previous 05c acceptance evidence remains historical; evaluate these uncovered assertions against the actual checkout rather than declaring its tests failed. Repair only a demonstrated defect.
+**Status: verification hardening complete; owner review pending.** This remains test/evidence work,
+not a new training feature. It ran **after 05d** and **before 05f**. Previous 05c acceptance
+evidence remains historical. The new assertions passed against the actual checkout, so no runtime
+repair was made.
 
 **Read only where relevant:** `IT-TRAIN-003`/`004`/`009`/`012`/`014` and `IT-RUN-002`/`003`/`004` in [integration behaviors](../INTEGRATION_TEST_BEHAVIORS.md); `TD-TRAIN`, `TD-FAIL`, `TD-RUN`, `TD-PRESET` in [fixtures](../INTEGRATION_TEST_DATA.md). Start with `tests/integration/test_training_ui.py`, `test_cnn_training.py`, `test_rf_training.py`, and `test_run.py`; inspect their owning Controller/Worker/Model seams only as needed. Consult the [source map](../agent/SOURCE_MAP.md) if an actual dependency boundary is implicated, and the [upstream workflow](../agent/UPSTREAM_TOOLBOX_WORKFLOW.md) **only** for a proven upstream defect. Follow [Git delivery](../agent/GIT_DELIVERY.md) at handoff.
 
@@ -16,3 +19,21 @@
 - The tests must assert the **actual public seam** and use their existing indexed IDs in function docstrings; adding new ID rows is unnecessary unless a distinct behavior is established. Cover each family with real Worker transitions and inspect preserved Model/Dataset manifests and source hashes where applicable. Preserve 05d stdout/logging behavior and all scientific contracts.
 - Run the new focused cases and affected existing CNN/RF, Run and 05d regressions in the real environment; record commands, results, native evidence if the UI changes, platform/dependency limitations and verified Git SHAs in the existing evidence ledger. No HTML prototype changes, new training controls, inference, or installer work.
 - **Exit:** real native-to-Model flow for both families, crash/publication no-false-success cases, and GUI-restarted Model history are demonstrated by assertions and passing runs. Unverified cross-process expectations remain explicitly unresolved, not silently implemented.
+
+## Completion record
+
+- `IT-TRAIN-012`/`014` now click the real native Start action for loaded nondefault CNN and RF
+  presets, retain the frozen `request.json` snapshot after preset mutation/deletion, cross-check the
+  published Model configuration and preserve source WAV bytes.
+- `IT-TRAIN-004`/`009` and `IT-RUN-003`/`004` now kill real CNN and RF QProcesses before
+  publication and force the shared exclusive publication seam to fail with a real filesystem lock.
+  Terminal/restart state, released reservation, absent output/pointer/staging, preserved prior
+  Model bytes and unchanged source WAVs are asserted.
+- `IT-TRAIN-003` now closes the original native window/controller, reconstructs both from the same
+  settings, and inspects the persisted CNN/RF list and detail views, including a truthful undefined
+  metric reason. Existing fresh-process structural reload checks remain independent.
+- Repository contracts contain no cross-application-process single-Run guarantee. `IT-RUN-002`
+  is therefore explicitly controller/application-process scoped; cross-process exclusivity remains
+  unverified and was not implemented.
+- No visible UI or interaction changed, so the previously accepted Spec 05/05d native screenshots
+  remain applicable and no new screenshot was captured.

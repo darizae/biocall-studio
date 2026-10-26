@@ -485,6 +485,62 @@ missing-log feedback. Screenshot evidence is not used as a substitute for those 
 - Installed `.app`/Windows log locations, bundled Worker launch and platform dialogs remain the
   explicit Spec 06/07 gates; they are not claimed by these development-app captures.
 
+## Spec 05e — Critical training-path and failure-recovery verification
+
+**Status: verification complete; owner review pending.** No visible UI changed and no new
+scientific feature was added, so the reviewed Spec 05/05d native screenshots remain the visual
+record. The new integration assertions use the native Qt Start action, real supervised QProcesses,
+real filesystem publication, persisted settings and generated PCM WAVs. They passed without an
+application-code repair.
+
+### Verification provenance and scope
+
+- Verified from Trainer base SHA `f84e7bc663bd26d4cdcf43948e6cf38ede02d26d` on branch
+  `spec/05e-training-verification`; the delivery commit SHA is reported at handoff.
+- Host: macOS 26.6.2 (25G83), arm64; Python 3.12.7; PySide6/Qt 6.11.2; `alp-ui`
+  0.1.0a0 from sibling SHA `330aaab96a6b32dd2d83ae84a52a2a238446d264`.
+- Scientific dependency: editable `bioacoustics-dl-toolbox` 0.1.1 from recorded sibling SHA
+  `8e2e0528d4ce718005e194d426cde6e62fda0909`. No upstream change was needed.
+- Data/privacy: temporary generated mono PCM WAVs, one real immutable Dataset and isolated
+  settings; no user Collection, private/HPC data or external connection.
+- `IT-TRAIN-012`/`014`: loaded nondefault CNN and RF presets flow through the actual native Start
+  button into the immutable request, real Worker executor and validated Model manifest. Editing or
+  deleting each preset after launch cannot change the frozen snapshot; source WAV bytes remain
+  unchanged.
+- `IT-TRAIN-004`/`009` and `IT-RUN-003`/`004`: both Workers are forcibly killed before
+  publication, and both are independently driven through a deterministic exclusive-publication
+  lock failure. Restart reconciliation retains non-success state, releases the reservation, leaves
+  no published pointer or staging output, and preserves an existing valid Model byte-for-byte.
+- `IT-TRAIN-003`: the original window/controller are shut down and reconstructed from the same
+  Collection/settings. The native Models list/detail shows CNN and Random Forest labels, stable
+  identifiers, Dataset references, saved metrics and the genuine undefined-F1 reason. Existing
+  fresh-process structural binary reload assertions remain in place.
+- Contract search found no cross-application-process exclusivity guarantee. `IT-RUN-002` is
+  explicitly scoped to one `WorkspaceController`/application process; no global lock was added and
+  cross-process exclusivity remains unverified.
+
+### Verification record
+
+- New focused cases:
+  `.venv/bin/pytest -q tests/integration/test_cnn_training.py::test_real_cnn_worker_publishes_reloadable_model_and_native_views tests/integration/test_rf_training.py::test_real_rf_worker_publishes_reloadable_model_and_native_views tests/integration/test_rf_training.py::test_both_training_families_recover_from_worker_loss_and_publication_failure`
+  — **3 passed** on their first run; this demonstrated no runtime defect.
+- Affected CNN/RF, native configuration, Run and 05d regression group:
+  `.venv/bin/pytest -q tests/integration/test_training_ui.py tests/integration/test_cnn_training.py tests/integration/test_rf_training.py tests/integration/test_run.py tests/integration/test_diagnostics.py`
+  — **18 passed**.
+- `.venv/bin/pytest -q tests/unit/test_diagnostics.py` — **10 passed**.
+- The first repo-wide `.venv/bin/pytest -q` stopped during collection because the unit and
+  integration diagnostics modules share the basename `test_diagnostics.py`. Adding pytest
+  `--import-mode=importlib` fixed that demonstrated test-harness defect.
+- Repo-wide rerun — **101 passed, 1 failed in 98.63 s**. The only failure was the existing
+  `IT-TRAIN-009` packaging precondition that the sibling toolbox checkout be clean; that checkout
+  contains owner changes (`AGENTS.md`, `README.md`, `assets/`) and was not modified or cleaned by
+  this work. All collected Trainer tests outside that external cleanliness gate passed.
+- `.venv/bin/ruff check` and `.venv/bin/ruff format --check` for the changed tests, plus
+  `scripts/audit_test_ids.py` (**74 IDs, 0 unknown**) and `scripts/check_fixtures.py` (**6 WAVs
+  verified**) passed. Repository-wide `ruff check`, `verify_handoff.py`, `git diff --check` and
+  `git lfs fsck` also passed; no `docs/priv` file is tracked. Repository-wide `ruff format --check`
+  remains limited by five unchanged 05d-era files reported as unformatted; none is in this change.
+
 ## Every subsequent spec: mandatory ledger
 
 Use [Prototype acceptance](../PROTOTYPE_ACCEPTANCE.md) for the full screenshot inventory and six

@@ -45,7 +45,7 @@ cancellation/recovery and every `IT-RUN-*` case.
 | Case ID | Public seam / expected result | Data |
 |---|---|---|
 | `IT-RUN-001` | Real QProcess Worker for Dataset Build moves through persisted starting/running/completed and valid final Artifact; Active Run remains navigable. | TD-RUN |
-| `IT-RUN-002` | Second requested Run conflicts while one active; locked input deletion/rebind conflicts; read-only browsing proceeds; terminal state releases reservation. | TD-RUN |
+| `IT-RUN-002` | Within one `WorkspaceController`/application process, a second requested Run conflicts while one is active; locked input deletion/rebind conflicts; read-only browsing proceeds; terminal state releases reservation. No cross-application-process exclusivity contract is established. | TD-RUN |
 | `IT-RUN-003` | Real cancellation and forced process loss produce cancelled/interrupted state after bounded reconciliation, no false published artifact and no eternal Active Run after restart. | TD-RUN, TD-FAIL |
 | `IT-RUN-004` | Artifact/staging name collision, corrupt publication or worker nonzero exit fails without overwriting a published Dataset/Model or promoting a stale output pointer. | TD-RUN, TD-FAIL |
 | `IT-RUN-005` | Native Run detail/history/Active Run sidebar reflect prototype section ordering, progress, cancel, conflict and terminal states through real Worker events; keyboard navigation and native evidence pass six-dimension review. | TD-UI, TD-RUN, TD-FAIL |
@@ -100,6 +100,11 @@ set and six-dimension review are in
 the same source-WAV-backed Dataset, trusted fresh-process reloads, package independence and reviewed
 native evidence. See the [Spec 05c ledger](design/evidence/README.md#spec-05c--real-rf-training-and-phase-05-acceptance)
 for the fresh commands and results; this index alone does not establish acceptance.
+
+Spec 05e subsequently hardens the existing IDs at their actual public seams: both native Start
+actions launch real Workers, both families cover Worker loss and publication failure, and the
+Models UI is reconstructed from persisted settings. See the
+[Spec 05e ledger](design/evidence/README.md#spec-05e--critical-training-path-and-failure-recovery-verification).
 
 Future Prediction inference cases are **reserved exclusively** in [PREDICTION](PREDICTION.md), outside this Trainer test index or any Trainer release gate.
 

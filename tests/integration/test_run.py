@@ -115,7 +115,7 @@ def test_real_qprocess_persists_progress_and_verified_dataset(qtbot, tmp_path, c
 def test_active_run_conflicts_but_read_only_browsing_and_terminal_release_work(
     qtbot, tmp_path, collection_factory
 ):
-    """Case: IT-RUN-002."""
+    """Case: IT-RUN-002. Exclusivity is scoped to one WorkspaceController/app process."""
     root, result, controller = _ready_controller(
         qtbot, tmp_path, collection_factory, worker_step_delay_seconds=0.18
     )

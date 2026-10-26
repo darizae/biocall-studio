@@ -30,7 +30,7 @@ packages = ["src/alpaca_desktop"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/unit", "tests/integration"]
-addopts = "-ra --strict-markers"
+addopts = "-ra --strict-markers --import-mode=importlib"
 markers = [
   "integration: real filesystem or component boundary",
   "qt: real Qt widget/model integration",

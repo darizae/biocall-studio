@@ -6,6 +6,7 @@ import sys
 
 import pytest
 from alp_ui.components import Plot
+from PySide6.QtWidgets import QInputDialog
 
 from alpaca_desktop.application.collection_scan import scan_collection
 from alpaca_desktop.application.workspace import WorkspaceController
@@ -87,7 +88,7 @@ def _fast_config(artifact, *, epochs=1, preset_origin=None):
 
 @pytest.mark.qt
 def test_real_cnn_worker_publishes_reloadable_model_and_native_views(
-    qapp, qtbot, tmp_path, wav_factory
+    qapp, qtbot, tmp_path, wav_factory, monkeypatch
 ):
     """Cases: IT-TRAIN-001, IT-TRAIN-005, IT-TRAIN-007, IT-TRAIN-008, IT-TRAIN-012,
     IT-TRAIN-014, IT-LOG-002.
@@ -102,22 +103,29 @@ def test_real_cnn_worker_publishes_reloadable_model_and_native_views(
     }
     controller = WorkspaceController(tmp_path / "settings")
     controller.bind_verified_collection(root, scan.collection_id)
-    preset_store = PresetStore(tmp_path / "presets")
+    preset_store = PresetStore(tmp_path / "settings" / "training-presets")
     preset = preset_store.create("Tiny CPU CNN", _fast_draft())
-    loaded = preset_store.load(preset.preset_id)
-    frozen = freeze_training_config(
-        loaded.draft,
-        TrainingDataset.from_artifact(dataset),
-        DeviceCapabilities(cuda=False, mps=False, cpu_count=8),
-        preset_origin=loaded.record.preset_id,
+    window = MainWindow(controller)
+    qtbot.addWidget(window)
+    window.show()
+    window.open_training(dataset.dataset_id)
+    page = window.training_page
+    page.load_preset(preset.preset_id)
+    monkeypatch.setattr(
+        QInputDialog,
+        "getText",
+        lambda *_args, **_kwargs: ("Tiny verified CNN", True),
     )
-    frozen_snapshot = frozen.to_worker_snapshot()
-
-    run_id = controller.start_training(
-        frozen,
-        model_label="Tiny verified CNN",
-        model_id="model-cnn-integration",
-    )
+    page.start_button.click()
+    assert page.last_frozen_config is not None
+    frozen_snapshot = page.last_frozen_config.to_worker_snapshot()
+    assert controller.active_run is not None
+    run_id = controller.active_run.run_id
+    model_id = controller.active_run.output_id
+    request = json.loads((root / ".alpaca" / "runs" / run_id / "request.json").read_text())
+    assert request["config"] == frozen_snapshot
+    assert request["model_label"] == "Tiny verified CNN"
+    assert window.current_route == "run-detail"
     preset_store.overwrite(preset.preset_id, TrainingDraft.defaults("cnn"))
     preset_store.delete(preset.preset_id)
     qtbot.waitUntil(
@@ -127,7 +135,7 @@ def test_real_cnn_worker_publishes_reloadable_model_and_native_views(
     run = next(run for run in controller.runs if run.run_id == run_id)
 
     assert run.status is RunStatus.COMPLETED
-    assert run.published_artifact_id == "model-cnn-integration"
+    assert run.published_artifact_id == model_id
     assert {item["phase"] for item in run.measurements} == {"train", "val"}
     assert all(item["loss"] >= 0 for item in run.measurements)
     worker_records, notices = read_diagnostic_records(worker_log_path(root, run_id))
@@ -140,7 +148,7 @@ def test_real_cnn_worker_publishes_reloadable_model_and_native_views(
     assert not any(record["event"] == "measurement_available" for record in worker_records)
     assert len(run.measurements) == 2
     models = list_models(root)
-    assert [model.model_id for model in models] == ["model-cnn-integration"]
+    assert [model.model_id for model in models] == [model_id]
     model = models[0]
     assert model.manifest["resolved_config"] == frozen_snapshot
     assert model.manifest["resolved_config"]["preset_origin"] == preset.preset_id
@@ -194,9 +202,6 @@ def test_real_cnn_worker_publishes_reloadable_model_and_native_views(
     )
     assert json.loads(completed.stdout)["num_classes"] == 2
 
-    window = MainWindow(controller)
-    qtbot.addWidget(window)
-    window.show()
     window.open_run(run_id)
     assert isinstance(window.run_detail_page.training_plot, Plot)
     assert window.run_detail_page.training_plot.accessibleDescription() == (
@@ -216,9 +221,7 @@ def test_real_cnn_worker_publishes_reloadable_model_and_native_views(
 
 
 @pytest.mark.qt
-def test_info_and_debug_diagnostics_do_not_change_cnn_science(
-    qapp, qtbot, tmp_path, wav_factory
-):
+def test_info_and_debug_diagnostics_do_not_change_cnn_science(qapp, qtbot, tmp_path, wav_factory):
     """Case: IT-LOG-002."""
     create_application()
     root = tmp_path / "collection"
@@ -255,9 +258,7 @@ def test_info_and_debug_diagnostics_do_not_change_cnn_science(
     info_model = models["model-cnn-info-diagnostics"]
     debug_model = models["model-cnn-debug-diagnostics"]
     assert info_model.manifest["results"] == debug_model.manifest["results"]
-    assert info_model.manifest["artifact"]["sha256"] == debug_model.manifest["artifact"][
-        "sha256"
-    ]
+    assert info_model.manifest["artifact"]["sha256"] == debug_model.manifest["artifact"]["sha256"]
     info_records, _ = read_diagnostic_records(worker_log_path(root, runs["info"].run_id))
     debug_records, _ = read_diagnostic_records(worker_log_path(root, runs["debug"].run_id))
     assert not any(record["event"] == "measurement_available" for record in info_records)
