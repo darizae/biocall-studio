@@ -159,6 +159,7 @@ def test_corrupt_application_settings_are_actionable_in_settings(qtbot, tmp_path
 
 
 def test_console_startup_passes_isolated_settings_to_the_real_gui(tmp_path):
+    """Case: IT-UI-001."""
     code = dedent("""
         import sys
         from pathlib import Path

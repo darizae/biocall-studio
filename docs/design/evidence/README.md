@@ -541,6 +541,72 @@ application-code repair.
   `git lfs fsck` also passed; no `docs/priv` file is tracked. Repository-wide `ruff format --check`
   remains limited by five unchanged 05d-era files reported as unformatted; none is in this change.
 
+## Spec 05f — UI, chart, scale and CLI coverage closeout
+
+**Status: verification complete; owner review pending.** This closeout adds no new screen, layout,
+label or painted chart behavior. It strengthens the existing native contracts at their real seams,
+so the accepted Spec 02 and Spec 05 native screenshots remain the visual evidence rather than being
+recaptured as indistinguishable images.
+
+### Verification provenance and scope
+
+- Host: macOS 26.6.2 (25G83), arm64; Python 3.12.7; PySide6/Qt 6.11.2; `alp-ui`
+  0.1.0a0 from sibling SHA `330aaab96a6b32dd2d83ae84a52a2a238446d264`.
+- The independently released `bioacoustics-dl-toolbox` 0.2.0 was accepted from clean sibling tag
+  `v0.2.0`, SHA `e478ca5156a5d1018d0a7a61486bc85fe7c1e92d`, and recorded separately in
+  Trainer commit `bf02120a84ceaabd31d6b9679d7c8948494afba5`. Its real audio, Dataset,
+  CNN/RF, Model reload and isolated-wheel checks passed before 05f work resumed.
+- `IT-TRAIN-010/011`: a catalog-driven native interaction now edits or explicitly verifies the
+  unsupported disposition of every detailed CNN/RF control. It checks typed current/default/
+  suggested values and recommendation basis, every HelpHint/tooltip/Wiki anchor, derived fields,
+  modified/reset state, section reset and collapse/reopen preservation. Existing focused tests
+  retain cross-field validation, unavailable choices, keyboard/Wiki navigation and launch gating.
+- `IT-TRAIN-005/006`: the consumer-owned Plot binding seam records the exact ordered values passed
+  to public `Plot.setLines`/`setBars`. Real Worker tests compare those values and axes with persisted
+  Run/Model facts and the selectable numeric alternatives. Run State rejects NaN/infinite values
+  before rendering; RF explicitly has no epoch-loss text or series, while an undefined Model metric
+  continues to show its persisted reason rather than zero.
+- `IT-COL-007`: the generated 10,001-record TD-SCALE Collection is mounted in a visible real
+  `MainWindow`. Paging is capped at 200 rows per fetch (51 pages total), a zero-interval event-loop
+  sentinel runs between every page, route navigation succeeds during paging, the live proxy filter
+  resolves the final recording, and the exact 10,002 WAV-header reads are retained without audio
+  decoding.
+- `UT-CLI-001` now owns the four existing version/help/import/invalid-option tests. The real console
+  startup test is mapped to `IT-UI-001` and continues to assert a visible native `MainWindow`, the
+  application `QApplication`, isolated settings and no settings-file mutation.
+
+### Native evidence review
+
+The existing original-resolution
+[advanced CNN form](spec-05-native/train-cnn-advanced.png),
+[CNN Plot](spec-05-native/run-cnn-plot.png),
+[RF Plot](spec-05-native/run-rf-plot.png) and
+[Collection overview](spec-02-native/collection-valid.png) were reopened and reviewed. The field
+hierarchy/reset affordances, line/bar axes and numeric alternatives, RF no-loss explanation and
+Collection table hierarchy remain unchanged. The six-dimension decisions in their owning Spec 02
+and Spec 05 rows therefore remain **MATCH**; there is no new state or owner exception to evidence.
+`scripts/verify_handoff.py --require-native-ux` revalidated the complete tracked native inventory.
+
+### Verification record
+
+- Red-first focused run failed at the intended new seams: no live Collection filter model and no
+  consumer-owned exact Plot binding data were exposed. The first catalog interaction also exposed
+  a test viewport/visibility distinction; the final assertion verifies expanded ancestry and
+  explicit widget visibility without confusing scroll clipping with hidden state.
+- Owning focused command:
+  `.venv/bin/python -m pytest -q tests/integration/test_training_ui.py
+  tests/integration/test_cnn_training.py tests/integration/test_rf_training.py
+  tests/integration/test_collection_scan.py tests/integration/test_shell.py tests/unit/test_cli.py`
+  — passed.
+- Repository-wide `.venv/bin/python -m pytest -q` — **104 passed in 94.09 s**.
+- Repository-wide `ruff check`; changed-file `ruff format --check`; `audit_test_ids.py`,
+  `check_fixtures.py`, `verify_handoff.py --require-native-ux`, Markdown/link checks,
+  `git diff --check` and `git lfs fsck` passed. The known repository-wide format-only limitation
+  remains five unchanged 05d-era files; all 05f files pass format verification.
+- Data/privacy: only generated PCM WAVs and temporary isolated Collection/settings roots were used;
+  no HPC, private Collection or external connection was involved. Installed `.app`/Windows
+  qualification remains owned by Specs 06/07.
+
 ## Every subsequent spec: mandatory ledger
 
 Use [Prototype acceptance](../PROTOTYPE_ACCEPTANCE.md) for the full screenshot inventory and six

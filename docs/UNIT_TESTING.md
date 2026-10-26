@@ -10,6 +10,7 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 |---|---|---|---|
 | `UT-PATH-001` | Portable relative segments reject absolute/traversal, invalid separators, reserved OS names | TD-PATH | 01 |
 | `UT-PATH-002` | Unicode NFC/casefold filename collisions cannot silently resolve an identity | TD-PATH | 01 |
+| `UT-CLI-001` | Version/help and invalid-option handling complete without importing optional Qt/`alp-ui`; real GUI startup remains owned by `IT-UI-001` and uses isolated Application Settings | TD-UI | 01, 05f |
 | `UT-COL-001` | Positive name parses anchored complete stem, integer ms and unique label; reject malformed/missing fields and overflow | TD-COL | 02 |
 | `UT-COL-002` | Exact unique source-stem resolution; overlapping prefixes, duplicate names and same-source duplicate interval rejected | TD-COL | 02 |
 | `UT-COL-003` | Half-open bounds `0 ≤ start < end ≤ source duration`, integer ms to sample frames and honest rounding tolerance | TD-WAV | 02 |

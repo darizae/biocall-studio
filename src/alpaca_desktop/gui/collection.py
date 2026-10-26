@@ -6,7 +6,7 @@ from datetime import datetime
 
 from alp_ui.components import Alert, Badge, Button, Card, DataTable, HelpHint, ProgressBar, Text
 from alp_ui.theme import ALPACA_LIGHT, make_icon
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, QSortFilterProxyModel, Qt
 from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
     QBoxLayout,
@@ -310,7 +310,11 @@ class CollectionPage(QScrollArea):
         )
         recordings.content_layout.addLayout(table_heading)
         self.recording_model = PagedRecordingModel(result, recordings)
-        self.recordings_table = DataTable(model=self.recording_model)
+        self.recording_filter_model = QSortFilterProxyModel(recordings)
+        self.recording_filter_model.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self.recording_filter_model.setFilterKeyColumn(0)
+        self.recording_filter_model.setSourceModel(self.recording_model)
+        self.recordings_table = DataTable(model=self.recording_filter_model)
         self.recordings_table.setAccessibleName("Source Recordings and positive counts")
         self.recordings_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 from alp_ui.components import Alert, Card, DataTable, HelpHint, ProgressBar, Text
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QBoxLayout
 
 from alpaca_desktop.application.collection_scan import (
@@ -413,7 +413,9 @@ def test_symlink_escape_and_wrong_collection_identity_cannot_rebind(
 
 
 @pytest.mark.qt
-def test_large_metadata_partitions_and_real_qt_model_page_rows(tmp_path, qtbot, wav_factory):
+def test_large_metadata_partitions_and_live_qt_window_stay_responsive(
+    qapp, tmp_path, qtbot, wav_factory
+):
     """Case: IT-COL-007."""
     root = tmp_path / "Large"
     recordings = root / "recordings"
@@ -434,14 +436,50 @@ def test_large_metadata_partitions_and_real_qt_model_page_rows(tmp_path, qtbot, 
     assert len(manifest["record_partitions"]) == 2
     assert published.recording_count == 10_001
 
-    model = PagedRecordingModel(published, page_size=200)
+    controller = WorkspaceController(tmp_path / "settings")
+    window = MainWindow(controller)
+    qtbot.addWidget(window)
+    window.show()
+    window.collection_page.set_result(published)
+    window.navigate("collection")
+    model = window.collection_page.recording_model
+    assert isinstance(model, PagedRecordingModel)
+    assert window.collection_page.recordings_table.isVisible()
     assert model.rowCount() == 200
     assert model.canFetchMore()
+
+    sentinel_ticks = []
+    sentinel = QTimer(window)
+    sentinel.setInterval(0)
+    sentinel.timeout.connect(lambda: sentinel_ticks.append(model.rowCount()))
+    sentinel.start()
     model.fetchMore()
     assert model.rowCount() == 400
+    pages = 2
     while model.canFetchMore():
+        before_page = model.rowCount()
         model.fetchMore()
+        assert 0 < model.rowCount() - before_page <= 200
+        pages += 1
+        qapp.processEvents()
+        if pages == 10:
+            window.navigate("wiki")
+            assert window.current_route == "wiki"
+            window.navigate("collection")
+            assert window.current_route == "collection"
+    sentinel.stop()
     assert model.rowCount() == 10_001
+    assert pages == 51
+    assert len(sentinel_ticks) >= pages - 2
+
+    filtered = window.collection_page.recording_filter_model
+    filtered.setFilterFixedString("REC_09999")
+    qapp.processEvents()
+    assert filtered.rowCount() == 1
+    assert filtered.index(0, 0).data() == "REC_09999.wav"
+    filtered.setFilterFixedString("")
+    assert filtered.rowCount() == 10_001
+    assert published.header_reads == 10_002
 
 
 @pytest.mark.qt

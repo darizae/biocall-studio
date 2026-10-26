@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 import sys
 
@@ -11,7 +12,7 @@ from PySide6.QtWidgets import QInputDialog
 from alpaca_desktop.application.collection_scan import scan_collection
 from alpaca_desktop.application.workspace import WorkspaceController
 from alpaca_desktop.domain.dataset import BuildConfig
-from alpaca_desktop.domain.run import RunStatus
+from alpaca_desktop.domain.run import RunState, RunStatus
 from alpaca_desktop.domain.training import (
     DeviceCapabilities,
     TrainingDataset,
@@ -204,6 +205,26 @@ def test_real_cnn_worker_publishes_reloadable_model_and_native_views(
 
     window.open_run(run_id)
     assert isinstance(window.run_detail_page.training_plot, Plot)
+    expected_lines = tuple(
+        (
+            f"{phase} loss",
+            tuple(
+                (float(item["epoch"]), float(item["loss"]))
+                for item in run.measurements
+                if item["phase"] == phase
+            ),
+        )
+        for phase in ("train", "val")
+    )
+    assert window.run_detail_page.training_plot_data == expected_lines
+    assert window.run_detail_page.training_plot.x_label == "Epoch"
+    assert window.run_detail_page.training_plot.y_label == "Loss"
+    assert all(
+        math.isfinite(value)
+        for _label, points in window.run_detail_page.training_plot_data
+        for point in points
+        for value in point
+    )
     assert window.run_detail_page.training_plot.accessibleDescription() == (
         "Line plot with 2 series and 2 points."
     )
@@ -212,6 +233,10 @@ def test_real_cnn_worker_publishes_reloadable_model_and_native_views(
         assert f"{item['phase']} loss {item['loss']:.4f}" in (
             window.run_detail_page.training_values.text()
         )
+    invalid_state = run.to_dict()
+    invalid_state["measurements"][0]["loss"] = float("nan")
+    with pytest.raises(ValueError, match="finite numeric data"):
+        RunState.from_dict(invalid_state)
     window.navigate("models")
     assert window.model_list_page.model.rowCount() == 1
     window.open_model(model.model_id)

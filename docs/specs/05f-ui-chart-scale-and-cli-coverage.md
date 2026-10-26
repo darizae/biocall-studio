@@ -1,6 +1,8 @@
 # 05f — UI, chart, scale and CLI coverage closeout
 
-**Status: planned verification hardening; begins only after 05e's recorded handoff.** Strengthen the *existing* acceptance contracts; avoid another pass over already proven science or broad UI redesign. No change to the HTML prototype.
+**Status: verification hardening complete; owner review pending.** This work began after 05e's
+recorded handoff and strengthens the *existing* acceptance contracts without another pass over
+already proven science or a broad UI redesign. The HTML prototype is unchanged.
 
 **Scoped references:** `IT-TRAIN-005`/`006`/`010`/`011`, `IT-COL-007`, `IT-UI-001` in [integration behaviors](../INTEGRATION_TEST_BEHAVIORS.md); `UT-CLI-001` in [unit index](../UNIT_TESTING.md); `TD-UI`, `TD-CONFIG`, `TD-TRAIN`, `TD-SCALE` in [fixture guide](../INTEGRATION_TEST_DATA.md). Begin with `tests/integration/test_training_ui.py`, `test_cnn_training.py`, `test_rf_training.py`, `test_collection_scan.py`, `test_shell.py` and `tests/unit/test_cli.py`. For native-only changes consult the **relevant** [UX parity rows](../design/UX_PARITY_MATRIX.md), [prototype acceptance](../design/PROTOTYPE_ACCEPTANCE.md) and [configuration extension](../design/SPEC05_CONFIGURATION_EXTENSION.md); use `../alp-ui` Showcase as required. Source-first prototype lookup hints are optional, not a restriction on inspection. [Git delivery](../agent/GIT_DELIVERY.md) applies at handoff.
 
@@ -16,3 +18,20 @@
 - Extend the listed tests **at their owning seam** and correct only observable defects. Every indexed ID included in a test docstring must be backed by assertions, not just mention. Reuse existing `TD-*` fixtures and small generated WAVs; preserve non-mutation, binary `target`/`noise` scope, presets and Model integrity.
 - Run focused Qt/chart/scale/CLI cases plus impacted regression suites, `scripts/audit_test_ids.py`, Markdown/link handoff audits and real native screenshot comparison **if any visual behavior changes**. Preserve 05e and 05d evidence. Record failures/blockers and honest per-ID coverage in the current evidence ledger and commit with verified status.
 - **Exit:** meaningful per-field interaction, exact plotted-data fidelity, observable large-Collection event-loop responsiveness and CLI index consistency are verified. Native installed-app qualification still belongs to 06/07.
+
+## Completion record
+
+- Catalog-driven, family-parameterized Qt interactions cover every detailed editable and derived
+  field, including current/default/suggested provenance, HelpHint/tooltip/Wiki anchors, changed and
+  reset state, keyboard disclosure, collapse preservation and existing invalid/unsupported gates.
+- A narrow consumer-owned binding seam records the exact ordered values passed to the real public
+  `alp-ui.Plot` setters. Genuine CNN/RF Worker cases compare that data, axes and numeric summaries
+  to persisted Run/Model facts; nonfinite Run values are rejected and RF has no epoch-loss output.
+- The 10,001-record Collection case now mounts the model in a visible `MainWindow`, verifies
+  200-row bounded pages, event-loop sentinel delivery, mid-page route navigation, live filtering
+  and exact header-read counts without decoding full recordings or using HPC data.
+- Existing CLI tests are mapped to `UT-CLI-001`; real console startup is mapped to `IT-UI-001`.
+  The full suite passes with 104 tests, and the test-ID/native-evidence/static audits pass.
+- No visible state or rendering changed, so the existing original-resolution Spec 02/05 native
+  screenshots were reviewed and retained. Installed `.app` and Windows qualification remain in
+  Specs 06/07. See the [05f evidence ledger](../design/evidence/README.md#spec-05f--ui-chart-scale-and-cli-coverage-closeout).

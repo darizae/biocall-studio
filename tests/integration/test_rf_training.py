@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import subprocess
 import sys
 from importlib.metadata import version
@@ -12,7 +13,7 @@ from PySide6.QtWidgets import QInputDialog, QLabel
 from alpaca_desktop.application.collection_scan import scan_collection
 from alpaca_desktop.application.workspace import WorkspaceController
 from alpaca_desktop.domain.dataset import BuildConfig
-from alpaca_desktop.domain.run import RunStatus
+from alpaca_desktop.domain.run import RunState, RunStatus
 from alpaca_desktop.domain.training import (
     DeviceCapabilities,
     TrainingDataset,
@@ -253,6 +254,14 @@ def test_real_rf_worker_publishes_reloadable_model_and_native_views(
     window.open_run(run_id)
     assert isinstance(window.run_detail_page.training_plot, Plot)
     assert window.run_detail_page.training_plot.kind == "bar"
+    assert window.run_detail_page.training_plot_data == tuple(
+        (item["feature"], float(item["importance"])) for item in importance_rows
+    )
+    assert window.run_detail_page.training_plot.x_label == "Feature"
+    assert window.run_detail_page.training_plot.y_label == "Importance"
+    assert all(
+        math.isfinite(value) for _feature, value in window.run_detail_page.training_plot_data
+    )
     assert window.run_detail_page.training_plot.accessibleDescription() == (
         f"Bar plot with {len(importance_rows)} categories."
     )
@@ -261,6 +270,15 @@ def test_real_rf_worker_publishes_reloadable_model_and_native_views(
         assert f"{item['feature']} · {item['importance']:.6f}" in (
             window.run_detail_page.training_values.text()
         )
+    assert "epoch" not in window.run_detail_page.training_values.text().lower()
+    assert "loss" not in window.run_detail_page.training_values.text().lower()
+    invalid_state = run.to_dict()
+    invalid_importance = next(
+        item for item in invalid_state["measurements"] if item.get("kind") == "feature_importance"
+    )
+    invalid_importance["importance"] = float("nan")
+    with pytest.raises(ValueError, match="finite and nonnegative"):
+        RunState.from_dict(invalid_state)
     window.navigate("models")
     assert window.model_list_page.model.rowCount() == 2
     displayed_families = {

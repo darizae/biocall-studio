@@ -10,6 +10,7 @@ from alpaca_desktop.cli import main
 
 
 def test_version_uses_installed_package_metadata_without_loading_gui(capsys):
+    """Case: UT-CLI-001."""
     with pytest.raises(SystemExit) as exit_info:
         main(["--version"])
     assert exit_info.value.code == 0
@@ -17,6 +18,7 @@ def test_version_uses_installed_package_metadata_without_loading_gui(capsys):
 
 
 def test_help_explains_settings_isolation_without_loading_gui(capsys):
+    """Case: UT-CLI-001."""
     with pytest.raises(SystemExit) as exit_info:
         main(["--help"])
     assert exit_info.value.code == 0
@@ -26,6 +28,7 @@ def test_help_explains_settings_isolation_without_loading_gui(capsys):
 
 
 def test_package_and_cli_import_without_loading_optional_gui():
+    """Case: UT-CLI-001."""
     result = subprocess.run(
         [
             sys.executable,
@@ -41,6 +44,7 @@ def test_package_and_cli_import_without_loading_optional_gui():
 
 
 def test_unknown_option_fails_before_startup(capsys):
+    """Case: UT-CLI-001."""
     with pytest.raises(SystemExit) as exit_info:
         main(["--unknown-option"])
     assert exit_info.value.code == 2

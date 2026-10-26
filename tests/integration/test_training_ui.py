@@ -57,6 +57,122 @@ def _window(qtbot, tmp_path, wav_factory):
     return window, dataset
 
 
+def _interact_with_alternative(qtbot, page, field):
+    """Change one real native control and return its observable value, if supported."""
+    control = page.field_controls[field.key]
+    native = getattr(control, "control", control)
+    if field.kind == "text":
+        native.setFocus()
+        native.clear()
+        qtbot.keyClicks(native, "Spec 05f")
+        return "Spec 05f"
+    if field.kind in {"int", "nullable_int"}:
+        value = 1 if field.default is None else int(field.default) + 1
+        native.setFocus()
+        native.setValue(value)
+        return value
+    if field.kind == "float":
+        value = float(field.default) + 0.01
+        native.setFocus()
+        native.setValue(value)
+        return value
+    if field.kind == "bool":
+        native.setFocus()
+        qtbot.keyClick(native, Qt.Key.Key_Space)
+        return not bool(field.default)
+    if field.kind == "select":
+        alternatives = [
+            index
+            for index in range(native.count())
+            if native.itemData(index) != field.default and native.model().item(index).isEnabled()
+        ]
+        if not alternatives:
+            assert any(
+                not native.model().item(index).isEnabled() for index in range(native.count())
+            )
+            return None
+        native.setFocus()
+        native.setCurrentIndex(alternatives[0])
+        return native.currentData()
+    raise AssertionError(f"unhandled field kind: {field.kind}")
+
+
+@pytest.mark.qt
+@pytest.mark.parametrize("family_index,family", [(0, "cnn"), (1, "rf")])
+def test_every_detailed_native_training_field_is_interactive_and_described(
+    qapp, qtbot, tmp_path, wav_factory, monkeypatch, family_index, family
+):
+    """Cases: IT-TRAIN-010, IT-TRAIN-011."""
+    window, _dataset = _window(qtbot, tmp_path, wav_factory)
+    page = window.training_page
+    page.family_input.setCurrentIndex(family_index)
+    page.more_settings.setFocus()
+    qtbot.keyClick(page.more_settings, Qt.Key.Key_Space)
+    assert page.more_settings.isChecked()
+    for section in page.detail_sections():
+        page.open_detail_section(section)
+    qapp.processEvents()
+
+    fields = [field for field in fields_for_family(family) if field.ui_tier == "details"]
+    assert fields
+    edited = []
+    for field in fields:
+        widget = page.field_widgets[field.key]
+        hint = page.help_hints[field.key]
+        control = page.field_controls[field.key]
+        owning_sections = [
+            name for name, content in page.section_contents.items() if content.isAncestorOf(widget)
+        ]
+        assert len(owning_sections) == 1
+        assert page.section_buttons[owning_sections[0]].isChecked()
+        assert not page.section_contents[owning_sections[0]].isHidden()
+        assert not widget.isHidden()
+        assert hint.focusPolicy() != Qt.FocusPolicy.NoFocus
+        assert field.help in hint.accessibleDescription()
+        assert field.wiki_anchor in hint.accessibleDescription()
+        assert field.help in hint.toolTip()
+        if field.mode == "derived":
+            assert control.isReadOnly()
+            assert page.field_captions[field.key].text() == "Automatically determined"
+            continue
+
+        assert page.field_value(field.key) == field.default
+        assert field.recommended_starting_value == field.default
+        assert field.recommendation_basis == "backend_default_baseline"
+        caption = page.field_captions[field.key].text()
+        assert "Default / suggested starting value:" in caption
+        assert "backend default" in caption
+        changed_to = _interact_with_alternative(qtbot, page, field)
+        if changed_to is None:
+            continue
+        qapp.processEvents()
+        if field.kind == "float":
+            assert page.field_value(field.key) == pytest.approx(changed_to)
+        else:
+            assert page.field_value(field.key) == changed_to
+        assert field.key in page.draft.modified_keys()
+        assert not page.reset_buttons[field.key].isHidden()
+        edited.append(field.key)
+        page.reset_buttons[field.key].click()
+        assert page.field_value(field.key) == field.default
+
+    assert edited
+    preserved_key = edited[0]
+    preserved_field = next(field for field in fields if field.key == preserved_key)
+    preserved_value = _interact_with_alternative(qtbot, page, preserved_field)
+    page.more_settings.click()
+    page.more_settings.click()
+    assert page.field_value(preserved_key) == preserved_value
+    assert page.modified_badge.text() == "1 modified"
+
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes
+    )
+    page.reset_details_button.click()
+    assert page.field_value(preserved_key) == preserved_field.default
+    assert page.modified_badge.text() == "Defaults"
+
+
 @pytest.mark.qt
 def test_native_training_page_primary_disclosure_family_drafts_and_wiki(
     qapp, qtbot, tmp_path, wav_factory

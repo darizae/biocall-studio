@@ -347,6 +347,7 @@ class RunDetailPage(QScrollArea):
                 bars = [
                     (str(item["feature"]), float(item["importance"])) for item in importance_rows
                 ]
+                self.training_plot_data = tuple(bars)
                 self.training_plot = Plot(kind="bar", x_label="Feature", y_label="Importance")
                 self.training_plot.setAccessibleName("Random Forest feature importance")
                 self.training_plot.setBars(bars)
@@ -371,6 +372,9 @@ class RunDetailPage(QScrollArea):
                     ]
                     if points:
                         lines[f"{phase} loss"] = points
+                self.training_plot_data = tuple(
+                    (label, tuple(points)) for label, points in lines.items()
+                )
                 self.training_plot = Plot(kind="line", x_label="Epoch", y_label="Loss")
                 self.training_plot.setAccessibleName("CNN train and validation loss")
                 self.training_plot.setLines(lines)

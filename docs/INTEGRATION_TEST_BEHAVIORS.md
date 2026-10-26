@@ -106,6 +106,11 @@ actions launch real Workers, both families cover Worker loss and publication fai
 Models UI is reconstructed from persisted settings. See the
 [Spec 05e ledger](design/evidence/README.md#spec-05e--critical-training-path-and-failure-recovery-verification).
 
+Spec 05f closes the existing UI/plot/scale ownership gaps: all detailed native fields are exercised,
+exact persisted values are compared at the public Plot binding seam, the 10,001-record model runs in
+a responsive live window, and CLI/startup tests carry their indexed IDs. See the
+[Spec 05f ledger](design/evidence/README.md#spec-05f--ui-chart-scale-and-cli-coverage-closeout).
+
 Future Prediction inference cases are **reserved exclusively** in [PREDICTION](PREDICTION.md), outside this Trainer test index or any Trainer release gate.
 
 ## 5d. Local logging and diagnostics (pre-release)
