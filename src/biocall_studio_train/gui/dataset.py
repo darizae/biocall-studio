@@ -7,7 +7,6 @@ from pathlib import Path
 
 from alp_ui.components import (
     Alert,
-    Badge,
     Button,
     Card,
     CheckBox,
@@ -27,7 +26,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
+    QInputDialog,
     QMessageBox,
     QScrollArea,
     QSizePolicy,
@@ -62,7 +61,8 @@ def _heading(title: str, subtitle: str, *, overline: str) -> QWidget:
     layout.setSpacing(3)
     layout.addWidget(Text(overline, role="overline"))
     layout.addWidget(Text(title, role="title"))
-    layout.addWidget(Text(subtitle, role="caption", word_wrap=True))
+    if subtitle:
+        layout.addWidget(Text(subtitle, role="caption", word_wrap=True))
     return widget
 
 
@@ -197,18 +197,15 @@ class DatasetBuilderPage(QScrollArea):
         self.outer = QVBoxLayout(self.content)
         self.outer.setContentsMargins(38, 30, 38, 42)
         self.outer.setSpacing(17)
-        self.crumbs = Text("Collection  /  Build Dataset", role="caption")
-        self.outer.addWidget(self.crumbs)
         header = QHBoxLayout()
         header.addWidget(
             _heading(
                 "Create a training Dataset",
-                "Select Source Recordings, then configure Negative Mining.",
+                "",
                 overline="DATASET BUILD",
             ),
             1,
         )
-        header.addWidget(Badge("Immutable output", intent="neutral"), 0, Qt.AlignmentFlag.AlignTop)
         self.outer.addLayout(header)
 
         self.columns = QGridLayout()
@@ -221,10 +218,9 @@ class DatasetBuilderPage(QScrollArea):
         self.sources_card.content_layout.addLayout(
             _section_header(
                 "1 · Choose positive examples",
-                "Include or exclude complete Source Recordings.",
                 help_text=(
-                    "Every selected Source Recording contributes its positive Annotations. "
-                    "Deselecting one excludes its positives and its audio from Negative Mining."
+                    "Choose which recordings to use. Deselecting a recording also excludes its "
+                    "labeled clips and background audio."
                 ),
             )
         )
@@ -248,8 +244,8 @@ class DatasetBuilderPage(QScrollArea):
             _section_header(
                 "3 · Dataset preview",
                 help_text=(
-                    "Counts are deterministic configuration estimates. Publication still "
-                    "revalidates input bytes and verifies every materialized Snippet."
+                    "Preview counts update with these settings. Final counts are checked when "
+                    "the Dataset is built."
                 ),
             )
         )
@@ -285,24 +281,15 @@ class DatasetBuilderPage(QScrollArea):
         self.preview_alert = Alert("", title="", intent="warning")
         self.preview_alert.hide()
         self.preview_card.content_layout.addWidget(self.preview_alert)
-        self.preview_card.content_layout.addWidget(
-            Text(
-                "Exact Split membership and underfill checks happen during Dataset Build. "
-                "Input freshness is revalidated before publication.",
-                role="caption",
-                word_wrap=True,
-            )
-        )
         left.addWidget(self.preview_card)
 
         self.settings_card = Card(shadow=False)
         self.settings_card.content_layout.addLayout(
             _section_header(
                 "2 · Negative Mining",
-                "Sample noise from unlabelled audio.",
                 help_text=(
-                    "Negative Mining samples background windows, never overlapping known "
-                    "positive or other protected source-time spans."
+                    "Choose background clips from selected recordings without using labeled "
+                    "calls or the protected time around them."
                 ),
             )
         )
@@ -324,8 +311,8 @@ class DatasetBuilderPage(QScrollArea):
             _field_with_help(
                 self.allocation,
                 "By Source Recording",
-                "Proportional follows positive counts; even distributes requests across "
-                "selected recordings.",
+                "Choose background clips in proportion to labeled clips, or spread them evenly "
+                "across recordings.",
             )
         )
         field_row = QHBoxLayout()
@@ -337,7 +324,8 @@ class DatasetBuilderPage(QScrollArea):
             _field_with_help(
                 self.split,
                 "Training Split",
-                "Group complete Source Recordings to prevent train/val audio leakage.",
+                "Keeps clips from the same recording together so they don't appear in both "
+                "training and validation.",
             ),
             1,
         )
@@ -346,7 +334,7 @@ class DatasetBuilderPage(QScrollArea):
             _field_with_help(
                 self.seed,
                 "Seed",
-                "The same selected inputs, bytes, seed, and settings produce equivalent output.",
+                "Using the same recordings, settings, and seed produces the same Dataset.",
             ),
             1,
         )
@@ -357,25 +345,19 @@ class DatasetBuilderPage(QScrollArea):
             "Balance target and noise where feasible while keeping each Source Recording together."
         )
         self.settings_card.content_layout.addWidget(self.balance)
-        self.settings_card.content_layout.addWidget(
-            Text("Split by Source Recording · no source leakage", role="caption")
-        )
         self.margin = SelectInput(("None", "0.25 s", "0.5 s", "1 s"))
         self.margin.setCurrentIndex(1)
         self.settings_card.content_layout.addWidget(
             _field_with_help(
                 self.margin,
                 "Positive exclusion margin",
-                "Additional protected time on both sides of every known positive Annotation.",
+                "Adds time before and after each labeled call that cannot be chosen as background.",
             )
         )
         self.build_button = Button("Build Dataset", size="large", loading_text="Building Dataset…")
         self.build_button.setIcon(make_icon("plus", color=ALPACA_LIGHT.colors.on_primary, size=16))
         self.build_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.settings_card.content_layout.addWidget(self.build_button)
-        no_mutation = Text("Source WAVs will not be modified.", role="caption")
-        no_mutation.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.settings_card.content_layout.addWidget(no_mutation)
 
         self.columns.addWidget(self.left_stack, 0, 0)
         self.columns.addWidget(self.settings_card, 0, 1, Qt.AlignmentFlag.AlignTop)
@@ -408,7 +390,6 @@ class DatasetBuilderPage(QScrollArea):
 
     def set_collection(self, result: ScanResult) -> None:
         self.result = result
-        self.crumbs.setText(f"{result.root_name}  /  Build Dataset")
         self.source_model = SourceSelectionModel(result, self.sources_table)
         self.source_model.selection_changed.connect(self._selection_changed)
         self.sources_table.setModel(self.source_model)
@@ -582,10 +563,14 @@ class DatasetListModel(QAbstractTableModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._artifacts: tuple[DatasetArtifact, ...] = ()
+        self._names: dict[str, str] = {}
 
-    def set_artifacts(self, artifacts: tuple[DatasetArtifact, ...]) -> None:
+    def set_artifacts(
+        self, artifacts: tuple[DatasetArtifact, ...], names: dict[str, str] | None = None
+    ) -> None:
         self.beginResetModel()
         self._artifacts = artifacts
+        self._names = names or {}
         self.endResetModel()
 
     def artifact(self, row: int) -> DatasetArtifact:
@@ -603,7 +588,7 @@ class DatasetListModel(QAbstractTableModel):
         artifact = self._artifacts[index.row()]
         manifest = artifact.manifest
         return (
-            f"{artifact.label}\n{artifact.dataset_id}",
+            self._names.get(artifact.dataset_id, artifact.label),
             manifest["collection_label"],
             f"{manifest['counts']['total']:,}",
             manifest["created_at"].split("T", 1)[0],
@@ -617,8 +602,14 @@ class DatasetListModel(QAbstractTableModel):
 
 
 class DatasetListPage(QScrollArea):
-    def __init__(self, open_builder: Callable[[], None], open_dataset: Callable[[str], None]):
+    def __init__(
+        self,
+        controller: WorkspaceController,
+        open_builder: Callable[[], None],
+        open_dataset: Callable[[str], None],
+    ):
         super().__init__()
+        self.controller = controller
         self.open_builder = open_builder
         self.open_dataset = open_dataset
         self.collection_root: Path | None = None
@@ -633,7 +624,7 @@ class DatasetListPage(QScrollArea):
         header.addWidget(
             _heading(
                 "Datasets",
-                "Published, immutable training inputs.",
+                "",
                 overline="DATA",
             ),
             1,
@@ -677,7 +668,11 @@ class DatasetListPage(QScrollArea):
             self.error_alert.show()
         else:
             self.error_alert.hide()
-        self.model.set_artifacts(artifacts)
+        names = {
+            artifact.dataset_id: self.controller.dataset_name(artifact.dataset_id, artifact.label)
+            for artifact in artifacts
+        }
+        self.model.set_artifacts(artifacts, names)
         self.table.setVisible(bool(artifacts))
         self.table.setFixedHeight(max(120, 44 + 45 * len(artifacts)))
         self.empty.setVisible(not artifacts)
@@ -688,11 +683,15 @@ class DatasetDetailPage(QScrollArea):
     def __init__(
         self,
         delete_requested: Callable[[str], None],
+        rename_requested: Callable[[str, str], str],
+        name_resolver: Callable[[str, str], str],
         open_collection: Callable[[], None],
         train_requested: Callable[[str], None],
     ):
         super().__init__()
         self.delete_requested = delete_requested
+        self.rename_requested = rename_requested
+        self.name_resolver = name_resolver
         self.open_collection = open_collection
         self.train_requested = train_requested
         self.dataset: DatasetArtifact | None = None
@@ -717,17 +716,22 @@ class DatasetDetailPage(QScrollArea):
             elif item.layout():
                 self._clear_layout(item.layout())
         manifest = artifact.manifest
-        self.outer.addWidget(Text(f"Datasets  /  {artifact.dataset_id}", role="caption"))
         header = QHBoxLayout()
+        display_name = self.name_resolver(artifact.dataset_id, artifact.label)
+        self.display_name = display_name
+        self.setAccessibleName(f"Dataset detail: {display_name}")
         header.addWidget(
             _heading(
-                artifact.label,
-                f"Dataset ID · {artifact.dataset_id} · {manifest['created_at'].split('T', 1)[0]}",
+                display_name,
+                manifest["created_at"].split("T", 1)[0],
                 overline="IMMUTABLE DATASET",
             ),
             1,
         )
         actions = QHBoxLayout()
+        self.rename_button = Button("Rename", variant="outline")
+        self.rename_button.clicked.connect(self._prompt_rename)
+        actions.addWidget(self.rename_button)
         self.delete_button = Button("Delete", variant="danger")
         self.delete_button.clicked.connect(self._confirm_delete)
         actions.addWidget(self.delete_button)
@@ -739,17 +743,16 @@ class DatasetDetailPage(QScrollArea):
         self.outer.addLayout(header)
         stats = QGridLayout()
         values = (
-            ("Target Snippets", manifest["counts"]["target"], "positive examples"),
-            ("Noise Snippets", manifest["counts"]["noise"], "mined background"),
-            ("Total Snippets", manifest["counts"]["total"], "materialized WAV"),
-            ("Source Recordings", len(manifest["selected_sources"]), "selected for build"),
+            ("Target Snippets", manifest["counts"]["target"]),
+            ("Noise Snippets", manifest["counts"]["noise"]),
+            ("Total Snippets", manifest["counts"]["total"]),
+            ("Source Recordings", len(manifest["selected_sources"])),
         )
         self.stat_cards: list[Card] = []
-        for column, (label, value, note) in enumerate(values):
+        for column, (label, value) in enumerate(values):
             card = Card(shadow=False)
             card.content_layout.addWidget(Text(label, role="caption"))
             card.content_layout.addWidget(Text(f"{value:,}", role="heading"))
-            card.content_layout.addWidget(Text(note, role="caption"))
             stats.addWidget(card, 0, column)
             self.stat_cards.append(card)
         self.outer.addLayout(stats)
@@ -764,10 +767,7 @@ class DatasetDetailPage(QScrollArea):
         split_card.content_layout.addLayout(
             _section_header(
                 "train / val Splits",
-                help_text=(
-                    "Split assignments are deterministic and grouped by Source Recording; "
-                    "no source contributes to both train and val."
-                ),
+                help_text="Keeps all clips from a recording in either training or validation.",
             )
         )
         for split in ("train", "val"):
@@ -788,36 +788,7 @@ class DatasetDetailPage(QScrollArea):
                     role="caption",
                 )
             )
-        split_card.content_layout.addWidget(
-            Alert(
-                "Source metadata, build parameters, Splits and per-Snippet provenance "
-                "are retained.",
-                title="Immutable and reproducible",
-                intent="success",
-            )
-        )
         left.addWidget(split_card)
-        files_card = Card(shadow=False)
-        files_card.content_layout.addLayout(
-            _section_header(
-                "Generated Dataset files",
-                help_text="Verified app-owned files under the selected Collection.",
-            )
-        )
-        tree = QLabel(
-            f".alpaca/datasets/{artifact.dataset_id}/\n"
-            "  dataset.json\n"
-            "  entries/snippets-*.jsonl\n"
-            "  snippets/target/*.wav\n"
-            "  snippets/noise/*.wav\n"
-            "  splits/train.csv\n"
-            "  splits/val.csv"
-        )
-        tree.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        tree.setAccessibleName("Generated Dataset file tree")
-        files_card.content_layout.addWidget(tree)
-        left.addWidget(files_card)
-
         right_stack = QWidget()
         right = QVBoxLayout(right_stack)
         right.setContentsMargins(0, 0, 0, 0)
@@ -827,7 +798,7 @@ class DatasetDetailPage(QScrollArea):
         collection_button = Button(
             f"{manifest['collection_label']} →", variant="outline", size="small"
         )
-        collection_button.setAccessibleDescription(f"Open Collection {manifest['collection_id']}")
+        collection_button.setAccessibleDescription("Open the source Collection")
         collection_button.clicked.connect(self.open_collection)
         rows: tuple[tuple[str, QWidget], ...] = (
             ("Collection", collection_button),
@@ -874,21 +845,6 @@ class DatasetDetailPage(QScrollArea):
             row.addWidget(value)
             provenance.content_layout.addLayout(row)
         right.addWidget(provenance)
-        next_card = Card(shadow=False)
-        next_card.content_layout.addWidget(Text("Next", role="subheading"))
-        next_card.content_layout.addWidget(
-            Text(
-                "Train a classifier with these target/noise Snippets. Training is not "
-                "implemented yet.",
-                role="caption",
-                word_wrap=True,
-            )
-        )
-        next_train = Button("Train Model")
-        next_train.setAccessibleDescription("Configure training for this immutable Dataset.")
-        next_train.clicked.connect(lambda: self.train_requested(artifact.dataset_id))
-        next_card.content_layout.addWidget(next_train)
-        right.addWidget(next_card)
         right.addStretch()
         self.columns.addWidget(left_stack, 0, 0)
         self.columns.addWidget(right_stack, 0, 1, Qt.AlignmentFlag.AlignTop)
@@ -921,13 +877,29 @@ class DatasetDetailPage(QScrollArea):
         answer = QMessageBox.question(
             self,
             "Delete Dataset?",
-            f"Delete {self.dataset.label}? Its Snippets and Split files will be removed. "
+            f"Delete {self.display_name}? Its Snippets and Split files will be removed. "
             f"The original Collection WAVs stay unchanged.{consequence}",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
         if answer == QMessageBox.StandardButton.Yes:
             self.delete_requested(self.dataset.dataset_id)
+
+    def _prompt_rename(self) -> None:
+        if self.dataset is None or self.collection_root is None:
+            return
+        name, accepted = QInputDialog.getText(
+            self, "Rename Dataset", "Name", text=self.display_name
+        )
+        if not accepted:
+            return
+        try:
+            renamed = self.rename_requested(self.dataset.dataset_id, name)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Dataset could not be renamed", str(exc))
+            return
+        self.display_name = renamed
+        self.set_dataset(self.collection_root, self.dataset)
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         super().resizeEvent(event)

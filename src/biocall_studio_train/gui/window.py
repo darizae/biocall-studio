@@ -114,13 +114,13 @@ class SelectCollectionPage(QScrollArea):
         heading = QVBoxLayout()
         heading.setSpacing(3)
         heading.addWidget(Text("Select Collection", role="subheading"))
-        heading.addWidget(Text("We check the folder. No import or audio copy.", role="caption"))
         header.addLayout(heading)
         header.addStretch()
         header.addWidget(
             HelpHint(
-                "A Collection is your existing folder with recordings/ and positives/. "
-                "Positive filenames identify source-time in integer milliseconds.",
+                "Choose a folder with recordings/ and positives/. Trainer doesn't copy your "
+                "WAV files. Each labeled clip filename includes when it occurs in the full "
+                "recording.",
                 subject="Collection folders",
             )
         )
@@ -171,9 +171,6 @@ class SelectCollectionPage(QScrollArea):
         self.wiki_button.setAccessibleName("How should my folder look?")
         self.wiki_button.clicked.connect(open_wiki)
         choose_layout.addWidget(self.wiki_button, 0, Qt.AlignmentFlag.AlignHCenter)
-        local_note = Text("Local only · source WAVs stay read-only.", role="caption")
-        local_note.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        choose_layout.addWidget(local_note)
         card.content_layout.addWidget(choose_panel)
 
         self.retry_scan_button = Button("Scan again", variant="outline", size="small")
@@ -230,7 +227,6 @@ class WikiPage(QScrollArea):
         heading.setSpacing(4)
         heading.addWidget(Text("WIKI", role="overline"))
         heading.addWidget(Text("Selecting a Collection", role="title"))
-        heading.addWidget(Text("One folder. WAV files. Timestamps in filenames.", role="caption"))
         header.addLayout(heading)
         header.addStretch()
         self.select_button = Button("Select Collection")
@@ -254,24 +250,7 @@ class WikiPage(QScrollArea):
         self.keep_awake_card.content_layout.addWidget(self.keep_awake_title)
         self.keep_awake_text = Text(KEEP_AWAKE_HELP, role="body", word_wrap=True)
         self.keep_awake_card.content_layout.addWidget(self.keep_awake_text)
-        self.keep_awake_card.content_layout.addWidget(
-            Text(
-                "If the computer actually sleeps, CPU training pauses. It may continue after "
-                "wake if the app and Worker survive, but sleep, lid close and shutdown are not "
-                "protected or guaranteed recovery paths.",
-                role="caption",
-                word_wrap=True,
-            )
-        )
         outer.addWidget(self.keep_awake_card)
-        outer.addWidget(
-            Text(
-                "A timestamp is a user-supplied label. Names and WAV headers cannot prove "
-                "waveform identity.",
-                role="caption",
-                word_wrap=True,
-            )
-        )
         outer.addStretch()
         self.setWidget(content)
         self._place_cards(False)
@@ -318,18 +297,11 @@ class WikiPage(QScrollArea):
             "     SITE_002__start-001200ms__end-003600ms__call01.wav"
         )
         fixed_font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-        fixed_font.setPointSize(11)
+        fixed_font.setPointSize(12)
         tree.setFont(fixed_font)
         tree.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         tree.setAccessibleName("Collection folder layout")
         card.content_layout.addWidget(tree)
-        card.content_layout.addWidget(
-            Text(
-                "Use WAV files only. The Trainer creates .alpaca/ metadata only after validation.",
-                role="caption",
-                word_wrap=True,
-            )
-        )
         return card
 
     @staticmethod
@@ -338,13 +310,14 @@ class WikiPage(QScrollArea):
         header = QHBoxLayout()
         header.addWidget(Text("2 · Put times in each positive WAV name", role="subheading"))
         header.addWidget(
-            HelpHint("Milliseconds are integers. 1000 ms = 1 s.", subject="Source-time timestamps")
+            HelpHint("Use whole milliseconds. 1000 ms equals 1 second.", subject="Clip times")
         )
         header.addStretch()
         card.content_layout.addLayout(header)
+        card.content_layout.addWidget(Text("The times refer to the full recording.", role="body"))
         example = QLabel("SITE_001__start-012500ms__end-014900ms__call01.wav")
         fixed_font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-        fixed_font.setPointSize(10)
+        fixed_font.setPointSize(12)
         example.setFont(fixed_font)
         example.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         example.setAccessibleName("Positive filename source-time example")
@@ -360,20 +333,12 @@ class WikiPage(QScrollArea):
             row.addStretch()
             row.addWidget(Text(value, role="body"))
             card.content_layout.addLayout(row)
-        card.content_layout.addWidget(
-            Text(
-                "These source-time bounds describe the original recording, not the positive "
-                "clip timeline.",
-                role="caption",
-                word_wrap=True,
-            )
-        )
         return card
 
     @staticmethod
     def _validation_card() -> Card:
         card = Card(shadow=False)
-        card.content_layout.addWidget(Text("3 · What we validate", role="subheading"))
+        card.content_layout.addWidget(Text("3 · Validation", role="subheading"))
         for title, detail in (
             ("Folder layout", "recordings/ and positives/ exist; WAVs are directly inside."),
             ("Names", "Each positive names exactly one complete Source Recording stem."),
@@ -422,11 +387,6 @@ class SettingsPage(QScrollArea):
         layout.setSpacing(18)
         layout.addWidget(Text("LOCAL FOLDERS", role="overline"))
         layout.addWidget(Text("Settings", role="title"))
-        layout.addWidget(
-            Text(
-                "Trainer metadata and generated artifacts stay with the Collection.", role="caption"
-            )
-        )
 
         grid = QGridLayout()
         self.grid = grid
@@ -438,8 +398,8 @@ class SettingsPage(QScrollArea):
         binding_header.addStretch()
         binding_header.addWidget(
             HelpHint(
-                "The Collection is the folder you select. Machine-specific binding stays in "
-                "local Application Settings.",
+                "This is the folder currently open in Trainer. Changing it doesn't move or "
+                "copy files.",
                 subject="Collection folders",
             )
         )
@@ -455,34 +415,12 @@ class SettingsPage(QScrollArea):
             binding.content_layout.addWidget(Text(label, role="caption"))
             binding.content_layout.addWidget(value)
             binding.content_layout.addWidget(Divider())
-        binding.content_layout.addWidget(
-            Text(
-                "A recent folder is only pending. Collection Scan validates identity before "
-                "saving or rebinding it.",
-                role="caption",
-                word_wrap=True,
-            )
-        )
         self.error_alert = Alert("", title="Application Settings", intent="danger")
         self.error_alert.hide()
         binding.content_layout.addWidget(self.error_alert)
         grid.addWidget(binding, 0, 0)
 
-        plan = Card(shadow=False)
-        self.plan_card = plan
-        plan.content_layout.addWidget(Text("Native reading plan", role="subheading"))
-        for title, detail in (
-            ("First selection", "List folders asynchronously and read bounded WAV headers."),
-            ("Reopen", "Compare cached file facts and recheck only changed inputs."),
-            ("Large Collections", "Page metadata; never read all audio into memory."),
-            ("Scientific safety", "Revalidate before Build and never mutate source WAVs."),
-            ("Runs", "One Active Run, staged publication and recoverable cancellation."),
-        ):
-            plan.content_layout.addWidget(Text(title, role="body"))
-            plan.content_layout.addWidget(Text(detail, role="caption", word_wrap=True))
-        grid.addWidget(plan, 0, 1)
         grid.setColumnStretch(0, 1)
-        grid.setColumnStretch(1, 1)
         layout.addLayout(grid)
 
         power = Card(shadow=False)
@@ -501,15 +439,6 @@ class SettingsPage(QScrollArea):
         diagnostics = Card(shadow=False)
         self.diagnostics_card = diagnostics
         diagnostics.content_layout.addWidget(Text("Diagnostics", role="subheading"))
-        diagnostics.content_layout.addWidget(
-            Text(
-                "Local logs help investigate startup, Collection Scan and scientific Runs. "
-                "Nothing is uploaded automatically. Export rechecks and redacts records before "
-                "creating a support ZIP.",
-                role="caption",
-                word_wrap=True,
-            )
-        )
         diagnostic_actions = QHBoxLayout()
         self.open_diagnostics_button = Button(
             "Open diagnostics folder", variant="outline", size="small"
@@ -553,17 +482,9 @@ class SettingsPage(QScrollArea):
     def _place_cards(self, compact: bool) -> None:
         self.is_compact = compact
         self.grid.removeWidget(self.binding_card)
-        self.grid.removeWidget(self.plan_card)
-        if compact:
-            self.grid.setColumnStretch(0, 1)
-            self.grid.setColumnStretch(1, 0)
-            self.grid.addWidget(self.binding_card, 0, 0)
-            self.grid.addWidget(self.plan_card, 1, 0)
-        else:
-            self.grid.setColumnStretch(0, 1)
-            self.grid.setColumnStretch(1, 1)
-            self.grid.addWidget(self.binding_card, 0, 0)
-            self.grid.addWidget(self.plan_card, 0, 1)
+        self.grid.setColumnStretch(0, 1)
+        self.grid.setColumnStretch(1, 0)
+        self.grid.addWidget(self.binding_card, 0, 0)
 
     def _refresh(self) -> None:
         path = self.controller.collection_path
@@ -625,9 +546,11 @@ class MainWindow(QMainWindow):
             lambda: self.navigate("wiki"),
         )
         self.builder_page = DatasetBuilderPage(controller)
-        self.dataset_list_page = DatasetListPage(self.open_builder, self.open_dataset)
+        self.dataset_list_page = DatasetListPage(controller, self.open_builder, self.open_dataset)
         self.dataset_detail_page = DatasetDetailPage(
             self._delete_dataset,
+            controller.rename_dataset,
+            controller.dataset_name,
             lambda: self.navigate("collection"),
             self.open_training,
         )
@@ -637,6 +560,8 @@ class MainWindow(QMainWindow):
             self._open_training_wiki,
             self._open_power_wiki,
         )
+        self.training_page.draft_status_changed.connect(self._set_training_draft_open)
+        self.training_page.draft_discarded.connect(lambda: self.navigate("datasets"))
         self.training_wiki_page = TrainingWikiPage(self._return_from_training_wiki)
         self.run_list_page = RunListPage(self.open_run, lambda: self.navigate("select"))
         self.run_detail_page = RunDetailPage(
@@ -645,8 +570,11 @@ class MainWindow(QMainWindow):
             lambda: self.navigate("runs"),
             self._open_run_log,
             lambda run_id: controller.worker_log_for_run(run_id) is not None,
+            controller.rename_run,
+            self._delete_run,
         )
         self.model_list_page = ModelListPage(
+            controller,
             self.open_model,
             lambda: self.navigate("datasets"),
         )
@@ -654,6 +582,10 @@ class MainWindow(QMainWindow):
             self.open_dataset,
             self.open_run,
             lambda: self.navigate("models"),
+            controller.rename_model,
+            self._delete_model,
+            controller.model_name,
+            lambda dataset_id, fallback: self._dataset_name(dataset_id, fallback),
         )
         self.wiki_page = WikiPage(lambda: self.navigate("select"))
         self.wiki_select_button = self.wiki_page.select_button
@@ -868,10 +800,6 @@ class MainWindow(QMainWindow):
         footer = QVBoxLayout(self.sidebar_footer)
         footer.setContentsMargins(0, 0, 0, 0)
         footer.setSpacing(6)
-        footer.addWidget(Divider())
-        footer.addWidget(Text("●  Local workspace", role="body"))
-        footer.addWidget(Text("Scientific data stays on your computer.", role="caption"))
-        footer.addWidget(Text("NATIVE DEVELOPMENT PREVIEW", role="overline"))
         self.sidebar_layout.addWidget(self.sidebar_footer)
         return sidebar
 
@@ -887,6 +815,11 @@ class MainWindow(QMainWindow):
         icon = QLabel()
         icon.setPixmap(make_icon("list", color=ALPACA_LIGHT.colors.primary).pixmap(22, 22))
         layout.addWidget(icon)
+        layout.addStretch()
+        self.open_draft_button = Button("Training setup · Open →", variant="outline", size="small")
+        self.open_draft_button.clicked.connect(lambda: self.navigate("training"))
+        self.open_draft_button.hide()
+        layout.addWidget(self.open_draft_button)
         active = QVBoxLayout()
         active.setSpacing(0)
         active.addWidget(Text("ACTIVE RUN", role="overline"))
@@ -909,8 +842,10 @@ class MainWindow(QMainWindow):
         self.view_run_button.clicked.connect(self._open_active_run)
         self.view_run_button.hide()
         layout.addWidget(self.view_run_button)
-        layout.addStretch()
         return header
+
+    def _set_training_draft_open(self, is_open: bool) -> None:
+        self.open_draft_button.setVisible(is_open)
 
     def _empty_artifact_page(self, label: str, subtitle: str, title: str) -> QWidget:
         page = QWidget()
@@ -920,14 +855,13 @@ class MainWindow(QMainWindow):
         layout.setSpacing(10)
         layout.addWidget(Text(label.upper(), role="overline"))
         layout.addWidget(Text(label, role="title"))
-        layout.addWidget(Text(subtitle, role="caption"))
         layout.addSpacing(14)
         action = Button("Select Collection")
         action.setIcon(make_icon("plus", color=ALPACA_LIGHT.colors.on_primary, size=16))
         action.clicked.connect(lambda: self.navigate("select"))
         empty = EmptyState(
             title,
-            text="Choose a Collection to begin. No sample or simulated artifacts are shown.",
+            text="Choose a Collection to begin.",
             icon=make_icon("folder", color=ALPACA_LIGHT.colors.primary, size=28),
             action=action,
         )
@@ -1128,6 +1062,15 @@ class MainWindow(QMainWindow):
             return
         self.model_detail_page.set_model(artifact)
         self.navigate("model-detail")
+
+    def _dataset_name(self, dataset_id: str, fallback: str) -> str:
+        root = self.controller.collection_path
+        if root is not None:
+            try:
+                fallback = load_dataset(root, dataset_id).label
+            except (OSError, ValueError):
+                pass
+        return self.controller.dataset_name(dataset_id, fallback)
 
     def open_training(self, dataset_id: str) -> None:
         root = self.controller.collection_path
@@ -1358,6 +1301,24 @@ class MainWindow(QMainWindow):
             return
         self.dataset_list_page.refresh(root)
         self.navigate("datasets")
+
+    def _delete_run(self, run_id: str) -> None:
+        try:
+            self.controller.delete_run(run_id)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Run could not be deleted", str(exc))
+            return
+        self._refresh_run_surfaces()
+        self.navigate("runs")
+
+    def _delete_model(self, model_id: str) -> None:
+        try:
+            self.controller.delete_model(model_id)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Model could not be deleted", str(exc))
+            return
+        self.model_list_page.refresh(self.controller.collection_path)
+        self.navigate("models")
 
     def _scan_started(self, root: str) -> None:
         self.scan_page.begin(root)

@@ -38,6 +38,7 @@ from biocall_studio_train.domain.run import (
     assert_dataset_mutable,
     assert_run_start_allowed,
     new_run,
+    rename_run,
     transition_run,
     update_run_progress,
 )
@@ -53,13 +54,16 @@ from biocall_studio_train.persistence.datasets import (
     load_dataset,
 )
 from biocall_studio_train.persistence.diagnostics import BoundedStderrCapture, worker_log_path
+from biocall_studio_train.persistence.display_names import DisplayNameStore
 from biocall_studio_train.persistence.models import (
     ModelArtifact,
+    delete_model,
     discard_uncommitted_model,
     load_model,
 )
 from biocall_studio_train.persistence.runs import (
     create_run,
+    delete_run,
     load_completion_receipt,
     reconcile_runs,
     request_cancellation,
@@ -264,6 +268,12 @@ class WorkspaceController(QObject):
             if identifier is not None
         }
         return frozenset(reserved)
+
+    @property
+    def reserved_model_ids(self) -> frozenset[str]:
+        if self._active_run is None or self._active_run.output_kind != "model":
+            return frozenset()
+        return frozenset({self._active_run.output_id})
 
     @property
     def diagnostics_available(self) -> bool:
@@ -726,11 +736,83 @@ class WorkspaceController(QObject):
         if self.collection_path is None:
             raise ValueError("No Collection is bound.")
         assert_dataset_mutable(self._runs, dataset_id)
-        return delete_dataset(
+        deletion = delete_dataset(
             self.collection_path,
             dataset_id,
             reserved_dataset_ids=self.reserved_dataset_ids,
         )
+        DisplayNameStore(self.collection_path).forget("datasets", dataset_id)
+        return deletion
+
+    def dataset_name(self, dataset_id: str, fallback: str) -> str:
+        if self.collection_path is None:
+            return fallback
+        return DisplayNameStore(self.collection_path).name("datasets", dataset_id, fallback)
+
+    def model_name(self, model_id: str, fallback: str) -> str:
+        if self.collection_path is None:
+            return fallback
+        return DisplayNameStore(self.collection_path).name("models", model_id, fallback)
+
+    def rename_dataset(self, dataset_id: str, name: str) -> str:
+        if self.collection_path is None:
+            raise ValueError("No Collection is bound.")
+        load_dataset(self.collection_path, dataset_id)
+        renamed = DisplayNameStore(self.collection_path).rename("datasets", dataset_id, name)
+        self.changed.emit()
+        return renamed
+
+    def rename_model(self, model_id: str, name: str) -> str:
+        if self.collection_path is None:
+            raise ValueError("No Collection is bound.")
+        load_model(self.collection_path, model_id)
+        renamed = DisplayNameStore(self.collection_path).rename("models", model_id, name)
+        self.changed.emit()
+        return renamed
+
+    def delete_model(self, model_id: str) -> None:
+        if self.collection_path is None:
+            raise ValueError("No Collection is bound.")
+        if model_id in self.reserved_model_ids:
+            raise ValueError("Cannot delete a Model reserved by the Active Run.")
+        delete_model(self.collection_path, model_id)
+        DisplayNameStore(self.collection_path).forget("models", model_id)
+
+    def rename_run(self, run_id: str, name: str) -> RunState:
+        state = next((run for run in self._runs if run.run_id == run_id), None)
+        if state is None:
+            raise ValueError("Run does not exist.")
+        renamed = rename_run(state, name, now=utc_now())
+        self._set_run(renamed)
+        return renamed
+
+    def delete_run(self, run_id: str) -> None:
+        if self.collection_path is None:
+            raise ValueError("No Collection is bound.")
+        state = next((run for run in self._runs if run.run_id == run_id), None)
+        if state is None:
+            raise ValueError("Run does not exist.")
+        if state.active:
+            raise ValueError("An Active Run cannot be deleted.")
+        delete_run(self.collection_path, run_id)
+        self._runs = tuple(run for run in self._runs if run.run_id != run_id)
+        self.runs_changed.emit()
+
+    def unbind_collection(self) -> None:
+        """Forget the machine-local binding without changing any Collection file."""
+        if self._active_run is not None:
+            raise ValueError("Cannot unbind the Collection while a Run is active.")
+        if self.is_scanning:
+            raise ValueError("Cancel the current scan before unbinding the Collection.")
+        self._save(ApplicationSettings(None, None, self._settings.keep_computer_awake))
+        self._pending_collection_path = None
+        self._scan_root = None
+        self.scan_result = None
+        self._runs = ()
+        self._active_run = None
+        self.pending_changed.emit()
+        self.runs_changed.emit()
+        self._diagnostic("collection_unbound", "Collection binding removed")
 
     @property
     def shutdown_is_ready(self) -> bool:

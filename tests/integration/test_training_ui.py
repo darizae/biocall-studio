@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from alp_ui.components import HelpHint, NumberInput, SelectInput
+from alp_ui.components import HelpHint, NumberInput, SelectInput, Text
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QInputDialog, QMessageBox
 
@@ -102,7 +102,7 @@ def _interact_with_alternative(qtbot, page, field):
 def test_every_detailed_native_training_field_is_interactive_and_described(
     qapp, qtbot, tmp_path, wav_factory, monkeypatch, family_index, family
 ):
-    """Cases: IT-TRAIN-010, IT-TRAIN-011."""
+    """Cases: IT-TRAIN-010, IT-TRAIN-011, IT-UI-005."""
     window, _dataset = _window(qtbot, tmp_path, wav_factory)
     page = window.training_page
     page.family_input.setCurrentIndex(family_index)
@@ -128,20 +128,15 @@ def test_every_detailed_native_training_field_is_interactive_and_described(
         assert not page.section_contents[owning_sections[0]].isHidden()
         assert not widget.isHidden()
         assert hint.focusPolicy() != Qt.FocusPolicy.NoFocus
-        assert field.help in hint.accessibleDescription()
-        assert field.wiki_anchor in hint.accessibleDescription()
-        assert field.help in hint.toolTip()
+        assert hint.accessibleDescription() == field.help
+        assert hint.toolTip() == field.help
         if field.mode == "derived":
             assert control.isReadOnly()
-            assert page.field_captions[field.key].text() == "Automatically determined"
             continue
 
         assert page.field_value(field.key) == field.default
         assert field.recommended_starting_value == field.default
         assert field.recommendation_basis == "backend_default_baseline"
-        caption = page.field_captions[field.key].text()
-        assert "Default / suggested starting value:" in caption
-        assert "backend default" in caption
         changed_to = _interact_with_alternative(qtbot, page, field)
         if changed_to is None:
             continue
@@ -177,7 +172,7 @@ def test_every_detailed_native_training_field_is_interactive_and_described(
 def test_native_training_page_primary_disclosure_family_drafts_and_wiki(
     qapp, qtbot, tmp_path, wav_factory
 ):
-    """Case: IT-TRAIN-010."""
+    """Cases: IT-TRAIN-010, IT-UI-005."""
     window, dataset = _window(qtbot, tmp_path, wav_factory)
     page = window.training_page
 
@@ -195,8 +190,18 @@ def test_native_training_page_primary_disclosure_family_drafts_and_wiki(
         "device",
     }
     assert not page.more_settings.isChecked()
+    visible_text = {label.text().lower() for label in page.findChildren(Text)}
+    assert all("backend default" not in text for text in visible_text)
+    assert page.cards.getItemPosition(page.cards.indexOf(page.dataset_card))[:2] == (0, 0)
+    assert page.cards.getItemPosition(page.cards.indexOf(page.config_card))[:2] == (1, 0)
+    assert page.cards.getItemPosition(page.cards.indexOf(page.start_card))[:2] == (2, 0)
+    assert window.open_draft_button.isVisible()
 
     page.set_field_value("training.batch_size", 32)
+    window.navigate("settings")
+    window.open_draft_button.click()
+    assert window.current_route == "training"
+    assert page.field_value("training.batch_size") == 32
     page.more_settings.setFocus()
     qtbot.keyClick(page.more_settings, Qt.Key.Key_Space)
     assert page.more_settings.isChecked()
@@ -211,20 +216,18 @@ def test_native_training_page_primary_disclosure_family_drafts_and_wiki(
     cnn_details = {field.key for field in fields_for_family("cnn") if field.ui_tier == "details"}
     assert cnn_details <= page.field_widgets.keys()
     assert all(
-        field.wiki_anchor in page.help_hints[field.key].accessibleDescription()
+        page.help_hints[field.key].accessibleDescription() == field.help
         for field in fields_for_family("cnn")
     )
     page.open_detail_section("Spectrogram")
     assert page.field_widgets["spectrogram.n_fft"].isVisible()
-    assert (
-        "Default / suggested starting value: 4096"
-        in page.field_captions["spectrogram.n_fft"].text()
-    )
     hint = page.help_hints["spectrogram.n_fft"]
     assert isinstance(hint, HelpHint)
     hint.setFocus()
     qtbot.keyClick(hint, Qt.Key.Key_Space)
-    assert "Wiki: training-configuration#spectrogram-n-fft" in hint.accessibleDescription()
+    assert hint.accessibleDescription() == next(
+        field.help for field in fields_for_family("cnn") if field.key == "spectrogram.n_fft"
+    )
     page.wiki_buttons["spectrogram.n_fft"].click()
     assert window.current_route == "training-wiki"
     assert window.training_wiki_page.anchor == "training-configuration#spectrogram-n-fft"
@@ -241,48 +244,54 @@ def test_native_training_page_primary_disclosure_family_drafts_and_wiki(
     rf_details = {field.key for field in fields_for_family("rf") if field.ui_tier == "details"}
     assert rf_details <= page.field_widgets.keys()
     assert page.field_controls["feature_family"].isReadOnly()
-    assert page.field_captions["feature_family"].text() == "Automatically determined"
     page.set_field_value("n_estimators", 1200)
     page.family_input.setCurrentIndex(0)
     assert page.field_value("training.batch_size") == 32
     page.family_input.setCurrentIndex(1)
     assert page.field_value("n_estimators") == 1200
+    page.discard_button.click()
+    assert window.current_route == "datasets"
+    assert not window.open_draft_button.isVisible()
+    assert page.field_value("training.batch_size") == 16
 
 
 @pytest.mark.qt
 def test_native_validation_preserves_values_blocks_launch_and_resets(
     qapp, qtbot, tmp_path, wav_factory, monkeypatch
 ):
-    """Case: IT-TRAIN-011."""
+    """Cases: IT-TRAIN-011, IT-UI-005."""
     window, _dataset = _window(qtbot, tmp_path, wav_factory)
     page = window.training_page
     page.more_settings.click()
     page.open_detail_section("Spectrogram")
     assert isinstance(page.field_controls["spectrogram.n_fft"], NumberInput)
 
-    page.set_field_value("training.learning_rate", 1e-10)
-    assert page.field_controls["training.learning_rate"].value() == pytest.approx(1e-10)
-    assert page.field_value("training.learning_rate") == pytest.approx(1e-10)
+    learning_rate = page.field_controls["training.learning_rate"]
+    assert learning_rate.control.minimum() == 0
+    assert learning_rate.control.decimals() == 5
+    learning_rate.setValue(-1)
+    assert learning_rate.value() == 0
+    page.reset_field("training.learning_rate")
 
     device = page.field_controls["device"]
     mps_index = device.control.findData("mps")
     mps_item = device.model().item(mps_index)
     assert not mps_item.isEnabled()
-    assert "MPS is unavailable in the verified training executor" in mps_item.toolTip()
-    assert "MPS unsupported by verified executor" in device.control.accessibleDescription()
-    assert "MPS unsupported by verified executor" in device.descriptionText()
+    assert "MPS isn't available for training yet" in mps_item.toolTip()
+    assert "MPS isn't available yet" in device.control.accessibleDescription()
+    assert device.descriptionText() == ""
 
     noise_source = page.field_controls["augmentation.noise_source"]
     collection_noise_index = noise_source.control.findData("collection-selected")
     collection_noise_item = noise_source.model().item(collection_noise_index)
     assert not collection_noise_item.isEnabled()
-    assert "Collection-selected noise is unavailable" in collection_noise_item.toolTip()
-    assert "collection-selected noise lacks verified executor support" in (
+    assert "Collection noise isn't available for augmentation yet" in (
+        collection_noise_item.toolTip()
+    )
+    assert "Collection noise isn't available for augmentation yet" in (
         noise_source.control.accessibleDescription()
     )
-    assert "collection-selected noise lacks verified executor support" in (
-        noise_source.descriptionText()
-    )
+    assert noise_source.descriptionText() == ""
 
     page.set_field_value("spectrogram.n_fft", 1024)
     page.set_field_value("spectrogram.hop_length", 2048)

@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from alp_ui.components import Alert, Card, DataTable, HelpHint, ProgressBar, Text
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QBoxLayout
+from PySide6.QtWidgets import QBoxLayout, QMessageBox
 
 from biocall_studio_train.application.collection_scan import (
     inputs_match_scan,
@@ -484,9 +484,9 @@ def test_large_metadata_partitions_and_live_qt_window_stay_responsive(
 
 @pytest.mark.qt
 def test_collection_ui_repair_rescan_cta_focus_and_narrow_layout(
-    qapp, qtbot, tmp_path, collection_factory
+    qapp, qtbot, tmp_path, collection_factory, monkeypatch
 ):
-    """Case: IT-COL-008."""
+    """Cases: IT-COL-008, IT-UI-005."""
     root = collection_factory(tmp_path / "Repair", source_count=1)
     positive = root / "positives" / "REC_A__start-00500ms__end-01000ms__call1.wav"
     broken = positive.with_name("REC_A__call1.wav")
@@ -512,8 +512,12 @@ def test_collection_ui_repair_rescan_cta_focus_and_narrow_layout(
         "Recordings",
         "Validation details",
         "Folder",
-        "Fast reopening",
     } <= page_text
+    assert "Fast reopening" not in page_text
+    matching_titles = [
+        label for label in window.collection_page.findChildren(Text) if label.text() == root.name
+    ]
+    assert len(matching_titles) == 1
     assert window._navigation["collections"].isChecked()
     assert window._navigation["collections"].accessibleDescription() == "Current page"
     hints = window.collection_page.findChildren(HelpHint)
@@ -550,3 +554,11 @@ def test_collection_ui_repair_rescan_cta_focus_and_narrow_layout(
     assert window.collection_page.header_layout.direction() == QBoxLayout.Direction.TopToBottom
     assert window.collection_page.content_layout.direction() == QBoxLayout.Direction.TopToBottom
     assert window.collection_page.build_button.focusPolicy() != Qt.FocusPolicy.NoFocus
+    source_bytes = {path: path.read_bytes() for path in root.glob("*/*.wav")}
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes
+    )
+    window.collection_page.unbind_button.click()
+    assert window.current_route == "select"
+    assert controller.collection_path is None
+    assert {path: path.read_bytes() for path in source_bytes} == source_bytes

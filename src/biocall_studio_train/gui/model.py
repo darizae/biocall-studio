@@ -5,22 +5,24 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from alp_ui.components import Alert, Badge, Button, Card, DataTable, EmptyState, Text
+from alp_ui.components import Alert, Button, Card, DataTable, EmptyState, Text
 from alp_ui.theme import ALPACA_LIGHT, make_icon
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
-from PySide6.QtGui import QFontDatabase, QResizeEvent
+from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
-    QLabel,
+    QInputDialog,
+    QMessageBox,
     QScrollArea,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
+from biocall_studio_train.persistence.datasets import load_dataset
 from biocall_studio_train.persistence.models import ModelArtifact, list_models
 
 
@@ -31,7 +33,8 @@ def _heading(title: str, subtitle: str, *, overline: str) -> QWidget:
     layout.setSpacing(3)
     layout.addWidget(Text(overline, role="overline"))
     layout.addWidget(Text(title, role="title"))
-    layout.addWidget(Text(subtitle, role="caption", word_wrap=True))
+    if subtitle:
+        layout.addWidget(Text(subtitle, role="caption", word_wrap=True))
     return widget
 
 
@@ -46,10 +49,19 @@ class ModelListModel(QAbstractTableModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._models: tuple[ModelArtifact, ...] = ()
+        self._names: dict[str, str] = {}
+        self._dataset_names: dict[str, str] = {}
 
-    def set_models(self, models: tuple[ModelArtifact, ...]) -> None:
+    def set_models(
+        self,
+        models: tuple[ModelArtifact, ...],
+        names: dict[str, str] | None = None,
+        dataset_names: dict[str, str] | None = None,
+    ) -> None:
         self.beginResetModel()
         self._models = models
+        self._names = names or {}
+        self._dataset_names = dataset_names or {}
         self.endResetModel()
 
     def model_artifact(self, row: int) -> ModelArtifact:
@@ -69,14 +81,15 @@ class ModelListModel(QAbstractTableModel):
         family = "CNN" if manifest["family"] == "cnn" else "Random Forest"
         if role == Qt.ItemDataRole.DisplayRole:
             return (
-                f"{artifact.label}\n{artifact.model_id}",
+                self._names.get(artifact.model_id, artifact.label),
                 family,
-                manifest["dataset_id"],
+                self._dataset_names.get(manifest["dataset_id"], "Dataset unavailable"),
                 manifest["created_at"].split("T", 1)[0],
                 "Inspect →",
             )[index.column()]
         if role == Qt.ItemDataRole.AccessibleTextRole:
-            return f"{artifact.label}, {family}, Dataset {manifest['dataset_id']}"
+            dataset_name = self._dataset_names.get(manifest["dataset_id"], "Dataset unavailable")
+            return f"{self._names.get(artifact.model_id, artifact.label)}, {family}, {dataset_name}"
         return None
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):  # noqa: N802
@@ -86,8 +99,14 @@ class ModelListModel(QAbstractTableModel):
 
 
 class ModelListPage(QScrollArea):
-    def __init__(self, open_model: Callable[[str], None], open_datasets: Callable[[], None]):
+    def __init__(
+        self,
+        controller,
+        open_model: Callable[[str], None],
+        open_datasets: Callable[[], None],
+    ):
         super().__init__()
+        self.controller = controller
         self.open_model = open_model
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
@@ -99,7 +118,7 @@ class ModelListPage(QScrollArea):
         layout.addWidget(
             _heading(
                 "Models",
-                "Verified classifiers published by completed Training Runs.",
+                "",
                 overline="IMMUTABLE ARTIFACTS",
             )
         )
@@ -135,7 +154,20 @@ class ModelListPage(QScrollArea):
             models = ()
             self.error_alert.text_widget.setText(str(exc))
             self.error_alert.show()
-        self.model.set_models(models)
+        names = {
+            artifact.model_id: self.controller.model_name(artifact.model_id, artifact.label)
+            for artifact in models
+        }
+        dataset_names: dict[str, str] = {}
+        if collection_root is not None:
+            for artifact in models:
+                dataset_id = artifact.manifest["dataset_id"]
+                try:
+                    fallback = load_dataset(collection_root, dataset_id).label
+                except (OSError, ValueError):
+                    fallback = "Dataset unavailable"
+                dataset_names[dataset_id] = self.controller.dataset_name(dataset_id, fallback)
+        self.model.set_models(models, names, dataset_names)
         self.table.setVisible(bool(models))
         self.table.setFixedHeight(max(120, 44 + 48 * len(models)))
         self.empty.setVisible(not models and not self.error_alert.isVisible())
@@ -147,11 +179,19 @@ class ModelDetailPage(QScrollArea):
         open_dataset: Callable[[str], None],
         open_run: Callable[[str], None],
         open_models: Callable[[], None],
+        rename_model: Callable[[str, str], str],
+        delete_model: Callable[[str], None],
+        model_name: Callable[[str, str], str],
+        dataset_name: Callable[[str, str], str],
     ):
         super().__init__()
         self.open_dataset = open_dataset
         self.open_run = open_run
         self.open_models = open_models
+        self.rename_model = rename_model
+        self.delete_model = delete_model
+        self.model_name = model_name
+        self.dataset_name = dataset_name
         self.artifact: ModelArtifact | None = None
         self.is_compact = False
         self.setWidgetResizable(True)
@@ -168,21 +208,28 @@ class ModelDetailPage(QScrollArea):
         self.outer = QVBoxLayout(self.content)
         self.outer.setContentsMargins(38, 30, 38, 42)
         self.outer.setSpacing(16)
-        self.outer.addWidget(Text(f"Models  /  {artifact.model_id}", role="caption"))
         is_rf = manifest["family"] == "random_forest"
         family_label = "Random Forest" if is_rf else "CNN"
+        self.display_name = self.model_name(artifact.model_id, artifact.label)
         header = QHBoxLayout()
         header.addWidget(
             _heading(
-                artifact.label,
-                f"Published {family_label} classifier · read-only artifact",
+                self.display_name,
+                "",
                 overline="MODEL",
             ),
             1,
         )
-        header.addWidget(Badge("Verified", intent="success"), 0, Qt.AlignmentFlag.AlignTop)
+        actions = QHBoxLayout()
+        self.rename_button = Button("Rename", variant="outline")
+        self.rename_button.clicked.connect(self._prompt_rename)
+        actions.addWidget(self.rename_button)
+        self.delete_button = Button("Delete", variant="danger")
+        self.delete_button.clicked.connect(self._confirm_delete)
+        actions.addWidget(self.delete_button)
+        header.addLayout(actions)
         self.outer.addLayout(header)
-        self.setAccessibleName(f"Model detail: {artifact.label} · {family_label}")
+        self.setAccessibleName(f"Model detail: {self.display_name} · {family_label}")
 
         summary = QGridLayout()
         summary.setSpacing(10)
@@ -221,11 +268,14 @@ class ModelDetailPage(QScrollArea):
 
         overview = Card(shadow=False)
         overview.content_layout.addWidget(Text("Model details", role="subheading"))
-        self.model_id = Text(artifact.model_id, role="body", selectable=True)
         detail_rows: tuple[tuple[str, QWidget], ...] = (
-            ("Model ID", self.model_id),
-            ("Dataset", Text(manifest["dataset_id"], role="body", selectable=True)),
-            ("Training Run", Text(manifest["run_id"], role="body", selectable=True)),
+            (
+                "Dataset",
+                Text(
+                    self.dataset_name(manifest["dataset_id"], "Dataset unavailable"),
+                    role="body",
+                ),
+            ),
             ("Created", Text(manifest["created_at"], role="body")),
             (
                 "Task",
@@ -255,17 +305,6 @@ class ModelDetailPage(QScrollArea):
 
         metrics_card = Card(shadow=False)
         metrics_card.content_layout.addWidget(Text("Validation metrics", role="subheading"))
-        metrics_card.content_layout.addWidget(
-            Text(
-                (
-                    "Measured on the immutable validation Split using the saved decision threshold."
-                    if is_rf
-                    else "Measured on the immutable validation Split using the selected checkpoint."
-                ),
-                role="caption",
-                word_wrap=True,
-            )
-        )
         for name in ("accuracy", "precision", "recall", "f1", "roc_auc"):
             row = QHBoxLayout()
             row.addWidget(Text(name.replace("_", " ").upper(), role="caption"))
@@ -273,20 +312,6 @@ class ModelDetailPage(QScrollArea):
             row.addWidget(Text(_metric(metrics[name]), role="body"))
             metrics_card.content_layout.addLayout(row)
         left.addWidget(metrics_card)
-
-        files = Card(shadow=False)
-        files.content_layout.addWidget(Text("Immutable files", role="subheading"))
-        tree = QLabel(
-            f"{artifact.model_id}/\n"
-            "├── model.json   manifest + metrics + provenance\n"
-            f"└── {manifest['artifact']['path']}   "
-            f"{manifest['artifact']['sha256'][:12]}… sha256"
-        )
-        tree.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        tree.setAccessibleName("Model file tree")
-        tree.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
-        files.content_layout.addWidget(tree)
-        left.addWidget(files)
 
         boundary = Card(shadow=False)
         boundary.content_layout.addWidget(Text("Prediction not included", role="subheading"))
@@ -296,13 +321,6 @@ class ModelDetailPage(QScrollArea):
                 "on new recordings belongs to a later, explicitly validated workflow.",
                 role="body",
                 word_wrap=True,
-            )
-        )
-        boundary.content_layout.addWidget(
-            Alert(
-                "No prediction was run and no scientific result is implied.",
-                title="Training artifact only",
-                intent="info",
             )
         )
         right.addWidget(boundary)
@@ -360,3 +378,29 @@ class ModelDetailPage(QScrollArea):
             self.columns.setColumnStretch(1, 2)
             self.columns.addWidget(self.left_stack, 0, 0)
             self.columns.addWidget(self.right_stack, 0, 1, Qt.AlignmentFlag.AlignTop)
+
+    def _prompt_rename(self) -> None:
+        if self.artifact is None:
+            return
+        name, accepted = QInputDialog.getText(self, "Rename Model", "Name", text=self.display_name)
+        if not accepted:
+            return
+        try:
+            self.rename_model(self.artifact.model_id, name)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Model could not be renamed", str(exc))
+            return
+        self.set_model(self.artifact)
+
+    def _confirm_delete(self) -> None:
+        if self.artifact is None:
+            return
+        answer = QMessageBox.question(
+            self,
+            "Delete Model?",
+            f"Delete {self.display_name}? Its Dataset and Training Run will be kept.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self.delete_model(self.artifact.model_id)

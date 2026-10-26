@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from alp_ui.components import DataTable, HelpHint, NumberInput, ProgressBar, SelectInput
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QInputDialog, QMessageBox
 
 from biocall_studio_train.application.collection_scan import scan_collection
 from biocall_studio_train.application.workspace import WorkspaceController
@@ -289,7 +289,7 @@ def test_dataset_reopens_and_explicit_delete_preserves_models_and_inputs(tmp_pat
 def test_native_builder_controls_states_worker_and_dataset_navigation(
     qapp, qtbot, tmp_path, wav_factory, monkeypatch
 ):
-    """Case: IT-DB-005."""
+    """Cases: IT-DB-005, IT-UI-005."""
     create_application()
     root = _collection(tmp_path / "collection", wav_factory)
     result = _published(root)
@@ -372,6 +372,15 @@ def test_native_builder_controls_states_worker_and_dataset_navigation(
     index = window.dataset_list_page.model.index(0, 0)
     window.dataset_list_page.table.clicked.emit(index)
     assert window.current_route == "dataset-detail"
+    manifest_before = (detail.dataset.root / "dataset.json").read_bytes()
+    monkeypatch.setattr(QInputDialog, "getText", lambda *args, **kwargs: ("Morning calls", True))
+    detail.rename_button.click()
+    assert detail.display_name == "Morning calls"
+    assert detail.accessibleName() == "Dataset detail: Morning calls"
+    assert (detail.dataset.root / "dataset.json").read_bytes() == manifest_before
+    window.navigate("datasets")
+    assert window.dataset_list_page.model.index(0, 0).data() == "Morning calls"
+    window.dataset_list_page.table.clicked.emit(window.dataset_list_page.model.index(0, 0))
 
     monkeypatch.setattr(
         QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes

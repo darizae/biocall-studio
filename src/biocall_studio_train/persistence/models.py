@@ -160,6 +160,21 @@ def list_models(collection_root: Path) -> tuple[ModelArtifact, ...]:
     )
 
 
+def delete_model(collection_root: Path, model_id: str) -> None:
+    """Delete one verified published Model without changing its Dataset or Run."""
+    artifact = load_model(collection_root, model_id)
+    parent = artifact.root.parent
+    shutil.rmtree(artifact.root)
+    try:
+        descriptor = os.open(parent, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    except OSError:
+        pass
+
+
 def discard_uncommitted_model(
     collection_root: Path,
     model_id: str,

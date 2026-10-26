@@ -19,7 +19,7 @@ from alp_ui.components import (
     Text,
     TextInput,
 )
-from PySide6.QtCore import QSignalBlocker, Qt
+from PySide6.QtCore import QSignalBlocker, Qt, Signal
 from PySide6.QtGui import QResizeEvent
 from PySide6.QtWidgets import (
     QDialog,
@@ -107,18 +107,9 @@ class TrainingWikiPage(QScrollArea):
         self.title = Text("Training configuration", role="title")
         layout.addWidget(self.title)
         self.anchor_label = Text("", role="caption", selectable=True)
-        layout.addWidget(self.anchor_label)
         card = Card(shadow=False)
         self.help_text = Text("", role="body", word_wrap=True)
         card.content_layout.addWidget(self.help_text)
-        card.content_layout.addWidget(
-            Text(
-                "Defaults are reproducible backend baselines, not evidence-backed optima. "
-                "The selected Dataset and available hardware are validated before a Run can start.",
-                role="caption",
-                word_wrap=True,
-            )
-        )
         layout.addWidget(card)
         self.back_button = Button("← Back to Model configuration", variant="outline")
         self.back_button.clicked.connect(back)
@@ -146,13 +137,6 @@ class PresetManagerDialog(QDialog):
         layout.setContentsMargins(22, 22, 22, 22)
         layout.setSpacing(12)
         layout.addWidget(Text("Saved configurations", role="heading"))
-        layout.addWidget(
-            Text(
-                "Reusable user-level settings. Datasets and Collection paths are never stored.",
-                role="caption",
-                word_wrap=True,
-            )
-        )
         self.list_widget = QListWidget()
         self.list_widget.setAccessibleName("Saved configuration list")
         layout.addWidget(self.list_widget, 1)
@@ -254,6 +238,9 @@ class PresetManagerDialog(QDialog):
 
 
 class TrainingPage(QScrollArea):
+    draft_status_changed = Signal(bool)
+    draft_discarded = Signal()
+
     def __init__(
         self,
         controller,
@@ -274,12 +261,12 @@ class TrainingPage(QScrollArea):
         self.collection_root: Path | None = None
         self.artifact: DatasetArtifact | None = None
         self.last_frozen_config: FrozenTrainingConfig | None = None
+        self.draft_open = False
         self._compact = False
         self._updating = False
         self.manage_dialog: PresetManagerDialog | None = None
         self.field_widgets: dict[str, QWidget] = {}
         self.field_controls: dict[str, QWidget] = {}
-        self.field_captions: dict[str, Text] = {}
         self.help_hints: dict[str, HelpHint] = {}
         self.wiki_buttons: dict[str, Button] = {}
         self.section_buttons: dict[str, Button] = {}
@@ -293,21 +280,16 @@ class TrainingPage(QScrollArea):
         self.outer = QVBoxLayout(self.content)
         self.outer.setContentsMargins(38, 30, 38, 42)
         self.outer.setSpacing(16)
-        self.outer.addWidget(Text("Datasets  /  Train Model", role="caption"))
         header = QHBoxLayout()
         heading = QVBoxLayout()
         heading.setSpacing(3)
         heading.addWidget(Text("TRAINING", role="overline"))
         heading.addWidget(Text("Train a Model", role="title"))
-        heading.addWidget(
-            Text(
-                "Choose a classifier. Training uses the selected immutable Dataset.",
-                role="caption",
-            )
-        )
         header.addLayout(heading)
         header.addStretch()
-        header.addWidget(Badge("Runs locally", intent="neutral"))
+        self.discard_button = Button("Discard", variant="outline", size="small")
+        self.discard_button.clicked.connect(self.discard_draft)
+        header.addWidget(self.discard_button)
         self.outer.addLayout(header)
 
         self.cards = QGridLayout()
@@ -315,10 +297,6 @@ class TrainingPage(QScrollArea):
         self.dataset_card = self._build_dataset_card()
         self.config_card = self._build_config_card()
         self.start_card = self._build_start_card()
-        self.left_stack = QWidget()
-        self.left_layout = QVBoxLayout(self.left_stack)
-        self.left_layout.setContentsMargins(0, 0, 0, 0)
-        self.left_layout.setSpacing(16)
         self.outer.addLayout(self.cards)
         self.outer.addStretch()
         self.setWidget(self.content)
@@ -341,12 +319,12 @@ class TrainingPage(QScrollArea):
         title = QVBoxLayout()
         title.setSpacing(2)
         title.addWidget(Text("1 · Dataset", role="subheading"))
-        title.addWidget(Text("Positive and mined-negative WAV Snippets", role="caption"))
         header.addLayout(title)
         header.addStretch()
         header.addWidget(
             HelpHint(
-                "CNN and Random Forest use the same immutable Dataset with train and val Splits.",
+                "Choose the Dataset to train. Both model types use its existing training and "
+                "validation groups.",
                 subject="Training Dataset",
             )
         )
@@ -384,14 +362,11 @@ class TrainingPage(QScrollArea):
         title = QVBoxLayout()
         title.setSpacing(2)
         title.addWidget(Text("2 · Model configuration", role="subheading"))
-        self.family_caption = Text("CNN · spectrogram", role="caption")
-        title.addWidget(self.family_caption)
         header.addLayout(title)
         header.addStretch()
         header.addWidget(
             HelpHint(
-                "CNN and Random Forest are different model families selected on this "
-                "Training page.",
+                "Choose CNN for spectrogram-based learning or Random Forest for acoustic features.",
                 subject="Model families",
             )
         )
@@ -439,19 +414,11 @@ class TrainingPage(QScrollArea):
         header.addStretch()
         header.addWidget(
             HelpHint(
-                "The complete validated configuration is frozen before future Worker dispatch.",
+                "Checks these settings, then starts training.",
                 subject="Start Training",
             )
         )
         card.content_layout.addLayout(header)
-        self.dataset_safety = Alert(
-            "Train a neural network and track loss and validation metrics.",
-            title="Dataset stays unchanged",
-            intent="success",
-        )
-        card.content_layout.addWidget(self.dataset_safety)
-        self.run_summary = Text("CNN · Dataset not selected · CPU/automatic", role="caption")
-        card.content_layout.addWidget(self.run_summary)
         self.launch_alert = Alert("", title="Configuration verified", intent="info")
         self.launch_alert.hide()
         card.content_layout.addWidget(self.launch_alert)
@@ -464,8 +431,6 @@ class TrainingPage(QScrollArea):
         self.keep_awake_retry_button = self.power_control.retry_button
         self.keep_awake_error = self.power_control.error
         actions = QHBoxLayout()
-        self.run_availability = Text("One Active Run at a time.", role="caption")
-        actions.addWidget(self.run_availability)
         actions.addStretch()
         self.start_button = Button("Start Training", size="large")
         self.start_button.clicked.connect(self._prepare_start)
@@ -476,23 +441,11 @@ class TrainingPage(QScrollArea):
     def _place_cards(self, compact: bool) -> None:
         for card in (self.dataset_card, self.config_card, self.start_card):
             self.cards.removeWidget(card)
-        while self.left_layout.count():
-            self.left_layout.takeAt(0)
-        self.cards.removeWidget(self.left_stack)
-        if compact:
-            self.cards.addWidget(self.dataset_card, 0, 0)
-            self.cards.addWidget(self.config_card, 1, 0)
-            self.cards.addWidget(self.start_card, 2, 0)
-            self.cards.setColumnStretch(0, 1)
-            self.cards.setColumnStretch(1, 0)
-        else:
-            self.left_layout.addWidget(self.dataset_card)
-            self.left_layout.addWidget(self.start_card)
-            self.left_layout.addStretch()
-            self.cards.addWidget(self.left_stack, 0, 0, Qt.AlignmentFlag.AlignTop)
-            self.cards.addWidget(self.config_card, 0, 1, Qt.AlignmentFlag.AlignTop)
-            self.cards.setColumnStretch(0, 3)
-            self.cards.setColumnStretch(1, 2)
+        self.cards.addWidget(self.dataset_card, 0, 0)
+        self.cards.addWidget(self.config_card, 1, 0)
+        self.cards.addWidget(self.start_card, 2, 0)
+        self.cards.setColumnStretch(0, 1)
+        self.cards.setColumnStretch(1, 0)
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         super().resizeEvent(event)
@@ -508,12 +461,33 @@ class TrainingPage(QScrollArea):
         self.dataset_input.control.clear()
         selected_index = 0
         for index, item in enumerate(artifacts):
-            self.dataset_input.addItem(f"{item.label} · {item.dataset_id}", item.dataset_id)
+            self.dataset_input.addItem(
+                self.controller.dataset_name(item.dataset_id, item.label), item.dataset_id
+            )
             if item.dataset_id == artifact.dataset_id:
                 selected_index = index
         self.dataset_input.setCurrentIndex(selected_index)
         del blocker
         self._apply_dataset(artifact)
+        if not self.draft_open:
+            self.draft_open = True
+            self.draft_status_changed.emit(True)
+
+    def discard_draft(self) -> None:
+        self.drafts = {"cnn": TrainingDraft.defaults("cnn"), "rf": TrainingDraft.defaults("rf")}
+        self._preset_origins = {"cnn": None, "rf": None}
+        self.family = "cnn"
+        self.dataset_id = None
+        self.collection_root = None
+        self.artifact = None
+        self.last_frozen_config = None
+        self.draft_open = False
+        blocker = QSignalBlocker(self.family_input.control)
+        self.family_input.setCurrentIndex(0)
+        del blocker
+        self._rebuild_form()
+        self.draft_status_changed.emit(False)
+        self.draft_discarded.emit()
 
     def _dataset_changed(self, index: int) -> None:
         if self._updating or self.collection_root is None or index < 0:
@@ -538,14 +512,6 @@ class TrainingPage(QScrollArea):
         if self._updating:
             return
         self.family = "rf" if index == 1 else "cnn"
-        self.family_caption.setText(
-            "Random Forest · acoustic features" if self.family == "rf" else "CNN · spectrogram"
-        )
-        self.dataset_safety.text_widget.setText(
-            "Extract features, fit a forest, validate and save the classifier."
-            if self.family == "rf"
-            else "Train a neural network and track loss and validation metrics."
-        )
         self.last_frozen_config = None
         self.launch_alert.hide()
         self._rebuild_form()
@@ -567,7 +533,7 @@ class TrainingPage(QScrollArea):
         self._clear_form()
         self.field_widgets = {}
         self.field_controls = {}
-        self.field_captions = {}
+        self.field_accessibility: dict[str, str] = {}
         self.help_hints = {}
         self.wiki_buttons = {}
         self.section_buttons = {}
@@ -641,14 +607,7 @@ class TrainingPage(QScrollArea):
         layout.setSpacing(4)
         label_row = QHBoxLayout()
         label = QLabel(field.label)
-        hint_text = (
-            f"{field.help} Wiki: {field.wiki_anchor}. "
-            "Suggested starting point uses the backend default; it is not an "
-            "evidence-backed optimum."
-            if field.mode == "editable"
-            else f"{field.help} Wiki: {field.wiki_anchor}. Automatically determined."
-        )
-        hint = HelpHint(hint_text, subject=field.label)
+        hint = HelpHint(field.help, subject=field.label)
         label_row.addWidget(label)
         label_row.addWidget(hint)
         wiki = Button("Wiki →", variant="outline", size="small")
@@ -663,15 +622,6 @@ class TrainingPage(QScrollArea):
         label.setBuddy(native_control)
         native_control.setAccessibleName(field.label)
         layout.addWidget(control)
-        if field.mode == "derived":
-            caption_text = "Automatically determined"
-        else:
-            caption_text = (
-                f"Default / suggested starting value: {_display_value(field.default)}"
-                + (" · backend default" if detailed else "")
-            )
-        caption = Text(caption_text, role="caption", word_wrap=True)
-        layout.addWidget(caption)
         actions = QHBoxLayout()
         if field.mode == "editable":
             reset = Button("Reset field", variant="outline", size="small")
@@ -688,7 +638,6 @@ class TrainingPage(QScrollArea):
             layout.addLayout(actions)
         self.field_widgets[field.key] = widget
         self.field_controls[field.key] = control
-        self.field_captions[field.key] = caption
         self.help_hints[field.key] = hint
         self.wiki_buttons[field.key] = wiki
         return widget
@@ -713,6 +662,19 @@ class TrainingPage(QScrollArea):
             control.valueChanged.connect(lambda _value, key=field.key: self._control_changed(key))
             return control
         if field.kind == "float":
+            if field.key == "training.learning_rate":
+                control = NumberInput(
+                    kind="decimal",
+                    minimum=0,
+                    maximum=1,
+                    decimals=5,
+                    step=0.00001,
+                    value=float(value),
+                )
+                control.valueChanged.connect(
+                    lambda _value, key=field.key: self._control_changed(key)
+                )
+                return control
             control = NumberInput(
                 kind="decimal",
                 minimum=-1_000_000_000,
@@ -741,7 +703,7 @@ class TrainingPage(QScrollArea):
                         item.setToolTip(reason)
             if unavailable:
                 description = self._unavailable_field_description(field.key, unavailable)
-                control.setDescriptionText(description)
+                self.field_accessibility[field.key] = description
             control.currentIndexChanged.connect(
                 lambda _index, key=field.key: self._control_changed(key)
             )
@@ -757,9 +719,9 @@ class TrainingPage(QScrollArea):
         if key == "device" and choice == "cuda" and not self.capabilities.cuda:
             return "CUDA is unavailable because it was not detected in this runtime."
         if key == "device" and choice == "mps" and not self.capabilities.mps:
-            return "MPS is unavailable in the verified training executor."
+            return "MPS isn't available for training yet."
         if key == "augmentation.noise_source" and choice == "collection-selected":
-            return "Collection-selected noise is unavailable until executor support is verified."
+            return "Collection noise isn't available for augmentation yet."
         return ""
 
     @staticmethod
@@ -770,10 +732,10 @@ class TrainingPage(QScrollArea):
             if "cuda" in choices:
                 parts.append("CUDA not detected")
             if "mps" in choices:
-                parts.append("MPS unsupported by verified executor")
+                parts.append("MPS isn't available yet")
             return "Unavailable: " + "; ".join(parts) + "."
         if key == "augmentation.noise_source":
-            return "Unavailable: collection-selected noise lacks verified executor support."
+            return "Unavailable: Collection noise isn't available for augmentation yet."
         return "Unavailable: " + "; ".join(reason for _choice, reason in unavailable)
 
     def _control_value(self, key: str) -> object:
@@ -914,8 +876,16 @@ class TrainingPage(QScrollArea):
             else self.draft.validate(dataset, self.capabilities)
         )
         for key, control in self.field_controls.items():
+            error = errors.get(key, "")
             if hasattr(control, "setErrorText"):
-                control.setErrorText(errors.get(key, ""))
+                control.setErrorText(error)
+            context = self.field_accessibility.get(key, "")
+            if context:
+                description = " ".join(
+                    part for part in (context, f"Error: {error}" if error else "") if part
+                )
+                control.setAccessibleDescription(description)
+                getattr(control, "control", control).setAccessibleDescription(description)
         if errors:
             first = next(iter(errors.values()))
             suffix = f" {len(errors) - 1} more issue(s)." if len(errors) > 1 else ""
@@ -925,9 +895,6 @@ class TrainingPage(QScrollArea):
             self.error_alert.hide()
         active = self.controller.active_run is not None
         self.start_button.setEnabled(not errors and not active)
-        self.run_availability.setText(
-            "Another Run is active." if active else "One Active Run at a time."
-        )
         modified_details = sum(
             field.key in self.draft.modified_keys()
             for field in fields_for_family(self.family)
@@ -944,16 +911,6 @@ class TrainingPage(QScrollArea):
                 == "primary"
             ):
                 button.setVisible(key in modified)
-        device = self.draft.value("device") if self.family == "cnn" else "CPU"
-        dataset_label = self.dataset_id or "Dataset not selected"
-        primary = (
-            f"{self.draft.value('training.max_epochs')} epochs · batch "
-            f"{self.draft.value('training.batch_size')}"
-            if self.family == "cnn"
-            else f"{self.draft.value('n_estimators')} trees · depth "
-            f"{_display_value(self.draft.value('max_depth'))}"
-        )
-        self.run_summary.setText(f"{self.family.upper()} · {dataset_label} · {device} · {primary}")
 
     def _prepare_start(self) -> None:
         dataset = self._dataset_context()
@@ -976,7 +933,8 @@ class TrainingPage(QScrollArea):
         if self.artifact is None:
             return
         family_label = "CNN" if self.family == "cnn" else "Random Forest"
-        default_label = f"{self.artifact.label} · {family_label}"
+        dataset_name = self.controller.dataset_name(self.artifact.dataset_id, self.artifact.label)
+        default_label = f"{dataset_name} · {family_label}"
         label, accepted = QInputDialog.getText(
             self,
             "Name your Model",
@@ -994,6 +952,9 @@ class TrainingPage(QScrollArea):
             self.launch_alert.title_widget.setText("Training could not start")
             self.launch_alert.text_widget.setText(str(exc))
             self.launch_alert.show()
+        else:
+            self.draft_open = False
+            self.draft_status_changed.emit(False)
 
     def _refresh_preset_selector(self) -> None:
         records = [record for record in self._preset_records() if record.family == self.family]
@@ -1058,9 +1019,6 @@ class TrainingPage(QScrollArea):
         blocker = QSignalBlocker(self.family_input.control)
         self.family_input.setCurrentIndex(0 if self.family == "cnn" else 1)
         del blocker
-        self.family_caption.setText(
-            "CNN · spectrogram" if self.family == "cnn" else "Random Forest · acoustic features"
-        )
         self._rebuild_form()
         return loaded.record
 

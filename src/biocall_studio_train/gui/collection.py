@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QMessageBox,
     QScrollArea,
     QSizePolicy,
     QVBoxLayout,
@@ -159,21 +160,12 @@ class ReadingCollectionPage(QScrollArea):
             row.addWidget(value)
             card.content_layout.addLayout(row)
         actions = QHBoxLayout()
-        actions.addWidget(Text("You can cancel this scan.", role="caption"))
         actions.addStretch()
         self.cancel_button = Button("Cancel scan", variant="secondary")
         self.cancel_button.clicked.connect(controller.cancel_scan)
         actions.addWidget(self.cancel_button)
         card.content_layout.addLayout(actions)
         layout.addWidget(card)
-        note = Text(
-            "Large folders are read by a bounded background I/O worker; "
-            "source audio is not decoded.",
-            role="caption",
-            word_wrap=True,
-        )
-        note.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(note)
         outer.addWidget(self.narrow, 0, Qt.AlignmentFlag.AlignHCenter)
         outer.addStretch()
         self.setWidget(content)
@@ -224,8 +216,6 @@ class CollectionPage(QScrollArea):
             elif item.layout():
                 self._clear_layout(item.layout())
 
-        crumbs = Text(f"Collections  /  {result.root_name}", role="caption")
-        self.outer.addWidget(crumbs)
         self.header_layout = QBoxLayout(QBoxLayout.Direction.LeftToRight)
         heading_widget = QWidget()
         heading = QVBoxLayout(heading_widget)
@@ -233,7 +223,6 @@ class CollectionPage(QScrollArea):
         heading.setSpacing(3)
         heading.addWidget(Text("COLLECTION", role="overline"))
         heading.addWidget(Text(result.root_name, role="title"))
-        heading.addWidget(Text(f"Selected folder: {result.root_name}", role="caption"))
         heading_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.header_layout.addWidget(heading_widget)
         actions_widget = QWidget()
@@ -243,6 +232,9 @@ class CollectionPage(QScrollArea):
         self.choose_button = Button("Choose another folder", variant="outline")
         self.choose_button.clicked.connect(self.open_select)
         actions.addWidget(self.choose_button)
+        self.unbind_button = Button("Unbind", variant="outline")
+        self.unbind_button.clicked.connect(self._confirm_unbind)
+        actions.addWidget(self.unbind_button)
         self.rescan_button = Button("Rescan Collection", variant="secondary")
         self.rescan_button.clicked.connect(self.controller.rescan)
         actions.addWidget(self.rescan_button)
@@ -261,23 +253,22 @@ class CollectionPage(QScrollArea):
         self.stats_layout.setSpacing(12)
         self.summary_cards = []
         values = (
-            ("Source Recordings", f"{result.recording_count:,}", "Original WAVs"),
-            ("Positive examples", f"{result.positive_count:,}", "Labeled WAVs"),
-            ("Recorded audio", _duration(result.duration_seconds), "From WAV headers"),
-            ("Collection", "Valid" if result.valid else "Needs fixes", "Native checks"),
+            ("Source Recordings", f"{result.recording_count:,}"),
+            ("Positive examples", f"{result.positive_count:,}"),
+            ("Recorded audio", _duration(result.duration_seconds)),
+            ("Collection", "Valid" if result.valid else "Needs fixes"),
         )
-        for column, (label, value, note) in enumerate(values):
+        for column, (label, value) in enumerate(values):
             card = Card(shadow=False)
             card.content_layout.addWidget(Text(label, role="caption"))
             card.content_layout.addWidget(Text(value, role="heading"))
-            card.content_layout.addWidget(Text(note, role="caption"))
             self.summary_cards.append(card)
             self.stats_layout.addWidget(card, 0, column)
         self.outer.addLayout(self.stats_layout)
 
         if result.valid:
             self.status_alert = Alert(
-                "Folder, WAV headers, source names and snippet timestamps are consistent.",
+                "Ready to build a Dataset.",
                 title="Collection valid",
                 intent="success",
             )
@@ -298,13 +289,12 @@ class CollectionPage(QScrollArea):
         table_heading = QHBoxLayout()
         title = QVBoxLayout()
         title.addWidget(Text("Recordings", role="subheading"))
-        title.addWidget(Text("Positive snippets by Source Recording", role="caption"))
         table_heading.addLayout(title)
         table_heading.addStretch()
         table_heading.addWidget(
             HelpHint(
-                "Positive WAV names reference the complete Source Recording stem and carry "
-                "source-time start/end values in integer milliseconds.",
+                "Each labeled clip filename names its full recording and includes the clip's "
+                "start and end time in milliseconds.",
                 subject="Source and positive mapping",
             )
         )
@@ -369,7 +359,8 @@ class CollectionPage(QScrollArea):
         folder_header.addStretch()
         folder_header.addWidget(
             HelpHint(
-                "Compact metadata is written under .alpaca/ without changing source WAVs.",
+                "Trainer stores its own files in .alpaca/ and doesn't copy or change your WAV "
+                "files.",
                 subject="Collection storage",
             )
         )
@@ -398,27 +389,6 @@ class CollectionPage(QScrollArea):
         folder.content_layout.addWidget(tree)
         right.addWidget(folder)
 
-        cache = Card(shadow=False)
-        cache.content_layout.addWidget(Text("Fast reopening", role="subheading"))
-        for label, value in (
-            ("Metadata", "Ready" if result.valid else "Not published"),
-            ("Audio copies", "None"),
-            ("What we check", "Header + names + times"),
-        ):
-            row = QHBoxLayout()
-            row.addWidget(Text(label, role="caption"))
-            row.addStretch()
-            row.addWidget(Text(value, role="body"))
-            cache.content_layout.addLayout(row)
-        cache.content_layout.addWidget(
-            Text(
-                "Reopen compares path, size, modified time and cached header facts. "
-                "Current inputs are checked again before Dataset Build.",
-                role="caption",
-                word_wrap=True,
-            )
-        )
-        right.addWidget(cache)
         right.addStretch()
 
         self.content_layout = QBoxLayout(QBoxLayout.Direction.LeftToRight)
@@ -426,14 +396,6 @@ class CollectionPage(QScrollArea):
         self.content_layout.addWidget(self.left_stack, 5)
         self.content_layout.addWidget(self.right_stack, 3)
         self.outer.addLayout(self.content_layout)
-        note = Text(
-            "Source-time intervals come from filenames; validation does not prove matching "
-            "waveform content.",
-            role="caption",
-            word_wrap=True,
-        )
-        note.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.outer.addWidget(note)
         self.outer.addStretch()
         self._apply_compact(self.viewport().width() < 850)
 
@@ -466,6 +428,23 @@ class CollectionPage(QScrollArea):
             self.status_alert.setAccessibleDescription(self.status_alert.text_widget.text())
             return
         self.open_build()
+
+    def _confirm_unbind(self) -> None:
+        answer = QMessageBox.question(
+            self,
+            "Unbind Collection?",
+            "Forget this Collection on this computer? Its files will not be changed.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            self.controller.unbind_collection()
+        except ValueError as exc:
+            QMessageBox.warning(self, "Collection cannot be unbound", str(exc))
+            return
+        self.open_select()
 
     @classmethod
     def _clear_layout(cls, layout) -> None:

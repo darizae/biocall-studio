@@ -33,15 +33,6 @@ class KeepAwakeControl(QWidget):
         row.addWidget(self.status)
         layout.addLayout(row)
 
-        layout.addWidget(
-            Text(
-                "Helps prevent inactivity-based sleep while Trainer is open; the display may "
-                "turn off. It cannot override lid close, manual Sleep, shutdown, low battery, "
-                "updates or system policy.",
-                role="caption",
-                word_wrap=True,
-            )
-        )
         actions = QHBoxLayout()
         self.wiki_button = Button(
             "Read Keep computer awake Wiki entry →", variant="outline", size="small"

@@ -9,6 +9,7 @@
 - Keep pure rules separate from Qt, filesystem publication and subprocess orchestration. Reuse the verified implementation at its correct owner; no speculative abstraction or downstream duplication of scientific algorithms.
 - Use **test-driven development** at the real boundary. Match each asserting test to its indexed `UT-*` or `IT-*` case; record commands, failures and platform limits. A written test ID is not passing evidence.
 - For **visible UI work**, follow the active spec's prototype/`alp-ui` acceptance links. The browser prototype illustrates interactions, not backend science. Capture/review real native screenshots.
+- Keep visible copy sparse, plain and user-facing: do not expose internal IDs or implementation details, repeat labels, narrate the app as “we”, or add filler captions/cards/alerts. Put genuinely useful context in concise help or the Wiki; show editable names for artifacts. Destructive actions require clear confirmation and stay non-cascading; removing a Collection binding never deletes its files.
 - Only use HPC data when the active test requires an authorized exemplar; private `docs/priv/` stays ignored and ordinary tests never connect to HPC. Missing `tests/data/` in ZIP handoffs is expected.
 - Work on the correct Git branch, commit verified changes, and report the real commit SHA plus clean status. Do not silently merge, push upstream or advance to another spec. See [Git delivery](docs/agent/GIT_DELIVERY.md) when starting/finishing work.
 

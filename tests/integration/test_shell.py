@@ -136,7 +136,7 @@ def test_empty_routes_help_and_qt_screenshot_are_real_native_widgets(qtbot, work
     assert hint is not None
     hint.setFocus()
     qtbot.keyClick(hint, Qt.Key.Key_Space)
-    assert "Milliseconds are integers" in hint.accessibleDescription()
+    assert "Use whole milliseconds" in hint.accessibleDescription()
     screenshot = window.grab()
     image_path = tmp_path / "wiki.png"
     assert screenshot.save(str(image_path))

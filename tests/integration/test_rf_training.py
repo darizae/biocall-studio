@@ -8,7 +8,7 @@ from importlib.metadata import version
 
 import pytest
 from alp_ui.components import Plot
-from PySide6.QtWidgets import QInputDialog, QLabel
+from PySide6.QtWidgets import QInputDialog, QLabel, QMessageBox
 
 from biocall_studio_train.application.collection_scan import scan_collection
 from biocall_studio_train.application.workspace import WorkspaceController
@@ -23,6 +23,7 @@ from biocall_studio_train.domain.training import (
 from biocall_studio_train.gui.app import create_application
 from biocall_studio_train.gui.window import MainWindow
 from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio_train.persistence.datasets import load_dataset
 from biocall_studio_train.persistence.diagnostics import read_diagnostic_records, worker_log_path
 from biocall_studio_train.persistence.models import (
     list_models,
@@ -109,7 +110,7 @@ def test_real_rf_worker_publishes_reloadable_model_and_native_views(
     qapp, qtbot, tmp_path, wav_factory, monkeypatch
 ):
     """Cases: IT-TRAIN-002, IT-TRAIN-003, IT-TRAIN-005, IT-TRAIN-006, IT-TRAIN-007,
-    IT-TRAIN-008, IT-TRAIN-012, IT-TRAIN-014, IT-LOG-002.
+    IT-TRAIN-008, IT-TRAIN-012, IT-TRAIN-014, IT-LOG-002, IT-UI-005.
     """
     create_application()
     root = tmp_path / "collection"
@@ -332,20 +333,33 @@ def test_real_rf_worker_publishes_reloadable_model_and_native_views(
         for row in range(reopened.model_list_page.model.rowCount())
     }
     assert restarted_rows == {
-        cnn_model_id: ("CNN", dataset.dataset_id),
-        model_id: ("Random Forest", dataset.dataset_id),
-        undefined_model.model_id: ("Random Forest", dataset.dataset_id),
+        cnn_model_id: ("CNN", dataset.label),
+        model_id: ("Random Forest", dataset.label),
+        undefined_model.model_id: ("Random Forest", dataset.label),
     }
     for artifact in (cnn_model, model):
         reopened.open_model(artifact.model_id)
         assert reopened.current_route == "model-detail"
-        assert reopened.model_detail_page.model_id.text() == artifact.model_id
         detail_text = "\n".join(label.text() for label in reopened.findChildren(QLabel))
-        assert artifact.manifest["dataset_id"] in detail_text
+        assert artifact.model_id not in detail_text
+        assert dataset.label in detail_text
         assert f"{artifact.manifest['results']['metrics']['accuracy']['value']:.3f}" in detail_text
     reopened.open_model(undefined_model.model_id)
     undefined_model_text = "\n".join(label.text() for label in reopened.findChildren(QLabel))
     assert "F1 is undefined without target true positives." in undefined_model_text
+    undefined_manifest = (undefined_model.root / "model.json").read_bytes()
+    monkeypatch.setattr(QInputDialog, "getText", lambda *args, **kwargs: ("Quiet forest", True))
+    reopened.model_detail_page.rename_button.click()
+    assert reopened.model_detail_page.display_name == "Quiet forest"
+    assert reopened.model_detail_page.accessibleName().startswith("Model detail: Quiet forest")
+    assert (undefined_model.root / "model.json").read_bytes() == undefined_manifest
+    monkeypatch.setattr(
+        QMessageBox, "question", lambda *args, **kwargs: QMessageBox.StandardButton.Yes
+    )
+    reopened.model_detail_page.delete_button.click()
+    assert reopened.current_route == "models"
+    assert not undefined_model.root.exists()
+    assert load_dataset(root, dataset.dataset_id).root.is_dir()
 
     manifest_path = model.root / "model.json"
     original_manifest = manifest_path.read_text()

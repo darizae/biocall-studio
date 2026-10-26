@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from alp_ui.components import Alert, Badge, Button, DataTable, ProgressBar
+from alp_ui.components import Alert, Badge, Button, DataTable, ProgressBar, Text
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QInputDialog, QMessageBox
 
 from biocall_studio_train.application.collection_scan import scan_collection
 from biocall_studio_train.application.workspace import WorkspaceController
@@ -274,7 +274,7 @@ def test_collision_nonzero_exit_and_corrupt_completed_output_never_overwrite(
 def test_native_run_detail_cancellation_failure_completion_and_history(
     qapp, qtbot, tmp_path, collection_factory, monkeypatch
 ):
-    """Case: IT-RUN-005."""
+    """Cases: IT-RUN-005, IT-UI-005."""
     create_application()
     root = tmp_path / "collection"
     result = _published_collection(root, collection_factory)
@@ -310,9 +310,10 @@ def test_native_run_detail_cancellation_failure_completion_and_history(
         "progress",
         "measurements",
         "activity",
-        "output",
         "details",
+        "output",
     )
+    assert detail.right_stack.isAncestorOf(detail.activity)
     assert window._navigation["runs"].isChecked()
     assert window.active_run_label.text().startswith("Build ·")
     assert window.active_run_progress.isVisible()
@@ -380,7 +381,20 @@ def test_native_run_detail_cancellation_failure_completion_and_history(
     index = window.run_list_page.model.index(0, 0)
     window.run_list_page.table.clicked.emit(index)
     assert window.current_route == "run-detail"
-
+    selected_run = detail.run
+    assert selected_run is not None
+    assert selected_run.run_id not in {label.text() for label in detail.findChildren(Text)}
+    monkeypatch.setattr(QInputDialog, "getText", lambda *args, **kwargs: ("Morning build", True))
+    detail.rename_button.click()
+    assert detail.run is not None and detail.run.title == "Morning build"
+    assert detail.accessibleName() == "Run detail: Morning build"
+    assert load_run(root, detail.run.run_id).title == "Morning build"
     window.resize(700, 780)
     qtbot.waitUntil(lambda: window.is_compact and detail.is_compact)
     assert detail.horizontalScrollBar().maximum() == 0
+
+    output_id = detail.run.output_id
+    detail.delete_button.click()
+    assert window.current_route == "runs"
+    assert window.run_list_page.model.rowCount() == 2
+    assert (root / ".alpaca" / "datasets" / output_id).is_dir()

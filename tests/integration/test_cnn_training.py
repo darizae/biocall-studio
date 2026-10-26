@@ -7,7 +7,7 @@ import sys
 
 import pytest
 from alp_ui.components import Plot
-from PySide6.QtWidgets import QInputDialog
+from PySide6.QtWidgets import QInputDialog, QLabel
 
 from biocall_studio_train.application.collection_scan import scan_collection
 from biocall_studio_train.application.workspace import WorkspaceController
@@ -242,7 +242,9 @@ def test_real_cnn_worker_publishes_reloadable_model_and_native_views(
     assert window.model_list_page.model.rowCount() == 1
     window.open_model(model.model_id)
     assert window.current_route == "model-detail"
-    assert window.model_detail_page.model_id.text() == model.model_id
+    detail_text = "\n".join(label.text() for label in window.model_detail_page.findChildren(QLabel))
+    assert model.model_id not in detail_text
+    assert dataset.label in detail_text
     assert "Tiny verified CNN" in window.model_detail_page.accessibleName()
 
 

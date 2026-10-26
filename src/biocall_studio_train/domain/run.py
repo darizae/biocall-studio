@@ -413,6 +413,16 @@ def new_run(
     return state
 
 
+def rename_run(state: RunState, title: str, *, now: str) -> RunState:
+    """Change only the user-facing Run name; stable identity and history stay intact."""
+    title = _required_text(title, "Run name").strip()
+    if len(title) > 80 or any(ord(character) < 32 for character in title):
+        raise ValueError("Run name must be at most 80 printable characters.")
+    renamed = replace(state, title=title, updated_at=_required_text(now, "Run update time"))
+    _validate_state(renamed)
+    return renamed
+
+
 def transition_run(
     state: RunState,
     status: RunStatus,

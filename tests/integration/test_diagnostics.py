@@ -71,13 +71,9 @@ def test_real_session_scan_and_dataset_worker_write_correlated_private_logs(
         "collection_scan_started",
         "collection_scan_completed",
     } <= app_events
-    assert {record["session_id"] for record in app_records} == {
-        controller.diagnostics.session_id
-    }
+    assert {record["session_id"] for record in app_records} == {controller.diagnostics.session_id}
 
-    run_id = controller.start_dataset_build(
-        _config(scan), dataset_id="dataset-diagnostics"
-    )
+    run_id = controller.start_dataset_build(_config(scan), dataset_id="dataset-diagnostics")
     qtbot.waitUntil(lambda: controller.active_run is None, timeout=20_000)
     run = load_run(root, run_id)
     assert run.status is RunStatus.COMPLETED
@@ -144,7 +140,7 @@ def test_stderr_storm_is_drained_sanitized_and_cannot_complete_run(
 def test_native_log_access_and_confirmed_sanitized_export(
     qapp, qtbot, tmp_path, collection_factory, monkeypatch
 ):
-    """Case: IT-LOG-004."""
+    """Cases: IT-LOG-004, IT-UI-005."""
     create_application()
     root, scan, controller = _ready(qtbot, tmp_path, collection_factory)
     run_id = controller.start_dataset_build(_config(scan), dataset_id="dataset-ui-log")
@@ -199,10 +195,9 @@ def test_native_log_access_and_confirmed_sanitized_export(
     window.resize(700, 780)
     qtbot.waitUntil(lambda: settings.is_compact)
     assert settings.grid.itemAtPosition(0, 0).widget() is settings.binding_card
-    assert settings.grid.itemAtPosition(1, 0).widget() is settings.plan_card
+    assert settings.grid.itemAtPosition(1, 0) is None
 
     old_run = next(item for item in controller.runs if item.run_id == run_id)
     worker_log_path(root, run_id).unlink()
     window.run_detail_page.set_run(old_run)
     assert not window.run_detail_page.open_log_button.isVisible()
-    assert "older Runs" in window.run_detail_page.log_unavailable.text()

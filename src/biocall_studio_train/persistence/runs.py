@@ -147,6 +147,17 @@ def list_runs(collection_root: Path) -> tuple[RunState, ...]:
     return tuple(states)
 
 
+def delete_run(collection_root: Path, run_id: str) -> None:
+    """Delete one terminal Run record without deleting its published output."""
+    state = load_run(collection_root, run_id)
+    if state.active:
+        raise ValueError("An Active Run cannot be deleted.")
+    directory = _run_directory(collection_root, run_id, require=True)
+    parent = directory.parent
+    shutil.rmtree(directory)
+    _fsync_directory(parent)
+
+
 def write_run_request(collection_root: Path, run_id: str, payload: dict) -> Path:
     directory = _run_directory(collection_root, run_id, require=True)
     path = directory / "request.json"

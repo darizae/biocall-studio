@@ -13,6 +13,7 @@ from biocall_studio_train.domain.run import (
     assert_run_start_allowed,
     new_run,
     reconcile_run,
+    rename_run,
     transition_run,
     update_run_progress,
 )
@@ -84,6 +85,18 @@ def test_single_active_run_transition_table_and_reservation_conflicts():
     assert_run_start_allowed((failed,), candidate)
     assert_collection_rebind_allowed((failed,), "collection-002")
     assert_dataset_mutable((failed,), "dataset-ready")
+
+
+def test_run_display_name_is_editable_without_changing_identity():
+    """Case: UT-UI-001."""
+    run = _run()
+    renamed = rename_run(run, "  Dawn build  ", now=LATER)
+    assert renamed.title == "Dawn build"
+    assert renamed.run_id == run.run_id
+    assert renamed.request_id == run.request_id
+    assert renamed.updated_at == LATER
+    with pytest.raises(ValueError, match="cannot be empty"):
+        rename_run(run, "   ", now=LATER)
 
 
 def test_recovery_and_published_pointer_decisions_are_conservative():

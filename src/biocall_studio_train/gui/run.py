@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QMessageBox,
     QScrollArea,
@@ -41,7 +42,8 @@ def _heading(title: str, subtitle: str, *, overline: str) -> QWidget:
     layout.setSpacing(3)
     layout.addWidget(Text(overline, role="overline"))
     layout.addWidget(Text(title, role="title"))
-    layout.addWidget(Text(subtitle, role="caption", word_wrap=True))
+    if subtitle:
+        layout.addWidget(Text(subtitle, role="caption", word_wrap=True))
     return widget
 
 
@@ -112,7 +114,7 @@ class RunListModel(QAbstractTableModel):
                 return Qt.AlignmentFlag.AlignCenter
         if role == Qt.ItemDataRole.DisplayRole:
             return (
-                f"{run.title}\n{run.run_id}",
+                run.title,
                 _kind_label(run),
                 run.status.value,
                 run.created_at.split("T", 1)[0],
@@ -144,7 +146,7 @@ class RunListPage(QScrollArea):
         header.addWidget(
             _heading(
                 "Runs",
-                "Dataset Build and Training history.",
+                "",
                 overline="EXECUTION",
             ),
             1,
@@ -195,7 +197,7 @@ class RunListPage(QScrollArea):
 
 
 class RunDetailPage(QScrollArea):
-    section_order = ("progress", "measurements", "activity", "output", "details")
+    section_order = ("progress", "measurements", "activity", "details", "output")
 
     def __init__(
         self,
@@ -204,6 +206,8 @@ class RunDetailPage(QScrollArea):
         open_history: Callable[[], None],
         open_log: Callable[[RunState], bool],
         log_available: Callable[[str], bool],
+        rename_run: Callable[[str, str], RunState],
+        delete_run: Callable[[str], None],
     ):
         super().__init__()
         self.cancel_run = cancel_run
@@ -211,6 +215,8 @@ class RunDetailPage(QScrollArea):
         self.open_history = open_history
         self.open_log = open_log
         self.log_available = log_available
+        self.rename_run = rename_run
+        self.delete_run = delete_run
         self.run: RunState | None = None
         self.is_compact = False
         self.setWidgetResizable(True)
@@ -227,6 +233,7 @@ class RunDetailPage(QScrollArea):
 
     def set_run(self, run: RunState) -> None:
         self.run = run
+        self.setAccessibleName(f"Run detail: {run.title}")
         old = self.takeWidget()
         if old is not None:
             old.deleteLater()
@@ -234,18 +241,19 @@ class RunDetailPage(QScrollArea):
         self.outer = QVBoxLayout(self.content)
         self.outer.setContentsMargins(38, 30, 38, 42)
         self.outer.setSpacing(16)
-        self.outer.addWidget(Text(f"Runs  /  {run.run_id}", role="caption"))
-
         header = QHBoxLayout()
         header.addWidget(
             _heading(
                 run.title,
-                f"Run ID · {run.run_id} · {run.created_at.split('T', 1)[0]}",
+                run.created_at.split("T", 1)[0],
                 overline=f"RUN · {_kind_label(run).upper()}",
             ),
             1,
         )
         actions = QHBoxLayout()
+        self.rename_button = Button("Rename", variant="outline")
+        self.rename_button.clicked.connect(self._prompt_rename)
+        actions.addWidget(self.rename_button)
         self.cancel_button = Button("Cancel Run", variant="danger")
         self.cancel_button.setAccessibleDescription(
             "Request cooperative cancellation; unpublished output will not be published."
@@ -270,6 +278,10 @@ class RunDetailPage(QScrollArea):
         self.open_output_button.clicked.connect(lambda: self.open_output(run))
         self.open_output_button.setVisible(run.status is RunStatus.COMPLETED)
         actions.addWidget(self.open_output_button)
+        self.delete_button = Button("Delete", variant="danger")
+        self.delete_button.clicked.connect(self._confirm_delete)
+        self.delete_button.setVisible(run.terminal)
+        actions.addWidget(self.delete_button)
         header.addLayout(actions)
         self.outer.addLayout(header)
 
@@ -333,14 +345,6 @@ class RunDetailPage(QScrollArea):
                 measurements_card.content_layout.addWidget(
                     Text("Validation and feature importance", role="subheading")
                 )
-                measurements_card.content_layout.addWidget(
-                    Text(
-                        "Random Forest reports held-out validation metrics and actual fitted "
-                        "feature importances; it does not produce epoch loss.",
-                        role="caption",
-                        word_wrap=True,
-                    )
-                )
                 importance_rows = [
                     item for item in run.measurements if item.get("kind") == "feature_importance"
                 ]
@@ -356,13 +360,6 @@ class RunDetailPage(QScrollArea):
                 accessible_name = "Feature importance numeric values"
             else:
                 measurements_card.content_layout.addWidget(Text("Training loss", role="subheading"))
-                measurements_card.content_layout.addWidget(
-                    Text(
-                        "Measured train and validation loss reported by the supervised Worker.",
-                        role="caption",
-                        word_wrap=True,
-                    )
-                )
                 lines: dict[str, list[tuple[float, float]]] = {}
                 for phase in ("train", "val"):
                     points = [
@@ -414,21 +411,14 @@ class RunDetailPage(QScrollArea):
         self.activity.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         self.activity.setAccessibleName("Run activity log")
         fixed = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-        fixed.setPointSize(10)
+        fixed.setPointSize(12)
         self.activity.setFont(fixed)
         self.activity.setStyleSheet(
             "QLabel#runActivity { background: #0f172a; color: #b8d4ca; "
             "border-radius: 8px; padding: 12px; }"
         )
         activity_card.content_layout.addWidget(self.activity)
-        self.log_unavailable = Text(
-            "No Worker log is available for older Runs; diagnostics are not backfilled.",
-            role="caption",
-            word_wrap=True,
-        )
-        self.log_unavailable.setVisible(not self.log_available(run.run_id))
-        activity_card.content_layout.addWidget(self.log_unavailable)
-        left.addWidget(activity_card)
+        right.addWidget(activity_card)
 
         output_card = Card(shadow=False)
         output_header = QHBoxLayout()
@@ -439,29 +429,18 @@ class RunDetailPage(QScrollArea):
         self.output_alert = Alert(text, title=title, intent=intent)
         output_card.content_layout.addWidget(self.output_alert)
         if run.status is RunStatus.COMPLETED:
-            output_id = QHBoxLayout()
-            output_id.addWidget(
-                Text(
-                    "Dataset ID" if run.output_kind == "dataset" else "Model ID",
-                    role="caption",
-                )
-            )
-            output_id.addStretch()
-            output_id.addWidget(Text(run.output_id, role="body"))
-            output_card.content_layout.addLayout(output_id)
             open_again = Button(
                 "Open Dataset →" if run.output_kind == "dataset" else "Open Model →"
             )
             open_again.clicked.connect(lambda: self.open_output(run))
             output_card.content_layout.addWidget(open_again)
-        right.addWidget(output_card)
+        self.output_card = output_card
 
         details_card = Card(shadow=False)
         details_card.content_layout.addWidget(Text("Run details", role="subheading"))
         for label, value in (
             ("Kind", _kind_label(run)),
             ("Status", run.status.value),
-            ("Collection", run.collection_id),
             ("Started", run.created_at),
         ):
             row = QHBoxLayout()
@@ -473,6 +452,7 @@ class RunDetailPage(QScrollArea):
         right.addStretch()
 
         self.outer.addLayout(self.columns)
+        self.outer.addWidget(output_card)
         self.outer.addStretch()
         self.setWidget(self.content)
         self._place_columns(self.viewport().width() < 850)
@@ -482,7 +462,7 @@ class RunDetailPage(QScrollArea):
         if run.status in {RunStatus.CREATED, RunStatus.STARTING, RunStatus.RUNNING}:
             return (
                 "Not yet published",
-                "Inputs are read-only. Output stays private until validation completes.",
+                "",
                 "neutral",
             )
         if run.status is RunStatus.CANCELLING:
@@ -494,7 +474,7 @@ class RunDetailPage(QScrollArea):
         if run.status is RunStatus.COMPLETED:
             return (
                 "Dataset ready" if run.output_kind == "dataset" else "Model ready",
-                "The verified immutable output is published and ready to open.",
+                "",
                 "success",
             )
         if run.status is RunStatus.CANCELLED:
@@ -527,7 +507,32 @@ class RunDetailPage(QScrollArea):
     def _open_log(self) -> None:
         if self.run is None or not self.open_log(self.run):
             self.open_log_button.hide()
-            self.log_unavailable.show()
+
+    def _prompt_rename(self) -> None:
+        if self.run is None:
+            return
+        name, accepted = QInputDialog.getText(self, "Rename Run", "Name", text=self.run.title)
+        if not accepted:
+            return
+        try:
+            renamed = self.rename_run(self.run.run_id, name)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Run could not be renamed", str(exc))
+            return
+        self.set_run(renamed)
+
+    def _confirm_delete(self) -> None:
+        if self.run is None or self.run.active:
+            return
+        answer = QMessageBox.question(
+            self,
+            "Delete Run?",
+            f"Delete {self.run.title} from Run history? Published output will be kept.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer == QMessageBox.StandardButton.Yes:
+            self.delete_run(self.run.run_id)
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         super().resizeEvent(event)

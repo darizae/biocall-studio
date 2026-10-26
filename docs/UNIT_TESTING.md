@@ -23,6 +23,7 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-DB-004` | Snippet/source interval/label provenance and manifest references are validated; reject conflicting/multiple Snippet labels and any class set other than `target`/`noise` | TD-SPLIT | 03 |
 | `UT-RUN-001` | Exactly one Active Run, terminal-state transition table, duplicate start and reservation conflicts | TD-RUN | 04 |
 | `UT-RUN-002` | Orphan/restart/cancel policy and published-pointer validity decisions are conservative | TD-RUN | 04 |
+| `UT-UI-001` | Mutable Dataset/Model display names are validated and atomically stored outside immutable manifests; Run renaming preserves stable identity and history | TD-UI, TD-PATH, TD-RUN | UI pass |
 | `UT-POWER-001` | Application Settings v2→v3 migration and strict boolean validation; keep-awake request/effective-state idempotence, retryable acquisition failure and unsupported-platform distinction | TD-FAIL | 05g |
 | `UT-AUDIO-001` | PCM frame-interval and desktop adapter compatibility; details/edge cases in [Spec 04.5](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) | TD-WAV | 04.5 |
 | `UT-AUDIO-002` | Manifest metadata, integrity hashing and exception policy; [Spec 04.5](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) | TD-WAV, TD-FAIL | 04.5 |
