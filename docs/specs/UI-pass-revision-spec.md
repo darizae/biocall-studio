@@ -1,0 +1,36 @@
+- Text is so small. Everything looks so zoomed out. Barely readable from how zoom out it is. Is this in the upstream alp-ui? If so, it definitely must be fixed.
+- Random text on UI that doesn’t need to be there or is just very weird machine-like phrasing, very user-unfriendly phrasing and wording: Scientific data stays on your computer, These source-time bounds describe the original recording, not the positive (I get what you’re trying to say here, but it should be right after the title of the card it correspond to; and more human readable; it sounds so cryptic the way it’s written), "A timestamp is a user-supplied label. Names and WAV headers cannot prove “ → remove, “No sample or simulated artifacts are shown” → remove,
+- Remove!All these little captions and shit are so distracting and don’t contribute anything. That’s what the main components should be for, intuitively, and the tooltips to help.  I’ll give more examples (I probably won’t catch), but remove them and also others!
+    - “"Local only · source WAVs stay read-only.”” → remove
+    - "Source-time intervals come from filenames; validation does not prove matching “ → remove
+    - - "Source-time intervals come from filenames; validation does not prove matching “ → remove
+    - "Exact Split membership and underfill checks happen during Dataset Build. “ → remove
+    - “no_mutation = Text("Source WAVs will not be modified.", role="caption")” → remove
+    - Dataset ID → remove
+    - split_card.content_layout.addWidget( Alert( "Source metadata, build parameters, Splits and per-Snippet provenance " "are retained.", title="Immutable and reproducible", intent="success", ) ) → also example of weird, distracting thing. Remove.
+    - “self.dataset_safety = Alert( "Train a neural network and track loss and validation metrics.", title="Dataset stays unchanged", intent="success", )” → also example of weird, distracting thing. Remove..
+    - layout.addWidget( Text( "Helps prevent inactivity-based sleep while Trainer is open; the display may " "turn off. It cannot override lid close, manual Sleep, shutdown, low battery, " "updates or system policy.", role="caption", word_wrap=True, ) ) → also example of weird, distracting thing. Remove..
+    - In the sub-captions of the settings, in each field. Remove. Should be in tooltip if anything. And also, not saying “backend default”.
+- Weird cryptic phrasing. Change!
+    - “"Negative Mining samples background windows, never overlapping known " "positive or other protected source-time spans.”” → Weird cryptic phrasing
+    - "Positive filenames identify source-time in integer milliseconds.” → cryptic weird phrasing!
+    - “We check the folder. No import or audio copy.” → Don’t talk in “we”. Ever. Also, cryptic as well. Shit writing. Should be more like “Doesn’t copy your files”.
+    - "Positive filenames identify source-time in integer milliseconds.” → Also cryptic and hard to read
+    - In General, all tooltips have cryptic and weird phrasing. Just give me proposed replacements in a table, I’ll validate or reject.
+    - "The verified immutable output is published and ready to open.” → WEIRD! And not even needed. remove.
+    - “"Inputs are read-only. Output stays private until validation completes.", "neutral",” → Remove
+    - self.log_unavailable = Text( "No Worker log is available for older Runs; diagnostics are not backfilled.", role="caption", word_wrap=True, ) → remove
+- “Idle” little card. Should be in the top right instead. And not so zoomed out.
+- “cache.content_layout.addWidget(Text("Fast reopening", role="subheading")) for label, value in ( ("Metadata", "Ready" if result.valid else "Not published"), ("Audio copies", "None"), ("What we check", "Header + names + times"), ):” → This card doesn’t need to be here at all. The user doesn’t care.
+- If I’m preparing a model training run, which I get to after having selected a dataset, and “start a training”, it leads me to this page of preparing a training, but if I leave that page, for example by going to the wiki, then the page is lost, can’t recover, and I don’t know if the things I had put there are gone. This page needs to be reachable easily, and when a training run is being prepared, it says “open” and reachable, cached, unless discarded. Also each run should have an editable name too. Yes, a Unique ID, but that ID is not user facing, just the name it gets by default or the user can set/edit.
+    - Also in that page, it should be sliding down: 1 → 2 → 3. Not the “model configuration” to the right of “Dataset”, and then below “dataset” (bottom left from “model configuration”) the 3 - Start Training; that’s just weird and unintuitive. We go from top to bottom.
+- This thing says the name of the collection three times in a row. Just stick to the big one, remove the redundancy
+    
+    !Screenshot 2026-10-26 at 21.29.21.png
+    
+- User doesn’t need to know the id of a run; it doesn’t need to see it there on the UI. Actually there should be the functionality to just edit the dataset name. And that’s what’s shown.
+- Just don’t let the learning rate go below zero. Also don’t show so many decimals. J
+- In doing the fixes, do NOT introduce weird little captions everywhere that do not contribute to anything!
+- IN an ongoing run, “Run activity” card should be to the right of the card showing the progress. Output should be at the bottom.
+- There’s no functionality to delete datasets, models or runs. Should be possible (no weird little captions!)
+    - For collections, not deleted but “unbound” (no weird little captions!)
