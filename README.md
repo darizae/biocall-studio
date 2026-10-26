@@ -1,36 +1,64 @@
-# alpaca Desktop Trainer
+<p align="center">
+  <img src="assets/branding/on-background/readme-header.png" alt="BioCall Studio Train" width="900" />
+</p>
 
-**A local desktop application for preparing supervised bioacoustics datasets and training CNN or Random Forest models.** Designed for working with existing WAV collections on your computer, without importing or moving your recordings.
+# BioCall Studio Train
 
-> **Development preview:** The PySide6 application implements native Collection selection,
-> cancellable WAV-header scanning, validation, cache publication and immutable Dataset Build with
-> protected Negative Mining and source-grouped Splits, plus persisted supervised Worker Runs,
-> cancellation, recovery and history. The native Training page now provides complete typed CNN/RF
-> configuration and user-level saved presets. Genuine bounded CPU CNN and deterministic Random
-> Forest executors publish verified immutable Models with measured validation results. Bounded,
-> privacy-normalized local app/Worker logs and explicit sanitized support export are available;
-> Active Runs require an explicit safe-exit decision, orphan Workers cannot later publish, and an
-> optional app-wide keep-awake preference requests protection from automatic idle sleep. Installers
-> remain planned. Never interpret a simulated browser run as scientific output.
+Build and refine custom animal-call detectors from your own recordings, on your own computer.
 
-## What you can do
+BioCall Studio Train guides bioacoustics researchers from a folder of WAV recordings and known
+positive examples to a reproducible training Dataset and a verified CNN or Random Forest Model.
+It keeps source audio in place and read-only, explains fixable data problems, and records the
+configuration and provenance behind every published result.
 
-Choose an existing folder with `recordings/` and `positives/`, scan real WAV headers without
-copying audio, fix per-file validation issues, reopen published Collection metadata, and build a
-verified immutable Dataset of real target/noise WAV Snippets. Dataset Build keeps each Source
-Recording wholly in train or val. Follow actual stage progress, cancel safely, inspect failures and
-Configure either model family from a published Dataset, inspect/reset detailed settings, save and
-manage presets, and freeze a validated configuration handoff. Start genuine local CPU CNN or
-Random Forest Training, inspect measured CNN train/validation loss or RF feature importances,
-reopen the structurally verified checkpoint/estimator, and navigate each published Model's Dataset,
-Run, metrics and provenance. This Trainer does not run prediction or score new recordings.
-Completed Runs expose their contained local Worker log, while Settings can open local session logs
-or create an explicitly confirmed, revalidated diagnostics ZIP; diagnostics are never uploaded.
-For long local work, **Keep computer awake** can be enabled from Settings or Training. It keeps the
-display free to turn off and cannot override lid close, manual Sleep, shutdown, low battery,
-updates or system policy.
+> **Development preview:** the native macOS application is working from source. Packaged macOS
+> and Windows installers are on the roadmap and are not available yet.
 
-**Input folder example:**
+## What it does
+
+- Checks real WAV headers and positive-example filenames before training.
+- Builds balanced, source-grouped Datasets without copying or changing source recordings.
+- Trains genuine local CPU CNN and Random Forest models with measured validation results.
+- Keeps immutable Datasets, Runs, Models, logs, and provenance in the Collection's `.alpaca/`
+  workspace.
+- Supports safe cancellation, recovery, local diagnostics, and an optional keep-awake setting for
+  long runs.
+
+BioCall Studio Train creates models; it does not apply them to new recordings. Automated detection
+and expert review belong to the planned BioCall Studio Detect and Review applications.
+
+## Install and run from source
+
+You need Python **3.11–3.13**, Git, and adjacent checkouts of
+`bioacoustics-dl-toolbox` and `alp-ui`. The commands below create a project-local environment and
+do not install packages globally.
+
+```bash
+git clone git@github.com:darizae/biocall-studio-train.git
+cd biocall-studio-train
+
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -e '../bioacoustics-dl-toolbox[rf]'
+.venv/bin/python -m pip install -e '.[gui,test,integration]'
+.venv/bin/python -m pip install -e ../alp-ui
+
+.venv/bin/python -m biocall_studio_train
+```
+
+After installation, the console command is equivalent:
+
+```bash
+.venv/bin/biocall-studio-train
+```
+
+On Windows, use `.venv\Scripts\python.exe` instead of `.venv/bin/python`. Windows remains an
+unqualified development environment until the native installer milestone is complete. See
+[Development](docs/DEVELOPMENT.md) for environment troubleshooting and test commands.
+
+## Prepare a Collection
+
+Point the app at one folder containing your original recordings and exported positive examples:
 
 ```text
 Rainforest-dawn/
@@ -40,169 +68,67 @@ Rainforest-dawn/
     SITE_001__start-012500ms__end-014900ms__call01.wav
 ```
 
-Positive filename timestamps refer to the *original Source Recording* and are expressed in integer milliseconds. See [Selecting a Collection](docs/wiki/SELECTING_A_COLLECTION.md) for the complete naming rules.
+The timestamps in a positive filename identify its interval in the original Source Recording and
+use integer milliseconds. The app validates the relationship before it publishes metadata. Read
+[Selecting a Collection](docs/wiki/SELECTING_A_COLLECTION.md) for the complete naming rules.
 
-## Current native application
+## A typical workflow
 
-These are real PySide6 application captures from macOS using the sibling `alp-ui` checkout. They
-show the currently implemented native shell, Collection Scan, Dataset Build, Run lifecycle,
-Training and Model views. Counts, loss, metrics and feature importances come from generated real
-PCM WAV inputs and genuine CPU CNN/RF Runs; no simulated Model or metric is presented.
+1. **Select and check a Collection.** Choose the existing folder; BioCall Studio Train reads WAV
+   headers without importing or moving audio.
 
-**Select a Collection — native macOS app**
+   ![BioCall Studio Train Collection selection](docs/design/evidence/spec-01-native/select.png)
 
-![Native macOS alpaca Desktop Trainer Select Collection screen](docs/design/evidence/spec-01-native/select.png)
+2. **Fix clear input problems.** The Collection view points to individual files and explains what
+   needs attention before Dataset Build is enabled.
 
-**Selecting a Collection guidance — native macOS app**
+   ![Validated Collection overview](docs/design/evidence/spec-02-native/collection-valid.png)
 
-![Native macOS alpaca Desktop Trainer Wiki screen](docs/design/evidence/spec-01-native/wiki.png)
+3. **Build a reproducible Dataset.** Choose source recordings, negative-window policy, split, and
+   seed. Recordings stay grouped so one source cannot leak across train and validation.
 
-**Validated Collection after correcting and rescanning real WAVs — native macOS app**
+   ![Dataset Builder](docs/design/evidence/spec-03-native/builder.png)
 
-![Native macOS validated Collection overview](docs/design/evidence/spec-02-native/collection-valid.png)
+4. **Configure and train.** Start with the compact controls, open detailed settings only when you
+   need them, and save useful presets.
 
-**Fixable per-file Collection validation — native macOS app**
+   ![CNN training configuration](docs/design/evidence/spec-05-native/train-cnn.png)
 
-![Native macOS Collection validation errors](docs/design/evidence/spec-02-native/validation-errors.png)
+5. **Inspect the evidence.** Follow measured loss or feature importance, then reopen the verified
+   Model together with its Dataset, Run, metrics, and provenance.
 
-**Dataset Builder with real protected-window estimates — native macOS app**
+   ![Completed CNN training Run with measured loss](docs/design/evidence/spec-05-native/run-cnn-plot.png)
 
-![Native macOS Dataset Builder](docs/design/evidence/spec-03-native/builder.png)
+The [native evidence gallery](docs/design/evidence/README.md) contains the remaining normal,
+narrow, empty, error, cancellation, diagnostics, Random Forest, safe-exit, and keep-awake states.
+Its results come from generated real PCM WAV fixtures and genuine local training, not simulated
+scientific output.
 
-**Verified immutable Dataset detail — native macOS app**
+## Roadmap
 
-![Native macOS Dataset detail](docs/design/evidence/spec-03-native/dataset-detail.png)
+- **Available from source:** Collection validation, Dataset Build, persisted Runs, CNN and Random
+  Forest training, Model verification, diagnostics, safe exit, and optional keep-awake.
+- **Next:** a signed, notarized, clean-install-tested macOS application and DMG.
+- **Later:** a native Windows installer and Windows-specific path, DPI, accessibility, and Worker
+  qualification.
+- **Separate future applications:** BioCall Studio Detect for applying models and BioCall Studio
+  Review for checking candidate calls.
 
-**Active Dataset Build Run — native macOS app**
+## Development
 
-![Native macOS active Dataset Build Run](docs/design/evidence/spec-04-native/run-active.png)
-
-**Persisted Run history — native macOS app**
-
-![Native macOS Dataset Build Run history](docs/design/evidence/spec-04-native/runs-history.png)
-
-**CNN configuration with the compact primary roster — native macOS app**
-
-![Native macOS CNN Training configuration](docs/design/evidence/spec-05-native/train-cnn.png)
-
-**Detailed CNN settings with a non-default value — native macOS app**
-
-![Native macOS detailed CNN Training configuration](docs/design/evidence/spec-05-native/train-cnn-advanced.png)
-
-**Completed CNN Run with measured train/validation loss — native macOS app**
-
-![Native macOS completed CNN Training Run](docs/design/evidence/spec-05-native/run-cnn-plot.png)
-
-**Verified immutable CNN Model — native macOS app**
-
-![Native macOS CNN Model detail](docs/design/evidence/spec-05-native/model-detail.png)
-
-**Completed Random Forest Run with fitted feature importances — native macOS app**
-
-![Native macOS completed Random Forest Training Run](docs/design/evidence/spec-05-native/run-rf-plot.png)
-
-**Verified immutable Random Forest Model — native macOS app**
-
-![Native macOS Random Forest Model detail](docs/design/evidence/spec-05-native/model-detail-rf.png)
-
-**Completed Run with contained Worker log access — native macOS app**
-
-![Native macOS completed Run with Open log action](docs/design/evidence/spec-05d-native/run-open-log.png)
-
-**Local diagnostics support actions — native macOS app**
-
-![Native macOS Settings diagnostics actions](docs/design/evidence/spec-05d-native/settings-diagnostics.png)
-
-**Optional keep-awake control — native macOS app**
-
-![Native macOS Training keep-awake control](docs/design/evidence/spec-05g-native/train-power-on.png)
-
-**Safe exit confirmation for an Active Run — native macOS app**
-
-![Native macOS Active Run safe-exit confirmation](docs/design/evidence/spec-05g-native/active-run-exit-confirmation.png)
-
-**Readable fixed-light Active Run while macOS uses Dark appearance — native macOS app**
-
-![Native macOS fixed-light Active Run](docs/design/evidence/spec-05g-native/active-run-light-theme.png)
-
-The complete [native evidence set and parity review](docs/design/evidence/README.md) also covers
-Reading/cancel, Settings, all four initial empty routes, Builder underfill/busy states, Dataset
-list/detail navigation, Worker cancellation/failure/completion/history, both Training families,
-saved presets, genuine CNN loss, genuine RF feature importances, both-family Model list/detail,
-local diagnostic access/export, safe exit, optional keep-awake, keyboard interactions and narrow
-resized windows.
-
-## Interactive design reference
-
-The checked-in browser prototype remains the normative journey for later specs. Its images are
-**design targets**, not screenshots of the current native app, and its sample data/training progress
-are simulated.
-
-![Interactive UX prototype target for Select Collection](docs/design/prototypes/training-first/landing-preview.png)
-
-Explore the [interactive UX prototype](docs/design/prototypes/training-first/index.html) and the
-blocking [prototype acceptance gate](docs/design/PROTOTYPE_ACCEPTANCE.md).
-
-## Run the current development app (macOS)
-
-Prerequisites: Python **3.11–3.13**, adjacent `../bioacoustics-dl-toolbox` at committed
-revision `e478ca5156a5d1018d0a7a61486bc85fe7c1e92d` (tag `v0.2.0`), the native
-[`alp-ui`](docs/design/ALP_UI_CONSUMER_CONTRACT.md) checkout at `../alp-ui`, and Git LFS for the
-versioned audio example. Use the repository root as your working directory. These instructions
-install to a **project-local `.venv`**; no global Python packages are needed.
+Run the fast repository checks with:
 
 ```bash
-# From your repos/alpacaDesktopTrainer directory
-python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -e '../bioacoustics-dl-toolbox[rf]'
-.venv/bin/python -m pip install -e '.[gui,test,integration]'
-.venv/bin/python -m pip install -e ../alp-ui
-
-# Start the native PySide6 app
-.venv/bin/python -m alpaca_desktop
-```
-
-If you have already installed the package in `.venv`, **launch it directly**:
-
-```bash
-.venv/bin/python -m alpaca_desktop
-# Equivalent installed console entry point:
-.venv/bin/alpaca-desktop
-```
-
-Optional isolated Application Settings, useful during development:
-
-```bash
-.venv/bin/python -m alpaca_desktop --settings-dir /tmp/alpaca-trainer-settings
-```
-
-On Windows the development interpreter path is `.venv\Scripts\python.exe`; Windows native UI/release qualification is scheduled for Spec 07. This is a development setup, **not** a packaged installer. For environment troubleshooting and test commands, see [Development](docs/DEVELOPMENT.md).
-
-## Run checks
-
-```bash
-# Git LFS is needed only for versioned binary test fixtures in the actual checkout:
-git lfs install
-# If the repo tracks registered fixtures and you need those exact bytes:
-# git lfs pull
-# .venv/bin/python scripts/check_fixtures.py
 .venv/bin/python scripts/verify_handoff.py
 .venv/bin/python -m pytest -q tests/unit
-# On a native macOS desktop (not merely Qt offscreen):
 .venv/bin/python -m pytest -q tests/integration
 ```
 
-`docs/priv/` contains optional machine-specific HPC source instructions in the **private handoff archive**; it must never be tracked by Git. The optional `tests/data/example_collection/` in an actual Git checkout contains synthetic WAVs, **not** confidential HPC exports. The transfer ZIP intentionally omits `tests/data/`; generating temporary real WAV test cases is supported. Windows and packaged-app tests remain future qualification gates.
+Native GUI evidence must be captured on a real desktop; Qt offscreen output is supplemental only.
+Contributors should start with [AGENTS.md](AGENTS.md), then follow the
+[task router](docs/agent/ROUTING.md) to the single active specification. The current release phase
+is [Spec 06: macOS packaging and installer](docs/specs/06-macos-release-and-installer.md).
 
-## Developer documentation (start here if you are a coding agent)
-
-Read [AGENTS.md](AGENTS.md) → [agent routing](docs/agent/ROUTING.md) → **only the active spec** in [specs index](docs/specs/README.md). Do **not** read the entire documentation tree by default.
-
-**Current milestone:** [Spec 05g long-running Runs, safe exit and optional keep-awake](docs/specs/05g-long-running-sessions-and-safe-exit.md)
-hardens supervised Worker lifetime, confirmed asynchronous shutdown, restart reconciliation and
-ten-minute real-training durability. The synchronized machine-local keep-awake controls accurately
-report operating-system acquisition without claiming protection from forced sleep. Prediction
-remains out of scope; installed macOS/Windows qualification remains later work.
-
-Reference map (open only for the task at hand): [vision](docs/VISION.md), [glossary](docs/GLOSSARY.md), [domain workflow](docs/models/USER_WORKFLOWS_AND_DATA_MODEL.md), [workflow rules](docs/models/WORKFLOW_RULES.md), [architecture](docs/ARCHITECTURE.md), [UX parity](docs/design/UX_PARITY_MATRIX.md), [scientific sibling source map](docs/agent/SOURCE_MAP.md), [unit testing](docs/UNIT_TESTING.md), [integration testing](docs/INTEGRATION_TESTING.md), [fixture policy](docs/INTEGRATION_TEST_DATA.md), [Git/branch delivery](docs/agent/GIT_DELIVERY.md). The scientific pipeline is referenced from the verified sibling `../alpaca-pipelines` checkout; it is not vendored here.
+Brand assets are copied into this repository and documented in
+[assets/branding](assets/branding/README.md); they are not a runtime dependency on the separate
+brand-kit checkout.

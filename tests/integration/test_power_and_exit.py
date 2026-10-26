@@ -7,24 +7,24 @@ from alp_ui.components import Switch
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
 
-from alpaca_desktop.application.collection_scan import scan_collection
-from alpaca_desktop.application.power import PowerInhibitionUnavailable
-from alpaca_desktop.application.workspace import WorkspaceController
-from alpaca_desktop.domain.dataset import BuildConfig
-from alpaca_desktop.domain.run import RunStatus
-from alpaca_desktop.domain.training import (
+from biocall_studio_train.application.collection_scan import scan_collection
+from biocall_studio_train.application.power import PowerInhibitionUnavailable
+from biocall_studio_train.application.workspace import WorkspaceController
+from biocall_studio_train.domain.dataset import BuildConfig
+from biocall_studio_train.domain.run import RunStatus
+from biocall_studio_train.domain.training import (
     DeviceCapabilities,
     TrainingDataset,
     TrainingDraft,
     freeze_training_config,
 )
-from alpaca_desktop.gui.app import create_application
-from alpaca_desktop.gui.window import KEEP_AWAKE_HELP, MainWindow
-from alpaca_desktop.persistence.collection_metadata import publish_collection_metadata
-from alpaca_desktop.persistence.datasets import load_dataset
-from alpaca_desktop.persistence.models import list_models
-from alpaca_desktop.persistence.runs import load_run
-from alpaca_desktop.workflows.dataset_build import build_dataset
+from biocall_studio_train.gui.app import create_application
+from biocall_studio_train.gui.window import KEEP_AWAKE_HELP, MainWindow
+from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio_train.persistence.datasets import load_dataset
+from biocall_studio_train.persistence.models import list_models
+from biocall_studio_train.persistence.runs import load_run
+from biocall_studio_train.workflows.dataset_build import build_dataset
 
 pytestmark = [pytest.mark.integration, pytest.mark.qt]
 

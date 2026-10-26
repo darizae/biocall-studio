@@ -12,21 +12,21 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import Qt, QTimer
 
-from alpaca_desktop.application.collection_scan import scan_collection
-from alpaca_desktop.application.workspace import WorkspaceController
-from alpaca_desktop.domain.dataset import BuildConfig
-from alpaca_desktop.domain.run import RunStatus
-from alpaca_desktop.domain.training import (
+from biocall_studio_train.application.collection_scan import scan_collection
+from biocall_studio_train.application.workspace import WorkspaceController
+from biocall_studio_train.domain.dataset import BuildConfig
+from biocall_studio_train.domain.run import RunStatus
+from biocall_studio_train.domain.training import (
     DeviceCapabilities,
     TrainingDataset,
     TrainingDraft,
     freeze_training_config,
 )
-from alpaca_desktop.gui.app import create_application
-from alpaca_desktop.gui.window import MainWindow
-from alpaca_desktop.persistence.collection_metadata import publish_collection_metadata
-from alpaca_desktop.persistence.models import load_model
-from alpaca_desktop.workflows.dataset_build import build_dataset
+from biocall_studio_train.gui.app import create_application
+from biocall_studio_train.gui.window import MainWindow
+from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio_train.persistence.models import load_model
+from biocall_studio_train.workflows.dataset_build import build_dataset
 
 pytestmark = [pytest.mark.integration, pytest.mark.qt, pytest.mark.soak]
 
@@ -138,7 +138,9 @@ def test_ten_minute_real_cnn_run_remains_responsive_reloads_and_reuses(
     started = time.monotonic()
     started_at_utc = datetime.now(UTC).isoformat()
     heartbeat = 0
-    report_path = Path(os.environ.get("ALPACA_SOAK_REPORT", tmp_path / "soak-observations.json"))
+    report_path = Path(
+        os.environ.get("BIOCALL_STUDIO_TRAIN_SOAK_REPORT", tmp_path / "soak-observations.json")
+    )
 
     def beat() -> None:
         nonlocal heartbeat
@@ -212,7 +214,7 @@ def test_ten_minute_real_cnn_run_remains_responsive_reloads_and_reuses(
 
     reload_code = """
 from pathlib import Path
-from alpaca_desktop.persistence.models import load_model, structurally_reload_cnn_model
+from biocall_studio_train.persistence.models import load_model, structurally_reload_cnn_model
 root = Path(__import__('sys').argv[1])
 artifact = load_model(root, 'model-soak-cnn')
 structurally_reload_cnn_model(root, artifact.model_id)

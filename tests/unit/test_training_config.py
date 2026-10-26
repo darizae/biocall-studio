@@ -5,14 +5,14 @@ import stat
 
 import pytest
 
-from alpaca_desktop.domain.training import (
+from biocall_studio_train.domain.training import (
     DeviceCapabilities,
     TrainingDataset,
     TrainingDraft,
     field_definitions,
     freeze_training_config,
 )
-from alpaca_desktop.persistence.training_presets import PresetStore
+from biocall_studio_train.persistence.training_presets import PresetStore
 
 
 def _dataset() -> TrainingDataset:
@@ -168,7 +168,9 @@ def test_preset_store_rejects_corruption_unknown_schema_names_and_atomic_failure
             raise OSError("injected replace failure")
         return real_replace(source, destination)
 
-    monkeypatch.setattr("alpaca_desktop.persistence.training_presets.os.replace", fail_replace)
+    monkeypatch.setattr(
+        "biocall_studio_train.persistence.training_presets.os.replace", fail_replace
+    )
     with pytest.raises(OSError, match="injected"):
         store.rename(created.preset_id, "Changed")
     assert store.path.read_bytes() == before

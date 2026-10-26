@@ -258,7 +258,7 @@ Aggregate encoder features with average or maximum pooling. Default: `avg`, supp
 
 <a id="classifier-num-classes"></a>
 
-Derived from the immutable **binary single-label** target/noise Dataset; it is always exactly `2` and cannot disagree with the two-class map. One Snippet belongs to `target` **or** `noise`, never both. This setting is derived and cannot be edited. Multi-label and multi-class modes available in scientific libraries are **not supported** in Desktop Trainer; see [binary scope](../science/BINARY_CLASSIFICATION_CONTRACT.md).
+Derived from the immutable **binary single-label** target/noise Dataset; it is always exactly `2` and cannot disagree with the two-class map. One Snippet belongs to `target` **or** `noise`, never both. This setting is derived and cannot be edited. Multi-label and multi-class modes available in scientific libraries are **not supported** in BioCall Studio Train; see [binary scope](../science/BINARY_CLASSIFICATION_CONTRACT.md).
 
 ##### Classifier input channels (`classifier.input_channels`)
 

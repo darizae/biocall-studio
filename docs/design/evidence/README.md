@@ -1,5 +1,14 @@
 # Native UX parity evidence
 
+## BioCall Studio Train branding recapture
+
+On 26 October 2026, every tracked native development-app screenshot in the Spec 01, 02, 03, 04,
+05, 05d, and 05g evidence groups was regenerated with its owning `capture_spec*.py` command after
+the product rename. The visible desktop and narrow captures were reviewed for the supplied Train
+icon, **BioCall Studio / TRAIN** sidebar identity, readable spacing, and absence of the former
+product name. The README uses a representative subset of these real captures. This is development
+app evidence only; installed Finder/Dock/Windows identity remains gated by Specs 06 and 07.
+
 ## Spec 01 — shell and test foundation
 
 **Status: COMPLETE — ready for owner review.** The eight required Trainer views were captured

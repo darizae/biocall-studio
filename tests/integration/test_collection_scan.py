@@ -10,15 +10,15 @@ from alp_ui.components import Alert, Card, DataTable, HelpHint, ProgressBar, Tex
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import QBoxLayout
 
-from alpaca_desktop.application.collection_scan import (
+from biocall_studio_train.application.collection_scan import (
     inputs_match_scan,
     scan_collection,
 )
-from alpaca_desktop.application.workspace import WorkspaceController
-from alpaca_desktop.domain.collection import ScanResult
-from alpaca_desktop.gui.collection import PagedRecordingModel
-from alpaca_desktop.gui.window import MainWindow
-from alpaca_desktop.persistence.collection_metadata import (
+from biocall_studio_train.application.workspace import WorkspaceController
+from biocall_studio_train.domain.collection import ScanResult
+from biocall_studio_train.gui.collection import PagedRecordingModel
+from biocall_studio_train.gui.window import MainWindow
+from biocall_studio_train.persistence.collection_metadata import (
     load_collection_metadata,
     publish_collection_metadata,
 )

@@ -1,6 +1,6 @@
 # Selecting a Collection
 
-A **Collection** is the local folder you select in **alpaca Desktop Trainer**. It already contains the original WAV recordings and manually labeled **positive** WAV snippets. No import, standardization, or source-audio copy is required.
+A **Collection** is the local folder you select in **BioCall Studio Train**. It already contains the original WAV recordings and manually labeled **positive** WAV snippets. No import, standardization, or source-audio copy is required.
 
 ## The folder you select
 

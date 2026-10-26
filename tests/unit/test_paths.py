@@ -1,6 +1,6 @@
 import pytest
 
-from alpaca_desktop.domain.paths import ensure_unique_portable_paths, validate_relative_path
+from biocall_studio_train.domain.paths import ensure_unique_portable_paths, validate_relative_path
 
 
 @pytest.mark.parametrize(

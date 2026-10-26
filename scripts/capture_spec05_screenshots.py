@@ -16,11 +16,11 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QInputDialog, QMessageBox, QWidget
 
-from alpaca_desktop.application.workspace import WorkspaceController
-from alpaca_desktop.domain.dataset import BuildConfig
-from alpaca_desktop.gui.app import create_application
-from alpaca_desktop.gui.window import MainWindow
-from alpaca_desktop.workflows.dataset_build import build_dataset
+from biocall_studio_train.application.workspace import WorkspaceController
+from biocall_studio_train.domain.dataset import BuildConfig
+from biocall_studio_train.gui.app import create_application
+from biocall_studio_train.gui.window import MainWindow
+from biocall_studio_train.workflows.dataset_build import build_dataset
 
 
 def _wait_until(predicate, *, timeout_ms: int = 20_000) -> None:
@@ -197,7 +197,7 @@ def main(argv: list[str] | None = None) -> int:
         f"PySide6/Qt={pyside_version} alp-ui={importlib.metadata.version('alp-ui')}"
     )
 
-    with tempfile.TemporaryDirectory(prefix="alpaca-spec05-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="biocall-studio-train-spec05-") as temporary:
         temporary_root = Path(temporary)
         root = temporary_root / "Spec05Example"
         _make_collection(root)

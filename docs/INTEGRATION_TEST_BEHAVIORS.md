@@ -144,7 +144,7 @@ for Specs 06/07.
 | Case ID | Public seam / expected result | Data |
 |---|---|---|
 | `IT-E2E-001` | **Installed** native macOS package launches bundled UI/Worker, selects folder, builds Dataset, trains CNN/RF, restarts, opens published artifacts and **structurally reloads both Model formats using trusted local binary files** while leaving inputs intact. | TD-TRAIN, TD-UI |
-| `IT-MAC-001` | Versioned signed `.app` and installer `.dmg` verify correct bundle ID/embedded Qt and `alp-ui` resources, Developer ID signature/hardened runtime, notarization + stapling, Gatekeeper/quarantine first launch on supported Mac architecture. | TD-OS, TD-UI |
+| `IT-MAC-001` | Versioned signed `.app` and installer `.dmg` verify the **BioCall Studio Train** bundle/display name, checked-in Train ICNS in Finder/Dock/menu/window, correct bundle ID/embedded Qt and `alp-ui` resources, Developer ID signature/hardened runtime, notarization + stapling, Gatekeeper/quarantine first launch on supported Mac architecture. | TD-OS, TD-UI |
 | `IT-MAC-002` | Clean Mac installed-app launches its **bundled** Worker (not system Python), survives cancellation/restart and writes user state outside sealed app; folder chooser/help/plots/theme/resources work. | TD-OS, TD-RUN, TD-UI |
 | `IT-MAC-003` | Controlled release from exact tagged/approved commit emits installer with checksums/recorded dependency/SHA provenance and tested native E2E scientific outputs; missing signing/approval blocks promotion rather than advertising a public installer. | TD-OS, TD-TRAIN |
 | `IT-MAC-004` | Installed `.app` retains prototype route/state layout and pinned `alp-ui` styling, icons, themes, picker/help/plot at normal and narrow sizes; actual installed screenshots and six-dimension review pass before DMG promotion. | TD-OS, TD-UI |
@@ -156,7 +156,7 @@ for Specs 06/07.
 | `IT-WIN-001` | Real Windows input paths, case/Unicode collision, reparse containment, file locks and atomic updates honor same Collection contract. | TD-OS, TD-PATH |
 | `IT-WIN-002` | Windows native Qt/`alp-ui` file picker/scan and packaged QProcess/Worker launch, cancel, recovery and theme/assets function. | TD-OS, TD-RUN |
 | `IT-WIN-003` | **Installed** Windows native package builds and reopens one real Dataset and both CNN/RF Models, **structurally reloads both Model formats**; verified portable relative provenance. | TD-OS, TD-TRAIN |
-| `IT-WIN-004` | Clean Windows installation/uninstallation of versioned `.exe` retains user Collection; packaged resources, release digest/security/signing and native Windows keyboard/DPI help/plot parity are verified. | TD-OS, TD-UI |
+| `IT-WIN-004` | Clean Windows installation/uninstallation of versioned `.exe` retains user Collection; installer/Add-Remove/shortcut/taskbar/window show **BioCall Studio Train** with the checked-in multi-size Train ICO; packaged resources, release digest/security/signing and native Windows keyboard/DPI help/plot parity are verified. | TD-OS, TD-UI |
 | `IT-WIN-005` | Installed Windows app retains prototype layout/interaction and native `alp-ui` styling at 100%/150% DPI plus keyboard/focus, with screenshots and explicit owner-reviewed native exceptions before installer promotion. | TD-OS, TD-UI |
 
 ## Audit rules

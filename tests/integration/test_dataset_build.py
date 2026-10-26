@@ -12,15 +12,15 @@ from alp_ui.components import DataTable, HelpHint, NumberInput, ProgressBar, Sel
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
 
-from alpaca_desktop.application.collection_scan import scan_collection
-from alpaca_desktop.application.workspace import WorkspaceController
-from alpaca_desktop.domain.dataset import BuildConfig, Interval, protected_intervals
-from alpaca_desktop.gui.app import create_application
-from alpaca_desktop.gui.dataset import DatasetBuilderPage, DatasetDetailPage
-from alpaca_desktop.gui.window import MainWindow
-from alpaca_desktop.persistence.collection_metadata import publish_collection_metadata
-from alpaca_desktop.persistence.datasets import delete_dataset, list_datasets, load_dataset
-from alpaca_desktop.workflows.dataset_build import (
+from biocall_studio_train.application.collection_scan import scan_collection
+from biocall_studio_train.application.workspace import WorkspaceController
+from biocall_studio_train.domain.dataset import BuildConfig, Interval, protected_intervals
+from biocall_studio_train.gui.app import create_application
+from biocall_studio_train.gui.dataset import DatasetBuilderPage, DatasetDetailPage
+from biocall_studio_train.gui.window import MainWindow
+from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio_train.persistence.datasets import delete_dataset, list_datasets, load_dataset
+from biocall_studio_train.workflows.dataset_build import (
     DatasetBuildCancelled,
     DatasetBuildError,
     DatasetBuildUnderfill,

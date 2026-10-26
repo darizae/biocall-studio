@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from alpaca_desktop.application.power import KeepAwakeManager, native_power_adapter
+from biocall_studio_train.application.power import KeepAwakeManager, native_power_adapter
 
 pytestmark = pytest.mark.integration
 
@@ -28,14 +28,14 @@ def test_native_idle_sleep_acquisition_release_and_process_death():
             capture_output=True,
             text=True,
         ).stdout
-        assert "alpaca Desktop Trainer long-running local work" in assertions
+        assert "BioCall Studio Train long-running local work" in assertions
     released = manager.release_for_shutdown()
     assert not released.active
     assert released.error == ""
 
     code = """
 import time
-from alpaca_desktop.application.power import KeepAwakeManager, native_power_adapter
+from biocall_studio_train.application.power import KeepAwakeManager, native_power_adapter
 manager = KeepAwakeManager(native_power_adapter())
 state = manager.apply_requested(True)
 assert state.active, state.error
@@ -62,10 +62,10 @@ time.sleep(60)
                     capture_output=True,
                     text=True,
                 ).stdout
-                if "alpaca Desktop Trainer long-running local work" not in assertions:
+                if "BioCall Studio Train long-running local work" not in assertions:
                     break
                 time.sleep(0.05)
-            assert "alpaca Desktop Trainer long-running local work" not in assertions
+            assert "BioCall Studio Train long-running local work" not in assertions
     finally:
         if child.poll() is None:
             child.kill()

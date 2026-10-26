@@ -3,12 +3,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from alpaca_desktop.domain.rf_training import (
+from biocall_studio_train.domain.rf_training import (
     evaluate_binary_probabilities,
     rf_feature_names,
     validate_rf_estimator_structure,
 )
-from alpaca_desktop.domain.run import MAX_MEASUREMENTS
+from biocall_studio_train.domain.run import MAX_MEASUREMENTS
 
 
 def test_rf_feature_schema_is_exact_ordered_and_configuration_dependent():

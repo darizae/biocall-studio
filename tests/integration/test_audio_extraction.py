@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from alpaca_desktop.workflows.audio import (
+from biocall_studio_train.workflows.audio import (
     AudioExtractionCancelled,
     extract_dataset_audio,
 )
@@ -173,14 +173,14 @@ def test_fresh_installed_process_resolves_committed_separate_toolbox(tmp_path):
 import importlib.util
 import json
 import bioacoustics_dl_toolbox
-from alpaca_desktop.workflows import audio
+from biocall_studio_train.workflows import audio
 print(json.dumps({
     "package_file": bioacoustics_dl_toolbox.__file__,
     "api_module": audio.extract_pcm_wav_segment.__module__,
     "distribution": audio.TOOLBOX_DISTRIBUTION,
     "version": audio.TOOLBOX_VERSION,
     "revision": audio.TOOLBOX_SOURCE_REVISION,
-    "legacy_computation": importlib.util.find_spec("alpaca_desktop.computation") is not None,
+    "legacy_computation": importlib.util.find_spec("biocall_studio_train.computation") is not None,
 }))
 """
     environment = os.environ.copy()

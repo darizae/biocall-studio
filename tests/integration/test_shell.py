@@ -7,11 +7,11 @@ from alp_ui.components import DataTable, FolderPicker, HelpHint
 from PySide6.QtCore import QAbstractItemModel, Qt
 from PySide6.QtWidgets import QApplication, QLabel
 
-from alpaca_desktop.application.collection_scan import scan_collection
-from alpaca_desktop.application.workspace import WorkspaceController
-from alpaca_desktop.gui.app import create_application
-from alpaca_desktop.gui.window import MainWindow
-from alpaca_desktop.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio_train.application.collection_scan import scan_collection
+from biocall_studio_train.application.workspace import WorkspaceController
+from biocall_studio_train.gui.app import create_application
+from biocall_studio_train.gui.window import MainWindow
+from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
 
 pytestmark = [pytest.mark.integration, pytest.mark.qt]
 
@@ -21,10 +21,19 @@ def test_native_shell_routes_between_select_and_wiki(qapp, qtbot, workspace):
     app = create_application()
     assert create_application() is app is qapp is QApplication.instance()
     assert app.styleHints().colorScheme() is Qt.ColorScheme.Light
+    assert app.organizationName() == "BioCall Studio"
+    assert app.applicationName() == "biocall-studio-train"
+    assert app.applicationDisplayName() == "BioCall Studio Train"
+    assert not app.windowIcon().isNull()
     window = MainWindow(workspace)
     qtbot.addWidget(window)
     window.show()
     window.activateWindow()
+    assert window.windowTitle() == "BioCall Studio Train"
+    assert not window.windowIcon().isNull()
+    assert window.brand_icon.accessibleName() == "BioCall Studio Train logo"
+    assert window.brand_title.text() == "BioCall Studio"
+    assert window.brand_subtitle.text() == "TRAIN"
     assert window.current_route == "select"
     assert all(not button.icon().isNull() for button in window._navigation.values())
     assert window._navigation["select"].isChecked()
@@ -166,9 +175,9 @@ def test_console_startup_passes_isolated_settings_to_the_real_gui(tmp_path):
         from pathlib import Path
         from PySide6.QtCore import QTimer
         from PySide6.QtWidgets import QApplication
-        from alpaca_desktop.gui.app import create_application
-        from alpaca_desktop.gui.window import MainWindow
-        from alpaca_desktop.cli import main
+        from biocall_studio_train.gui.app import create_application
+        from biocall_studio_train.gui.window import MainWindow
+        from biocall_studio_train.cli import main
 
         app = create_application()
         def inspect_and_quit():

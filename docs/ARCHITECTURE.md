@@ -1,4 +1,4 @@
-# alpaca Desktop Trainer — Architecture
+# BioCall Studio Train — Architecture
 
 ## 1. Layers and authoritative handoffs
 
@@ -61,7 +61,7 @@ Use a typed **scan result** handoff (discovered inventory, metadata, validation 
 
 ## 4. Execution, reservations and publication
 
-**Scan** is a background I/O activity, separately cancellable; **Dataset Build/Training** are scientific Runs. Application Controller owns one Active Run; Worker runs separately via `QProcess`, launched from the application's current executable/environment. In development use the environment's interpreter with `-m alpaca_desktop --worker ...` (entry contract to implement); in packaged builds use the bundled executable `--worker ...`. Pass structured config/paths (not shell strings) and isolate settings when testing. The Worker cannot import or manipulate GUI widgets. Stage outputs on the same destination filesystem, verify manifests, referenced files/metrics/schema, then use an exclusive, lock-protected no-clobber publication into a previously absent ID directory (with native filesystem-specific tests). Crash/cancel/underfill never creates an apparently completed Dataset/Model.
+**Scan** is a background I/O activity, separately cancellable; **Dataset Build/Training** are scientific Runs. Application Controller owns one Active Run; Worker runs separately via `QProcess`, launched from the application's current executable/environment. In development use the environment's interpreter with `-m biocall_studio_train --worker ...` (entry contract to implement); in packaged builds use the bundled executable `--worker ...`. Pass structured config/paths (not shell strings) and isolate settings when testing. The Worker cannot import or manipulate GUI widgets. Stage outputs on the same destination filesystem, verify manifests, referenced files/metrics/schema, then use an exclusive, lock-protected no-clobber publication into a previously absent ID directory (with native filesystem-specific tests). Crash/cancel/underfill never creates an apparently completed Dataset/Model.
 
 Persist Run State at every meaningful lifecycle change using same-directory atomic replacement. Run completion requires **both** terminal state and validated output; reconcile orphaned/published-but-interrupted cases safely on startup. Cancellation is explicit and bounded. Worker progress is rate-limited and structured; check child exit code/log and actual output, not a Qt signal alone. No background daemon, queue, remote execution or auto-retry.
 

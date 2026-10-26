@@ -9,15 +9,15 @@ from pathlib import Path
 
 import pytest
 
-from alpaca_desktop.application.collection_scan import scan_collection
-from alpaca_desktop.application.owner_lifetime import OwnerLease
-from alpaca_desktop.domain.dataset import BuildConfig
-from alpaca_desktop.domain.run import RunKind, RunStatus, new_run, transition_run
-from alpaca_desktop.persistence.collection_metadata import publish_collection_metadata
-from alpaca_desktop.persistence.models import list_models
-from alpaca_desktop.persistence.runs import create_run, load_run, reconcile_runs
-from alpaca_desktop.persistence.settings import ApplicationSettings, SettingsStore
-from alpaca_desktop.workflows.dataset_build import DatasetBuildCancelled, build_dataset
+from biocall_studio_train.application.collection_scan import scan_collection
+from biocall_studio_train.application.owner_lifetime import OwnerLease
+from biocall_studio_train.domain.dataset import BuildConfig
+from biocall_studio_train.domain.run import RunKind, RunStatus, new_run, transition_run
+from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio_train.persistence.models import list_models
+from biocall_studio_train.persistence.runs import create_run, load_run, reconcile_runs
+from biocall_studio_train.persistence.settings import ApplicationSettings, SettingsStore
+from biocall_studio_train.workflows.dataset_build import DatasetBuildCancelled, build_dataset
 
 pytestmark = pytest.mark.integration
 
@@ -28,7 +28,7 @@ def test_worker_observes_kernel_owned_gui_lease_release(tmp_path: Path):
     code = """
 import sys
 from pathlib import Path
-from alpaca_desktop.application.owner_lifetime import WorkerOwnerGuard
+from biocall_studio_train.application.owner_lifetime import WorkerOwnerGuard
 
 guard = WorkerOwnerGuard(Path(sys.argv[1]))
 print('alive' if guard.owner_alive() else 'lost', flush=True)
@@ -189,16 +189,16 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QTimer
-from alpaca_desktop.application.workspace import WorkspaceController
-from alpaca_desktop.domain.training import (
+from biocall_studio_train.application.workspace import WorkspaceController
+from biocall_studio_train.domain.training import (
     DeviceCapabilities,
     TrainingDataset,
     TrainingDraft,
     freeze_training_config,
 )
-from alpaca_desktop.gui.app import create_application
-from alpaca_desktop.gui.window import MainWindow
-from alpaca_desktop.persistence.datasets import load_dataset
+from biocall_studio_train.gui.app import create_application
+from biocall_studio_train.gui.window import MainWindow
+from biocall_studio_train.persistence.datasets import load_dataset
 
 settings = Path(sys.argv[1])
 app = create_application()
@@ -268,7 +268,7 @@ raise SystemExit(app.exec())
             time.sleep(0.05)
         assert not _process_exists(worker_pid)
 
-        from alpaca_desktop.application.workspace import WorkspaceController
+        from biocall_studio_train.application.workspace import WorkspaceController
 
         reopened = WorkspaceController(settings_dir)
         state = load_run(root, run_id)

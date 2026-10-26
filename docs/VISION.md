@@ -1,4 +1,4 @@
-# alpaca Desktop Trainer — Product vision
+# BioCall Studio Train — Product vision
 
 ## Purpose and audience
 

@@ -6,8 +6,8 @@ import json
 import pytest
 from bioacoustics_dl_toolbox.audio import PcmExtractionCancelled, PcmSegmentFacts
 
-from alpaca_desktop.persistence.integrity import sha256_file
-from alpaca_desktop.workflows import audio as audio_adapter
+from biocall_studio_train.persistence.integrity import sha256_file
+from biocall_studio_train.workflows import audio as audio_adapter
 
 
 def test_audio_transform_maps_nearest_frames_and_stable_manifest_metadata():

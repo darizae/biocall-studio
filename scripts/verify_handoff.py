@@ -77,7 +77,7 @@ def main() -> int:
     for command in (
         "python3 -m venv .venv",
         ".venv/bin/python -m pip install -e ../alp-ui",
-        ".venv/bin/python -m alpaca_desktop",
+        ".venv/bin/python -m biocall_studio_train",
     ):
         if command not in readme:
             errors.append(f"README missing expected local setup/run command: {command}")

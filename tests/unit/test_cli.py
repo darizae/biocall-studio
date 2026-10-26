@@ -6,7 +6,7 @@ from importlib.metadata import version
 
 import pytest
 
-from alpaca_desktop.cli import main
+from biocall_studio_train.cli import main
 
 
 def test_version_uses_installed_package_metadata_without_loading_gui(capsys):
@@ -14,7 +14,7 @@ def test_version_uses_installed_package_metadata_without_loading_gui(capsys):
     with pytest.raises(SystemExit) as exit_info:
         main(["--version"])
     assert exit_info.value.code == 0
-    assert capsys.readouterr().out.strip() == version("alpaca-desktop")
+    assert capsys.readouterr().out.strip() == version("biocall-studio-train")
 
 
 def test_help_explains_settings_isolation_without_loading_gui(capsys):
@@ -33,7 +33,7 @@ def test_package_and_cli_import_without_loading_optional_gui():
         [
             sys.executable,
             "-c",
-            "import sys; import alpaca_desktop; import alpaca_desktop.cli; "
+            "import sys; import biocall_studio_train; import biocall_studio_train.cli; "
             "assert not any(n.startswith(('PySide6', 'alp_ui')) for n in sys.modules)",
         ],
         capture_output=True,

@@ -1,4 +1,4 @@
-# alpaca Desktop Trainer — Ubiquitous language
+# BioCall Studio Train — Ubiquitous language
 
 Use these exact capitalized domain nouns in UI, code, docs, spec IDs and test descriptions. Prefer singular nouns for types and titles. Scientific source intervals use **integer milliseconds** unless a field explicitly says otherwise.
 

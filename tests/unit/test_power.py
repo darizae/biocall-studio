@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from alpaca_desktop.application.power import KeepAwakeManager, PowerInhibitionUnavailable
-from alpaca_desktop.persistence.settings import ApplicationSettings, SettingsStore
+from biocall_studio_train.application.power import KeepAwakeManager, PowerInhibitionUnavailable
+from biocall_studio_train.persistence.settings import ApplicationSettings, SettingsStore
 
 
 class RecordingPowerAdapter:

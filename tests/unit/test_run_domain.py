@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from alpaca_desktop.domain.run import (
+from biocall_studio_train.domain.run import (
     RunConflictError,
     RunKind,
     RunReservation,

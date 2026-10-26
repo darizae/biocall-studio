@@ -1,6 +1,6 @@
 # Binary single-label classification — Trainer invariant
 
-**Scope:** every Dataset, Training configuration, CNN/RF Model export and user preset in **alpaca Desktop Trainer**. The scientific toolbox may implement richer classification modes; they are not enabled or exposed in this app. [Future Prediction](../PREDICTION.md) plans a consumer of these binary artifacts, not an inference feature in the Trainer.
+**Scope:** every Dataset, Training configuration, CNN/RF Model export and user preset in **BioCall Studio Train**. The scientific toolbox may implement richer classification modes; they are not enabled or exposed in this app. [Future Prediction](../PREDICTION.md) plans a consumer of these binary artifacts, not an inference feature in the Trainer.
 
 - **Exactly two mutually exclusive labels:** `target` (positive) and `noise` (candidate negative). Each materialized Snippet has exactly **one** hard class. No multi-hot vector, multiple class names per Snippet, third class, multi-output or multi-label task mode.
 - **Dataset:** persist stable, bijective class-to-index mapping for exactly these two labels, partition membership and source-time provenance. Reject malformed labels, missing mapping or class-order ambiguity before training.

@@ -10,15 +10,15 @@ from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QFileDialog, QMessageBox
 
-from alpaca_desktop.application.collection_scan import scan_collection
-from alpaca_desktop.application.workspace import WorkspaceController
-from alpaca_desktop.domain.dataset import BuildConfig
-from alpaca_desktop.domain.run import RunStatus
-from alpaca_desktop.gui.app import create_application
-from alpaca_desktop.gui.window import MainWindow
-from alpaca_desktop.persistence.collection_metadata import publish_collection_metadata
-from alpaca_desktop.persistence.diagnostics import read_diagnostic_records, worker_log_path
-from alpaca_desktop.persistence.runs import load_run
+from biocall_studio_train.application.collection_scan import scan_collection
+from biocall_studio_train.application.workspace import WorkspaceController
+from biocall_studio_train.domain.dataset import BuildConfig
+from biocall_studio_train.domain.run import RunStatus
+from biocall_studio_train.gui.app import create_application
+from biocall_studio_train.gui.window import MainWindow
+from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio_train.persistence.diagnostics import read_diagnostic_records, worker_log_path
+from biocall_studio_train.persistence.runs import load_run
 
 pytestmark = pytest.mark.integration
 

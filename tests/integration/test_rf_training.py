@@ -10,28 +10,28 @@ import pytest
 from alp_ui.components import Plot
 from PySide6.QtWidgets import QInputDialog, QLabel
 
-from alpaca_desktop.application.collection_scan import scan_collection
-from alpaca_desktop.application.workspace import WorkspaceController
-from alpaca_desktop.domain.dataset import BuildConfig
-from alpaca_desktop.domain.run import RunState, RunStatus
-from alpaca_desktop.domain.training import (
+from biocall_studio_train.application.collection_scan import scan_collection
+from biocall_studio_train.application.workspace import WorkspaceController
+from biocall_studio_train.domain.dataset import BuildConfig
+from biocall_studio_train.domain.run import RunState, RunStatus
+from biocall_studio_train.domain.training import (
     DeviceCapabilities,
     TrainingDataset,
     TrainingDraft,
     freeze_training_config,
 )
-from alpaca_desktop.gui.app import create_application
-from alpaca_desktop.gui.window import MainWindow
-from alpaca_desktop.persistence.collection_metadata import publish_collection_metadata
-from alpaca_desktop.persistence.diagnostics import read_diagnostic_records, worker_log_path
-from alpaca_desktop.persistence.models import (
+from biocall_studio_train.gui.app import create_application
+from biocall_studio_train.gui.window import MainWindow
+from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio_train.persistence.diagnostics import read_diagnostic_records, worker_log_path
+from biocall_studio_train.persistence.models import (
     list_models,
     load_model,
     structurally_reload_cnn_model,
     structurally_reload_rf_model,
 )
-from alpaca_desktop.persistence.training_presets import PresetStore
-from alpaca_desktop.workflows.dataset_build import build_dataset
+from biocall_studio_train.persistence.training_presets import PresetStore
+from biocall_studio_train.workflows.dataset_build import build_dataset
 
 pytestmark = pytest.mark.integration
 
@@ -238,7 +238,7 @@ def test_real_rf_worker_publishes_reloadable_model_and_native_views(
             (
                 "import json,sys; "
                 "from pathlib import Path; "
-                "from alpaca_desktop.persistence.models import structurally_reload_rf_model; "
+                "from biocall_studio_train.persistence.models import structurally_reload_rf_model; "
                 "print(json.dumps(structurally_reload_rf_model(Path(sys.argv[1]), "
                 "sys.argv[2]).to_dict(), sort_keys=True))"
             ),

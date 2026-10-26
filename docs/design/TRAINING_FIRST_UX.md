@@ -1,4 +1,4 @@
-# alpaca Desktop Trainer — Collection-first UX contract
+# BioCall Studio Train — Collection-first UX contract
 
 **Target product:** native PySide6 application. **Design reference:** [interactive HTML prototype](prototypes/training-first/index.html) and screenshot assets in its folder. **Important:** the browser prototype validates selected WAV headers/names in its own limited sandbox but *simulates* Dataset Build, Training, Run progress, Dataset/Model publication and persisted collection metadata. The design does not establish scientific or native integration-test coverage. Requirements for actual behavior are in the canonical docs and numbered specs.
 

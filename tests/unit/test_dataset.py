@@ -1,6 +1,6 @@
 import pytest
 
-from alpaca_desktop.domain.dataset import (
+from biocall_studio_train.domain.dataset import (
     BuildConfig,
     Interval,
     MiningSource,

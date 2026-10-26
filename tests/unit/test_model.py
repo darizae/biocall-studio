@@ -15,9 +15,9 @@ from bioacoustics_dl_toolbox.config import (
 from bioacoustics_dl_toolbox.models import Classifier, ResidualEncoder
 from bioacoustics_dl_toolbox.training.checkpoints import save_model
 
-from alpaca_desktop.domain.model import validate_model_manifest
-from alpaca_desktop.persistence.integrity import sha256_file
-from alpaca_desktop.persistence.models import (
+from biocall_studio_train.domain.model import validate_model_manifest
+from biocall_studio_train.persistence.integrity import sha256_file
+from biocall_studio_train.persistence.models import (
     discard_uncommitted_model,
     load_model,
     load_model_directory,
@@ -134,7 +134,7 @@ def _manifest(checkpoint, *, digest: str | None = None) -> dict:
             "format_version": 2,
         },
         "provenance": {
-            "trainer": {"distribution": "alpaca-desktop", "version": "0.1.0a0"},
+            "trainer": {"distribution": "biocall-studio-train", "version": "0.1.0a0"},
             "toolbox": {
                 "distribution": "bioacoustics-dl-toolbox",
                 "version": "0.2.0",

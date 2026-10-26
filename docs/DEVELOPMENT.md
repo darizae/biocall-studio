@@ -21,7 +21,7 @@ python -m pip install -e '.[gui,test,integration]'
 # When available, install/build the sibling PySide6 Widgets library:
 python -m pip install -e ../alp-ui
 python -c "import bioacoustics_dl_toolbox as m; print(m.__file__)"
-python -m alpaca_desktop
+python -m biocall_studio_train
 ```
 
 **Status:** the checked-in executable is a development scaffold, not the specified full Trainer. Follow the numbered specs before interpreting existing UI behavior as product acceptance. Do not add an undocumented dependency or fake fallback if a required sibling checkout is unavailable.
@@ -35,7 +35,7 @@ python scripts/audit_test_ids.py
 python -m pytest tests/integration -q
 python -m ruff check src tests scripts
 # Explicit periodic durability run; ordinary pytest excludes this marker by default:
-ALPACA_SOAK_REPORT=/tmp/alpaca-soak-observations.json \
+BIOCALL_STUDIO_TRAIN_SOAK_REPORT=/tmp/biocall-studio-train-soak-observations.json \
   python -m pytest -m soak tests/integration/test_long_running_runs.py -q -s
 ```
 

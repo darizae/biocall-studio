@@ -16,14 +16,14 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QWidget
 
-from alpaca_desktop.application.collection_scan import scan_collection
-from alpaca_desktop.application.power import PowerInhibitionUnavailable
-from alpaca_desktop.application.workspace import WorkspaceController
-from alpaca_desktop.domain.dataset import BuildConfig
-from alpaca_desktop.gui.app import create_application
-from alpaca_desktop.gui.window import MainWindow
-from alpaca_desktop.persistence.collection_metadata import publish_collection_metadata
-from alpaca_desktop.workflows.dataset_build import build_dataset
+from biocall_studio_train.application.collection_scan import scan_collection
+from biocall_studio_train.application.power import PowerInhibitionUnavailable
+from biocall_studio_train.application.workspace import WorkspaceController
+from biocall_studio_train.domain.dataset import BuildConfig
+from biocall_studio_train.gui.app import create_application
+from biocall_studio_train.gui.window import MainWindow
+from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio_train.workflows.dataset_build import build_dataset
 
 
 class UnavailablePowerAdapter:
@@ -104,7 +104,9 @@ def main(argv: list[str] | None = None) -> int:
         f"appearance={app.styleHints().colorScheme().name}"
     )
 
-    with tempfile.TemporaryDirectory(prefix="alpaca-spec05g-", dir="/tmp") as temporary:
+    with tempfile.TemporaryDirectory(
+        prefix="biocall-studio-train-spec05g-", dir="/tmp"
+    ) as temporary:
         temporary_root = Path(temporary)
         root = temporary_root / "Spec05gExample"
         _make_collection(root)
