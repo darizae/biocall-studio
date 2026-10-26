@@ -36,7 +36,7 @@ def test_training_wheels_use_committed_toolbox_artifact_without_sibling_imports(
         text=True,
     ).stdout
     assert toolbox_status == ""
-    assert "bioacoustics-dl-toolbox[rf]==0.1.1" in trainer_config["project"]["dependencies"]
+    assert "bioacoustics-dl-toolbox[rf]==0.2.0" in trainer_config["project"]["dependencies"]
 
     wheels = tmp_path / "wheels"
     wheels.mkdir()

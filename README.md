@@ -128,7 +128,7 @@ blocking [prototype acceptance gate](docs/design/PROTOTYPE_ACCEPTANCE.md).
 ## Run the current development app (macOS)
 
 Prerequisites: Python **3.11–3.13**, adjacent `../bioacoustics-dl-toolbox` at committed
-revision `8e2e0528d4ce718005e194d426cde6e62fda0909`, the native
+revision `e478ca5156a5d1018d0a7a61486bc85fe7c1e92d` (tag `v0.2.0`), the native
 [`alp-ui`](docs/design/ALP_UI_CONSUMER_CONTRACT.md) checkout at `../alp-ui`, and Git LFS for the
 versioned audio example. Use the repository root as your working directory. These instructions
 install to a **project-local `.venv`**; no global Python packages are needed.

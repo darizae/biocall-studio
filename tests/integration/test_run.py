@@ -97,8 +97,8 @@ def test_real_qprocess_persists_progress_and_verified_dataset(qtbot, tmp_path, c
     extraction = artifact.manifest["source_policy"]["audio_extraction"]
     assert extraction == {
         "distribution": "bioacoustics-dl-toolbox",
-        "version": "0.1.1",
-        "revision": "0fce0d4fa3d0931c5731e8b868f705e0a2120835",
+        "version": "0.2.0",
+        "revision": "e478ca5156a5d1018d0a7a61486bc85fe7c1e92d",
         "api": "bioacoustics_dl_toolbox.audio.extract_pcm_wav_segment",
     }
     assert str(root) not in artifact.root.joinpath("dataset.json").read_text()

@@ -208,6 +208,6 @@ print(json.dumps({
     }
     assert resolved["api_module"] == "bioacoustics_dl_toolbox.audio.io"
     assert resolved["distribution"] == "bioacoustics-dl-toolbox"
-    assert resolved["version"] == "0.1.1"
-    assert resolved["revision"] == "0fce0d4fa3d0931c5731e8b868f705e0a2120835"
+    assert resolved["version"] == "0.2.0"
+    assert resolved["revision"] == "e478ca5156a5d1018d0a7a61486bc85fe7c1e92d"
     assert resolved["legacy_computation"] is False

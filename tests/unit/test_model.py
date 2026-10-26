@@ -137,8 +137,8 @@ def _manifest(checkpoint, *, digest: str | None = None) -> dict:
             "trainer": {"distribution": "alpaca-desktop", "version": "0.1.0a0"},
             "toolbox": {
                 "distribution": "bioacoustics-dl-toolbox",
-                "version": "0.1.1",
-                "revision": "8e2e0528d4ce718005e194d426cde6e62fda0909",
+                "version": "0.2.0",
+                "revision": "e478ca5156a5d1018d0a7a61486bc85fe7c1e92d",
             },
             "torch_version": torch.__version__,
             "scientific_reference": "alpaca-pipelines@91af5287dc18313f88902dc9696e8756274736b3",
