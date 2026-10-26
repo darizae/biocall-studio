@@ -147,6 +147,25 @@ def main() -> int:
                 f"docs/design/evidence/spec-05-native/{name}" not in readme
             ):
                 errors.append(f"README must embed real native Spec 05 screenshot: {name}")
+        diagnostics_directory = ROOT / "docs/design/evidence/spec-05d-native"
+        for name in (
+            "run-open-log.png",
+            "settings-diagnostics.png",
+            "export-privacy-confirmation.png",
+            "run-open-log-narrow.png",
+            "settings-stacked-narrow.png",
+            "settings-diagnostics-narrow.png",
+            "alp-ui-showcase-current.png",
+        ):
+            shot = diagnostics_directory / name
+            if not shot.is_file() or shot.stat().st_size < 1024:
+                errors.append(f"Missing valid-sized persistent Spec 05d screenshot: {shot}")
+            elif shot.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
+                errors.append(f"Not a real PNG: {shot}")
+            if name in {"run-open-log.png", "settings-diagnostics.png"} and (
+                f"docs/design/evidence/spec-05d-native/{name}" not in readme
+            ):
+                errors.append(f"README must embed real native Spec 05d screenshot: {name}")
     ignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
     if not re.search(r"(?m)^docs/priv/$", ignore):
         errors.append("docs/priv/ must be ignored by Git")

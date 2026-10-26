@@ -14,6 +14,7 @@ The bar for completion is **screen-by-screen faithful UX and working Python/Qt**
 | Dataset detail / lists | immutable counts/split provenance; explicit delete, no silent dependent Model removal | `Card`, `DataTable`, `Badge`, `EmptyState` | 03/04: IT-DB-005, IT-RUN-005 |
 | CNN / RF configuration (`rf-config-preview.png`) | **Existing** prototype hierarchy and basic CNN/RF controls are mandatory. Extend **only in native app**, with only a handful of primary controls plus a compact, collapsed **More settings** extension showing current/default/suggested starting values on demand, and user presets per [Spec 05 extension](SPEC05_CONFIGURATION_EXTENSION.md); field-level `HelpHint` + Wiki anchors, validation and no reference-code paths. The browser prototype is **unchanged** and does not depict the added controls. | `SelectInput`, `NumberInput`, `HelpHint`, `Button` | 05: IT-TRAIN-001, 002, 007, 010–014 |
 | Training Run | CNN measured train/val loss in native line Plot; RF fit/validation stages + actual importance bar Plot; no fictional epoch curve for RF | `Plot`, `ProgressBar`, `DataTable`, `Text` | 05: IT-TRAIN-005, 006, 007 |
+| Run/Settings diagnostics | Preserve Run activity and all baseline Settings content; add secondary **Open log**, **Open diagnostics folder** and confirmed **Export diagnostics…** actions with missing-log/degraded feedback, no new primary route and no automatic upload | `Button`, `Card`, `Alert`, `Text`; native dialogs | 05d: IT-LOG-004 |
 | Model (`model-preview.png`) | stable ID, readable name, family and Dataset links, metric values/undefined reason, recorded schema | `Card`, `Badge`, `DataTable`, `Plot` only for meaningful values | 05: IT-TRAIN-003, 006, 007 |
 | Wiki (`wiki-preview.png`) / Settings | collection naming examples and corrective advice; machine-only remembered folder/relink | `Text`, `Card`, `FolderPicker`, `Button` | 01/02 |
 | Empty Collections/Datasets/Models/Runs | unambiguous next action; no rows or phantom success | `EmptyState`, `Button` | 01: IT-UI-001, 004 |
@@ -64,6 +65,11 @@ detail passed the six-dimension review at the current sibling `alp-ui` SHA. The
 [evidence ledger](evidence/README.md#spec-05c--real-rf-training-and-phase-05-acceptance) records the
 source-first prototype comparison, current Showcase capture, actual undefined-metric presentation
 and no-Prediction boundary. The ledger reports `IT-TRAIN-001`–`014` passing across both families.
+
+**Spec 05d evidence:** completed Run log access, Settings diagnostics actions/privacy confirmation
+and stacked narrow Settings preserve the prototype hierarchy while adding only the specified
+native support workflow. The [evidence ledger](evidence/README.md#spec-05d--local-logging-and-diagnostics)
+records the current Showcase, keyboard behavior, responsive review and `IT-LOG-004` evidence.
 
 ## Acceptance procedure
 

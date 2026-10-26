@@ -12,6 +12,7 @@ This roadmap describes **phase order**, not the current Git state. Use [agent ro
 | [05a — Configuration/presets](specs/05a-training-configuration-and-presets.md) | Native small-form + detailed typed controls, validation and reusable saved presets; no fabricated training | `UT-TRAIN-007`–`010`, `IT-TRAIN-010`/`011`/`013` |
 | [05b — CNN + Model foundation](specs/05b-cnn-training-and-model-foundation.md) | Real binary CPU CNN through Worker, immutable common Model format + trusted CNN structural reload | `UT-TRAIN-001`/`004`/`005`, `IT-TRAIN-001`; shared family IDs remain open |
 | [05c — RF + joint acceptance](specs/05c-rf-training-and-cross-family-acceptance.md) | Genuine RF features/fit, exported RF and CNN/RF plots, two-family Model reload and end-to-end preset tests; **no inference** | `UT-TRAIN-002`/`003`/`006`, `IT-TRAIN-002`–`009`/`012`/`014`; recheck all Spec 05 IDs |
+| [05d — Logging + diagnostics](specs/05d-end-to-end-logging-and-diagnostics.md) | Privacy-safe bounded app/Worker JSONL, incremental stderr draining, contained native access and sanitized support export | `UT-LOG-*`, `IT-LOG-*`; recheck affected Run/Build/Training IDs |
 | [06 — macOS](specs/06-macos-release-and-installer.md) | Reproducible signed/notarized installable `.dmg`, installed native/scientific validation | `IT-MAC-*`, `IT-E2E-*` |
 | [07 — Windows](specs/07-windows-release-and-installer.md) | Native Windows qualification and versioned `.exe` installer | `IT-WIN-*` |
 

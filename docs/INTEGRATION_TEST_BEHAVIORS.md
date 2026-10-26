@@ -103,6 +103,20 @@ for the fresh commands and results; this index alone does not establish acceptan
 
 Future Prediction inference cases are **reserved exclusively** in [PREDICTION](PREDICTION.md), outside this Trainer test index or any Trainer release gate.
 
+## 5d. Local logging and diagnostics (pre-release)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-LOG-001` | A real GUI/session and Collection Scan in isolated Application Settings produce correlated, bounded app JSONL with launch, settings/scan and safe count/status outcomes; shutdown is idempotent and deliberate path/WAV/credential strings are absent. | TD-UI, TD-PATH, TD-FAIL |
+| `IT-LOG-002` | Real QProcess Dataset Build, CNN and RF Workers independently write correlated Run logs while stdout remains schema-v1 progress/measurement only; `info` versus `debug` changes diagnostic detail but not scientific metrics, artifact digests or CNN metric collection. | TD-RUN, TD-TRAIN |
+| `IT-LOG-003` | Incremental QProcess stderr draining remains bounded during a storm; invalid protocol, cancellation, crash, nonzero exit, receipt mismatch and restart reconciliation retain accurate non-success Run states and sanitized diagnostics without deadlock or false publication. | TD-RUN, TD-FAIL, TD-PATH |
+| `IT-LOG-004` | Native Run detail exposes keyboard-usable Open log only for a contained existing log and explains older missing logs; Settings exposes Open diagnostics folder and confirmed Export diagnostics actions, and the resulting new ZIP revalidates/sanitizes only current app plus explicitly selected Run records. Native screenshots and six-dimension review cover desktop and narrow additions. | TD-UI, TD-RUN, TD-PATH |
+
+**Reported status:** Spec 05d implements `IT-LOG-001`–`004` in the macOS development app. See the
+[native diagnostics ledger](design/evidence/README.md#spec-05d--local-logging-and-diagnostics) for
+actual commands, privacy/stderr/scientific assertions and the installed-platform limits retained
+for Specs 06/07.
+
 ## 6. Native macOS installer and release gates (spec 06)
 
 | Case ID | Public seam / expected result | Data |

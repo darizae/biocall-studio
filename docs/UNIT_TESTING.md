@@ -34,10 +34,18 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-TRAIN-008` | Collapsed/expanded presentation never changes resolved scientific values; per-field/section reset explicitly updates draft only. Default/suggested values are provenance-backed; incompatible backend defaults produce validation, not silent correction. Numeric and cross-field validation, unsupported device/feature gating, known-typed effective defaults, RF null depth/feature schema; no source path inputs and no imaginary toggle behavior | TD-CONFIG | 05 |
 | `UT-TRAIN-009` | User saved presets: reject multi-label/multi-class/extra class settings; per-family values, create/load/duplicate/rename/delete/overwrite, draft vs stored vs immutable Run spec, no Collection/Dataset paths, stable IDs | TD-PRESET, TD-CONFIG | 05 |
 | `UT-TRAIN-010` | Preset schema migration/incompatible toolbox revision, corrupt JSON, unsafe/duplicate names, atomic failure and no silent field loss | TD-PRESET, TD-FAIL | 05 |
+| `UT-LOG-001` | Versioned JSONL record schema, level filtering, stable component/event names, correlation IDs and strict allowlisted context | TD-RUN, TD-FAIL | 05d |
+| `UT-LOG-002` | Portable privacy normalization excludes absolute/home/HPC/UNC/drive paths, WAV basenames, credentials, controls, arbitrary exception text and overlong values | TD-PATH, TD-FAIL | 05d |
+| `UT-LOG-003` | App/Run log containment rejects traversal and symlink escapes; diagnostics readers/exporters revalidate records and never copy corrupt or unknown fields verbatim | TD-PATH, TD-FAIL | 05d |
+| `UT-LOG-004` | App/Worker byte budgets, bounded rotation, age/total pruning, stderr storm bounds and non-recursive degraded-sink fallback | TD-RUN, TD-FAIL | 05d |
 
 **Reported status:** Spec 05c completes `UT-TRAIN-001`–`010`, including exact ordered RF feature
 schema, explicit positive-probability mapping, undefined metrics and structural estimator rejection.
 The [Spec 05 evidence](design/evidence/README.md#spec-05c--real-rf-training-and-phase-05-acceptance)
 records the fresh commands and results; listing the IDs here is not independent passing evidence.
+
+**Reported status:** Spec 05d implements `UT-LOG-001`–`004`; the
+[native diagnostics ledger](design/evidence/README.md#spec-05d--local-logging-and-diagnostics)
+records the red-first boundary and fresh verification. Listing the IDs is not passing evidence.
 
 Do not add unit tests that instantiate a fake repository/GUI just to mirror an `IT-*` case. Conversely, if the algorithm truly depends on WAV decoder/frame reads, include a minimal actual WAV integration test for that boundary. See [`INTEGRATION_TESTING.md`](INTEGRATION_TESTING.md) and its indexed behavior plan.

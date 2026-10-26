@@ -425,6 +425,66 @@ focus, progress and resize; **S** real scientific/undefined/error/completed-stat
 These are recorded macOS development-app results, not an independent rerun or owner sign-off.
 Installed `.app` and Windows qualification remain in Specs 06/07.
 
+## Spec 05d — Local logging and diagnostics
+
+**Status: implementation and native macOS development-app review complete; owner acceptance
+pending.** The completed Dataset Run, Settings support actions, privacy confirmation and responsive
+states were captured from the visible Cocoa app after a real QProcess Worker wrote its contained
+JSONL log. The browser prototype was not changed; these are the secondary native-only controls
+specified by 05d.
+
+### Capture provenance
+
+- Command: `unset QT_QPA_PLATFORM; .venv/bin/python scripts/capture_spec05d_screenshots.py`
+- Captured and reviewed 26 October 2026 on macOS 26.6.2 arm64; native Cocoa; 1470×956 logical
+  primary screen, device-pixel ratio 2.0 and logical DPI 72
+- Runtime: Python 3.12.7; PySide6/Qt 6.11.2; `alp-ui` 0.1.0a0 from the sibling checkout at
+  `330aaab96a6b32dd2d83ae84a52a2a238446d264`
+- Stored PNGs: 1280×807 desktop, 700×780 narrow and 1180×790 current Showcase
+- Scientific dependency was unchanged: editable `bioacoustics-dl-toolbox` 0.1.1 from sibling SHA
+  `8e2e0528d4ce718005e194d426cde6e62fda0909`; the supplied `alpaca-pipelines` reference remained
+  `91af5287dc18313f88902dc9696e8756274736b3`
+- Data/privacy: generated mono PCM WAVs, isolated `/tmp` Collection and Application Settings, no
+  user/HPC data; logs and exported ZIP assertions reject the temporary absolute path and WAV names
+- Capture mechanism: visible `QMainWindow`, native `QMessageBox` and Cocoa `QScreen.grabWindow`;
+  non-Cocoa/offscreen execution is rejected
+
+Prototype `runPage()` and `settingsPage()`, their reachable states and responsive CSS were reviewed
+source-first. The live sibling Showcase was launched and captured as
+[alp-ui-showcase-current.png](spec-05d-native/alp-ui-showcase-current.png). All PNGs were inspected
+at original resolution. The first narrow review exposed a two-column Settings mismatch; the native
+cards were then made to stack at the prototype breakpoint, retested and recaptured.
+
+### State-by-state review
+
+Six-dimension key: **H** information hierarchy/CTA/panel order; **N** navigation/active state;
+**C** terms/copy/feedback; **A** `alp-ui` components/theme/icons/accessibility; **I** interaction,
+focus, confirmation, scroll and resize; **S** diagnostic/error/completed-state fidelity.
+
+| State | Prototype / 05d target | Native evidence | Showcase and interaction evidence | Six dimensions | Difference / disposition |
+|---|---|---|---|---|---|
+| Completed Run log access | Baseline `runPage()` plus secondary 05d action | [run-open-log.png](spec-05d-native/run-open-log.png) | Existing activity/progress/output hierarchy is unchanged; contained log is revalidated immediately before native open; `IT-LOG-004` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | **Open log** is secondary to **Open Dataset** and appears only for a safe existing Worker log. Older Runs show explanatory copy instead of migration or fake evidence. |
+| Diagnostics Settings | Baseline `settingsPage()` plus native support card | [settings-diagnostics.png](spec-05d-native/settings-diagnostics.png) | Public `Card`, `Text`, `Button` and `Alert` follow current Showcase density; Collection/read plan cards and route remain in prototype order; `IT-LOG-004` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | The additive card is below the complete baseline and introduces no primary route, configuration dashboard or upload action. |
+| Export privacy confirmation | Explicit 05d consent contract | [export-privacy-confirmation.png](spec-05d-native/export-privacy-confirmation.png) | Native modal defaults to No and states local-only, revalidation/redaction, review-before-sharing and selected-Run scope; `IT-LOG-004` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Platform-native Yes/No labels are retained; no file chooser or overwrite occurs without affirmative consent. |
+| Narrow completed Run | Responsive `runPage()` plus Open log | [run-open-log-narrow.png](spec-05d-native/run-open-log-narrow.png) | 700×780 stacked Run cards, horizontally reachable nav, both secondary log and primary output actions visible; keyboard focus asserted | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Native vertical scrolling retains all baseline content; no horizontal page clipping. |
+| Narrow Settings hierarchy | Prototype responsive single-column Settings | [top](spec-05d-native/settings-stacked-narrow.png) · [diagnostics card](spec-05d-native/settings-diagnostics-narrow.png) | 700×780 cards stack Collection → reading plan → diagnostics; actions remain focusable and visible; `IT-LOG-004` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Two captures record the tall native page at top and bottom; ordinary vertical scroll connects them. |
+
+`IT-LOG-004` separately activates Open log through the contained path, tabs to Export, accepts the
+privacy confirmation, creates a new ZIP, verifies its inventory/selected Run scope, and checks
+missing-log feedback. Screenshot evidence is not used as a substitute for those assertions.
+
+### Verification record
+
+- Red-first unit collection initially failed because the diagnostics module did not exist; native
+  integration initially failed because stderr draining and log/export controls did not exist.
+- `UT-LOG-001`–`004` exercise schema/levels/correlation, adversarial privacy normalization,
+  containment/export revalidation, rotation/pruning, stderr bounds and degraded sinks.
+- `IT-LOG-001`–`004` exercise real GUI/session/Scan, Dataset/CNN/RF QProcesses, identical
+  `info`/`debug` scientific metrics and Model payload hashes, stderr storm failure, native access
+  and sanitized export.
+- Installed `.app`/Windows log locations, bundled Worker launch and platform dialogs remain the
+  explicit Spec 06/07 gates; they are not claimed by these development-app captures.
+
 ## Every subsequent spec: mandatory ledger
 
 Use [Prototype acceptance](../PROTOTYPE_ACCEPTANCE.md) for the full screenshot inventory and six

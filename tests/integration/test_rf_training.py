@@ -22,6 +22,7 @@ from alpaca_desktop.domain.training import (
 from alpaca_desktop.gui.app import create_application
 from alpaca_desktop.gui.window import MainWindow
 from alpaca_desktop.persistence.collection_metadata import publish_collection_metadata
+from alpaca_desktop.persistence.diagnostics import read_diagnostic_records, worker_log_path
 from alpaca_desktop.persistence.models import (
     list_models,
     load_model,
@@ -73,6 +74,7 @@ def _fast_rf_draft():
         "feature_config.n_mfcc": 4,
         "feature_config.fmin_hz": 100.0,
         "feature_config.fmax_hz": 3_500.0,
+        "logging_level": "debug",
     }.items():
         draft.set(key, value)
     return draft
@@ -106,7 +108,7 @@ def test_real_rf_worker_publishes_reloadable_model_and_native_views(
     qapp, qtbot, tmp_path, wav_factory
 ):
     """Cases: IT-TRAIN-002, IT-TRAIN-003, IT-TRAIN-005, IT-TRAIN-006, IT-TRAIN-007,
-    IT-TRAIN-008, IT-TRAIN-012, IT-TRAIN-014.
+    IT-TRAIN-008, IT-TRAIN-012, IT-TRAIN-014, IT-LOG-002.
     """
     create_application()
     root = tmp_path / "collection"
@@ -173,6 +175,14 @@ def test_real_rf_worker_publishes_reloadable_model_and_native_views(
     )
     importance_rows = [row for row in run.measurements if row["kind"] == "feature_importance"]
     assert importance_rows
+    worker_records, notices = read_diagnostic_records(worker_log_path(root, run_id))
+    assert notices == ()
+    assert {record["event"] for record in worker_records} >= {
+        "worker_started",
+        "training_stage",
+        "measurement_available",
+        "worker_completed",
+    }
     models = list_models(root)
     assert {model.model_id for model in models} == {
         "model-cnn-shared-dataset",
@@ -319,6 +329,55 @@ def test_real_rf_worker_publishes_reloadable_model_and_native_views(
     binary.write_bytes(bytes([original_binary[0] ^ 0xFF]) + original_binary[1:])
     with pytest.raises(ValueError, match="digest"):
         load_model(root, model.model_id)
+
+
+@pytest.mark.qt
+def test_info_and_debug_diagnostics_do_not_change_rf_science(
+    qapp, qtbot, tmp_path, wav_factory
+):
+    """Case: IT-LOG-002."""
+    create_application()
+    root = tmp_path / "collection"
+    scan, dataset = _dataset(root, wav_factory)
+    controller = WorkspaceController(tmp_path / "settings")
+    controller.bind_verified_collection(root, scan.collection_id)
+
+    runs = {}
+    for detail in ("info", "debug"):
+        draft = _fast_rf_draft()
+        draft.set("logging_level", detail)
+        frozen = freeze_training_config(
+            draft,
+            TrainingDataset.from_artifact(dataset),
+            DeviceCapabilities(cuda=False, mps=False, cpu_count=8),
+        )
+        run_id = controller.start_training(
+            frozen,
+            model_label=f"RF {detail} diagnostics",
+            model_id=f"model-rf-{detail}-diagnostics",
+        )
+        qtbot.waitUntil(
+            lambda current=run_id: any(
+                run.run_id == current and run.terminal for run in controller.runs
+            ),
+            timeout=180_000,
+        )
+        runs[detail] = next(run for run in controller.runs if run.run_id == run_id)
+
+    assert runs["info"].status is RunStatus.COMPLETED
+    assert runs["debug"].status is RunStatus.COMPLETED
+    assert runs["info"].measurements == runs["debug"].measurements
+    models = {model.model_id: model for model in list_models(root)}
+    info_model = models["model-rf-info-diagnostics"]
+    debug_model = models["model-rf-debug-diagnostics"]
+    assert info_model.manifest["results"] == debug_model.manifest["results"]
+    assert info_model.manifest["artifact"]["sha256"] == debug_model.manifest["artifact"][
+        "sha256"
+    ]
+    info_records, _ = read_diagnostic_records(worker_log_path(root, runs["info"].run_id))
+    debug_records, _ = read_diagnostic_records(worker_log_path(root, runs["debug"].run_id))
+    assert not any(record["event"] == "measurement_available" for record in info_records)
+    assert any(record["event"] == "measurement_available" for record in debug_records)
 
 
 @pytest.mark.qt

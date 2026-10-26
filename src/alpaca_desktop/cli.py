@@ -2,10 +2,23 @@
 
 import argparse
 import json
+import logging
+import re
 import sys
 import time
 from importlib.metadata import version
 from pathlib import Path
+
+from alpaca_desktop.persistence.diagnostics import (
+    WorkerDiagnosticSession,
+    sanitize_diagnostic_text,
+)
+
+
+def _diagnostic_session_id(value: str) -> str:
+    if not re.fullmatch(r"[a-f0-9]{32}", value):
+        raise argparse.ArgumentTypeError("invalid diagnostic session identifier")
+    return value
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -23,6 +36,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--request", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--worker-step-delay", type=float, default=0.0, help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--diagnostic-session-id",
+        type=_diagnostic_session_id,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument("--diagnostic-debug", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
 
     if args.worker == "dataset-build":
@@ -30,26 +49,36 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--request is required for the Dataset Build Worker")
         if not 0 <= args.worker_step_delay <= 5:
             parser.error("--worker-step-delay must be between 0 and 5 seconds")
-        return _run_dataset_build_worker(args.request, args.worker_step_delay)
+        return _run_dataset_build_worker(
+            args.request, args.worker_step_delay, args.diagnostic_session_id
+        )
     if args.worker == "cnn-training":
         if args.request is None:
             parser.error("--request is required for the CNN Training Worker")
         if not 0 <= args.worker_step_delay <= 5:
             parser.error("--worker-step-delay must be between 0 and 5 seconds")
-        return _run_cnn_training_worker(args.request, args.worker_step_delay)
+        return _run_cnn_training_worker(
+            args.request, args.worker_step_delay, args.diagnostic_session_id
+        )
     if args.worker == "rf-training":
         if args.request is None:
             parser.error("--request is required for the RF Training Worker")
         if not 0 <= args.worker_step_delay <= 5:
             parser.error("--worker-step-delay must be between 0 and 5 seconds")
-        return _run_rf_training_worker(args.request, args.worker_step_delay)
+        return _run_rf_training_worker(
+            args.request, args.worker_step_delay, args.diagnostic_session_id
+        )
 
     from alpaca_desktop.gui.app import run
 
-    return run(args.settings_dir)
+    return run(args.settings_dir, diagnostic_debug=args.diagnostic_debug)
 
 
-def _run_dataset_build_worker(request_path: Path, step_delay_seconds: float = 0.0) -> int:
+def _run_dataset_build_worker(
+    request_path: Path,
+    step_delay_seconds: float = 0.0,
+    diagnostic_session_id: str | None = None,
+) -> int:
     from alpaca_desktop.persistence.collection_metadata import load_collection_metadata
     from alpaca_desktop.persistence.runs import (
         WORKER_RESULT_SCHEMA_VERSION,
@@ -68,6 +97,7 @@ def _run_dataset_build_worker(request_path: Path, step_delay_seconds: float = 0.
             time.sleep(step_delay_seconds)
 
     root: Path | None = None
+    diagnostics: WorkerDiagnosticSession | None = None
     try:
         if request_path.stat().st_size > 1_000_000:
             raise ValueError("Dataset Build request exceeds 1 MiB.")
@@ -77,19 +107,46 @@ def _run_dataset_build_worker(request_path: Path, step_delay_seconds: float = 0.
         scan = load_collection_metadata(root)
         if scan.collection_id != request.collection_id:
             raise ValueError("Dataset Build request Collection binding no longer matches.")
+        try:
+            diagnostics = WorkerDiagnosticSession(
+                root,
+                request.run_id,
+                request.request_id,
+                session_id=diagnostic_session_id,
+                debug=False,
+                request_path=request_path,
+                component="alpaca_desktop.worker.dataset",
+            )
+        except (OSError, ValueError):
+            print("Worker diagnostics unavailable", file=sys.stderr)
+        if diagnostics is not None:
+            diagnostics.emit(
+                "worker_started",
+                "Dataset Build Worker started",
+                context={"run_kind": "dataset_build", "operation": "dataset_build"},
+            )
         emit("started", message="Dataset Build Worker started")
+        last_diagnostic_progress = (-1, -1)
+
+        def progress(stage_index: int, progress: int, message: str) -> None:
+            nonlocal last_diagnostic_progress
+            emit("progress", stage_index=stage_index, progress=progress, message=message)
+            bucket = progress // 10
+            if diagnostics is not None and (stage_index, bucket) != last_diagnostic_progress:
+                last_diagnostic_progress = (stage_index, bucket)
+                diagnostics.emit(
+                    "worker_stage",
+                    "Dataset Build stage updated",
+                    context={"stage": f"stage-{stage_index}", "count": progress},
+                )
+
         artifact = build_dataset(
             root,
             scan,
             request.config,
             dataset_id=request.dataset_id,
             cancelled=lambda: cancellation_requested(request_path),
-            progress=lambda stage_index, progress, message: emit(
-                "progress",
-                stage_index=stage_index,
-                progress=progress,
-                message=message,
-            ),
+            progress=progress,
             run_id=request.run_id,
             request_id=request.request_id,
         )
@@ -103,19 +160,45 @@ def _run_dataset_build_worker(request_path: Path, step_delay_seconds: float = 0.
         write_completion_receipt(request_path, receipt)
     except DatasetBuildCancelled as exc:
         emit("cancelled", message=str(exc))
+        if diagnostics is not None:
+            diagnostics.emit(
+                "worker_cancelled",
+                "Dataset Build Worker cancelled before publication",
+                level=logging.WARNING,
+                context={"status": "cancelled"},
+            )
         return 2
     except Exception as exc:
-        message = str(exc)
-        if root is not None:
-            message = message.replace(str(root), "<Collection>")
+        message = sanitize_diagnostic_text(str(exc))
+        if diagnostics is not None:
+            diagnostics.emit(
+                "worker_failed",
+                "Dataset Build Worker failed",
+                level=logging.ERROR,
+                context={"status": "failed", "exception_type": type(exc).__name__},
+            )
         emit("error", message=message)
         print(message, file=sys.stderr)
         return 1
-    emit("completed", output_id=artifact.dataset_id, message="Output verified and published")
-    return 0
+    else:
+        if diagnostics is not None:
+            diagnostics.emit(
+                "worker_completed",
+                "Dataset output verified and published",
+                context={"status": "completed", "run_kind": "dataset_build"},
+            )
+        emit("completed", output_id=artifact.dataset_id, message="Output verified and published")
+        return 0
+    finally:
+        if diagnostics is not None:
+            diagnostics.close()
 
 
-def _run_cnn_training_worker(request_path: Path, step_delay_seconds: float = 0.0) -> int:
+def _run_cnn_training_worker(
+    request_path: Path,
+    step_delay_seconds: float = 0.0,
+    diagnostic_session_id: str | None = None,
+) -> int:
     from alpaca_desktop.persistence.collection_metadata import load_collection_metadata
     from alpaca_desktop.persistence.runs import (
         WORKER_RESULT_SCHEMA_VERSION,
@@ -134,6 +217,7 @@ def _run_cnn_training_worker(request_path: Path, step_delay_seconds: float = 0.0
             time.sleep(step_delay_seconds)
 
     root: Path | None = None
+    diagnostics: WorkerDiagnosticSession | None = None
     try:
         if request_path.stat().st_size > 1_000_000:
             raise ValueError("CNN Training request exceeds 1 MiB.")
@@ -143,18 +227,63 @@ def _run_cnn_training_worker(request_path: Path, step_delay_seconds: float = 0.0
         metadata = load_collection_metadata(root)
         if metadata.collection_id != request.collection_id:
             raise ValueError("CNN Training request Collection binding no longer matches.")
+        try:
+            diagnostics = WorkerDiagnosticSession(
+                root,
+                request.run_id,
+                request.request_id,
+                session_id=diagnostic_session_id,
+                debug=request.config.effective_values["logging_level"] == "debug",
+                request_path=request_path,
+                component="alpaca_desktop.worker.cnn",
+            )
+        except (OSError, ValueError):
+            print("Worker diagnostics unavailable", file=sys.stderr)
+        if diagnostics is not None:
+            diagnostics.emit(
+                "worker_started",
+                "CNN Training Worker started",
+                context={"run_kind": "training", "training_family": "cnn"},
+            )
         emit("started", message="CNN Training Worker started")
+        last_diagnostic_progress = (-1, -1)
+
+        def progress(stage_index: int, progress: int, message: str) -> None:
+            nonlocal last_diagnostic_progress
+            emit("progress", stage_index=stage_index, progress=progress, message=message)
+            bucket = progress // 10
+            if diagnostics is not None and (stage_index, bucket) != last_diagnostic_progress:
+                last_diagnostic_progress = (stage_index, bucket)
+                diagnostics.emit(
+                    "training_stage",
+                    "CNN Training stage updated",
+                    context={
+                        "stage": f"stage-{stage_index}",
+                        "count": progress,
+                        "training_family": "cnn",
+                    },
+                )
+
+        measurement_count = 0
+
+        def measurement(row: dict) -> None:
+            nonlocal measurement_count
+            measurement_count += 1
+            emit("measurement", **row)
+            if diagnostics is not None:
+                diagnostics.emit(
+                    "measurement_available",
+                    "CNN measurement became available",
+                    level=logging.DEBUG,
+                    context={"training_family": "cnn", "count": measurement_count},
+                )
+
         artifact = train_cnn_model(
             root,
             request,
             cancelled=lambda: cancellation_requested(request_path),
-            progress=lambda stage_index, progress, message: emit(
-                "progress",
-                stage_index=stage_index,
-                progress=progress,
-                message=message,
-            ),
-            measurement=lambda row: emit("measurement", **row),
+            progress=progress,
+            measurement=measurement,
         )
         write_completion_receipt(
             request_path,
@@ -168,19 +297,49 @@ def _run_cnn_training_worker(request_path: Path, step_delay_seconds: float = 0.0
         )
     except CnnTrainingCancelled as exc:
         emit("cancelled", message=str(exc))
+        if diagnostics is not None:
+            diagnostics.emit(
+                "worker_cancelled",
+                "CNN Training Worker cancelled before publication",
+                level=logging.WARNING,
+                context={"status": "cancelled", "training_family": "cnn"},
+            )
         return 2
     except Exception as exc:
-        message = str(exc)
-        if root is not None:
-            message = message.replace(str(root), "<Collection>")
+        message = sanitize_diagnostic_text(str(exc))
+        if diagnostics is not None:
+            diagnostics.emit(
+                "worker_failed",
+                "CNN Training Worker failed",
+                level=logging.ERROR,
+                context={
+                    "status": "failed",
+                    "training_family": "cnn",
+                    "exception_type": type(exc).__name__,
+                },
+            )
         emit("error", message=message)
         print(message, file=sys.stderr)
         return 1
-    emit("completed", output_id=artifact.model_id, message="Output verified and published")
-    return 0
+    else:
+        if diagnostics is not None:
+            diagnostics.emit(
+                "worker_completed",
+                "CNN Model verified and published",
+                context={"status": "completed", "training_family": "cnn"},
+            )
+        emit("completed", output_id=artifact.model_id, message="Output verified and published")
+        return 0
+    finally:
+        if diagnostics is not None:
+            diagnostics.close()
 
 
-def _run_rf_training_worker(request_path: Path, step_delay_seconds: float = 0.0) -> int:
+def _run_rf_training_worker(
+    request_path: Path,
+    step_delay_seconds: float = 0.0,
+    diagnostic_session_id: str | None = None,
+) -> int:
     from alpaca_desktop.persistence.collection_metadata import load_collection_metadata
     from alpaca_desktop.persistence.runs import (
         WORKER_RESULT_SCHEMA_VERSION,
@@ -199,6 +358,7 @@ def _run_rf_training_worker(request_path: Path, step_delay_seconds: float = 0.0)
             time.sleep(step_delay_seconds)
 
     root: Path | None = None
+    diagnostics: WorkerDiagnosticSession | None = None
     try:
         if request_path.stat().st_size > 1_000_000:
             raise ValueError("RF Training request exceeds 1 MiB.")
@@ -208,18 +368,63 @@ def _run_rf_training_worker(request_path: Path, step_delay_seconds: float = 0.0)
         metadata = load_collection_metadata(root)
         if metadata.collection_id != request.collection_id:
             raise ValueError("RF Training request Collection binding no longer matches.")
+        try:
+            diagnostics = WorkerDiagnosticSession(
+                root,
+                request.run_id,
+                request.request_id,
+                session_id=diagnostic_session_id,
+                debug=request.config.effective_values["logging_level"] == "debug",
+                request_path=request_path,
+                component="alpaca_desktop.worker.rf",
+            )
+        except (OSError, ValueError):
+            print("Worker diagnostics unavailable", file=sys.stderr)
+        if diagnostics is not None:
+            diagnostics.emit(
+                "worker_started",
+                "RF Training Worker started",
+                context={"run_kind": "training", "training_family": "rf"},
+            )
         emit("started", message="RF Training Worker started")
+        last_diagnostic_progress = (-1, -1)
+
+        def progress(stage_index: int, progress: int, message: str) -> None:
+            nonlocal last_diagnostic_progress
+            emit("progress", stage_index=stage_index, progress=progress, message=message)
+            bucket = progress // 10
+            if diagnostics is not None and (stage_index, bucket) != last_diagnostic_progress:
+                last_diagnostic_progress = (stage_index, bucket)
+                diagnostics.emit(
+                    "training_stage",
+                    "RF Training stage updated",
+                    context={
+                        "stage": f"stage-{stage_index}",
+                        "count": progress,
+                        "training_family": "rf",
+                    },
+                )
+
+        measurement_count = 0
+
+        def measurement(row: dict) -> None:
+            nonlocal measurement_count
+            measurement_count += 1
+            emit("measurement", **row)
+            if diagnostics is not None:
+                diagnostics.emit(
+                    "measurement_available",
+                    "RF measurement became available",
+                    level=logging.DEBUG,
+                    context={"training_family": "rf", "count": measurement_count},
+                )
+
         artifact = train_rf_model(
             root,
             request,
             cancelled=lambda: cancellation_requested(request_path),
-            progress=lambda stage_index, progress, message: emit(
-                "progress",
-                stage_index=stage_index,
-                progress=progress,
-                message=message,
-            ),
-            measurement=lambda row: emit("measurement", **row),
+            progress=progress,
+            measurement=measurement,
         )
         write_completion_receipt(
             request_path,
@@ -233,13 +438,39 @@ def _run_rf_training_worker(request_path: Path, step_delay_seconds: float = 0.0)
         )
     except RfTrainingCancelled as exc:
         emit("cancelled", message=str(exc))
+        if diagnostics is not None:
+            diagnostics.emit(
+                "worker_cancelled",
+                "RF Training Worker cancelled before publication",
+                level=logging.WARNING,
+                context={"status": "cancelled", "training_family": "rf"},
+            )
         return 2
     except Exception as exc:
-        message = str(exc)
-        if root is not None:
-            message = message.replace(str(root), "<Collection>")
+        message = sanitize_diagnostic_text(str(exc))
+        if diagnostics is not None:
+            diagnostics.emit(
+                "worker_failed",
+                "RF Training Worker failed",
+                level=logging.ERROR,
+                context={
+                    "status": "failed",
+                    "training_family": "rf",
+                    "exception_type": type(exc).__name__,
+                },
+            )
         emit("error", message=message)
         print(message, file=sys.stderr)
         return 1
-    emit("completed", output_id=artifact.model_id, message="Output verified and published")
-    return 0
+    else:
+        if diagnostics is not None:
+            diagnostics.emit(
+                "worker_completed",
+                "RF Model verified and published",
+                context={"status": "completed", "training_family": "rf"},
+            )
+        emit("completed", output_id=artifact.model_id, message="Output verified and published")
+        return 0
+    finally:
+        if diagnostics is not None:
+            diagnostics.close()

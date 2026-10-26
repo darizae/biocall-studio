@@ -1,6 +1,8 @@
 """Collection selection, background Scan, and machine-local verified binding."""
 
+import logging
 import sys
+import time
 import uuid
 from pathlib import Path
 from threading import Event
@@ -13,6 +15,7 @@ from alpaca_desktop.application.collection_scan import (
     inputs_match_scan,
     scan_collection,
 )
+from alpaca_desktop.application.diagnostics import DiagnosticSession, diagnostic_context_for_run
 from alpaca_desktop.domain.collection import ScanResult
 from alpaca_desktop.domain.dataset import BuildConfig
 from alpaca_desktop.domain.run import (
@@ -40,6 +43,7 @@ from alpaca_desktop.persistence.datasets import (
     delete_dataset,
     load_dataset,
 )
+from alpaca_desktop.persistence.diagnostics import BoundedStderrCapture, worker_log_path
 from alpaca_desktop.persistence.models import (
     ModelArtifact,
     discard_uncommitted_model,
@@ -127,6 +131,8 @@ class WorkspaceController(QObject):
         worker_step_delay_seconds: float = 0.0,
         cancel_grace_ms: int = 1_500,
         kill_grace_ms: int = 3_000,
+        diagnostics: DiagnosticSession | None = None,
+        diagnostic_debug: bool = False,
     ):
         super().__init__()
         if settings_dir is None:
@@ -136,7 +142,11 @@ class WorkspaceController(QObject):
             if not location:
                 raise OSError("Qt could not locate Application Settings storage.")
             settings_dir = Path(location)
-        self.settings_file = settings_dir.resolve() / "settings.json"
+        settings_dir = settings_dir.resolve()
+        self.diagnostics = diagnostics or DiagnosticSession(
+            settings_dir, debug=diagnostic_debug
+        )
+        self.settings_file = settings_dir / "settings.json"
         self._store = SettingsStore(self.settings_file)
         self.error_message = ""
         self._settings_error_message = ""
@@ -153,8 +163,11 @@ class WorkspaceController(QObject):
         self._run_process: QProcess | None = None
         self._current_run_id: str | None = None
         self._run_stdout_buffer = b""
+        self._run_stderr = BoundedStderrCapture()
         self._worker_error = ""
         self._protocol_error = ""
+        self._diagnostic_stage_index = -1
+        self._scan_started_at = 0.0
         self._worker_step_delay_seconds = worker_step_delay_seconds
         self._cancel_grace_ms = cancel_grace_ms
         self._kill_grace_ms = kill_grace_ms
@@ -165,6 +178,12 @@ class WorkspaceController(QObject):
             self.error_message = str(exc)
             self._settings_error_message = self.error_message
             self._settings = ApplicationSettings()
+            self._diagnostic(
+                "settings_read_failed",
+                "Application Settings could not be read; defaults are active",
+                level=logging.WARNING,
+                exception_type=type(exc).__name__,
+            )
         if self.collection_path is not None:
             self._load_runs(self.collection_path)
 
@@ -205,6 +224,62 @@ class WorkspaceController(QObject):
             if identifier is not None
         }
         return frozenset(reserved)
+
+    @property
+    def diagnostics_available(self) -> bool:
+        return self.diagnostics.available
+
+    @property
+    def diagnostics_unavailable_message(self) -> str:
+        if self.diagnostics.available:
+            return ""
+        return "Diagnostics are unavailable for this session. Scientific work is unaffected."
+
+    def worker_log_for_run(self, run_id: str) -> Path | None:
+        root = self.collection_path
+        if root is None:
+            return None
+        try:
+            path = worker_log_path(root, run_id, create=False)
+        except (FileNotFoundError, OSError, ValueError):
+            return None
+        return path if path.is_file() and not path.is_symlink() else None
+
+    def export_diagnostics(
+        self, destination: Path, *, run_id: str | None = None, overwrite: bool = False
+    ):
+        selected_run = None
+        if run_id is not None and self.collection_path is not None:
+            selected_run = (self.collection_path, run_id)
+        result = self.diagnostics.export(
+            destination, selected_run=selected_run, overwrite=overwrite
+        )
+        self._diagnostic(
+            "diagnostics_exported",
+            "Diagnostics support bundle exported",
+            run_id=run_id,
+            count=result.included_records,
+        )
+        return result
+
+    def _diagnostic(
+        self,
+        event: str,
+        message: str,
+        *,
+        level: int = logging.INFO,
+        run: RunState | None = None,
+        **context: object,
+    ) -> None:
+        values = diagnostic_context_for_run(run) if run is not None else {}
+        values.update(context)
+        self.diagnostics.emit(
+            "alpaca_desktop.application.workspace",
+            event,
+            message,
+            level=level,
+            context=values,
+        )
 
     def request_collection(self, directory: str) -> None:
         """Keep picker intent pending until its background Scan validates and publishes."""
@@ -253,6 +328,11 @@ class WorkspaceController(QObject):
             raise ValueError("Collection identity does not match the verified binding.")
         assert_collection_rebind_allowed(self._runs, expected_id)
         self._save(ApplicationSettings(resolved_path, expected_id))
+        self._diagnostic(
+            "collection_bound",
+            "Verified Collection binding saved",
+            operation="collection_scan",
+        )
         # A same-identity refresh may finish while this Controller still owns a
         # live Worker. Startup reconciliation is only valid without a supervisor.
         if self._active_run is None:
@@ -318,6 +398,12 @@ class WorkspaceController(QObject):
         )
         create_run(self.collection_path, state)
         self._set_run(state)
+        self._diagnostic(
+            "run_reserved",
+            "Dataset Build Run reserved",
+            run=state,
+            operation="dataset_build",
+        )
         request = DatasetBuildRequest(
             run_id,
             request_id,
@@ -426,6 +512,12 @@ class WorkspaceController(QObject):
         )
         create_run(self.collection_path, state)
         self._set_run(state)
+        self._diagnostic(
+            "run_reserved",
+            "Training Run reserved",
+            run=state,
+            operation="training",
+        )
         try:
             self._build_request_path = write_run_request(
                 self.collection_path, run_id, request.to_dict()
@@ -463,11 +555,14 @@ class WorkspaceController(QObject):
         self._run_process = process
         self._current_run_id = self._active_run.run_id if self._active_run is not None else None
         self._run_stdout_buffer = b""
+        self._run_stderr = BoundedStderrCapture()
         self._worker_error = ""
         self._protocol_error = ""
+        self._diagnostic_stage_index = -1
         process.setProcessChannelMode(QProcess.ProcessChannelMode.SeparateChannels)
         process.started.connect(self._on_run_process_started)
         process.readyReadStandardOutput.connect(self._on_run_stdout)
+        process.readyReadStandardError.connect(self._on_run_stderr)
         process.finished.connect(self._on_run_finished)
         process.errorOccurred.connect(self._on_run_process_error)
         arguments = [
@@ -477,16 +572,31 @@ class WorkspaceController(QObject):
             str(request_path),
             "--worker-step-delay",
             str(self._worker_step_delay_seconds),
+            "--diagnostic-session-id",
+            self.diagnostics.session_id,
         ]
-        process.setProgram(sys.executable)
-        process.setArguments(
-            arguments if getattr(sys, "frozen", False) else ["-m", "alpaca_desktop", *arguments]
-        )
+        program, launch_arguments = self._worker_command(arguments)
+        process.setProgram(program)
+        process.setArguments(launch_arguments)
         if worker == "dataset-build":
             self.build_started.emit()
         else:
             self.training_started.emit()
         process.start()
+        self._diagnostic(
+            "worker_launch_requested",
+            "Worker process launch requested",
+            run=self._active_run,
+            operation=worker,
+        )
+
+    def _worker_command(self, arguments: list[str]) -> tuple[str, list[str]]:
+        return (
+            sys.executable,
+            arguments
+            if getattr(sys, "frozen", False)
+            else ["-m", "alpaca_desktop", *arguments],
+        )
 
     def cancel_active_run(self) -> None:
         state = self._active_run
@@ -501,6 +611,12 @@ class WorkspaceController(QObject):
         )
         request_cancellation(root, state.run_id)
         self._set_run(state)
+        self._diagnostic(
+            "run_cancel_requested",
+            "Run cancellation requested",
+            level=logging.WARNING,
+            run=state,
+        )
         run_id = state.run_id
         QTimer.singleShot(self._cancel_grace_ms, lambda: self._terminate_run(run_id))
         QTimer.singleShot(self._kill_grace_ms, lambda: self._kill_run(run_id))
@@ -520,21 +636,27 @@ class WorkspaceController(QObject):
         process = self._run_process
         state = self._active_run
         root = self.collection_path
-        if process is None or state is None or root is None:
-            return
-        process.blockSignals(True)
-        request_cancellation(root, state.run_id)
-        if process.state() != QProcess.ProcessState.NotRunning:
-            process.terminate()
-            if not process.waitForFinished(500):
-                process.kill()
-                process.waitForFinished(500)
-        self._run_process = None
-        self._current_run_id = None
-        self._build_request_path = None
-        process.deleteLater()
-        self._load_runs(root)
-        self.runs_changed.emit()
+        if process is not None and state is not None and root is not None:
+            self._diagnostic(
+                "application_shutdown_active_run",
+                "Application shutdown interrupted an Active Run",
+                level=logging.WARNING,
+                run=state,
+            )
+            process.blockSignals(True)
+            request_cancellation(root, state.run_id)
+            if process.state() != QProcess.ProcessState.NotRunning:
+                process.terminate()
+                if not process.waitForFinished(500):
+                    process.kill()
+                    process.waitForFinished(500)
+            self._run_process = None
+            self._current_run_id = None
+            self._build_request_path = None
+            process.deleteLater()
+            self._load_runs(root)
+            self.runs_changed.emit()
+        self.diagnostics.close()
 
     def _set_run(self, state: RunState) -> None:
         if self.collection_path is None:
@@ -559,6 +681,12 @@ class WorkspaceController(QObject):
             self._runs = ()
             self._active_run = None
             self.error_message = f"Run history could not be loaded: {exc}"
+            self._diagnostic(
+                "run_reconciliation_failed",
+                "Run history reconciliation failed",
+                level=logging.ERROR,
+                exception_type=type(exc).__name__,
+            )
             return
         active = [run for run in self._runs if run.active]
         if active:
@@ -566,22 +694,32 @@ class WorkspaceController(QObject):
             self._active_run = None
         else:
             self._active_run = None
+        self._diagnostic(
+            "run_reconciliation_completed",
+            "Run history reconciliation completed",
+            operation="restart_reconciliation",
+            count=sum(run.status is RunStatus.INTERRUPTED for run in self._runs),
+        )
 
     def _on_run_process_started(self) -> None:
         state = self._active_run
         if state is None or state.status is not RunStatus.STARTING:
             return
-        self._set_run(
-            transition_run(
-                state,
-                RunStatus.RUNNING,
-                now=utc_now(),
-                message=(
-                    "Dataset Build Worker started"
-                    if state.kind is RunKind.DATASET_BUILD
-                    else "CNN Training Worker started"
-                ),
-            )
+        updated = transition_run(
+            state,
+            RunStatus.RUNNING,
+            now=utc_now(),
+            message=(
+                "Dataset Build Worker started"
+                if state.kind is RunKind.DATASET_BUILD
+                else "Training Worker started"
+            ),
+        )
+        self._set_run(updated)
+        self._diagnostic(
+            "worker_process_started",
+            "Worker process started",
+            run=updated,
         )
 
     def _on_run_stdout(self) -> None:
@@ -592,7 +730,7 @@ class WorkspaceController(QObject):
             return
         self._run_stdout_buffer += bytes(process.readAllStandardOutput())
         if len(self._run_stdout_buffer) > 1_000_000:
-            self._protocol_error = "Worker progress exceeded its 1 MiB bound."
+            self._set_protocol_error("Worker progress exceeded its 1 MiB bound.")
             process.kill()
             return
         while b"\n" in self._run_stdout_buffer:
@@ -602,13 +740,28 @@ class WorkspaceController(QObject):
             try:
                 event = json.loads(line)
             except (UnicodeDecodeError, json.JSONDecodeError):
-                self._protocol_error = "Worker sent invalid structured progress."
+                self._set_protocol_error("Worker sent invalid structured progress.")
                 continue
             self._apply_worker_event(event)
 
+    def _on_run_stderr(self) -> None:
+        process = self._run_process
+        if process is not None:
+            self._run_stderr.feed(bytes(process.readAllStandardError()))
+
+    def _set_protocol_error(self, message: str) -> None:
+        if not self._protocol_error:
+            self._diagnostic(
+                "worker_protocol_failed",
+                "Worker progress protocol validation failed",
+                level=logging.ERROR,
+                run=self._active_run,
+            )
+        self._protocol_error = message
+
     def _apply_worker_event(self, event: object) -> None:
         if not isinstance(event, dict) or event.get("schema_version") != 1:
-            self._protocol_error = "Worker sent an unsupported progress event."
+            self._set_protocol_error("Worker sent an unsupported progress event.")
             return
         state = self._active_run
         if state is None:
@@ -625,9 +778,17 @@ class WorkspaceController(QObject):
                     now=utc_now(),
                 )
             except (KeyError, TypeError, ValueError) as exc:
-                self._protocol_error = f"Worker progress was invalid: {exc}"
+                self._set_protocol_error(f"Worker progress was invalid: {exc}")
             else:
                 self._set_run(updated)
+                if updated.stage_index != self._diagnostic_stage_index:
+                    self._diagnostic_stage_index = updated.stage_index
+                    self._diagnostic(
+                        "run_stage_updated",
+                        "Run stage updated",
+                        run=updated,
+                        count=updated.progress,
+                    )
         elif event_name == "measurement" and state.status is RunStatus.RUNNING:
             try:
                 measurement = {
@@ -637,11 +798,11 @@ class WorkspaceController(QObject):
                 }
                 self._set_run(append_run_measurement(state, measurement, now=utc_now()))
             except (TypeError, ValueError) as exc:
-                self._protocol_error = f"Worker measurement was invalid: {exc}"
+                self._set_protocol_error(f"Worker measurement was invalid: {exc}")
         elif event_name == "error":
             self._worker_error = message or "Worker failed."
         elif event_name not in {"started", "completed", "cancelled"}:
-            self._protocol_error = "Worker sent an unknown progress event."
+            self._set_protocol_error("Worker sent an unknown progress event.")
 
     def _on_run_finished(self, exit_code: int, exit_status) -> None:
         process = self._run_process
@@ -650,7 +811,17 @@ class WorkspaceController(QObject):
         if process is None or state is None or root is None:
             return
         self._on_run_stdout()
-        stderr = bytes(process.readAllStandardError()).decode(errors="replace").strip()
+        self._on_run_stderr()
+        self._run_stderr.finish()
+        stderr = self._run_stderr.summary if self._run_stderr.lines else ""
+        if self._run_stderr.lines or self._run_stderr.dropped_bytes:
+            self._diagnostic(
+                "worker_stderr_observed",
+                stderr,
+                level=logging.WARNING,
+                run=state,
+                count=len(self._run_stderr.lines),
+            )
         artifact: DatasetArtifact | ModelArtifact | None = None
         result_error = ""
         try:
@@ -673,6 +844,11 @@ class WorkspaceController(QObject):
             )
             self.error_message = ""
             self._set_run(state)
+            self._diagnostic(
+                "run_completed",
+                "Run output verified and published",
+                run=state,
+            )
             if state.kind is RunKind.DATASET_BUILD:
                 self.build_completed.emit(artifact)
             else:
@@ -685,6 +861,12 @@ class WorkspaceController(QObject):
                 message="Cancelled · staged output not published",
             )
             self._set_run(state)
+            self._diagnostic(
+                "run_cancelled",
+                "Run cancelled without published output",
+                level=logging.WARNING,
+                run=state,
+            )
             if state.kind is RunKind.DATASET_BUILD:
                 self.build_cancelled.emit()
             else:
@@ -704,6 +886,12 @@ class WorkspaceController(QObject):
             )
             self.error_message = message
             self._set_run(state)
+            self._diagnostic(
+                "worker_interrupted",
+                "Worker process stopped unexpectedly",
+                level=logging.ERROR,
+                run=state,
+            )
             if state.kind is RunKind.DATASET_BUILD:
                 self.build_failed.emit(message)
             else:
@@ -732,6 +920,12 @@ class WorkspaceController(QObject):
             )
             self.error_message = message
             self._set_run(state)
+            self._diagnostic(
+                "run_failed",
+                "Run failed without verified publication",
+                level=logging.ERROR,
+                run=state,
+            )
             if state.kind is RunKind.DATASET_BUILD:
                 self.build_failed.emit(message)
             else:
@@ -776,6 +970,12 @@ class WorkspaceController(QObject):
         )
         self.error_message = message
         self._set_run(state)
+        self._diagnostic(
+            "worker_start_failed",
+            "Worker process could not start",
+            level=logging.ERROR,
+            run=state,
+        )
         process = self._run_process
         self._run_process = None
         self._current_run_id = None
@@ -821,6 +1021,7 @@ class WorkspaceController(QObject):
         self.scan_result = None
         self.scan_progress = ScanProgress("Listing files", 0, 0, 0, 0, 0)
         self.is_scanning = True
+        self._scan_started_at = time.monotonic()
         thread = _CollectionScanThread(self._scan_root, self._scan_step_delay_seconds)
         self._scan_thread = thread
         thread.progress_changed.connect(self._on_progress)
@@ -829,6 +1030,11 @@ class WorkspaceController(QObject):
         thread.cancelled.connect(self._on_cancelled)
         thread.finished.connect(self._release_thread)
         self.scan_started.emit(str(self._scan_root))
+        self._diagnostic(
+            "collection_scan_started",
+            "Collection Scan started",
+            operation="collection_scan",
+        )
         thread.start()
 
     def _on_progress(self, progress: ScanProgress) -> None:
@@ -849,6 +1055,14 @@ class WorkspaceController(QObject):
                 self.error_message = str(exc)
                 self.scan_failed.emit(self.error_message)
                 return
+        self._diagnostic(
+            "collection_scan_completed",
+            "Collection Scan completed",
+            operation="collection_scan",
+            duration_ms=int((time.monotonic() - self._scan_started_at) * 1_000),
+            count=len(result.records) + len(result.positives),
+            status="valid" if result.valid else "invalid",
+        )
         self.scan_completed.emit(result)
 
     def _on_failure(self, message: str) -> None:
@@ -857,6 +1071,13 @@ class WorkspaceController(QObject):
         if self._restart_replacement_scan():
             return
         self.error_message = message
+        self._diagnostic(
+            "collection_scan_failed",
+            "Collection Scan failed",
+            level=logging.ERROR,
+            operation="collection_scan",
+            duration_ms=int((time.monotonic() - self._scan_started_at) * 1_000),
+        )
         self.scan_failed.emit(message)
 
     def _on_cancelled(self) -> None:
@@ -864,6 +1085,13 @@ class WorkspaceController(QObject):
         self.scan_result = None
         if self._restart_replacement_scan():
             return
+        self._diagnostic(
+            "collection_scan_cancelled",
+            "Collection Scan cancelled",
+            level=logging.WARNING,
+            operation="collection_scan",
+            duration_ms=int((time.monotonic() - self._scan_started_at) * 1_000),
+        )
         self.scan_cancelled.emit()
 
     def _restart_replacement_scan(self) -> bool:

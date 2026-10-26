@@ -13,6 +13,7 @@
 | Training configuration, detailed native UI, presets (**05a first**) | [05a](../specs/05a-training-configuration-and-presets.md) |
 | Real CNN training, shared Model publication/reload (**after 05a**) | [05b](../specs/05b-cnn-training-and-model-foundation.md) |
 | Real RF training, both-family qualification (**after 05b**) | [05c](../specs/05c-rf-training-and-cross-family-acceptance.md) |
+| Local logging, Worker diagnostics and support export (**after 05c**) | [05d](../specs/05d-end-to-end-logging-and-diagnostics.md) |
 | macOS app and signed/notarized DMG | [06](../specs/06-macos-release-and-installer.md) |
 | Native Windows qualification and installer | [07](../specs/07-windows-release-and-installer.md) |
 

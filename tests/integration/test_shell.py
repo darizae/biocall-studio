@@ -190,4 +190,7 @@ def test_console_startup_passes_isolated_settings_to_the_real_gui(tmp_path):
     )
     assert result.returncode == 0, result.stderr
     assert "GUI startup uses isolated Application Settings" in result.stdout
-    assert not settings_dir.exists()
+    assert not (settings_dir / "settings.json").exists()
+    isolated_logs = list((settings_dir / "logs").glob("session-*.jsonl"))
+    assert len(isolated_logs) == 1
+    assert str(settings_dir) not in isolated_logs[0].read_text()

@@ -1,0 +1,83 @@
+# 05d — Local end-to-end logging and diagnostics (pre-release)
+
+**Status: implementation and native macOS development-app evidence recorded; owner acceptance pending.** Implemented after 05c and before installed-app qualification in 06/07. This spec owns **diagnostics**, not Run semantics, scientific metrics, artifact formats, or release signing.
+
+**Scoped references:** [Architecture](../ARCHITECTURE.md) §§1–2, 4; [Run lifecycle](../models/WORKFLOW_RULES.md) §4; indexed `UT-LOG-*` in [unit testing](../UNIT_TESTING.md) and `IT-LOG-*` in [integration behaviors](../INTEGRATION_TEST_BEHAVIORS.md). For the **small native UI additions only**, consult the relevant Run/Settings rows in [UX matrix](../design/UX_PARITY_MATRIX.md) and [prototype acceptance](../design/PROTOTYPE_ACCEPTANCE.md). Read [training configuration catalog](../science/TRAINING_CONFIGURATION_CATALOG.md) only when connecting the existing `logging_level` field. Consult [Git delivery](../agent/GIT_DELIVERY.md) at handoff; no sibling checkout is needed unless a demonstrated dependency defect requires it.
+
+## Why this phase exists
+
+Current code already provides **bounded Run activity** in `domain/run.py` and `gui/run.py`, persisted state in `persistence/runs.py`, JSON progress/measurements on Worker stdout in `cli.py`, and a CNN `logging.Handler` in `workflows/cnn_training.py` that *parses training metrics*. These are valuable **operational state and scientific outputs**, not comprehensive diagnostics. There is no centrally configured application logger, durable per-Worker log, capture of unhandled exceptions/Qt warnings, rotation/retention, or user-initiated diagnostic export. `WorkspaceController._on_run_finished()` currently drains stderr only at process termination; it must also be drained while the process runs to avoid pipe backpressure. RF does not have the same CNN log-detail handling. The logical `runs/<run-id>/logs/` directory described in the data model is not yet implemented.
+
+**Outcome:** A user can investigate launch, Collection Scan, Dataset Build, CNN/RF training, Model publication/reopen, cancel/crash and restart from bounded, privacy-safe local evidence, correlated across GUI and Worker, without changing output correctness, Run history, or the prototype's primary workflow. No telemetry, cloud upload, inference, or extra scientific training options.
+
+## 1. Ownership and persistence
+
+| Boundary / owner | Responsibility and storage |
+|---|---|
+| `application`/GUI bootstrap | Initialize an **application session** logger before Controller/theme work where possible; capture startup, settings/scan, supervisor, user-command and error outcomes. Store under the per-user **Qt `AppLocalDataLocation`** `logs/`; when `--settings-dir` is used, isolate logs under that test settings directory. Never inside a frozen app bundle. |
+| `persistence` | One small, Qt-free logging/storage helper for safe paths, JSONL encoding, rotation, retention, portable redaction and diagnostics collection. Reuse existing Run-path containment rules; do not introduce a second Run State. |
+| Worker CLI and Qt-free workflows | After validated request/Run binding, independently write `<Collection>/.alpaca/runs/<run-id>/logs/worker.jsonl` plus bounded rotated segments. Use a **single writer per file/process**. Pre-validation failures with no trusted Run path fall back to bounded stderr and parent session diagnostics. |
+| `domain/run.py` + `run_state.json` | **Unchanged authoritative lifecycle:** statuses, progress, measurements, last error and bounded activity. Log files are supporting evidence; their absence/corruption never proves a completed Model or changes a terminal Run. |
+| Model/Dataset publication | Unchanged immutable artifacts; log files stay **outside** `datasets/` and `models/`, are not hashed into a Model manifest, and never contain raw serialized request/configuration or audio. |
+| `gui` | Minimal native Run-detail “Open log” and Settings “Open diagnostics folder” / “Export diagnostics” actions, plus readable log-unavailable feedback. Do not replace Run activity or add a new primary route. Follow `alp-ui` and the authoritative prototype layout. |
+
+App log files: `session-<UTC-date>-<random-session-id>.jsonl` (and owned rotation segments) in the user log directory. Worker files: `worker.jsonl` in the validated Run logs directory (and owned rotation segments). `session_id`, `run_id`, and `request_id` link records logically; no machine-absolute Collection path is used as an identity. Pass an opaque `session_id` from the parent to its Worker through a validated, internal `--diagnostic-session-id` argument (optional for direct Worker test invocation), **not** via a changed Run request/Model schema or inherited file handle. Do **not** change existing Run/Model/Dataset schemas solely to add logging.
+
+Use Python `logging` and standard-library handlers/serialization; avoid loguru, databases, queues, external servers and a logging service. Keep Qt imports out of Worker scientific workflows. Do not let a child inherit an active parent file handler.
+
+## 2. Event contract and levels
+
+Each JSONL record is one newline-terminated UTF-8 object with **versioned schema**. Required: `schema_version: 1`, `timestamp_utc` (ISO-8601 with milliseconds), `level` (`DEBUG`/`INFO`/`WARNING`/`ERROR`/`CRITICAL`), `component` (stable `alpaca_desktop.*` name), `event` (stable machine-friendly code), `message` (short portable human text), `session_id` (when available), and `pid`. Optional **allowlisted** context: `run_id`, `request_id`, `operation`, `run_kind`, `training_family`, `stage`, `status`, `duration_ms`, `count`, `exception_type`, `error_id` and version/build identifiers. Do not persist arbitrary `extra`, exception `repr`, object dumps, environment variables, command lines or stack-local values. Unknown/corrupt JSONL lines are ignored with safe feedback by readers/exporters; the next record remains parseable.
+
+- `INFO`: session launch/shutdown; verified Collection binding; scan start/summary/cancel/failure; Dataset Build/Training start/stage/terminal status; validated publication/reload; safe artifact IDs; restart reconciliation. Include meaningful count/duration summaries rather than per-file or per-batch streams.
+- `WARNING`: stale metadata, invalid input, recoverable conditions, deprecated/corrupt user settings/presets, partial diagnostics, logging sink/rotation issues.
+- `ERROR`/`CRITICAL`: nonrecoverable scan, Worker launch/protocol/receipt, output validation, publication, cleanup and application failures; include a generated `error_id` shared with the user-facing error when feasible, exception **type** and sanitized diagnostic location (module/function or safe in-repo relative frame; no raw traceback paths).
+- `DEBUG`: explicit opt-in, scoped execution decisions and timings (e.g., stage counts, dataset/split summaries, CNN epochs, RF feature extraction aggregates). Never raw audio, Snippet arrays, user source names, labels from arbitrary filenames, probabilities per input, or entire configurations. Throttle repetitive warnings and high-frequency updates.
+
+The existing training `logging_level` (`info`/`debug`) determines **diagnostic verbosity for both CNN and RF Workers**; it must not alter training mathematics, random seeds, metric collection or Run/Model format. Application logs default to `INFO`; an explicit development-only startup verbosity override may enable `DEBUG` without adding a new visible configuration dashboard. Keep the CNN metric collector **separate** from diagnostic handlers: attaching a file handler must not intercept/change the metric parser or create duplicate loss rows. Third-party logging and Python warnings may be captured **selectively** with level filters and privacy normalization, not by indiscriminately dumping library objects.
+
+### Coverage map (log at the owning seam)
+
+| Flow | Required diagnostic transitions |
+|---|---|
+| CLI/GUI startup + Settings | Session/build/Python/Qt/toolbox package versions when safely available, configuration read failure/recovery, theme/widget launch failure, graceful/abnormal termination |
+| Collection Scan | Request/bind, cache reuse/revalidation, selected count/issue summary, cancel, I/O/permission error; **no raw file list** |
+| Dataset Build | Run reservation, Worker launch, stages, validated counts, cancel/force-kill, staging cleanup, publication validation/receipt, failure |
+| CNN and RF | Family, frozen non-sensitive setting summary/revision, stage/epoch or feature summary, measurement availability (not duplicated samples), exception/cancel, Model publish/reload validity |
+| Supervisor/restart | Process start failure, protocol validation, stderr overflow, exit code/status, receipt/artifact validation, cancelled/failed/interrupted reconciliation, orphan cleanup |
+| UI/diagnostics | Significant user action, failed open/export and export completion; no routine navigation/click telemetry |
+
+## 3. Privacy and fault containment
+
+Logs are **local only**; never auto-send, upload or attach them to a Model. Diagnostics export requires an explicit user action and displays a clear privacy notice before saving. Logs and ZIPs must not include absolute home/Collection/HPC paths, source/positive WAV basenames, audio, personal metadata, tokens, credentials, private environment variables, stack locals, arbitrary exception strings or full training configs. User-visible validation detail that legitimately names a recording **does not automatically become safe log content**. Use explicit allowlisted fields and a common conservative redaction/normalization boundary for messages, third-party errors, Qt messages, stderr and exception stacks; if a field cannot be safely normalized, omit it and keep only an exception class/error code. Scrub portable path fragments as well as POSIX, Windows drive/UNC and home paths. Limit record length/depth and reject embedded newlines/control characters.
+
+- Validate run-log containment and reject symlinks/junction/reparse escapes before **writing, opening, exporting or deleting**; do not follow untrusted links while rotating/pruning. Enforce user-write permissions where supported; do not create files beside the selected Collection outside `.alpaca/`.
+- Default budgets: **app** 5 MiB per file, max 3 rotated segments per session, retain for **14 days and at most 50 MiB total** under the owned logs directory; **Worker** 5 MiB per file and at most 3 rotated segments **per Run** (20 MiB total), without automatically deleting Run directories/history. Enforce limits during normal use and at startup (prune **only** recognized, non-active app log files). Treat overlong single records as truncated/safely summarized, not as a reason to exceed caps.
+- Do not put the Worker log on stdout. That channel remains exclusively newline-delimited **schema-v1 progress/measurement events**; malformed/oversized stdout must continue to trigger the existing protocol failure, not be reinterpreted as logs.
+- **Drain QProcess stderr incrementally**, with a bounded byte/line buffer, dropped-byte count and a final sanitized truncation summary. Never let large stderr deadlock the Worker; do not stream unsanitized stderr into the GUI or files. Parent emits at most bounded diagnostic events for stderr storms; maintain the existing genuine exit/receipt validation.
+- Sink failures (permission, disk-full, malformed rotated file, locked Windows file) must not silently corrupt scientific outputs or crash the GUI/Worker. Provide a single bounded in-memory/terminal fallback and visible “diagnostics unavailable” notice; do not re-enter the broken logger recursively. Preserve accurate Run failure/status from the actual operation; acknowledge that forced kill/power loss may leave a truncated final log line.
+- No cloud telemetry, analytics, crash-upload service, raw OS crash dump collection, continuous file-watching UI, new queue/background daemon, or logging-to-model-export requirements.
+
+## 4. Access and support workflow
+
+A Run detail page already shows its human-readable **activity**; retain it. Add a secondary accessible **Open log** action only when a safe log exists; explain missing logs for older Runs (no forced migration/backfill). In Settings, expose **Open diagnostics folder** and **Export diagnostics…** without changing the prototype's existing navigation/primary calls to action. Use real public `alp-ui` widgets, native dialogs and keyboard/focus labels. The exporter writes a **new** user-chosen ZIP with sanitized, size-capped current/recent app logs and optionally the selected Run's Worker logs, a small `diagnostics.json` inventory of versions/session/Run IDs and redaction/truncation notices. **Revalidate and sanitize records again during export**; copying existing log bytes without validation is not sufficient. Ask for confirmation; default to excluding unrelated Collections/Runs and never gather files via broad recursive globbing. Never overwrite an existing ZIP without explicit confirmation. A diagnostics ZIP is a **support bundle**, not a scientific Artifact or immutable Model.
+
+Do not change the checked-in prototype. For added native-only controls, compare the relevant Run/Settings states and `alp-ui` Showcase, capture real native screenshots, and record intentional extensions under the existing [prototype acceptance](../design/PROTOTYPE_ACCEPTANCE.md) evidence procedure.
+
+## 5. Implementation order and TDD
+
+1. **Contract + pure tests:** introduce a Qt-free diagnostic record encoder, context filter/redactor, safe owned-path resolver and bounded rotation/prune/export selection. Assert every sensitive-data variant **before** integrating application loggers.
+2. **Application session:** initialize idempotently for regular GUI and isolated test settings; log startup/scan/settings/supervisor/recovery and handle unhandled Python exceptions plus relevant Qt messages without breaking Qt's handler chain. Ensure session close flushes handlers once.
+3. **Worker subprocesses:** initialize a fresh Worker logger after request validation; log Dataset Build, CNN and RF stages/terminal exceptions; honor training `logging_level` consistently and preserve CNN metric history. Flush best-effort on normal termination.
+4. **Supervisor robustness:** connect `readyReadStandardError`, bound buffers, sanitize records and test stderr storms, invalid protocols, cancellations, crashes, receipt mismatch and logs absent on restart. Keep stdout and terminal Run decisions untouched.
+5. **Native access/export:** implement small accessible Run/Settings actions, privacy confirmation, controlled ZIP packaging and actual native visual review; verify old Runs and unwritable diagnostic storage degrade gracefully.
+6. **Real environment handoff:** run focused tests, complete existing Worker/training regressions, audits and macOS native evidence; record actual commands, results, dependency SHAs and Git commit. Spec 06/07 must recheck installed-app logging on each platform, but **this pre-release spec must be testable without installers**.
+
+### Owned acceptance cases (single definitions in indexes)
+
+- Unit `UT-LOG-001`–`004`: record schema/levels/correlation, sensitive-data exclusion, containment, budgets/rotation/pruning and degraded sinks.
+- Integration `IT-LOG-001`–`004`: real GUI/session/scan, real QProcess Dataset/CNN/RF + metric/protocol preservation, stderr/crash/restart/failure resilience, native access and sanitized export.
+- Use existing `TD-RUN`, `TD-FAIL`, `TD-TRAIN`, `TD-PATH` and `TD-UI` resources; generate adversarial log strings in tests. No HPC or new LFS assets should be needed.
+- Run the exact new cases **and** affected `UT-RUN-*`, `IT-RUN-*`, `IT-DB-*`, `IT-TRAIN-*`; verify no changes in model/dataset digests or scientific metric values with `info` versus `debug`. Use [test indexes](../UNIT_TESTING.md) and [integration behaviors](../INTEGRATION_TEST_BEHAVIORS.md) for definitive assertions; do not claim success from ID listings or planned output.
+
+**Exit:** logs exist and can be interpreted after restart; a real failed/cancelled/crashed Worker has correlated bounded diagnostics without ever falsely completing a Run; deliberate sensitive inputs cannot leak via exception, stderr or export; actual CNN/RF training and Model reload behave identically; UI access is keyboard-usable and visually reviewed; no mandatory upstream changes or new runtime service. Report honest test/platform blockers and commits. Installed macOS/Windows write locations, bundled Worker import paths and export dialogs are revalidated by 06/07, not declared accepted here.

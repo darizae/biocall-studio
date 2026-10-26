@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+from pathlib import Path
+
 from alp_ui.components import (
     Alert,
     Badge,
@@ -16,10 +19,11 @@ from alp_ui.components import (
     Text,
 )
 from alp_ui.theme import ALPACA_LIGHT, interactions, make_icon
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
-from PySide6.QtGui import QCloseEvent, QFontDatabase, QResizeEvent
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QUrl
+from PySide6.QtGui import QCloseEvent, QDesktopServices, QFontDatabase, QResizeEvent
 from PySide6.QtWidgets import (
     QBoxLayout,
+    QFileDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -381,9 +385,10 @@ class WikiPage(QScrollArea):
 class SettingsPage(QScrollArea):
     """Explain the machine-local binding without inventing a scanner or rebind UI."""
 
-    def __init__(self, controller: WorkspaceController):
+    def __init__(self, controller: WorkspaceController, open_diagnostics, export_diagnostics):
         super().__init__()
         self.controller = controller
+        self.is_compact = False
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setAccessibleName("Settings")
@@ -400,8 +405,10 @@ class SettingsPage(QScrollArea):
         )
 
         grid = QGridLayout()
+        self.grid = grid
         grid.setSpacing(16)
         binding = Card(shadow=False)
+        self.binding_card = binding
         binding_header = QHBoxLayout()
         binding_header.addWidget(Text("Collection folders", role="subheading"))
         binding_header.addStretch()
@@ -438,6 +445,7 @@ class SettingsPage(QScrollArea):
         grid.addWidget(binding, 0, 0)
 
         plan = Card(shadow=False)
+        self.plan_card = plan
         plan.content_layout.addWidget(Text("Native reading plan", role="subheading"))
         for title, detail in (
             ("First selection", "List folders asynchronously and read bounded WAV headers."),
@@ -452,18 +460,90 @@ class SettingsPage(QScrollArea):
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
         layout.addLayout(grid)
+
+        diagnostics = Card(shadow=False)
+        self.diagnostics_card = diagnostics
+        diagnostics.content_layout.addWidget(Text("Diagnostics", role="subheading"))
+        diagnostics.content_layout.addWidget(
+            Text(
+                "Local logs help investigate startup, Collection Scan and scientific Runs. "
+                "Nothing is uploaded automatically. Export rechecks and redacts records before "
+                "creating a support ZIP.",
+                role="caption",
+                word_wrap=True,
+            )
+        )
+        diagnostic_actions = QHBoxLayout()
+        self.open_diagnostics_button = Button(
+            "Open diagnostics folder", variant="outline", size="small"
+        )
+        self.open_diagnostics_button.setAccessibleDescription(
+            "Open the local folder containing this application's session logs."
+        )
+        self.open_diagnostics_button.clicked.connect(self._open_diagnostics)
+        diagnostic_actions.addWidget(self.open_diagnostics_button)
+        self.export_diagnostics_button = Button(
+            "Export diagnostics…", variant="secondary", size="small"
+        )
+        self.export_diagnostics_button.setAccessibleDescription(
+            "Review a privacy notice, then save a sanitized local support ZIP."
+        )
+        self.export_diagnostics_button.clicked.connect(self._export_diagnostics)
+        diagnostic_actions.addWidget(self.export_diagnostics_button)
+        diagnostic_actions.addStretch()
+        diagnostics.content_layout.addLayout(diagnostic_actions)
+        self.diagnostics_alert = Alert("", title="Diagnostics", intent="neutral")
+        self.diagnostics_alert.hide()
+        diagnostics.content_layout.addWidget(self.diagnostics_alert)
+        layout.addWidget(diagnostics)
         layout.addStretch()
         self.setWidget(content)
 
         controller.changed.connect(self._refresh)
+        self._open_diagnostics_callback = open_diagnostics
+        self._export_diagnostics_callback = export_diagnostics
         self._refresh()
         if controller.error_message:
             self.error_alert.text_widget.setText(controller.error_message)
             self.error_alert.show()
+        if not controller.diagnostics_available:
+            self._show_diagnostics_feedback(controller.diagnostics_unavailable_message)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._place_cards(event.size().width() < 850)
+
+    def _place_cards(self, compact: bool) -> None:
+        self.is_compact = compact
+        self.grid.removeWidget(self.binding_card)
+        self.grid.removeWidget(self.plan_card)
+        if compact:
+            self.grid.setColumnStretch(0, 1)
+            self.grid.setColumnStretch(1, 0)
+            self.grid.addWidget(self.binding_card, 0, 0)
+            self.grid.addWidget(self.plan_card, 1, 0)
+        else:
+            self.grid.setColumnStretch(0, 1)
+            self.grid.setColumnStretch(1, 1)
+            self.grid.addWidget(self.binding_card, 0, 0)
+            self.grid.addWidget(self.plan_card, 0, 1)
 
     def _refresh(self) -> None:
         path = self.controller.collection_path
         self.binding_value.setText(str(path) if path else "No Collection has been validated.")
+
+    def _show_diagnostics_feedback(self, message: str) -> None:
+        self.diagnostics_alert.text_widget.setText(message)
+        self.diagnostics_alert.setAccessibleName(f"Diagnostics: {message}")
+        self.diagnostics_alert.show()
+
+    def _open_diagnostics(self) -> None:
+        self._show_diagnostics_feedback(self._open_diagnostics_callback())
+
+    def _export_diagnostics(self) -> None:
+        message = self._export_diagnostics_callback()
+        if message:
+            self._show_diagnostics_feedback(message)
 
 
 class MainWindow(QMainWindow):
@@ -519,6 +599,8 @@ class MainWindow(QMainWindow):
             controller.cancel_active_run,
             self._open_run_output,
             lambda: self.navigate("runs"),
+            self._open_run_log,
+            lambda run_id: controller.worker_log_for_run(run_id) is not None,
         )
         self.model_list_page = ModelListPage(
             self.open_model,
@@ -531,7 +613,11 @@ class MainWindow(QMainWindow):
         )
         self.wiki_page = WikiPage(lambda: self.navigate("select"))
         self.wiki_select_button = self.wiki_page.select_button
-        self.settings_page = SettingsPage(controller)
+        self.settings_page = SettingsPage(
+            controller,
+            self._open_diagnostics_folder,
+            self._export_diagnostics,
+        )
         self.empty_pages: dict[str, EmptyState] = {}
         for route, page in (
             ("select", self.select_page),
@@ -864,6 +950,8 @@ class MainWindow(QMainWindow):
                     else self._navigation["runs"]
                 )
                 target.setFocus()
+        elif route == "settings":
+            self.settings_page.open_diagnostics_button.setFocus()
 
     def open_builder(self) -> None:
         result = self.controller.scan_result
@@ -944,6 +1032,110 @@ class MainWindow(QMainWindow):
             self.open_dataset(run.output_id)
         else:
             self.open_model(run.output_id)
+
+    def _open_run_log(self, run) -> bool:
+        path = self.controller.worker_log_for_run(run.run_id)
+        if path is None:
+            self.controller._diagnostic(
+                "worker_log_open_failed",
+                "Worker log is unavailable",
+                level=logging.WARNING,
+                run=run,
+            )
+            return False
+        opened = QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+        self.controller._diagnostic(
+            "worker_log_opened" if opened else "worker_log_open_failed",
+            "Worker log opened" if opened else "Worker log could not be opened",
+            level=logging.INFO if opened else logging.WARNING,
+            run=run,
+        )
+        return opened
+
+    def _open_diagnostics_folder(self) -> str:
+        directory = self.controller.diagnostics.log_dir
+        if (
+            not self.controller.diagnostics_available
+            or directory.is_symlink()
+            or not directory.is_dir()
+        ):
+            self.controller._diagnostic(
+                "diagnostics_folder_open_failed",
+                "Diagnostics folder is unavailable",
+                level=logging.WARNING,
+            )
+            return self.controller.diagnostics_unavailable_message
+        opened = QDesktopServices.openUrl(QUrl.fromLocalFile(str(directory)))
+        self.controller._diagnostic(
+            "diagnostics_folder_opened" if opened else "diagnostics_folder_open_failed",
+            "Diagnostics folder opened" if opened else "Diagnostics folder could not be opened",
+            level=logging.INFO if opened else logging.WARNING,
+        )
+        return (
+            "Opened the local diagnostics folder."
+            if opened
+            else "The diagnostics folder could not be opened."
+        )
+
+    def _export_diagnostics(self) -> str:
+        answer = QMessageBox.question(
+            self,
+            "Export diagnostics?",
+            "The support ZIP stays local and is never uploaded automatically. Existing log "
+            "records are revalidated and redacted, but review the ZIP before sharing it. "
+            "Include this session and the currently selected Run log, when available?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return ""
+        filename, _selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Export diagnostics",
+            "alpaca-diagnostics.zip",
+            "ZIP archive (*.zip)",
+        )
+        if not filename:
+            return ""
+        destination = Path(filename)
+        if destination.suffix.lower() != ".zip":
+            destination = destination.with_suffix(".zip")
+        overwrite = False
+        if destination.exists():
+            overwrite_answer = QMessageBox.question(
+                self,
+                "Replace diagnostics ZIP?",
+                f"A file named {destination.name} already exists. Replace it?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if overwrite_answer != QMessageBox.StandardButton.Yes:
+                return "The existing diagnostics ZIP was not changed."
+            overwrite = True
+        run = self.run_detail_page.run
+        run_id = (
+            run.run_id
+            if run is not None and self.controller.worker_log_for_run(run.run_id) is not None
+            else None
+        )
+        try:
+            result = self.controller.export_diagnostics(
+                destination,
+                run_id=run_id,
+                overwrite=overwrite,
+            )
+        except (FileExistsError, OSError, ValueError):
+            self.controller._diagnostic(
+                "diagnostics_export_failed",
+                "Diagnostics support bundle export failed",
+                level=logging.ERROR,
+                run_id=run_id,
+            )
+            return "Diagnostics could not be exported. No scientific artifact was changed."
+        return (
+            f"Diagnostics exported with {result.included_records} sanitized records. "
+            "Review the ZIP before sharing it."
+        )
 
     def _dataset_built(self, artifact) -> None:
         self.builder_page.set_busy(False)

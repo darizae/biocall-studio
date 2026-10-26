@@ -20,6 +20,7 @@ from alpaca_desktop.domain.training import (
 from alpaca_desktop.gui.app import create_application
 from alpaca_desktop.gui.window import MainWindow
 from alpaca_desktop.persistence.collection_metadata import publish_collection_metadata
+from alpaca_desktop.persistence.diagnostics import read_diagnostic_records, worker_log_path
 from alpaca_desktop.persistence.models import list_models, structurally_reload_cnn_model
 from alpaca_desktop.persistence.training_presets import PresetStore
 from alpaca_desktop.workflows.dataset_build import build_dataset
@@ -88,7 +89,9 @@ def _fast_config(artifact, *, epochs=1, preset_origin=None):
 def test_real_cnn_worker_publishes_reloadable_model_and_native_views(
     qapp, qtbot, tmp_path, wav_factory
 ):
-    """Cases: IT-TRAIN-001, IT-TRAIN-005, IT-TRAIN-007, IT-TRAIN-008, IT-TRAIN-012, IT-TRAIN-014."""
+    """Cases: IT-TRAIN-001, IT-TRAIN-005, IT-TRAIN-007, IT-TRAIN-008, IT-TRAIN-012,
+    IT-TRAIN-014, IT-LOG-002.
+    """
     create_application()
     root = tmp_path / "collection"
     scan, dataset = _dataset(root, wav_factory)
@@ -127,6 +130,15 @@ def test_real_cnn_worker_publishes_reloadable_model_and_native_views(
     assert run.published_artifact_id == "model-cnn-integration"
     assert {item["phase"] for item in run.measurements} == {"train", "val"}
     assert all(item["loss"] >= 0 for item in run.measurements)
+    worker_records, notices = read_diagnostic_records(worker_log_path(root, run_id))
+    assert notices == ()
+    assert {record["event"] for record in worker_records} >= {
+        "worker_started",
+        "training_stage",
+        "worker_completed",
+    }
+    assert not any(record["event"] == "measurement_available" for record in worker_records)
+    assert len(run.measurements) == 2
     models = list_models(root)
     assert [model.model_id for model in models] == ["model-cnn-integration"]
     model = models[0]
@@ -201,6 +213,56 @@ def test_real_cnn_worker_publishes_reloadable_model_and_native_views(
     assert window.current_route == "model-detail"
     assert window.model_detail_page.model_id.text() == model.model_id
     assert "Tiny verified CNN" in window.model_detail_page.accessibleName()
+
+
+@pytest.mark.qt
+def test_info_and_debug_diagnostics_do_not_change_cnn_science(
+    qapp, qtbot, tmp_path, wav_factory
+):
+    """Case: IT-LOG-002."""
+    create_application()
+    root = tmp_path / "collection"
+    scan, dataset = _dataset(root, wav_factory)
+    controller = WorkspaceController(tmp_path / "settings")
+    controller.bind_verified_collection(root, scan.collection_id)
+
+    runs = {}
+    for detail in ("info", "debug"):
+        draft = _fast_draft()
+        draft.set("logging_level", detail)
+        frozen = freeze_training_config(
+            draft,
+            TrainingDataset.from_artifact(dataset),
+            DeviceCapabilities(cuda=False, mps=False, cpu_count=8),
+        )
+        run_id = controller.start_training(
+            frozen,
+            model_label=f"CNN {detail} diagnostics",
+            model_id=f"model-cnn-{detail}-diagnostics",
+        )
+        qtbot.waitUntil(
+            lambda current=run_id: any(
+                run.run_id == current and run.terminal for run in controller.runs
+            ),
+            timeout=180_000,
+        )
+        runs[detail] = next(run for run in controller.runs if run.run_id == run_id)
+
+    assert runs["info"].status is RunStatus.COMPLETED
+    assert runs["debug"].status is RunStatus.COMPLETED
+    assert runs["info"].measurements == runs["debug"].measurements
+    models = {model.model_id: model for model in list_models(root)}
+    info_model = models["model-cnn-info-diagnostics"]
+    debug_model = models["model-cnn-debug-diagnostics"]
+    assert info_model.manifest["results"] == debug_model.manifest["results"]
+    assert info_model.manifest["artifact"]["sha256"] == debug_model.manifest["artifact"][
+        "sha256"
+    ]
+    info_records, _ = read_diagnostic_records(worker_log_path(root, runs["info"].run_id))
+    debug_records, _ = read_diagnostic_records(worker_log_path(root, runs["debug"].run_id))
+    assert not any(record["event"] == "measurement_available" for record in info_records)
+    assert any(record["event"] == "measurement_available" for record in debug_records)
+    assert len(runs["info"].measurements) == len(runs["debug"].measurements) == 2
 
 
 @pytest.mark.qt

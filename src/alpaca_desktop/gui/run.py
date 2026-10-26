@@ -202,11 +202,15 @@ class RunDetailPage(QScrollArea):
         cancel_run: Callable[[], None],
         open_output: Callable[[RunState], None],
         open_history: Callable[[], None],
+        open_log: Callable[[RunState], bool],
+        log_available: Callable[[str], bool],
     ):
         super().__init__()
         self.cancel_run = cancel_run
         self.open_output = open_output
         self.open_history = open_history
+        self.open_log = open_log
+        self.log_available = log_available
         self.run: RunState | None = None
         self.is_compact = False
         self.setWidgetResizable(True)
@@ -250,6 +254,13 @@ class RunDetailPage(QScrollArea):
         self.cancel_button.setVisible(run.active)
         self.cancel_button.setEnabled(run.status is not RunStatus.CANCELLING)
         actions.addWidget(self.cancel_button)
+        self.open_log_button = Button("Open log", variant="outline")
+        self.open_log_button.setAccessibleDescription(
+            "Open this Run's contained local Worker diagnostic log."
+        )
+        self.open_log_button.clicked.connect(self._open_log)
+        self.open_log_button.setVisible(self.log_available(run.run_id))
+        actions.addWidget(self.open_log_button)
         self.open_output_button = Button(
             "Open Dataset" if run.output_kind == "dataset" else "Open Model"
         )
@@ -406,6 +417,13 @@ class RunDetailPage(QScrollArea):
             "border-radius: 8px; padding: 12px; }"
         )
         activity_card.content_layout.addWidget(self.activity)
+        self.log_unavailable = Text(
+            "No Worker log is available for older Runs; diagnostics are not backfilled.",
+            role="caption",
+            word_wrap=True,
+        )
+        self.log_unavailable.setVisible(not self.log_available(run.run_id))
+        activity_card.content_layout.addWidget(self.log_unavailable)
         left.addWidget(activity_card)
 
         output_card = Card(shadow=False)
@@ -501,6 +519,11 @@ class RunDetailPage(QScrollArea):
         )
         if answer == QMessageBox.StandardButton.Yes:
             self.cancel_run()
+
+    def _open_log(self) -> None:
+        if self.run is None or not self.open_log(self.run):
+            self.open_log_button.hide()
+            self.log_unavailable.show()
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         super().resizeEvent(event)
