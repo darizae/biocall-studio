@@ -34,6 +34,9 @@ python scripts/audit_test_ids.py
 # On native macOS with Qt libraries and appropriate local fixtures:
 python -m pytest tests/integration -q
 python -m ruff check src tests scripts
+# Explicit periodic durability run; ordinary pytest excludes this marker by default:
+ALPACA_SOAK_REPORT=/tmp/alpaca-soak-observations.json \
+  python -m pytest -m soak tests/integration/test_long_running_runs.py -q -s
 ```
 
 The only initial CI-eligible suite is Qt-independent `tests/unit/` plus inexpensive static checks, without HPC access; CI pulls only the small versioned Git LFS synthetic fixture bytes when executing the integrity audit. Real Qt/application/filesystem and QProcess/in-process workflow integration executes locally on native macOS with test-specific temporary Collection roots and isolated Application Settings. Capture run commands/results by indexed ID. `pytest-qt` tests need a real compatible platform plugin; headless/offscreen Qt smoke is not a native-dialog or packaged-app qualification.

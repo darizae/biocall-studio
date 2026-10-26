@@ -44,6 +44,7 @@ from alpaca_desktop.domain.training import (
     fields_for_family,
     freeze_training_config,
 )
+from alpaca_desktop.gui.power import KeepAwakeControl
 from alpaca_desktop.persistence.datasets import DatasetArtifact, list_datasets, load_dataset
 from alpaca_desktop.persistence.training_presets import PresetRecord, PresetStore
 
@@ -258,11 +259,13 @@ class TrainingPage(QScrollArea):
         controller,
         preset_store: PresetStore,
         open_wiki: Callable[[FieldDefinition], None],
+        open_power_wiki: Callable[[], None],
     ):
         super().__init__()
         self.controller = controller
         self.preset_store = preset_store
         self.open_wiki = open_wiki
+        self.open_power_wiki = open_power_wiki
         self.capabilities = DeviceCapabilities.detect()
         self.drafts = {"cnn": TrainingDraft.defaults("cnn"), "rf": TrainingDraft.defaults("rf")}
         self._preset_origins: dict[str, str | None] = {"cnn": None, "rf": None}
@@ -322,11 +325,11 @@ class TrainingPage(QScrollArea):
         self._place_cards(False)
         self._rebuild_form()
         self.verticalScrollBar().setValue(0)
-        controller.run_changed.connect(lambda _run: self._validate_and_refresh())
-        controller.training_started.connect(lambda: self.start_button.setLoading(True))
-        controller.training_completed.connect(lambda _model: self.start_button.setLoading(False))
-        controller.training_failed.connect(lambda _message: self.start_button.setLoading(False))
-        controller.training_cancelled.connect(lambda: self.start_button.setLoading(False))
+        controller.run_changed.connect(self._run_state_changed)
+        controller.training_started.connect(self._training_started)
+        controller.training_completed.connect(self._training_finished)
+        controller.training_failed.connect(self._training_finished)
+        controller.training_cancelled.connect(self._training_finished)
 
     @property
     def draft(self) -> TrainingDraft:
@@ -452,6 +455,14 @@ class TrainingPage(QScrollArea):
         self.launch_alert = Alert("", title="Configuration verified", intent="info")
         self.launch_alert.hide()
         card.content_layout.addWidget(self.launch_alert)
+        self.power_control = KeepAwakeControl(self.controller, self.open_power_wiki)
+        card.content_layout.addWidget(self.power_control)
+        self.keep_awake_toggle = self.power_control.toggle
+        self.keep_awake_status = self.power_control.status
+        self.keep_awake_hint = self.power_control.hint
+        self.keep_awake_wiki_button = self.power_control.wiki_button
+        self.keep_awake_retry_button = self.power_control.retry_button
+        self.keep_awake_error = self.power_control.error
         actions = QHBoxLayout()
         self.run_availability = Text("One Active Run at a time.", role="caption")
         actions.addWidget(self.run_availability)
@@ -885,6 +896,15 @@ class TrainingPage(QScrollArea):
             return TrainingDataset.from_artifact(self.artifact)
         except ValueError:
             return None
+
+    def _run_state_changed(self, _run) -> None:
+        self._validate_and_refresh()
+
+    def _training_started(self) -> None:
+        self.start_button.setLoading(True)
+
+    def _training_finished(self, *_args) -> None:
+        self.start_button.setLoading(False)
 
     def _validate_and_refresh(self) -> None:
         dataset = self._dataset_context()

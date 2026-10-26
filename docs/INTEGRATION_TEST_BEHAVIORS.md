@@ -6,7 +6,7 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 
 | Case ID | Public seam / expected result | Data |
 |---|---|---|
-| `IT-UI-001` | Native Qt/`alp-ui` launches, Select Collection primary action and Wiki navigate; theme/resources render and back/focus navigation survives page changes. | TD-UI |
+| `IT-UI-001` | Native Qt/`alp-ui` launches, Select Collection primary action and Wiki navigate; the app-owned Light color scheme prevents host Dark appearance from producing mixed/unreadable viewports, resources render and back/focus navigation survives page changes. | TD-UI |
 | `IT-UI-002` | Test-isolated Application Settings retain valid Collection binding across restart and support explicit rebind; original input WAV bytes remain untouched. | TD-COL, TD-PATH |
 | `IT-UI-003` | Updated public `alp-ui` `FolderPicker` is used in actual native Select UI: folderChanged routes pending selection, cancellation leaves previous path/verification unchanged and does not start scan; accessible full path and keyboard operate. | TD-UI, TD-COL |
 | `IT-UI-004` | Prototype Select/Wiki/empty-state structure is exercised with real `alp-ui` Widgets, an accessible inline Wiki action, keyboard Tab/Space and HelpHint, and no demo scientific completions. **Separately required native macOS evidence:** persist real Trainer screenshots (not only pytest tmp files), compare side by side with both bundled prototype and sibling Showcase, log deviations and update README with truthful native shots before claiming UI acceptance. | TD-UI |
@@ -49,12 +49,24 @@ cancellation/recovery and every `IT-RUN-*` case.
 | `IT-RUN-003` | Real cancellation and forced process loss produce cancelled/interrupted state after bounded reconciliation, no false published artifact and no eternal Active Run after restart. | TD-RUN, TD-FAIL |
 | `IT-RUN-004` | Artifact/staging name collision, corrupt publication or worker nonzero exit fails without overwriting a published Dataset/Model or promoting a stale output pointer. | TD-RUN, TD-FAIL |
 | `IT-RUN-005` | Native Run detail/history/Active Run sidebar reflect prototype section ordering, progress, cancel, conflict and terminal states through real Worker events; keyboard navigation and native evidence pass six-dimension review. | TD-UI, TD-RUN, TD-FAIL |
+| `IT-RUN-006` | Native close/quit during an Active Run presents one accessible safe-default confirmation; dismiss/Keep open preserves the exact Worker and progress, while confirmed exit requests stopping once. Idle/completed close has no warning and active Scan shutdown remains safe. | TD-UI, TD-RUN |
+| `IT-RUN-007` | Confirmed exit during real Dataset Build/CNN/RF stops the supervised Worker before window exit, records an honest cancelled/interrupted result, removes incomplete stage/output/checkpoints, preserves inputs and prior artifacts, and retains a fully committed matching output at the receipt boundary. | TD-RUN, TD-FAIL, TD-TRAIN |
+| `IT-RUN-008` | Actual GUI-process loss releases its kernel-owned lease so a genuine Worker cannot later publish; restart reconciles safely, cleans orphan stage only after stop and retains a fully committed provenance-matching artifact. | TD-RUN, TD-FAIL, TD-TRAIN |
+| `IT-RUN-009` | Explicit opt-in ≥600-second real-QProcess CNN durability run remains event-loop responsive during native navigation, records bounded resource/log/stage observations, publishes and structurally reloads a checksum-valid Model, then completes a second short reuse Run without a stale Worker. | TD-RUN, TD-TRAIN, TD-UI |
+| `IT-POWER-001` | Settings and Training expose synchronized accessible keep-awake controls, canonical Wiki/help, persistence/reacquisition and truthful On/Off/Not active states; toggling remains independent of a real Run and failed settings writes do not misstate OS state. | TD-UI, TD-RUN, TD-FAIL |
+| `IT-POWER-002` | Actual macOS/Windows adapter acquires/releases automatic idle-sleep inhibition and abnormal GUI-process death releases OS-owned protection; unsupported platforms are not claimed. | TD-FAIL |
 
 Spec 04 implementation evidence: `tests/integration/test_run.py` asserts all five rows through real
 QProcess, persistence, restart, reservation and native-widget seams. The tracked Cocoa comparison
 set and six-dimension review are in
 [`design/evidence/spec-04-native/`](design/evidence/spec-04-native/) and the
 [evidence ledger](design/evidence/README.md). Packaged Worker launch remains owned by Spec 06.
+
+Spec 05g extends the accepted lifecycle with `IT-RUN-006`–`009` and `IT-POWER-001`–`002`.
+Its explicit soak is excluded from ordinary pytest selection and must be invoked with `-m soak`;
+the [Spec 05g evidence ledger](design/evidence/README.md#spec-05g--long-running-runs-safe-exit-and-optional-keep-awake)
+records the native platform, duration, resources, artifact hashes and UI review. Windows native
+power and installed-app requalification remain owned by Specs 07 and 06/07 respectively.
 
 ## 4.5 Upstream PCM/WAV extraction — **Spec 04.5**
 

@@ -15,6 +15,7 @@ The bar for completion is **screen-by-screen faithful UX and working Python/Qt**
 | CNN / RF configuration (`rf-config-preview.png`) | **Existing** prototype hierarchy and basic CNN/RF controls are mandatory. Extend **only in native app**, with only a handful of primary controls plus a compact, collapsed **More settings** extension showing current/default/suggested starting values on demand, and user presets per [Spec 05 extension](SPEC05_CONFIGURATION_EXTENSION.md); field-level `HelpHint` + Wiki anchors, validation and no reference-code paths. The browser prototype is **unchanged** and does not depict the added controls. | `SelectInput`, `NumberInput`, `HelpHint`, `Button` | 05: IT-TRAIN-001, 002, 007, 010–014 |
 | Training Run | CNN measured train/val loss in native line Plot; RF fit/validation stages + actual importance bar Plot; no fictional epoch curve for RF | `Plot`, `ProgressBar`, `DataTable`, `Text` | 05: IT-TRAIN-005, 006, 007 |
 | Run/Settings diagnostics | Preserve Run activity and all baseline Settings content; add secondary **Open log**, **Open diagnostics folder** and confirmed **Export diagnostics…** actions with missing-log/degraded feedback, no new primary route and no automatic upload | `Button`, `Card`, `Alert`, `Text`; native dialogs | 05d: IT-LOG-004 |
+| Safe exit / keep awake | Active close has one safe-default native confirmation and responsive stopping state. Settings and the Training Start card share one explicit **Keep computer awake** toggle with On/Off/Not active status, compact help/Wiki link and no change to the primary Start Training CTA. The fixed light native theme must not inherit an unreadable host Dark appearance. | `Switch`, `HelpHint`, `Button`, `Alert`, `Card`; native dialog | 05g: IT-RUN-006, IT-POWER-001 |
 | Model (`model-preview.png`) | stable ID, readable name, family and Dataset links, metric values/undefined reason, recorded schema | `Card`, `Badge`, `DataTable`, `Plot` only for meaningful values | 05: IT-TRAIN-003, 006, 007 |
 | Wiki (`wiki-preview.png`) / Settings | collection naming examples and corrective advice; machine-only remembered folder/relink | `Text`, `Card`, `FolderPicker`, `Button` | 01/02 |
 | Empty Collections/Datasets/Models/Runs | unambiguous next action; no rows or phantom success | `EmptyState`, `Button` | 01: IT-UI-001, 004 |
@@ -70,6 +71,13 @@ and no-Prediction boundary. The ledger reports `IT-TRAIN-001`–`014` passing ac
 and stacked narrow Settings preserve the prototype hierarchy while adding only the specified
 native support workflow. The [evidence ledger](evidence/README.md#spec-05d--local-logging-and-diagnostics)
 records the current Showcase, keyboard behavior, responsive review and `IT-LOG-004` evidence.
+
+**Spec 05g evidence:** the safe-default Active Run exit confirmation plus synchronized Settings/
+Training keep-awake controls, failure state, Wiki entry and narrow layouts preserve the existing
+prototype hierarchy. The native application is explicitly Light even when macOS uses Dark
+appearance, preventing native scroll viewports from breaking contrast. The
+[evidence ledger](evidence/README.md#spec-05g--long-running-runs-safe-exit-and-optional-keep-awake)
+records the Cocoa captures and interaction evidence.
 
 ## Acceptance procedure
 

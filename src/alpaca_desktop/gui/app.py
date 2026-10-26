@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from alp_ui.theme import install_theme
-from PySide6.QtCore import QStandardPaths, QtMsgType, qInstallMessageHandler
+from PySide6.QtCore import QStandardPaths, Qt, QtMsgType, qInstallMessageHandler
 from PySide6.QtWidgets import QApplication
 
 from alpaca_desktop.application.diagnostics import DiagnosticSession
@@ -23,11 +23,17 @@ def _base_application(argv: list[str] | None = None) -> QApplication:
     return app
 
 
+def _initialize_application(app: QApplication) -> None:
+    if app.property("alpaca_desktop_initialized"):
+        return
+    app.styleHints().setColorScheme(Qt.ColorScheme.Light)
+    install_theme(app)
+    app.setProperty("alpaca_desktop_initialized", True)
+
+
 def create_application(argv: list[str] | None = None) -> QApplication:
     app = _base_application(argv)
-    if not app.property("alpaca_desktop_initialized"):
-        install_theme(app)
-        app.setProperty("alpaca_desktop_initialized", True)
+    _initialize_application(app)
     return app
 
 
@@ -88,9 +94,7 @@ def run(settings_dir: Path | None = None, *, diagnostic_debug: bool = False) -> 
     diagnostics = DiagnosticSession(settings_dir, debug=diagnostic_debug)
     hooks = _DiagnosticHooks(diagnostics)
     try:
-        if not app.property("alpaca_desktop_initialized"):
-            install_theme(app)
-            app.setProperty("alpaca_desktop_initialized", True)
+        _initialize_application(app)
         window = MainWindow(WorkspaceController(settings_dir, diagnostics=diagnostics))
         window.show()
         return app.exec()

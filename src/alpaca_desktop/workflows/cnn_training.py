@@ -349,6 +349,7 @@ def train_cnn_model(
     cancelled: Callable[[], bool] | None = None,
     progress: Callable[[int, int, str], None] | None = None,
     measurement: Callable[[dict[str, Any]], None] | None = None,
+    publication_allowed: Callable[[], bool] | None = None,
 ) -> ModelArtifact:
     """Train, validate, stage, structurally reload, and exclusively publish one CNN Model."""
     root = collection_root.resolve(strict=True)
@@ -635,10 +636,11 @@ def train_cnn_model(
         _check_cancelled(cancelled)
         if progress is not None:
             progress(3, 98, "Publishing verified CNN Model")
-        publish_model_directory(stage, final)
+        publish_model_directory(stage, final, publication_allowed)
         return load_model(root, safe_model_id)
     except InterruptedError as exc:
-        raise CnnTrainingCancelled("CNN Training cancelled before Model publication.") from exc
+        message = str(exc) or "CNN Training cancelled before Model publication."
+        raise CnnTrainingCancelled(message) from exc
     finally:
         if stage_container.exists():
             shutil.rmtree(stage_container)

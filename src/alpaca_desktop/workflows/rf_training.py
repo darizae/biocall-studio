@@ -268,6 +268,7 @@ def train_rf_model(
     cancelled: Callable[[], bool] | None = None,
     progress: Callable[[int, int, str], None] | None = None,
     measurement: Callable[[dict[str, Any]], None] | None = None,
+    publication_allowed: Callable[[], bool] | None = None,
 ) -> ModelArtifact:
     """Extract, fit, validate, structurally reload, and publish one RF Model."""
     root = collection_root.resolve(strict=True)
@@ -494,8 +495,10 @@ def train_rf_model(
         _check_cancelled(cancelled)
         if progress is not None:
             progress(4, 98, "Publishing verified RF Model")
-        publish_model_directory(stage, final)
+        publish_model_directory(stage, final, publication_allowed)
         return load_model(root, safe_model_id)
+    except InterruptedError as exc:
+        raise RfTrainingCancelled(str(exc) or "RF Training cancelled before publication.") from exc
     finally:
         if stage_container.exists():
             shutil.rmtree(stage_container)

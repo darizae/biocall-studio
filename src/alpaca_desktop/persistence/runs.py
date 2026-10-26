@@ -202,17 +202,25 @@ def load_completion_receipt(collection_root: Path, state: RunState) -> dict:
     return raw
 
 
-def _valid_output(collection_root: Path, state: RunState) -> bool:
+def _valid_output(collection_root: Path, state: RunState) -> tuple[bool, bool]:
+    """Return structural validity and matching durable Run provenance."""
     try:
         if state.output_kind == "dataset":
-            load_dataset(collection_root, state.output_id)
-            return True
+            artifact = load_dataset(collection_root, state.output_id)
+            provenance = artifact.manifest.get("run")
+            return True, provenance == {
+                "run_id": state.run_id,
+                "request_id": state.request_id,
+            }
         if state.output_kind == "model":
-            load_model(collection_root, state.output_id)
-            return True
+            artifact = load_model(collection_root, state.output_id)
+            return True, (
+                artifact.manifest.get("run_id") == state.run_id
+                and artifact.manifest.get("request_id") == state.request_id
+            )
     except (OSError, ValueError):
-        return False
-    return False
+        return False, False
+    return False, False
 
 
 def _cleanup_staging(collection_root: Path, state: RunState) -> None:
@@ -241,11 +249,15 @@ def reconcile_runs(collection_root: Path) -> tuple[RunState, ...]:
             receipt = False
         else:
             receipt = True
-        output_valid = _valid_output(collection_root, state)
+        output_valid, durable_publication = _valid_output(collection_root, state)
+        completion_evidence = receipt or durable_publication
         if (
             state.output_kind == "model"
             and output_valid
-            and (not receipt or (state.terminal and state.status is not RunStatus.COMPLETED))
+            and (
+                not completion_evidence
+                or (state.terminal and state.status is not RunStatus.COMPLETED)
+            )
         ):
             discard_uncommitted_model(
                 collection_root,
@@ -257,7 +269,7 @@ def reconcile_runs(collection_root: Path) -> tuple[RunState, ...]:
         updated = reconcile_run(
             state,
             now=utc_now(),
-            completion_receipt=receipt,
+            completion_receipt=completion_evidence,
             published_output_valid=output_valid,
         )
         if updated != state:

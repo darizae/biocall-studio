@@ -30,11 +30,12 @@ packages = ["src/alpaca_desktop"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/unit", "tests/integration"]
-addopts = "-ra --strict-markers --import-mode=importlib"
+addopts = "-ra --strict-markers --import-mode=importlib -m 'not soak'"
 markers = [
   "integration: real filesystem or component boundary",
   "qt: real Qt widget/model integration",
   "packaged: native packaged executable",
+  "soak: explicitly invoked long-duration durability verification",
 ]
 
 [tool.ruff]

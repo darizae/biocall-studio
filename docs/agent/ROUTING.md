@@ -14,6 +14,9 @@
 | Real CNN training, shared Model publication/reload (**after 05a**) | [05b](../specs/05b-cnn-training-and-model-foundation.md) |
 | Real RF training, both-family qualification (**after 05b**) | [05c](../specs/05c-rf-training-and-cross-family-acceptance.md) |
 | Local logging, Worker diagnostics and support export (**after 05c**) | [05d](../specs/05d-end-to-end-logging-and-diagnostics.md) |
+| Critical training-path and recovery verification (**after 05d**) | [05e](../specs/05e-training-critical-path-and-recovery-verification.md) |
+| UI, chart, scale and CLI coverage closeout (**after 05e**) | [05f](../specs/05f-ui-chart-scale-and-cli-coverage.md) |
+| Long-running Runs, safe exit and optional keep-awake (**after 05f**) | [05g](../specs/05g-long-running-sessions-and-safe-exit.md) |
 | macOS app and signed/notarized DMG | [06](../specs/06-macos-release-and-installer.md) |
 | Native Windows qualification and installer | [07](../specs/07-windows-release-and-installer.md) |
 

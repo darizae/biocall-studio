@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +17,11 @@ def write_model_manifest(path: Path, payload: dict[str, Any]) -> None:
         os.fsync(stream.fileno())
 
 
-def publish_model_directory(stage: Path, final: Path) -> None:
+def publish_model_directory(
+    stage: Path,
+    final: Path,
+    publication_allowed: Callable[[], bool] | None = None,
+) -> None:
     final.parent.mkdir(parents=True, exist_ok=True)
     lock = final.parent / ".publish.lock"
     descriptor: int | None = None
@@ -26,6 +31,8 @@ def publish_model_directory(stage: Path, final: Path) -> None:
         os.fsync(descriptor)
         if final.exists():
             raise FileExistsError(f"Model already exists: {final.name}")
+        if publication_allowed is not None and not publication_allowed():
+            raise InterruptedError("Worker owner was lost before Model publication.")
         os.rename(stage, final)
         try:
             directory = os.open(final.parent, os.O_RDONLY)

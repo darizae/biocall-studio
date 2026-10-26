@@ -41,6 +41,7 @@ def main(argv: list[str] | None = None) -> int:
         type=_diagnostic_session_id,
         help=argparse.SUPPRESS,
     )
+    parser.add_argument("--owner-lease", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--diagnostic-debug", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
 
@@ -49,24 +50,27 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--request is required for the Dataset Build Worker")
         if not 0 <= args.worker_step_delay <= 5:
             parser.error("--worker-step-delay must be between 0 and 5 seconds")
+        guard = _worker_owner_guard(parser, args.owner_lease)
         return _run_dataset_build_worker(
-            args.request, args.worker_step_delay, args.diagnostic_session_id
+            args.request, args.worker_step_delay, args.diagnostic_session_id, guard
         )
     if args.worker == "cnn-training":
         if args.request is None:
             parser.error("--request is required for the CNN Training Worker")
         if not 0 <= args.worker_step_delay <= 5:
             parser.error("--worker-step-delay must be between 0 and 5 seconds")
+        guard = _worker_owner_guard(parser, args.owner_lease)
         return _run_cnn_training_worker(
-            args.request, args.worker_step_delay, args.diagnostic_session_id
+            args.request, args.worker_step_delay, args.diagnostic_session_id, guard
         )
     if args.worker == "rf-training":
         if args.request is None:
             parser.error("--request is required for the RF Training Worker")
         if not 0 <= args.worker_step_delay <= 5:
             parser.error("--worker-step-delay must be between 0 and 5 seconds")
+        guard = _worker_owner_guard(parser, args.owner_lease)
         return _run_rf_training_worker(
-            args.request, args.worker_step_delay, args.diagnostic_session_id
+            args.request, args.worker_step_delay, args.diagnostic_session_id, guard
         )
 
     from alpaca_desktop.gui.app import run
@@ -74,10 +78,26 @@ def main(argv: list[str] | None = None) -> int:
     return run(args.settings_dir, diagnostic_debug=args.diagnostic_debug)
 
 
+def _worker_owner_guard(parser, lease_path: Path | None):
+    from alpaca_desktop.application.owner_lifetime import WorkerOwnerGuard
+
+    if lease_path is None:
+        parser.error("--owner-lease is required for a supervised Worker")
+    try:
+        guard = WorkerOwnerGuard(lease_path)
+    except (OSError, ValueError) as exc:
+        parser.error(str(exc))
+    if not guard.owner_alive():
+        parser.error("The Worker owner is no longer alive.")
+    guard.start_watchdog()
+    return guard
+
+
 def _run_dataset_build_worker(
     request_path: Path,
     step_delay_seconds: float = 0.0,
     diagnostic_session_id: str | None = None,
+    owner_guard=None,
 ) -> int:
     from alpaca_desktop.persistence.collection_metadata import load_collection_metadata
     from alpaca_desktop.persistence.runs import (
@@ -145,10 +165,14 @@ def _run_dataset_build_worker(
             scan,
             request.config,
             dataset_id=request.dataset_id,
-            cancelled=lambda: cancellation_requested(request_path),
+            cancelled=lambda: (
+                cancellation_requested(request_path)
+                or (owner_guard is not None and not owner_guard.owner_alive())
+            ),
             progress=progress,
             run_id=request.run_id,
             request_id=request.request_id,
+            publication_allowed=(None if owner_guard is None else owner_guard.owner_alive),
         )
         receipt = {
             "schema_version": WORKER_RESULT_SCHEMA_VERSION,
@@ -192,12 +216,15 @@ def _run_dataset_build_worker(
     finally:
         if diagnostics is not None:
             diagnostics.close()
+        if owner_guard is not None:
+            owner_guard.close()
 
 
 def _run_cnn_training_worker(
     request_path: Path,
     step_delay_seconds: float = 0.0,
     diagnostic_session_id: str | None = None,
+    owner_guard=None,
 ) -> int:
     from alpaca_desktop.persistence.collection_metadata import load_collection_metadata
     from alpaca_desktop.persistence.runs import (
@@ -281,9 +308,13 @@ def _run_cnn_training_worker(
         artifact = train_cnn_model(
             root,
             request,
-            cancelled=lambda: cancellation_requested(request_path),
+            cancelled=lambda: (
+                cancellation_requested(request_path)
+                or (owner_guard is not None and not owner_guard.owner_alive())
+            ),
             progress=progress,
             measurement=measurement,
+            publication_allowed=(None if owner_guard is None else owner_guard.owner_alive),
         )
         write_completion_receipt(
             request_path,
@@ -333,12 +364,15 @@ def _run_cnn_training_worker(
     finally:
         if diagnostics is not None:
             diagnostics.close()
+        if owner_guard is not None:
+            owner_guard.close()
 
 
 def _run_rf_training_worker(
     request_path: Path,
     step_delay_seconds: float = 0.0,
     diagnostic_session_id: str | None = None,
+    owner_guard=None,
 ) -> int:
     from alpaca_desktop.persistence.collection_metadata import load_collection_metadata
     from alpaca_desktop.persistence.runs import (
@@ -422,9 +456,13 @@ def _run_rf_training_worker(
         artifact = train_rf_model(
             root,
             request,
-            cancelled=lambda: cancellation_requested(request_path),
+            cancelled=lambda: (
+                cancellation_requested(request_path)
+                or (owner_guard is not None and not owner_guard.owner_alive())
+            ),
             progress=progress,
             measurement=measurement,
+            publication_allowed=(None if owner_guard is None else owner_guard.owner_alive),
         )
         write_completion_receipt(
             request_path,
@@ -474,3 +512,5 @@ def _run_rf_training_worker(
     finally:
         if diagnostics is not None:
             diagnostics.close()
+        if owner_guard is not None:
+            owner_guard.close()

@@ -20,6 +20,7 @@ def test_native_shell_routes_between_select_and_wiki(qapp, qtbot, workspace):
     """Case: IT-UI-001."""
     app = create_application()
     assert create_application() is app is qapp is QApplication.instance()
+    assert app.styleHints().colorScheme() is Qt.ColorScheme.Light
     window = MainWindow(workspace)
     qtbot.addWidget(window)
     window.show()

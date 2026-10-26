@@ -16,6 +16,12 @@ from alpaca_desktop.application.collection_scan import (
     scan_collection,
 )
 from alpaca_desktop.application.diagnostics import DiagnosticSession, diagnostic_context_for_run
+from alpaca_desktop.application.owner_lifetime import OwnerLease
+from alpaca_desktop.application.power import (
+    KeepAwakeManager,
+    PowerAdapter,
+    native_power_adapter,
+)
 from alpaca_desktop.domain.collection import ScanResult
 from alpaca_desktop.domain.dataset import BuildConfig
 from alpaca_desktop.domain.run import (
@@ -122,6 +128,8 @@ class WorkspaceController(QObject):
     run_changed = Signal(object)
     runs_changed = Signal()
     run_conflict = Signal(str)
+    power_changed = Signal()
+    shutdown_ready = Signal()
 
     def __init__(
         self,
@@ -133,6 +141,7 @@ class WorkspaceController(QObject):
         kill_grace_ms: int = 3_000,
         diagnostics: DiagnosticSession | None = None,
         diagnostic_debug: bool = False,
+        power_adapter: PowerAdapter | None = None,
     ):
         super().__init__()
         if settings_dir is None:
@@ -143,9 +152,8 @@ class WorkspaceController(QObject):
                 raise OSError("Qt could not locate Application Settings storage.")
             settings_dir = Path(location)
         settings_dir = settings_dir.resolve()
-        self.diagnostics = diagnostics or DiagnosticSession(
-            settings_dir, debug=diagnostic_debug
-        )
+        self._owner_lease = OwnerLease.create(settings_dir)
+        self.diagnostics = diagnostics or DiagnosticSession(settings_dir, debug=diagnostic_debug)
         self.settings_file = settings_dir / "settings.json"
         self._store = SettingsStore(self.settings_file)
         self.error_message = ""
@@ -172,6 +180,9 @@ class WorkspaceController(QObject):
         self._cancel_grace_ms = cancel_grace_ms
         self._kill_grace_ms = kill_grace_ms
         self._build_request_path: Path | None = None
+        self._power_error_message = ""
+        self._shutdown_requested = False
+        self._shutdown_finished = False
         try:
             self._settings = self._store.load()
         except (OSError, ValueError) as exc:
@@ -184,6 +195,16 @@ class WorkspaceController(QObject):
                 level=logging.WARNING,
                 exception_type=type(exc).__name__,
             )
+        self._power = KeepAwakeManager(power_adapter or native_power_adapter())
+        self._power.apply_requested(self._settings.keep_computer_awake)
+        if self._settings.keep_computer_awake:
+            self._diagnostic(
+                "keep_awake_startup_applied",
+                "Stored keep-awake preference applied at startup",
+                level=(logging.INFO if self.keep_awake_active else logging.WARNING),
+                operation="power",
+                status="active" if self.keep_awake_active else "not_active",
+            )
         if self.collection_path is not None:
             self._load_runs(self.collection_path)
 
@@ -194,6 +215,22 @@ class WorkspaceController(QObject):
     @property
     def collection_id(self) -> str | None:
         return self._settings.collection_id
+
+    @property
+    def keep_awake_requested(self) -> bool:
+        return self._settings.keep_computer_awake
+
+    @property
+    def keep_awake_active(self) -> bool:
+        return self._power.state.active
+
+    @property
+    def keep_awake_available(self) -> bool:
+        return self._power.state.available
+
+    @property
+    def keep_awake_error(self) -> str:
+        return self._power_error_message or self._power.state.error
 
     @property
     def pending_collection_path(self) -> Path | None:
@@ -327,7 +364,13 @@ class WorkspaceController(QObject):
         if metadata.collection_id != expected_id:
             raise ValueError("Collection identity does not match the verified binding.")
         assert_collection_rebind_allowed(self._runs, expected_id)
-        self._save(ApplicationSettings(resolved_path, expected_id))
+        self._save(
+            ApplicationSettings(
+                resolved_path,
+                expected_id,
+                self._settings.keep_computer_awake,
+            )
+        )
         self._diagnostic(
             "collection_bound",
             "Verified Collection binding saved",
@@ -353,6 +396,59 @@ class WorkspaceController(QObject):
     def cancel_scan(self) -> None:
         if self._scan_thread is not None and self._scan_thread.isRunning():
             self._scan_thread.cancel_event.set()
+
+    def set_keep_awake(self, enabled: bool) -> None:
+        """Persist the opt-in choice before changing effective OS state."""
+        if not isinstance(enabled, bool):
+            raise TypeError("Keep-awake preference must be boolean.")
+        if enabled == self._settings.keep_computer_awake and not self.keep_awake_error:
+            return
+        candidate = ApplicationSettings(
+            self._settings.collection_path,
+            self._settings.collection_id,
+            enabled,
+        )
+        try:
+            self._store.save(candidate)
+        except OSError as exc:
+            self._power_error_message = (
+                "The keep-awake preference could not be saved; effective power state was not "
+                f"changed. {self._portable_error(str(exc))}"
+            )
+            self.power_changed.emit()
+            self._diagnostic(
+                "keep_awake_preference_write_failed",
+                "Keep-awake preference could not be saved; OS state was unchanged",
+                level=logging.ERROR,
+                operation="power",
+                status="unchanged",
+                exception_type=type(exc).__name__,
+            )
+            return
+        self._settings = candidate
+        self._power_error_message = ""
+        self._power.apply_requested(enabled)
+        self.changed.emit()
+        self.power_changed.emit()
+        self._diagnostic(
+            "keep_awake_changed",
+            "Keep-awake preference and effective state updated",
+            level=(logging.INFO if not enabled or self.keep_awake_active else logging.WARNING),
+            operation="power",
+            status=("active" if self.keep_awake_active else "not_active" if enabled else "off"),
+        )
+
+    def retry_keep_awake(self) -> None:
+        self._power_error_message = ""
+        self._power.apply_requested(self._settings.keep_computer_awake)
+        self.power_changed.emit()
+        self._diagnostic(
+            "keep_awake_retried",
+            "Keep-awake operating-system request retried",
+            level=(logging.INFO if self.keep_awake_active else logging.WARNING),
+            operation="power",
+            status="active" if self.keep_awake_active else "not_active",
+        )
 
     def current_inputs_ready(self) -> bool:
         if self.scan_result is None or not self.scan_result.valid or self._scan_root is None:
@@ -574,6 +670,8 @@ class WorkspaceController(QObject):
             str(self._worker_step_delay_seconds),
             "--diagnostic-session-id",
             self.diagnostics.session_id,
+            "--owner-lease",
+            str(self._owner_lease.path),
         ]
         program, launch_arguments = self._worker_command(arguments)
         process.setProgram(program)
@@ -593,9 +691,7 @@ class WorkspaceController(QObject):
     def _worker_command(self, arguments: list[str]) -> tuple[str, list[str]]:
         return (
             sys.executable,
-            arguments
-            if getattr(sys, "frozen", False)
-            else ["-m", "alpaca_desktop", *arguments],
+            arguments if getattr(sys, "frozen", False) else ["-m", "alpaca_desktop", *arguments],
         )
 
     def cancel_active_run(self) -> None:
@@ -631,6 +727,41 @@ class WorkspaceController(QObject):
             reserved_dataset_ids=self.reserved_dataset_ids,
         )
 
+    @property
+    def shutdown_is_ready(self) -> bool:
+        scan_running = self._scan_thread is not None and self._scan_thread.isRunning()
+        worker_running = (
+            self._run_process is not None
+            and self._run_process.state() != QProcess.ProcessState.NotRunning
+        )
+        return not scan_running and not worker_running and self._active_run is None
+
+    def request_shutdown(self) -> None:
+        """Asynchronously stop owned work; emit only after every child has stopped."""
+        if self._shutdown_requested:
+            return
+        self._shutdown_requested = True
+        if self.is_scanning:
+            self.cancel_scan()
+        if self._active_run is not None:
+            self.cancel_active_run()
+        self._maybe_emit_shutdown_ready()
+
+    def _maybe_emit_shutdown_ready(self) -> None:
+        if self._shutdown_requested and self.shutdown_is_ready:
+            self.shutdown_ready.emit()
+
+    def finalize_shutdown(self) -> None:
+        if self._shutdown_finished:
+            return
+        if not self.shutdown_is_ready:
+            raise RuntimeError("Cannot exit while a supervised Worker is still running.")
+        self._power.release_for_shutdown()
+        self._owner_lease.close()
+        self.power_changed.emit()
+        self._shutdown_finished = True
+        self.diagnostics.close()
+
     def shutdown(self) -> None:
         """Stop a supervised Worker before the GUI process exits."""
         process = self._run_process
@@ -656,6 +787,10 @@ class WorkspaceController(QObject):
             process.deleteLater()
             self._load_runs(root)
             self.runs_changed.emit()
+        self._power.release_for_shutdown()
+        self._owner_lease.close()
+        self.power_changed.emit()
+        self._shutdown_finished = True
         self.diagnostics.close()
 
     def _set_run(self, state: RunState) -> None:
@@ -951,6 +1086,7 @@ class WorkspaceController(QObject):
         self._current_run_id = None
         self._build_request_path = None
         process.deleteLater()
+        self._maybe_emit_shutdown_ready()
 
     def _on_run_process_error(self, error) -> None:
         if error != QProcess.ProcessError.FailedToStart or self._active_run is None:
@@ -985,6 +1121,7 @@ class WorkspaceController(QObject):
             self.build_failed.emit(message)
         else:
             self.training_failed.emit(message)
+        self._maybe_emit_shutdown_ready()
 
     def _terminate_run(self, run_id: str) -> None:
         if (
@@ -1108,6 +1245,7 @@ class WorkspaceController(QObject):
             self._scan_thread = None
         if thread is not None:
             thread.deleteLater()
+        self._maybe_emit_shutdown_ready()
 
     def _save(self, settings: ApplicationSettings) -> None:
         self._store.save(settings)

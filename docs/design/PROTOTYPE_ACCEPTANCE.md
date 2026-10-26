@@ -18,6 +18,7 @@ The table provides **optional starting points**, not prescribed inspection paths
 | 05b — CNN / shared Model | `trainPage` (254), `startTraining` (258), `lossChart` (239), `nameModel` / `saveModel` (262/266), `modelPage` (269) |
 | 05c — RF / both-family UX | `trainPage` (254), `rfChart` (238), `startTraining` (258), `modelPage` (269), `modelsPage` (272) |
 | 05d — diagnostics additions | `runPage` (230), `settingsPage` (275); native-only actions are defined by Spec 05d |
+| 05g — safe exit / keep awake | `globalRun` (83), `runPage` (230), `trainPage` (254), `wikiPage` (274), `settingsPage` (275); native-only controls/dialog are defined by Spec 05g |
 | 06–07 — installed releases | No separate prototype route; recheck only the implemented views/states from the applicable rows above in the **installed native app**. |
 
 **No Run-specific preview PNGs exist in this bundle.** For Spec 04, infer Run detail, active/cancelling/failed/completed states and Runs history from the relevant `app.js` functions and `styles.css`; use the existing preview PNGs only for the shared visual language. Do not search for or invent Run preview images. Spec 04.5 is upstream audio extraction and has no separate prototype view.
@@ -55,6 +56,7 @@ The HTML prototype remains unchanged and governs the baseline Training view. The
 | 04 | Active Run and sidebar, Run detail while working/cancelling/failed/completed, Runs history | `run-active.png`, `run-cancelling.png`, `run-failed.png`, `runs-history.png` | `IT-RUN-005` |
 | 05 | CNN/RF configuration, real training progress/plots, Model list/detail | `train-cnn.png`, `train-rf.png`, `train-cnn-advanced.png`, `train-rf-advanced.png`, `presets-list.png`, `presets-unsaved.png`, `presets-confirm-delete.png`, `run-cnn-plot.png`, `run-rf-plot.png`, `model-detail.png` | `IT-TRAIN-007` |
 | 05d | Completed Run diagnostic access, Settings support actions/privacy confirmation, responsive additions and current Showcase | `run-open-log.png`, `settings-diagnostics.png`, `export-privacy-confirmation.png`, `run-open-log-narrow.png`, `settings-stacked-narrow.png`, `settings-diagnostics-narrow.png`, `alp-ui-showcase-current.png` | `IT-LOG-004` |
+| 05g | Settings and Training keep-awake Off/On/Unavailable states, Wiki help, narrow responsive placement, readable Active Run and safe-default exit confirmation | `settings-power-off.png`, `settings-power-on.png`, `settings-power-unavailable.png`, `train-power-on.png`, `wiki-keep-awake.png`, `settings-power-narrow.png`, `train-power-narrow.png`, `active-run-light-theme.png`, `active-run-exit-confirmation.png` | `IT-POWER-001`, `IT-RUN-006` |
 | 06 | Installed macOS app reproduces all implemented screen groups, native dialogs/theme/fonts/resources and narrow sizes | `spec-06-installed/` comparison set of representative screens plus installed smoke log | `IT-MAC-004` |
 | 07 | Installed Windows app reproduces all implemented screens within native platform constraints (including DPI variants) | `spec-07-installed/` comparison set and DPI+keyboard review | `IT-WIN-005` |
 

@@ -9,7 +9,9 @@
 > configuration and user-level saved presets. Genuine bounded CPU CNN and deterministic Random
 > Forest executors publish verified immutable Models with measured validation results. Bounded,
 > privacy-normalized local app/Worker logs and explicit sanitized support export are available;
-> installers remain planned. Never interpret a simulated browser run as scientific output.
+> Active Runs require an explicit safe-exit decision, orphan Workers cannot later publish, and an
+> optional app-wide keep-awake preference requests protection from automatic idle sleep. Installers
+> remain planned. Never interpret a simulated browser run as scientific output.
 
 ## What you can do
 
@@ -24,6 +26,9 @@ reopen the structurally verified checkpoint/estimator, and navigate each publish
 Run, metrics and provenance. This Trainer does not run prediction or score new recordings.
 Completed Runs expose their contained local Worker log, while Settings can open local session logs
 or create an explicitly confirmed, revalidated diagnostics ZIP; diagnostics are never uploaded.
+For long local work, **Keep computer awake** can be enabled from Settings or Training. It keeps the
+display free to turn off and cannot override lid close, manual Sleep, shutdown, low battery,
+updates or system policy.
 
 **Input folder example:**
 
@@ -108,11 +113,24 @@ PCM WAV inputs and genuine CPU CNN/RF Runs; no simulated Model or metric is pres
 
 ![Native macOS Settings diagnostics actions](docs/design/evidence/spec-05d-native/settings-diagnostics.png)
 
+**Optional keep-awake control — native macOS app**
+
+![Native macOS Training keep-awake control](docs/design/evidence/spec-05g-native/train-power-on.png)
+
+**Safe exit confirmation for an Active Run — native macOS app**
+
+![Native macOS Active Run safe-exit confirmation](docs/design/evidence/spec-05g-native/active-run-exit-confirmation.png)
+
+**Readable fixed-light Active Run while macOS uses Dark appearance — native macOS app**
+
+![Native macOS fixed-light Active Run](docs/design/evidence/spec-05g-native/active-run-light-theme.png)
+
 The complete [native evidence set and parity review](docs/design/evidence/README.md) also covers
 Reading/cancel, Settings, all four initial empty routes, Builder underfill/busy states, Dataset
 list/detail navigation, Worker cancellation/failure/completion/history, both Training families,
 saved presets, genuine CNN loss, genuine RF feature importances, both-family Model list/detail,
-local diagnostic access/export, keyboard interactions and narrow resized windows.
+local diagnostic access/export, safe exit, optional keep-awake, keyboard interactions and narrow
+resized windows.
 
 ## Interactive design reference
 
@@ -181,10 +199,10 @@ git lfs install
 
 Read [AGENTS.md](AGENTS.md) → [agent routing](docs/agent/ROUTING.md) → **only the active spec** in [specs index](docs/specs/README.md). Do **not** read the entire documentation tree by default.
 
-**Current milestone:** [Spec 05d local logging and diagnostics](docs/specs/05d-end-to-end-logging-and-diagnostics.md)
-is implemented with bounded privacy-safe GUI/Worker JSONL, stderr fault containment, explicit
-native access and sanitized support export. Genuine CNN/RF results and immutable Model formats are
-unchanged. Prediction remains out of scope; installed macOS/Windows logging and release
-qualification remain later work.
+**Current milestone:** [Spec 05g long-running Runs, safe exit and optional keep-awake](docs/specs/05g-long-running-sessions-and-safe-exit.md)
+hardens supervised Worker lifetime, confirmed asynchronous shutdown, restart reconciliation and
+ten-minute real-training durability. The synchronized machine-local keep-awake controls accurately
+report operating-system acquisition without claiming protection from forced sleep. Prediction
+remains out of scope; installed macOS/Windows qualification remains later work.
 
 Reference map (open only for the task at hand): [vision](docs/VISION.md), [glossary](docs/GLOSSARY.md), [domain workflow](docs/models/USER_WORKFLOWS_AND_DATA_MODEL.md), [workflow rules](docs/models/WORKFLOW_RULES.md), [architecture](docs/ARCHITECTURE.md), [UX parity](docs/design/UX_PARITY_MATRIX.md), [scientific sibling source map](docs/agent/SOURCE_MAP.md), [unit testing](docs/UNIT_TESTING.md), [integration testing](docs/INTEGRATION_TESTING.md), [fixture policy](docs/INTEGRATION_TEST_DATA.md), [Git/branch delivery](docs/agent/GIT_DELIVERY.md). The scientific pipeline is referenced from the verified sibling `../alpaca-pipelines` checkout; it is not vendored here.

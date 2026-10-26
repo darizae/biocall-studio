@@ -382,7 +382,11 @@ def _recheck_hashes(
             raise DatasetBuildError(f"Collection input changed during Dataset Build: {key}")
 
 
-def _publish(stage: Path, final: Path) -> None:
+def _publish(
+    stage: Path,
+    final: Path,
+    publication_allowed: Callable[[], bool] | None = None,
+) -> None:
     final.parent.mkdir(parents=True, exist_ok=True)
     lock = final.parent / ".publish.lock"
     descriptor: int | None = None
@@ -392,6 +396,8 @@ def _publish(stage: Path, final: Path) -> None:
         os.fsync(descriptor)
         if final.exists():
             raise FileExistsError(f"Dataset already exists: {final.name}")
+        if publication_allowed is not None and not publication_allowed():
+            raise InterruptedError("Worker owner was lost before Dataset publication.")
         os.rename(stage, final)
         try:
             directory = os.open(final.parent, os.O_RDONLY)
@@ -428,6 +434,7 @@ def build_dataset(
     progress: Callable[[int, int, str], None] | None = None,
     run_id: str | None = None,
     request_id: str | None = None,
+    publication_allowed: Callable[[], bool] | None = None,
 ) -> DatasetArtifact:
     """Materialize, verify, and exclusively publish one immutable Dataset."""
     root = collection_root.resolve(strict=True)
@@ -632,10 +639,11 @@ def build_dataset(
         if progress is not None:
             progress(3, 96, "Publishing verified Dataset")
         _check_cancelled(cancelled)
-        _publish(stage, final)
+        _publish(stage, final, publication_allowed)
         return load_dataset(root, dataset_id)
     except InterruptedError as exc:
-        raise DatasetBuildCancelled("Dataset Build cancelled before publication.") from exc
+        message = str(exc) or "Dataset Build cancelled before publication."
+        raise DatasetBuildCancelled(message) from exc
     finally:
         if stage.exists():
             shutil.rmtree(stage)

@@ -19,7 +19,7 @@ from alp_ui.components import (
     Text,
 )
 from alp_ui.theme import ALPACA_LIGHT, interactions, make_icon
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QUrl
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer, QUrl
 from PySide6.QtGui import QCloseEvent, QDesktopServices, QFontDatabase, QResizeEvent
 from PySide6.QtWidgets import (
     QBoxLayout,
@@ -42,6 +42,7 @@ from alpaca_desktop.application.workspace import WorkspaceController
 from alpaca_desktop.gui.collection import CollectionPage, ReadingCollectionPage
 from alpaca_desktop.gui.dataset import DatasetBuilderPage, DatasetDetailPage, DatasetListPage
 from alpaca_desktop.gui.model import ModelDetailPage, ModelListPage
+from alpaca_desktop.gui.power import KEEP_AWAKE_HELP, KeepAwakeControl
 from alpaca_desktop.gui.run import RunDetailPage, RunListPage
 from alpaca_desktop.gui.training import TrainingPage, TrainingWikiPage
 from alpaca_desktop.persistence.datasets import load_dataset
@@ -246,6 +247,22 @@ class WikiPage(QScrollArea):
         self.validation_card = self._validation_card()
         self.messages_card = self._messages_card()
         outer.addLayout(self.cards)
+        self.keep_awake_card = Card(shadow=False)
+        self.keep_awake_title = Text("Keep computer awake", role="subheading")
+        self.keep_awake_title.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.keep_awake_card.content_layout.addWidget(self.keep_awake_title)
+        self.keep_awake_text = Text(KEEP_AWAKE_HELP, role="body", word_wrap=True)
+        self.keep_awake_card.content_layout.addWidget(self.keep_awake_text)
+        self.keep_awake_card.content_layout.addWidget(
+            Text(
+                "If the computer actually sleeps, CPU training pauses. It may continue after "
+                "wake if the app and Worker survive, but sleep, lid close and shutdown are not "
+                "protected or guaranteed recovery paths.",
+                role="caption",
+                word_wrap=True,
+            )
+        )
+        outer.addWidget(self.keep_awake_card)
         outer.addWidget(
             Text(
                 "A timestamp is a user-supplied label. Names and WAV headers cannot prove "
@@ -385,7 +402,13 @@ class WikiPage(QScrollArea):
 class SettingsPage(QScrollArea):
     """Explain the machine-local binding without inventing a scanner or rebind UI."""
 
-    def __init__(self, controller: WorkspaceController, open_diagnostics, export_diagnostics):
+    def __init__(
+        self,
+        controller: WorkspaceController,
+        open_diagnostics,
+        export_diagnostics,
+        open_power_wiki,
+    ):
         super().__init__()
         self.controller = controller
         self.is_compact = False
@@ -460,6 +483,19 @@ class SettingsPage(QScrollArea):
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
         layout.addLayout(grid)
+
+        power = Card(shadow=False)
+        self.power_card = power
+        power.content_layout.addWidget(Text("Power / long-running work", role="subheading"))
+        self.power_control = KeepAwakeControl(controller, open_power_wiki)
+        power.content_layout.addWidget(self.power_control)
+        self.keep_awake_toggle = self.power_control.toggle
+        self.keep_awake_status = self.power_control.status
+        self.keep_awake_hint = self.power_control.hint
+        self.keep_awake_wiki_button = self.power_control.wiki_button
+        self.keep_awake_retry_button = self.power_control.retry_button
+        self.keep_awake_error = self.power_control.error
+        layout.addWidget(power)
 
         diagnostics = Card(shadow=False)
         self.diagnostics_card = diagnostics
@@ -559,6 +595,11 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(640, 620)
         self._navigation: dict[str, QPushButton] = {}
         self._pages: dict[str, QWidget] = {}
+        self.close_dialog: QMessageBox | None = None
+        self._close_keep_button = None
+        self._close_stop_button = None
+        self._exit_requested = False
+        self._exit_ready = False
 
         central = QWidget()
         self._root_layout = QBoxLayout(QBoxLayout.Direction.LeftToRight, central)
@@ -592,6 +633,7 @@ class MainWindow(QMainWindow):
             controller,
             PresetStore(controller.settings_file.parent / "training-presets"),
             self._open_training_wiki,
+            self._open_power_wiki,
         )
         self.training_wiki_page = TrainingWikiPage(self._return_from_training_wiki)
         self.run_list_page = RunListPage(self.open_run, lambda: self.navigate("select"))
@@ -617,6 +659,7 @@ class MainWindow(QMainWindow):
             controller,
             self._open_diagnostics_folder,
             self._export_diagnostics,
+            self._open_power_wiki,
         )
         self.empty_pages: dict[str, EmptyState] = {}
         for route, page in (
@@ -665,6 +708,7 @@ class MainWindow(QMainWindow):
         controller.run_changed.connect(self._run_changed)
         controller.runs_changed.connect(self._refresh_run_surfaces)
         controller.run_conflict.connect(self._show_run_conflict)
+        controller.shutdown_ready.connect(self._shutdown_ready)
         self.navigate("select")
         self._refresh_run_surfaces()
         controller.reopen_bound_collection()
@@ -674,8 +718,91 @@ class MainWindow(QMainWindow):
         self._apply_responsive_layout(event.size().width() < 820)
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
-        self.controller.shutdown()
+        if self._exit_ready:
+            event.accept()
+            super().closeEvent(event)
+            return
+        if self._exit_requested:
+            event.ignore()
+            return
+        if self.controller.active_run is not None:
+            event.ignore()
+            self._show_active_close_dialog()
+            return
+        if self.controller.is_scanning:
+            event.ignore()
+            self._begin_exit()
+            return
+        self.controller.finalize_shutdown()
+        event.accept()
         super().closeEvent(event)
+
+    def _show_active_close_dialog(self) -> None:
+        if self.close_dialog is not None and self.close_dialog.isVisible():
+            self.close_dialog.raise_()
+            self.close_dialog.activateWindow()
+            return
+        run = self.controller.active_run
+        if run is None:
+            return
+        if run.kind.value == "dataset_build":
+            family = "Dataset Build"
+        elif run.training_family == "cnn":
+            family = "CNN Training"
+        else:
+            family = "Random Forest Training"
+        dialog = QMessageBox(self)
+        dialog.setIcon(QMessageBox.Icon.Warning)
+        dialog.setWindowTitle("Active Run")
+        dialog.setText(f"{family} is still active: {run.title}")
+        dialog.setInformativeText(
+            "If you exit, work in progress will be lost. Trainer will stop the Worker before "
+            "closing; no partially trained Dataset or Model and no resumable checkpoint will "
+            "be kept. Earlier published artifacts remain unchanged."
+        )
+        keep = dialog.addButton("Keep app open", QMessageBox.ButtonRole.RejectRole)
+        stop = dialog.addButton("Stop Run and Exit", QMessageBox.ButtonRole.DestructiveRole)
+        keep.setAccessibleDescription("Dismiss this warning and leave the Active Run untouched.")
+        stop.setAccessibleDescription("Cancel the Active Run, wait for its Worker, then exit.")
+        dialog.setDefaultButton(keep)
+        dialog.setEscapeButton(keep)
+        self.close_dialog = dialog
+        self._close_keep_button = keep
+        self._close_stop_button = stop
+        dialog.finished.connect(self._close_dialog_finished)
+        dialog.open()
+        keep.setFocus(Qt.FocusReason.ActiveWindowFocusReason)
+
+    def _close_dialog_finished(self, _result: int) -> None:
+        dialog = self.close_dialog
+        if dialog is None:
+            return
+        stop_requested = dialog.clickedButton() is self._close_stop_button
+        self.close_dialog = None
+        self._close_keep_button = None
+        self._close_stop_button = None
+        dialog.deleteLater()
+        if stop_requested:
+            if self.controller.active_run is not None:
+                self.open_run(self.controller.active_run.run_id)
+            self._begin_exit()
+
+    def _begin_exit(self) -> None:
+        if self._exit_requested:
+            return
+        self._exit_requested = True
+        self.controller.request_shutdown()
+
+    def _shutdown_ready(self) -> None:
+        if self._exit_requested:
+            QTimer.singleShot(0, self._finish_exit)
+
+    def _finish_exit(self) -> None:
+        if not self._exit_requested or self._exit_ready:
+            return
+        self.controller.finalize_shutdown()
+        self._exit_ready = True
+        self.close()
 
     def _build_sidebar(self) -> QFrame:
         sidebar = QFrame()
@@ -1015,6 +1142,11 @@ class MainWindow(QMainWindow):
     def _open_training_wiki(self, field) -> None:
         self.training_wiki_page.show_field(field)
         self.navigate("training-wiki")
+
+    def _open_power_wiki(self) -> None:
+        self.navigate("wiki")
+        self.wiki_page.ensureWidgetVisible(self.wiki_page.keep_awake_card)
+        self.wiki_page.keep_awake_title.setFocus(Qt.FocusReason.ShortcutFocusReason)
 
     def _return_from_training_wiki(self) -> None:
         field_key = self.training_wiki_page.field_key

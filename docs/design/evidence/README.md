@@ -607,6 +607,56 @@ and Spec 05 rows therefore remain **MATCH**; there is no new state or owner exce
   no HPC, private Collection or external connection was involved. Installed `.app`/Windows
   qualification remains owned by Specs 06/07.
 
+## Spec 05g — Long-running Runs, safe exit and optional keep-awake
+
+**Status: verification complete; owner review pending.** Native close now uses one safe-default
+confirmation and asynchronous supervised shutdown. A kernel-owned GUI lease plus pre-publication
+guard prevents an orphan Worker from later publishing; restart distinguishes incomplete staging
+from a fully committed provenance-matching artifact. The machine-local keep-awake preference is
+off by default and truthfully separates requested from effective OS state.
+
+### Native provenance and visual review
+
+- macOS 26.6.2 arm64; Python 3.12.7; PySide6/Qt 6.11.2; `alp-ui` 0.1.0a0 at
+  `330aaab96a6b32dd2d83ae84a52a2a238446d264`; native Cocoa, 1280×807 desktop and
+  700×780 narrow captures.
+- Command: `unset QT_QPA_PLATFORM; .venv/bin/python -u scripts/capture_spec05g_screenshots.py`
+  reported `appearance=Light` and captured all nine required images from generated PCM WAVs and
+  isolated temporary settings. No private/HPC input was used.
+- The reported dark partial UI was reproduced as a host Dark color scheme leaking into native
+  scroll viewports while fixed-light `alp-ui` content remained light. `IT-UI-001` failed red with
+  `ColorScheme.Dark`; the application now requests Qt Light before installing `ALPACA_LIGHT`, and
+  the soak initializes the real app rather than constructing an unthemed `MainWindow`.
+
+| State | Native evidence | Six-dimension result |
+|---|---|---|
+| Settings Off / On / unavailable | [Off](spec-05g-native/settings-power-off.png) · [On](spec-05g-native/settings-power-on.png) · [Not active](spec-05g-native/settings-power-unavailable.png) | H/N/C/A/I/S **MATCH**; synchronized status, retry and truthful failure |
+| Training placement and narrow layouts | [Training](spec-05g-native/train-power-on.png) · [Training narrow](spec-05g-native/train-power-narrow.png) · [Settings narrow](spec-05g-native/settings-power-narrow.png) | H/N/C/A/I/S **MATCH**; Start CTA remains primary and all controls remain reachable |
+| Canonical help | [Wiki](spec-05g-native/wiki-keep-awake.png) | H/N/C/A/I/S **MATCH**; battery/display/forced-sleep limits agree with both HelpHints |
+| Active Run and safe exit | [Readable fixed-light Run](spec-05g-native/active-run-light-theme.png) · [native confirmation](spec-05g-native/active-run-exit-confirmation.png) | H/N/C/A/I/S **MATCH**; only the modal intentionally dims the whole parent; Keep open is default/Escape |
+
+### Executed verification
+
+- `IT-RUN-009`: `.venv/bin/pytest -m soak tests/integration/test_long_running_runs.py -q -s`
+  — **1 passed in 690.35 s**. Real CNN Worker duration was **684.183 s**, with 6,693 Qt
+  heartbeats and 44 samples; peak RSS **541,456 KiB**, peak open handles **231**, bounded Worker
+  log **4,889 bytes**, and one supervised Worker throughout. The verified Model SHA-256 is
+  `cc026826dae8aea342b6e4d6b7f68a012ccbb8f8683c2d25cd3f35ee7cf9b86e`; fresh-process
+  structural reload passed, followed by a second completed Run with SHA-256
+  `c708599cd9835490862e99acd05c12a9724d7305caa60078881ea6d79c156326`. Full samples are in
+  [soak-observations.json](spec-05g-native/soak-observations.json) and raw output in
+  [soak-pytest.log](spec-05g-native/soak-pytest.log).
+- Focused `UT-POWER-001`, `IT-POWER-001/002`, `IT-RUN-006/007/008` and `IT-UI-001` command passed
+  on native macOS. `IT-POWER-002` verified the real IOKit assertion/release and process-death
+  cleanup. Ordinary pytest excludes `soak` through registered default marker selection.
+- Repository-wide `.venv/bin/pytest -q` passed all **126 selected tests**; the one deselected test
+  was the explicitly excluded soak above. Repository-wide Ruff, changed-file format verification,
+  `audit_test_ids.py` (**82 referenced IDs, 0 unknown**), `verify_handoff.py
+  `--require-native-ux`, and `git diff --check` passed.
+- Actual system suspend/lid-close and installed `.app` behavior were not claimed. Windows adapter,
+  owner-loss and installed `.exe` qualification remain Spec 07; installed macOS requalification
+  remains Spec 06. The ten-minute pass is not an overnight-reliability claim.
+
 ## Every subsequent spec: mandatory ledger
 
 Use [Prototype acceptance](../PROTOTYPE_ACCEPTANCE.md) for the full screenshot inventory and six

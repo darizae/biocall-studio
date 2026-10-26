@@ -23,6 +23,7 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-DB-004` | Snippet/source interval/label provenance and manifest references are validated; reject conflicting/multiple Snippet labels and any class set other than `target`/`noise` | TD-SPLIT | 03 |
 | `UT-RUN-001` | Exactly one Active Run, terminal-state transition table, duplicate start and reservation conflicts | TD-RUN | 04 |
 | `UT-RUN-002` | Orphan/restart/cancel policy and published-pointer validity decisions are conservative | TD-RUN | 04 |
+| `UT-POWER-001` | Application Settings v2→v3 migration and strict boolean validation; keep-awake request/effective-state idempotence, retryable acquisition failure and unsupported-platform distinction | TD-FAIL | 05g |
 | `UT-AUDIO-001` | PCM frame-interval and desktop adapter compatibility; details/edge cases in [Spec 04.5](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) | TD-WAV | 04.5 |
 | `UT-AUDIO-002` | Manifest metadata, integrity hashing and exception policy; [Spec 04.5](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) | TD-WAV, TD-FAIL | 04.5 |
 | `UT-TRAIN-001` | CNN settings bounds and resolved config; strict binary single-label `target`/`noise` mapping and split coverage; reject multi-label/multi-class config, extra classes, multi-hot targets or editable `num_classes` | TD-TRAIN | 05 |
@@ -48,5 +49,10 @@ records the fresh commands and results; listing the IDs here is not independent 
 **Reported status:** Spec 05d implements `UT-LOG-001`–`004`; the
 [native diagnostics ledger](design/evidence/README.md#spec-05d--local-logging-and-diagnostics)
 records the red-first boundary and fresh verification. Listing the IDs is not passing evidence.
+
+**Reported status:** Spec 05g implements `UT-POWER-001`; the
+[Spec 05g ledger](design/evidence/README.md#spec-05g--long-running-runs-safe-exit-and-optional-keep-awake)
+records the fresh migration, adapter-decision and native integration commands. Listing the ID is
+not passing evidence.
 
 Do not add unit tests that instantiate a fake repository/GUI just to mirror an `IT-*` case. Conversely, if the algorithm truly depends on WAV decoder/frame reads, include a minimal actual WAV integration test for that boundary. See [`INTEGRATION_TESTING.md`](INTEGRATION_TESTING.md) and its indexed behavior plan.
