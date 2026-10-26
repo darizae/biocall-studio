@@ -18,8 +18,6 @@ Write failing tests first; **`UT-TRAIN-001`/`004`/`005`** and **`IT-TRAIN-001`**
 
 CNN assertions for the **shared** IDs (`UT-TRAIN-003`, `IT-TRAIN-004`–`009`, `012`, `014`) are useful incremental tests but **do not close those IDs**: the indexed behaviors require both families and/or real preset-to-Model checks. No RF result, full Spec 05 acceptance, packaging independence or Prediction claim belongs to 05b. Finish with verified tests/evidence and a scoped [Git handoff](../agent/GIT_DELIVERY.md); report separate upstream SHA if applicable.
 
-## Snapshot handoff — 25 October 2026
+## Historical checkpoint — 25 October 2026
 
-**Implemented, awaiting owner acceptance:** CNN Worker, common Model publication/reload, owned tests and native evidence are present in this ZIP. The [05b evidence ledger](../design/evidence/README.md#spec-05b--real-cnn-training-and-common-model-foundation) records previous macOS test results and screenshots; these are not independent verification of the present checkout.
-
-Before closing 05b, rerun affected tests on the native checkout and verify the active toolbox import, visual evidence, Trainer/upstream commit SHAs and clean Git status. The transfer ZIP lacks `.git` and sibling/native dependencies, so those gates remain **unverified here**. Shared cross-family and package-independence gates stay with 05c.
+05b delivered the CNN Worker, common Model publication/reload, tests and [native evidence](../design/evidence/README.md#spec-05b--real-cnn-training-and-common-model-foundation). At that checkpoint, cross-family and wheel-independence gates were deferred to [05c](05c-rf-training-and-cross-family-acceptance.md), whose later execution record supersedes this handoff. Verify actual checkout tests and Git status before owner acceptance.

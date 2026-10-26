@@ -33,6 +33,7 @@ def _run(*, kind: RunKind = RunKind.DATASET_BUILD, input_dataset_id: str | None 
         output_id="dataset-001" if kind is RunKind.DATASET_BUILD else "model-001",
         stages=("Validate inputs", "Publish output"),
         now=NOW,
+        training_family="cnn" if kind is RunKind.TRAINING else None,
     )
 
 

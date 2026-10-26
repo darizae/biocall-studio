@@ -8,7 +8,11 @@ version = "0.1.0a0"
 description = "Local Collection-first bioacoustics Dataset and Model trainer"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
-dependencies = ["bioacoustics-dl-toolbox==0.1.1"]
+dependencies = [
+  "bioacoustics-dl-toolbox[rf]==0.1.1",
+  "joblib>=1.4,<2",
+  "scikit-learn>=1.5,<2",
+]
 
 [project.optional-dependencies]
 gui = ["PySide6-Essentials>=6.11,<6.12"]

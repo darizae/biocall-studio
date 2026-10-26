@@ -6,8 +6,8 @@
 > cancellable WAV-header scanning, validation, cache publication and immutable Dataset Build with
 > protected Negative Mining and source-grouped Splits, plus persisted supervised Worker Runs,
 > cancellation, recovery and history. The native Training page now provides complete typed CNN/RF
-> configuration and user-level saved presets. A genuine bounded CPU CNN executor publishes a
-> verified immutable Model with measured validation results; Random Forest execution and installers
+> configuration and user-level saved presets. Genuine bounded CPU CNN and deterministic Random
+> Forest executors publish verified immutable Models with measured validation results; installers
 > remain planned. Never interpret a simulated browser run as scientific output.
 
 ## What you can do
@@ -17,10 +17,10 @@ copying audio, fix per-file validation issues, reopen published Collection metad
 verified immutable Dataset of real target/noise WAV Snippets. Dataset Build keeps each Source
 Recording wholly in train or val. Follow actual stage progress, cancel safely, inspect failures and
 Configure either model family from a published Dataset, inspect/reset detailed settings, save and
-manage presets, and freeze a validated configuration handoff. Start genuine local CPU CNN Training,
-inspect measured train/validation loss, reopen its structurally verified checkpoint, and navigate the
-published Model's Dataset, Run, metrics and provenance. Random Forest execution remains disabled
-until Spec 05c; this Trainer does not run prediction or score new recordings.
+manage presets, and freeze a validated configuration handoff. Start genuine local CPU CNN or
+Random Forest Training, inspect measured CNN train/validation loss or RF feature importances,
+reopen the structurally verified checkpoint/estimator, and navigate each published Model's Dataset,
+Run, metrics and provenance. This Trainer does not run prediction or score new recordings.
 
 **Input folder example:**
 
@@ -38,8 +38,8 @@ Positive filename timestamps refer to the *original Source Recording* and are ex
 
 These are real PySide6 application captures from macOS using the sibling `alp-ui` checkout. They
 show the currently implemented native shell, Collection Scan, Dataset Build, Run lifecycle,
-Training and Model views. Counts, loss and metrics come from generated real PCM WAV inputs and a
-genuine CPU CNN Run; no simulated Model or training metric is presented.
+Training and Model views. Counts, loss, metrics and feature importances come from generated real
+PCM WAV inputs and genuine CPU CNN/RF Runs; no simulated Model or metric is presented.
 
 **Select a Collection — native macOS app**
 
@@ -89,11 +89,19 @@ genuine CPU CNN Run; no simulated Model or training metric is presented.
 
 ![Native macOS CNN Model detail](docs/design/evidence/spec-05-native/model-detail.png)
 
+**Completed Random Forest Run with fitted feature importances — native macOS app**
+
+![Native macOS completed Random Forest Training Run](docs/design/evidence/spec-05-native/run-rf-plot.png)
+
+**Verified immutable Random Forest Model — native macOS app**
+
+![Native macOS Random Forest Model detail](docs/design/evidence/spec-05-native/model-detail-rf.png)
+
 The complete [native evidence set and parity review](docs/design/evidence/README.md) also covers
 Reading/cancel, Settings, all four initial empty routes, Builder underfill/busy states, Dataset
 list/detail navigation, Worker cancellation/failure/completion/history, both Training families,
-saved presets, genuine CNN loss, published Model list/detail, keyboard interactions and narrow
-resized windows.
+saved presets, genuine CNN loss, genuine RF feature importances, both-family Model list/detail,
+keyboard interactions and narrow resized windows.
 
 ## Interactive design reference
 
@@ -118,7 +126,7 @@ install to a **project-local `.venv`**; no global Python packages are needed.
 # From your repos/alpacaDesktopTrainer directory
 python3 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -e ../bioacoustics-dl-toolbox
+.venv/bin/python -m pip install -e '../bioacoustics-dl-toolbox[rf]'
 .venv/bin/python -m pip install -e '.[gui,test,integration]'
 .venv/bin/python -m pip install -e ../alp-ui
 
@@ -162,9 +170,9 @@ git lfs install
 
 Read [AGENTS.md](AGENTS.md) → [agent routing](docs/agent/ROUTING.md) → **only the active spec** in [specs index](docs/specs/README.md). Do **not** read the entire documentation tree by default.
 
-**Current milestone:** [Spec 05b CNN training and Model foundation](docs/specs/05b-cnn-training-and-model-foundation.md)
-is implemented with a genuine CPU Worker, measured results, immutable Model publication, trusted
-fresh-process structural reload and native evidence. Real Random Forest execution remains Spec 05c;
-macOS/Windows installed release qualification remains later work.
+**Current milestone:** [Spec 05c RF training and cross-family acceptance](docs/specs/05c-rf-training-and-cross-family-acceptance.md)
+is implemented with genuine CNN/RF Workers, measured results, one immutable Model publication
+format, trusted fresh-process structural reloads and native evidence. Prediction remains out of
+scope; macOS/Windows installed release qualification remains later work.
 
 Reference map (open only for the task at hand): [vision](docs/VISION.md), [glossary](docs/GLOSSARY.md), [domain workflow](docs/models/USER_WORKFLOWS_AND_DATA_MODEL.md), [workflow rules](docs/models/WORKFLOW_RULES.md), [architecture](docs/ARCHITECTURE.md), [UX parity](docs/design/UX_PARITY_MATRIX.md), [scientific sibling source map](docs/agent/SOURCE_MAP.md), [unit testing](docs/UNIT_TESTING.md), [integration testing](docs/INTEGRATION_TESTING.md), [fixture policy](docs/INTEGRATION_TEST_DATA.md), [Git/branch delivery](docs/agent/GIT_DELIVERY.md). The scientific pipeline is referenced from the verified sibling `../alpaca-pipelines` checkout; it is not vendored here.

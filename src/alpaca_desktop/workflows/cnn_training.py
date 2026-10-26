@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import random
@@ -34,7 +33,7 @@ from bioacoustics_dl_toolbox.models import Classifier, ResidualEncoder
 from bioacoustics_dl_toolbox.training.checkpoints import save_model
 from bioacoustics_dl_toolbox.training.trainer import Trainer
 
-from alpaca_desktop.domain.model import MODEL_TOOLBOX_REVISION
+from alpaca_desktop.domain.model import MODEL_SCIENTIFIC_REFERENCE, MODEL_TOOLBOX_REVISION
 from alpaca_desktop.domain.paths import validate_relative_path
 from alpaca_desktop.domain.training import (
     DeviceCapabilities,
@@ -49,8 +48,10 @@ from alpaca_desktop.persistence.models import (
     load_model,
     structurally_reload_cnn_directory,
 )
-
-SCIENTIFIC_REFERENCE = "alpaca-pipelines@91af5287dc18313f88902dc9696e8756274736b3"
+from alpaca_desktop.workflows.model_publication import (
+    publish_model_directory,
+    write_model_manifest,
+)
 
 
 class CnnTrainingError(RuntimeError):
@@ -341,39 +342,6 @@ def _selected_epoch(history: dict[str, list[dict[str, Any]]], config: TrainingCo
     return int(choose(candidates, key=lambda row: float(row[key]))["epoch"])
 
 
-def _write_manifest(path: Path, payload: dict[str, Any]) -> None:
-    encoded = (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode()
-    with path.open("xb") as stream:
-        stream.write(encoded)
-        stream.flush()
-        os.fsync(stream.fileno())
-
-
-def _publish(stage: Path, final: Path) -> None:
-    final.parent.mkdir(parents=True, exist_ok=True)
-    lock = final.parent / ".publish.lock"
-    descriptor: int | None = None
-    try:
-        descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-        os.write(descriptor, f"{os.getpid()}\n".encode())
-        os.fsync(descriptor)
-        if final.exists():
-            raise FileExistsError(f"Model already exists: {final.name}")
-        os.rename(stage, final)
-        try:
-            directory = os.open(final.parent, os.O_RDONLY)
-            try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
-        except OSError:
-            pass
-    finally:
-        if descriptor is not None:
-            os.close(descriptor)
-            lock.unlink(missing_ok=True)
-
-
 def train_cnn_model(
     collection_root: Path,
     request: CnnTrainingRequest,
@@ -657,17 +625,17 @@ def train_cnn_model(
                     "revision": MODEL_TOOLBOX_REVISION,
                 },
                 "torch_version": torch.__version__,
-                "scientific_reference": SCIENTIFIC_REFERENCE,
+                "scientific_reference": MODEL_SCIENTIFIC_REFERENCE,
             },
         }
         if progress is not None:
             progress(3, 91, "Verifying staged CNN Model")
-        _write_manifest(stage / "model.json", manifest)
+        write_model_manifest(stage / "model.json", manifest)
         structurally_reload_cnn_directory(stage, safe_model_id)
         _check_cancelled(cancelled)
         if progress is not None:
             progress(3, 98, "Publishing verified CNN Model")
-        _publish(stage, final)
+        publish_model_directory(stage, final)
         return load_model(root, safe_model_id)
     except InterruptedError as exc:
         raise CnnTrainingCancelled("CNN Training cancelled before Model publication.") from exc

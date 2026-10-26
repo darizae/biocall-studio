@@ -17,7 +17,9 @@ def main(argv: list[str] | None = None) -> int:
         help="Isolate Application Settings in this directory instead of the Qt standard location.",
     )
     parser.add_argument(
-        "--worker", choices=("dataset-build", "cnn-training"), help=argparse.SUPPRESS
+        "--worker",
+        choices=("dataset-build", "cnn-training", "rf-training"),
+        help=argparse.SUPPRESS,
     )
     parser.add_argument("--request", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--worker-step-delay", type=float, default=0.0, help=argparse.SUPPRESS)
@@ -35,6 +37,12 @@ def main(argv: list[str] | None = None) -> int:
         if not 0 <= args.worker_step_delay <= 5:
             parser.error("--worker-step-delay must be between 0 and 5 seconds")
         return _run_cnn_training_worker(args.request, args.worker_step_delay)
+    if args.worker == "rf-training":
+        if args.request is None:
+            parser.error("--request is required for the RF Training Worker")
+        if not 0 <= args.worker_step_delay <= 5:
+            parser.error("--worker-step-delay must be between 0 and 5 seconds")
+        return _run_rf_training_worker(args.request, args.worker_step_delay)
 
     from alpaca_desktop.gui.app import run
 
@@ -159,6 +167,71 @@ def _run_cnn_training_worker(request_path: Path, step_delay_seconds: float = 0.0
             },
         )
     except CnnTrainingCancelled as exc:
+        emit("cancelled", message=str(exc))
+        return 2
+    except Exception as exc:
+        message = str(exc)
+        if root is not None:
+            message = message.replace(str(root), "<Collection>")
+        emit("error", message=message)
+        print(message, file=sys.stderr)
+        return 1
+    emit("completed", output_id=artifact.model_id, message="Output verified and published")
+    return 0
+
+
+def _run_rf_training_worker(request_path: Path, step_delay_seconds: float = 0.0) -> int:
+    from alpaca_desktop.persistence.collection_metadata import load_collection_metadata
+    from alpaca_desktop.persistence.runs import (
+        WORKER_RESULT_SCHEMA_VERSION,
+        cancellation_requested,
+        write_completion_receipt,
+    )
+    from alpaca_desktop.workflows.rf_training import (
+        RfTrainingCancelled,
+        RfTrainingRequest,
+        train_rf_model,
+    )
+
+    def emit(event: str, **payload) -> None:
+        print(json.dumps({"schema_version": 1, "event": event, **payload}), flush=True)
+        if step_delay_seconds:
+            time.sleep(step_delay_seconds)
+
+    root: Path | None = None
+    try:
+        if request_path.stat().st_size > 1_000_000:
+            raise ValueError("RF Training request exceeds 1 MiB.")
+        with request_path.open(encoding="utf-8") as stream:
+            request = RfTrainingRequest.from_dict(json.load(stream))
+        root = Path(request.collection_root)
+        metadata = load_collection_metadata(root)
+        if metadata.collection_id != request.collection_id:
+            raise ValueError("RF Training request Collection binding no longer matches.")
+        emit("started", message="RF Training Worker started")
+        artifact = train_rf_model(
+            root,
+            request,
+            cancelled=lambda: cancellation_requested(request_path),
+            progress=lambda stage_index, progress, message: emit(
+                "progress",
+                stage_index=stage_index,
+                progress=progress,
+                message=message,
+            ),
+            measurement=lambda row: emit("measurement", **row),
+        )
+        write_completion_receipt(
+            request_path,
+            {
+                "schema_version": WORKER_RESULT_SCHEMA_VERSION,
+                "run_id": request.run_id,
+                "request_id": request.request_id,
+                "output_kind": "model",
+                "output_id": artifact.model_id,
+            },
+        )
+    except RfTrainingCancelled as exc:
         emit("cancelled", message=str(exc))
         return 2
     except Exception as exc:

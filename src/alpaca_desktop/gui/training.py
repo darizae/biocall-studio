@@ -904,14 +904,9 @@ class TrainingPage(QScrollArea):
         else:
             self.error_alert.hide()
         active = self.controller.active_run is not None
-        supported = self.family == "cnn"
-        self.start_button.setEnabled(not errors and not active and supported)
+        self.start_button.setEnabled(not errors and not active)
         self.run_availability.setText(
-            "Another Run is active."
-            if active
-            else "Random Forest execution is implemented in Spec 05c."
-            if not supported
-            else "One Active Run at a time."
+            "Another Run is active." if active else "One Active Run at a time."
         )
         modified_details = sum(
             field.key in self.draft.modified_keys()
@@ -958,9 +953,10 @@ class TrainingPage(QScrollArea):
                 getattr(control, "control", control).setFocus()
             self._validate_and_refresh()
             return
-        if self.family != "cnn" or self.artifact is None:
+        if self.artifact is None:
             return
-        default_label = f"{self.artifact.label} · CNN"
+        family_label = "CNN" if self.family == "cnn" else "Random Forest"
+        default_label = f"{self.artifact.label} · {family_label}"
         label, accepted = QInputDialog.getText(
             self,
             "Name your Model",

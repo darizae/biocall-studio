@@ -252,7 +252,7 @@ WAVs. No training Worker ran, no metric was invented and no Model was published.
 
 ### Capture provenance
 
-- Captured 25 October 2026 on macOS 26.6.2 arm64, Python 3.12.7, PySide6/Qt 6.11.2,
+- Recaptured 26 October 2026 on macOS 26.6.2 arm64, Python 3.12.7, PySide6/Qt 6.11.2,
   `alp-ui` 0.1.0a0 at `330aaab96a6b32dd2d83ae84a52a2a238446d264`.
 - Cocoa primary screen: 1470×956 logical pixels, device pixel ratio 2.0, logical DPI 72; normal
   app capture 1280×807 and compact capture 700×780. PNGs preserve native compositor output.
@@ -304,7 +304,7 @@ structural reload and native naming/Run/Model screens. No inference was implemen
 ### Capture provenance
 
 - Command: `unset QT_QPA_PLATFORM; .venv/bin/python -u scripts/capture_spec05_screenshots.py`
-- Captured 25 October 2026 on macOS 26.6.2 arm64; native Cocoa; 1470×956 logical primary screen,
+- Recaptured 26 October 2026 on macOS 26.6.2 arm64; native Cocoa; 1470×956 logical primary screen,
   device pixel ratio 2.0 and logical DPI 72
 - Runtime: Python 3.12.7; PySide6/Qt 6.11.2; `alp-ui` 0.1.0a0 at
   `330aaab96a6b32dd2d83ae84a52a2a238446d264`
@@ -354,10 +354,76 @@ These are prior-session reports, not reruns from this ZIP. Tests exercise Datase
 CNN → Model, preset independence, trusted fresh-process reload, cancellation/no-publication,
 measured numeric Plot values and native navigation.
 
-**Open gates:** shared `UT-TRAIN-003`, `IT-TRAIN-004`–`009`/`012`/`014` require RF-side and/or
-package-independence verification in 05c; installed releases remain in 06/07. The transfer ZIP
-has no Git metadata or sibling checkout: confirm both commit SHAs and clean trees in the original
-repositories before accepting 05b.
+At this 05b checkpoint, shared `UT-TRAIN-003` and `IT-TRAIN-004`–`009`/`012`/`014` awaited RF and
+wheel verification, subsequently reported in 05c below. Installed qualification remains in 06/07.
+
+## Spec 05c — Real RF training and phase 05 acceptance
+
+**Status: 05c implementation and macOS tests reported complete; owner sign-off not established by this ZIP.** The recorded RF Worker fits/evaluates real Dataset Snippets and publishes a structurally reloadable, checksummed binary Model through the common CNN/RF boundary. The macOS record reports `UT-TRAIN-001`–`010` and `IT-TRAIN-001`–`014` passing. No Prediction/new-WAV inference was added.
+
+### Capture and scientific provenance
+
+- Command: `.venv/bin/python scripts/capture_spec05_screenshots.py --output-dir
+  docs/design/evidence/spec-05-native`
+- Captured and reviewed 26 October 2026 on macOS 26.6.2 arm64; native Cocoa; Python 3.12.7;
+  PySide6/Qt 6.11.2; `alp-ui` 0.1.0a0 at
+  `330aaab96a6b32dd2d83ae84a52a2a238446d264`
+- App/stored desktop PNGs: 1280×807; current Showcase: 1180×790; device-pixel ratio 2.0
+- Scientific reference: targeted `../alpaca-pipelines` RF implementation at
+  `91af5287dc18313f88902dc9696e8756274736b3`; direct reusable extractor dependency:
+  `bioacoustics-dl-toolbox` 0.1.1 at `8e2e0528d4ce718005e194d426cde6e62fda0909`
+- Data/privacy: generated mono PCM Source Recordings, timestamped positives and one real immutable
+  target/noise Dataset used by both genuine CNN and RF Runs; no user or HPC data
+- Capture mechanism: visible `QMainWindow`, native `QInputDialog` and Cocoa
+  `QScreen.grabWindow`; the capture command rejects non-Cocoa/offscreen rendering
+
+The pipeline's RF feature/preprocess code and tests were inspected at the recorded SHA before the
+toolbox helper was reused. The Trainer adapter retains the exact ordered pipeline names while the
+toolbox owns robust/MFCC calculation. Its loader's Kaiser resampler was not reused because it is
+not equivalent to the inspected pipeline. The Trainer instead records and applies the pipeline's
+current explicit `librosa` SOXR-HQ, fixed-length, unscaled policy before centered constant
+zero-padding, with the `librosa` version, FFT/hop/band/MFCC/delta settings, float policies,
+extractor revision, `classes_`, target probability column, threshold and ordered fitted
+importances. No upstream source change was necessary.
+
+Prototype `trainPage`, `rfChart`, `startTraining`, `modelPage`, relevant CSS/previews and the live
+sibling Showcase were reviewed source-first. The latter was captured as
+[alp-ui-showcase-current.png](spec-05-native/alp-ui-showcase-current.png); native images were reviewed at original resolution.
+
+### State-by-state review
+
+Six-dimension key: **H** information hierarchy/CTA/panel order; **N** navigation/active state;
+**C** terms/copy/feedback; **A** `alp-ui` components/theme/icons/accessibility; **I** interaction,
+focus, progress and resize; **S** real scientific/undefined/error/completed-state fidelity.
+
+| State | Prototype target | Native evidence | Showcase and interaction evidence | Six dimensions | Difference / disposition |
+|---|---|---|---|---|---|
+| RF naming and launch | `startTraining()` / `nameModel()` | [model-name-rf.png](spec-05-native/model-name-rf.png) | Frozen loaded-preset config, family-specific stages and one-Active-Run gate; `IT-TRAIN-002/012/014` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | As for CNN, the final label is collected before the Worker so atomic publication never leaves unnamed/orphan trained bytes. |
+| Completed RF Run and Plot | `runPage()` / `rfChart()` | [run-rf-plot.png](spec-05-native/run-rf-plot.png) | Real extract→fit→validate→verify stages; public `Plot.setBars`; exact selectable numeric alternative; `IT-TRAIN-005/006/007` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | Browser demo bars are replaced by the fitted estimator's ordered values. RF never shows fictional epoch loss. Zero importances remain truthful numeric measurements. |
+| Both-family Model list | `modelsPage()` | [models.png](spec-05-native/models.png) | One CNN and one RF genuinely trained from `dataset-training-evidence`; family, stable ID, readable label, Dataset/date and Inspect action; `IT-TRAIN-003/007/008` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | “Available to Prediction” remains omitted because structural reload does not authorize inference. |
+| RF Model detail | `modelPage()` / `model-preview.png` | [model-detail-rf.png](spec-05-native/model-detail-rf.png) | Saved threshold, actual metrics/undefined reason, Dataset/Run links, immutable files and exact toolbox/scikit-learn provenance; `IT-TRAIN-003/006/007/008` | H **MATCH** · N **MATCH** · C **MATCH** · A **MATCH** · I **MATCH** · S **MATCH** | The tiny evidence Dataset truthfully produced undefined F1 in this capture; the reason is displayed instead of a fictitious zero. The external Prediction CTA is replaced by the explicit scope boundary. |
+
+### Verification record
+
+- Red-first evidence: RF unit collection initially failed because the domain module did not exist;
+  RF integration initially failed because no structural RF loader existed.
+- `.venv/bin/pytest -q tests/unit/test_training_config.py tests/unit/test_model.py
+  tests/unit/test_rf_training_domain.py` — **12 passed**.
+- `.venv/bin/pytest -q tests/integration/test_training_ui.py
+  tests/integration/test_cnn_training.py tests/integration/test_rf_training.py
+  tests/integration/test_training_packaging.py` — **8 passed**.
+- `.venv/bin/pytest -q` — **86 passed** in 53.17 s.
+- `.venv/bin/ruff check src tests scripts` and `ruff format --check` — passed.
+- `scripts/audit_test_ids.py`, `scripts/check_fixtures.py`, native `verify_handoff.py` and
+  `git lfs fsck` — passed.
+- `IT-TRAIN-009` built committed toolbox and Trainer wheels, installed their artifacts into an
+  isolated target, and imported the RF workflow/extractor from those installed wheels rather than
+  either sibling source tree. Rebuilt wheel SHA-256 values were
+  `6aebdfe8aed86376691e34669e6213a314cc451f79541d0b4edaace1062b1f3e` (Trainer) and
+  `ef98db07ba6e5cf320c62d0d5f6f3386c554d98cfd522df68d86fbb1a770dc1f` (toolbox).
+
+These are recorded macOS development-app results, not an independent rerun or owner sign-off.
+Installed `.app` and Windows qualification remain in Specs 06/07.
 
 ## Every subsequent spec: mandatory ledger
 

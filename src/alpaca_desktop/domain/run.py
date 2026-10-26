@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Any
 
 from alpaca_desktop.domain.paths import validate_relative_path
 
-RUN_STATE_SCHEMA_VERSION = 2
+RUN_STATE_SCHEMA_VERSION = 3
 MAX_ACTIVITY_ENTRIES = 200
 MAX_ACTIVITY_MESSAGE_LENGTH = 1_000
-MAX_MEASUREMENTS = 200
+# The largest validated RF schema is 11 robust values plus 6 values per MFCC.
+# Retain its complete ordered importance series; CNN history remains bounded too.
+MAX_MEASUREMENTS = 6_100
 
 
 class RunKind(StrEnum):
@@ -116,6 +119,7 @@ class RunState:
     activity: tuple[str, ...]
     error: str
     published_artifact_id: str | None
+    training_family: str | None
     measurements: tuple[dict[str, Any], ...] = ()
 
     @property
@@ -162,6 +166,7 @@ class RunState:
             "activity": list(self.activity),
             "error": self.error,
             "published_artifact_id": self.published_artifact_id,
+            "training_family": self.training_family,
             "measurements": [dict(item) for item in self.measurements],
         }
 
@@ -188,6 +193,7 @@ class RunState:
             "activity",
             "error",
             "published_artifact_id",
+            "training_family",
             "measurements",
         }
         if set(raw) != expected:
@@ -213,6 +219,7 @@ class RunState:
                 published_artifact_id=_optional_id(
                     raw["published_artifact_id"], "published artifact ID"
                 ),
+                training_family=_training_family(raw["training_family"]),
                 measurements=_measurements(raw["measurements"]),
             )
         except (KeyError, TypeError) as exc:
@@ -258,6 +265,14 @@ def _output_kind(value: object) -> str:
     return str(value)
 
 
+def _training_family(value: object) -> str | None:
+    if value is None:
+        return None
+    if value not in {"cnn", "rf"}:
+        raise ValueError("Training family must be cnn, rf, or null.")
+    return str(value)
+
+
 def _stages(value: object) -> tuple[str, ...]:
     if not isinstance(value, (list, tuple)) or not value:
         raise ValueError("A Run requires at least one stage.")
@@ -281,6 +296,27 @@ def _measurements(value: object) -> tuple[dict[str, Any], ...]:
     prepared: list[dict[str, Any]] = []
     allowed = {"phase", "epoch", "loss", "accuracy", "precision", "recall", "f1"}
     for raw in value:
+        if isinstance(raw, dict) and raw.get("kind") == "feature_importance":
+            if (
+                set(raw) != {"kind", "feature", "importance"}
+                or not isinstance(raw["feature"], str)
+                or not raw["feature"]
+                or len(raw["feature"]) > 200
+                or isinstance(raw["importance"], bool)
+                or not isinstance(raw["importance"], (int, float))
+            ):
+                raise ValueError("RF feature importance measurement shape is invalid.")
+            importance = float(raw["importance"])
+            if not math.isfinite(importance) or importance < 0:
+                raise ValueError("RF feature importance must be finite and nonnegative.")
+            prepared.append(
+                {
+                    "kind": "feature_importance",
+                    "feature": raw["feature"],
+                    "importance": importance,
+                }
+            )
+            continue
         if (
             not isinstance(raw, dict)
             or not {"phase", "epoch", "loss"}.issubset(raw)
@@ -316,6 +352,10 @@ def _validate_state(state: RunState) -> None:
         raise ValueError("Dataset Build must reserve a Dataset output.")
     if state.kind is RunKind.TRAINING and state.output_kind != "model":
         raise ValueError("Training must reserve a Model output.")
+    if state.kind is RunKind.DATASET_BUILD and state.training_family is not None:
+        raise ValueError("Dataset Build cannot declare a Training family.")
+    if state.kind is RunKind.TRAINING and state.training_family not in {"cnn", "rf"}:
+        raise ValueError("Training Run must declare its model family.")
     if state.status is RunStatus.COMPLETED:
         if state.progress != 100 or state.stage_index != len(state.stages):
             raise ValueError("A completed Run must finish every stage at 100 percent.")
@@ -346,6 +386,7 @@ def new_run(
     output_id: str,
     stages: tuple[str, ...],
     now: str,
+    training_family: str | None = None,
 ) -> RunState:
     state = RunState(
         run_id=_portable_id(run_id, "Run ID"),
@@ -365,6 +406,7 @@ def new_run(
         activity=("Run created",),
         error="",
         published_artifact_id=None,
+        training_family=_training_family(training_family),
         measurements=(),
     )
     _validate_state(state)

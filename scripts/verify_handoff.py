@@ -132,6 +132,10 @@ def main() -> int:
             "presets-unsaved.png",
             "presets-confirm-delete.png",
             "train-cnn-narrow-focus.png",
+            "run-cnn-plot.png",
+            "run-rf-plot.png",
+            "model-detail.png",
+            "model-detail-rf.png",
             "alp-ui-showcase-current.png",
         ):
             shot = training_directory / name
@@ -139,7 +143,7 @@ def main() -> int:
                 errors.append(f"Missing valid-sized persistent Spec 05 screenshot: {shot}")
             elif shot.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
                 errors.append(f"Not a real PNG: {shot}")
-            if name == "train-cnn.png" and (
+            if name in {"train-cnn.png", "run-rf-plot.png", "model-detail-rf.png"} and (
                 f"docs/design/evidence/spec-05-native/{name}" not in readme
             ):
                 errors.append(f"README must embed real native Spec 05 screenshot: {name}")

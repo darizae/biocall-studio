@@ -318,53 +318,76 @@ class RunDetailPage(QScrollArea):
 
         if run.kind.value == "training":
             measurements_card = Card(shadow=False)
-            measurements_card.content_layout.addWidget(Text("Training loss", role="subheading"))
-            measurements_card.content_layout.addWidget(
-                Text(
-                    "Measured train and validation loss reported by the supervised Worker.",
-                    role="caption",
-                    word_wrap=True,
+            if run.training_family == "rf":
+                measurements_card.content_layout.addWidget(
+                    Text("Validation and feature importance", role="subheading")
                 )
-            )
-            lines: dict[str, list[tuple[float, float]]] = {}
-            for phase in ("train", "val"):
-                points = [
-                    (float(item["epoch"]), float(item["loss"]))
-                    for item in run.measurements
-                    if item.get("phase") == phase
+                measurements_card.content_layout.addWidget(
+                    Text(
+                        "Random Forest reports held-out validation metrics and actual fitted "
+                        "feature importances; it does not produce epoch loss.",
+                        role="caption",
+                        word_wrap=True,
+                    )
+                )
+                importance_rows = [
+                    item for item in run.measurements if item.get("kind") == "feature_importance"
                 ]
-                if points:
-                    lines[f"{phase} loss"] = points
-            self.training_plot = Plot(kind="line", x_label="Epoch", y_label="Loss")
-            self.training_plot.setAccessibleName("CNN train and validation loss")
-            self.training_plot.setLines(lines)
+                bars = [
+                    (str(item["feature"]), float(item["importance"])) for item in importance_rows
+                ]
+                self.training_plot = Plot(kind="bar", x_label="Feature", y_label="Importance")
+                self.training_plot.setAccessibleName("Random Forest feature importance")
+                self.training_plot.setBars(bars)
+                summaries = [f"{name} · {value:.6f}" for name, value in bars]
+                empty_text = "Measured feature importances appear after the forest has been fitted."
+                accessible_name = "Feature importance numeric values"
+            else:
+                measurements_card.content_layout.addWidget(Text("Training loss", role="subheading"))
+                measurements_card.content_layout.addWidget(
+                    Text(
+                        "Measured train and validation loss reported by the supervised Worker.",
+                        role="caption",
+                        word_wrap=True,
+                    )
+                )
+                lines: dict[str, list[tuple[float, float]]] = {}
+                for phase in ("train", "val"):
+                    points = [
+                        (float(item["epoch"]), float(item["loss"]))
+                        for item in run.measurements
+                        if item.get("phase") == phase
+                    ]
+                    if points:
+                        lines[f"{phase} loss"] = points
+                self.training_plot = Plot(kind="line", x_label="Epoch", y_label="Loss")
+                self.training_plot.setAccessibleName("CNN train and validation loss")
+                self.training_plot.setLines(lines)
+                by_epoch: dict[int, dict[str, float]] = {}
+                for item in run.measurements:
+                    phase = item.get("phase")
+                    epoch = item.get("epoch")
+                    loss = item.get("loss")
+                    if phase in {"train", "val"} and isinstance(epoch, int):
+                        by_epoch.setdefault(epoch, {})[str(phase)] = float(loss)
+                summaries = []
+                for epoch, phases in sorted(by_epoch.items())[-6:]:
+                    values = " · ".join(
+                        f"{phase} loss {phases[phase]:.4f}"
+                        for phase in ("train", "val")
+                        if phase in phases
+                    )
+                    summaries.append(f"Epoch {epoch} · {values}")
+                empty_text = "Measured loss appears after the first completed training phase."
+                accessible_name = "Numeric CNN loss measurements"
             self.training_plot.setMinimumHeight(230)
             measurements_card.content_layout.addWidget(self.training_plot)
-            by_epoch: dict[int, dict[str, float]] = {}
-            for item in run.measurements:
-                phase = item.get("phase")
-                epoch = item.get("epoch")
-                loss = item.get("loss")
-                if phase in {"train", "val"} and isinstance(epoch, int):
-                    by_epoch.setdefault(epoch, {})[str(phase)] = float(loss)
-            summaries = []
-            for epoch, phases in sorted(by_epoch.items())[-6:]:
-                values = " · ".join(
-                    f"{phase} loss {phases[phase]:.4f}"
-                    for phase in ("train", "val")
-                    if phase in phases
-                )
-                summaries.append(f"Epoch {epoch} · {values}")
-            self.training_values = QLabel(
-                "\n".join(summaries)
-                if summaries
-                else "Measured loss appears after the first completed training phase."
-            )
+            self.training_values = QLabel("\n".join(summaries) if summaries else empty_text)
             self.training_values.setWordWrap(True)
             self.training_values.setTextInteractionFlags(
                 Qt.TextInteractionFlag.TextSelectableByMouse
             )
-            self.training_values.setAccessibleName("Numeric CNN loss measurements")
+            self.training_values.setAccessibleName(accessible_name)
             measurements_card.content_layout.addWidget(self.training_values)
             left.addWidget(measurements_card)
 

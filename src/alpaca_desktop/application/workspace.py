@@ -57,6 +57,7 @@ from alpaca_desktop.persistence.runs import (
 from alpaca_desktop.persistence.settings import ApplicationSettings, SettingsStore
 from alpaca_desktop.workflows.cnn_training import CnnTrainingRequest
 from alpaca_desktop.workflows.dataset_build import DatasetBuildRequest
+from alpaca_desktop.workflows.rf_training import RfTrainingRequest
 
 
 class _CollectionScanThread(QThread):
@@ -358,11 +359,11 @@ class WorkspaceController(QObject):
         model_label: str,
         model_id: str | None = None,
     ) -> str:
-        """Persist and supervise one genuine CNN Training Run."""
+        """Persist and supervise one genuine CNN or Random Forest Training Run."""
         if self.collection_path is None or self.collection_id is None:
             raise ValueError("Select a validated Collection before Training.")
-        if config.family != "cnn":
-            raise ValueError("Spec 05b starts genuine CNN Training only.")
+        if config.family not in {"cnn", "rf"}:
+            raise ValueError("Training requires a supported CNN or RF configuration.")
         try:
             dataset = load_dataset(self.collection_path, config.dataset_id)
             TrainingDataset.from_artifact(dataset)
@@ -379,7 +380,8 @@ class WorkspaceController(QObject):
             model_id,
         )
         assert_run_start_allowed(self._runs, reservation)
-        candidate = CnnTrainingRequest(
+        request_type = CnnTrainingRequest if config.family == "cnn" else RfTrainingRequest
+        candidate = request_type(
             run_id,
             request_id,
             str(self.collection_path),
@@ -388,7 +390,7 @@ class WorkspaceController(QObject):
             model_id,
             model_label,
         )
-        request = CnnTrainingRequest.from_dict(candidate.to_dict())
+        request = request_type.from_dict(candidate.to_dict())
         final = self.collection_path / ".alpaca" / "models" / request.model_id
         if final.exists():
             raise RunConflictError(f"The prospective model output already exists: {model_id}")
@@ -397,18 +399,30 @@ class WorkspaceController(QObject):
             run_id=run_id,
             request_id=request_id,
             kind=RunKind.TRAINING,
-            title=run_name or f"Train CNN · {dataset.label}",
+            title=run_name
+            or f"Train {'CNN' if config.family == 'cnn' else 'Random Forest'} · {dataset.label}",
             collection_id=self.collection_id,
             input_dataset_id=dataset.dataset_id,
             output_kind="model",
             output_id=model_id,
             stages=(
-                "Validate immutable Dataset",
-                "Prepare spectrogram batches",
-                "Train and validate CNN",
-                "Verify and publish Model",
+                (
+                    "Validate immutable Dataset",
+                    "Prepare spectrogram batches",
+                    "Train and validate CNN",
+                    "Verify and publish Model",
+                )
+                if config.family == "cnn"
+                else (
+                    "Validate immutable Dataset",
+                    "Extract acoustic features",
+                    "Fit Random Forest",
+                    "Validate predictions",
+                    "Verify and publish Model",
+                )
             ),
             now=utc_now(),
+            training_family=config.family,
         )
         create_run(self.collection_path, state)
         self._set_run(state)
@@ -420,7 +434,11 @@ class WorkspaceController(QObject):
                 state,
                 RunStatus.STARTING,
                 now=utc_now(),
-                message="Starting CNN Training Worker",
+                message=(
+                    "Starting CNN Training Worker"
+                    if config.family == "cnn"
+                    else "Starting RF Training Worker"
+                ),
             )
             self._set_run(state)
         except Exception as exc:
@@ -429,12 +447,15 @@ class WorkspaceController(QObject):
                 RunStatus.FAILED,
                 now=utc_now(),
                 error=self._portable_error(str(exc)),
-                message="CNN Worker request could not be prepared",
+                message="Training Worker request could not be prepared",
             )
             self._set_run(failed)
             self.training_failed.emit(failed.error)
             raise
-        self._start_worker("cnn-training", self._build_request_path)
+        self._start_worker(
+            "cnn-training" if config.family == "cnn" else "rf-training",
+            self._build_request_path,
+        )
         return run_id
 
     def _start_worker(self, worker: str, request_path: Path) -> None:
@@ -672,7 +693,7 @@ class WorkspaceController(QObject):
             message = (
                 "The Dataset Build Worker stopped unexpectedly."
                 if state.kind is RunKind.DATASET_BUILD
-                else "The CNN Training Worker stopped unexpectedly."
+                else "The Training Worker stopped unexpectedly."
             )
             state = transition_run(
                 state,
@@ -705,7 +726,7 @@ class WorkspaceController(QObject):
                 message=(
                     "Dataset Build failed"
                     if state.kind is RunKind.DATASET_BUILD
-                    else "CNN Training failed"
+                    else "Training failed"
                 ),
                 error=message,
             )

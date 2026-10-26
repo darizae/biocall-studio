@@ -49,15 +49,21 @@ source-first prototype review, real Worker states and six-dimension no-regressio
 presets, delete confirmation and narrow keyboard focus passed the six-dimension native review at
 the current sibling `alp-ui` SHA. [`IT-TRAIN-010/011/013`](evidence/README.md) assert the real
 Dataset route, complete field/help inventory, strict validation, family isolation and persistent
-preset lifecycle. `IT-TRAIN-012/014` remain open for the genuine 05b/05c executors; no Run or Model
-success is inferred from configuration readiness.
+preset lifecycle. At 05a, `IT-TRAIN-012/014` were deferred to real executors; no Run or Model
+success was inferred from configuration readiness.
 
 **Spec 05b evidence:** native Model naming, the completed CNN Run with genuine measured loss,
 published Model list/detail and narrow Model detail passed the six-dimension review at the current
 sibling `alp-ui` SHA. The [evidence ledger](evidence/README.md) records the safety-mandated naming
 timing and no-Prediction boundary; `IT-TRAIN-001` is fully covered and CNN assertions for the shared
-`IT-TRAIN-004/005/007/008/009/012/014` behaviors pass. Shared family cases stay open for 05c rather
-than treating one CNN or its screenshots as complete RF evidence.
+`IT-TRAIN-004/005/007/008/009/012/014` behaviors pass for CNN. At 05b, shared cases awaited RF
+coverage in 05c; CNN screenshots alone did not satisfy them.
+
+**Spec 05c evidence:** the genuine RF Run/importance Plot, both-family Model list and RF Model
+detail passed the six-dimension review at the current sibling `alp-ui` SHA. The
+[evidence ledger](evidence/README.md#spec-05c--real-rf-training-and-phase-05-acceptance) records the
+source-first prototype comparison, current Showcase capture, actual undefined-metric presentation
+and no-Prediction boundary. The ledger reports `IT-TRAIN-001`–`014` passing across both families.
 
 ## Acceptance procedure
 

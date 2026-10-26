@@ -66,16 +66,17 @@ class ModelListModel(QAbstractTableModel):
             return None
         artifact = self._models[index.row()]
         manifest = artifact.manifest
+        family = "CNN" if manifest["family"] == "cnn" else "Random Forest"
         if role == Qt.ItemDataRole.DisplayRole:
             return (
                 f"{artifact.label}\n{artifact.model_id}",
-                "CNN",
+                family,
                 manifest["dataset_id"],
                 manifest["created_at"].split("T", 1)[0],
                 "Inspect →",
             )[index.column()]
         if role == Qt.ItemDataRole.AccessibleTextRole:
-            return f"{artifact.label}, CNN, Dataset {manifest['dataset_id']}"
+            return f"{artifact.label}, {family}, Dataset {manifest['dataset_id']}"
         return None
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):  # noqa: N802
@@ -168,26 +169,35 @@ class ModelDetailPage(QScrollArea):
         self.outer.setContentsMargins(38, 30, 38, 42)
         self.outer.setSpacing(16)
         self.outer.addWidget(Text(f"Models  /  {artifact.model_id}", role="caption"))
+        is_rf = manifest["family"] == "random_forest"
+        family_label = "Random Forest" if is_rf else "CNN"
         header = QHBoxLayout()
         header.addWidget(
             _heading(
                 artifact.label,
-                "Published CNN classifier · read-only artifact",
+                f"Published {family_label} classifier · read-only artifact",
                 overline="MODEL",
             ),
             1,
         )
         header.addWidget(Badge("Verified", intent="success"), 0, Qt.AlignmentFlag.AlignTop)
         self.outer.addLayout(header)
-        self.setAccessibleName(f"Model detail: {artifact.label}")
+        self.setAccessibleName(f"Model detail: {artifact.label} · {family_label}")
 
         summary = QGridLayout()
         summary.setSpacing(10)
         metrics = manifest["results"]["metrics"]
         for column, (label, value) in enumerate(
             (
-                ("FAMILY", "CNN"),
-                ("SELECTED EPOCH", str(manifest["results"]["selected_epoch"])),
+                ("FAMILY", family_label),
+                (
+                    "DECISION THRESHOLD" if is_rf else "SELECTED EPOCH",
+                    (
+                        f"{manifest['random_forest']['decision_policy']['threshold']:.3f}"
+                        if is_rf
+                        else str(manifest["results"]["selected_epoch"])
+                    ),
+                ),
                 ("VAL ACCURACY", _metric(metrics["accuracy"])),
                 ("ARTIFACT", f"{manifest['artifact']['size_bytes'] / 1024:.1f} KiB"),
             )
@@ -217,7 +227,15 @@ class ModelDetailPage(QScrollArea):
             ("Dataset", Text(manifest["dataset_id"], role="body", selectable=True)),
             ("Training Run", Text(manifest["run_id"], role="body", selectable=True)),
             ("Created", Text(manifest["created_at"], role="body")),
-            ("Task", Text("noise / target · categorical logits", role="body")),
+            (
+                "Task",
+                Text(
+                    "noise / target · target probability"
+                    if is_rf
+                    else "noise / target · categorical logits",
+                    role="body",
+                ),
+            ),
         )
         for label, value in detail_rows:
             row = QHBoxLayout()
@@ -239,7 +257,11 @@ class ModelDetailPage(QScrollArea):
         metrics_card.content_layout.addWidget(Text("Validation metrics", role="subheading"))
         metrics_card.content_layout.addWidget(
             Text(
-                "Measured on the immutable validation Split using the selected checkpoint.",
+                (
+                    "Measured on the immutable validation Split using the saved decision threshold."
+                    if is_rf
+                    else "Measured on the immutable validation Split using the selected checkpoint."
+                ),
                 role="caption",
                 word_wrap=True,
             )
@@ -257,7 +279,8 @@ class ModelDetailPage(QScrollArea):
         tree = QLabel(
             f"{artifact.model_id}/\n"
             "├── model.json   manifest + metrics + provenance\n"
-            f"└── model.pt     {manifest['artifact']['sha256'][:12]}… sha256"
+            f"└── {manifest['artifact']['path']}   "
+            f"{manifest['artifact']['sha256'][:12]}… sha256"
         )
         tree.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         tree.setAccessibleName("Model file tree")
@@ -286,12 +309,21 @@ class ModelDetailPage(QScrollArea):
 
         provenance = Card(shadow=False)
         provenance.content_layout.addWidget(Text("Provenance", role="subheading"))
-        for label, value in (
+        provenance_rows = [
             ("Trainer", manifest["provenance"]["trainer"]["version"]),
             ("Toolbox", manifest["provenance"]["toolbox"]["version"]),
             ("Toolbox revision", manifest["provenance"]["toolbox"]["revision"][:12]),
-            ("PyTorch", manifest["provenance"]["torch_version"]),
-        ):
+        ]
+        if is_rf:
+            provenance_rows.extend(
+                (
+                    ("scikit-learn", manifest["provenance"]["scikit_learn_version"]),
+                    ("Librosa", manifest["provenance"]["librosa_version"]),
+                )
+            )
+        else:
+            provenance_rows.append(("PyTorch", manifest["provenance"]["torch_version"]))
+        for label, value in provenance_rows:
             row = QHBoxLayout()
             row.addWidget(Text(label, role="caption"))
             row.addStretch()

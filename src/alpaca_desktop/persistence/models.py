@@ -1,4 +1,4 @@
-"""Verified immutable Model loading and trusted CNN structural reload."""
+"""Verified immutable Model loading and trusted family-specific structural reload."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+import joblib
 from bioacoustics_dl_toolbox.config import ClassifierConfig, EncoderConfig
 from bioacoustics_dl_toolbox.models import Classifier, ResidualEncoder
 from bioacoustics_dl_toolbox.training.checkpoints import (
@@ -17,9 +18,11 @@ from bioacoustics_dl_toolbox.training.checkpoints import (
 from bioacoustics_dl_toolbox.training.checkpoints import (
     load_model as toolbox_load_model,
 )
+from sklearn.ensemble import RandomForestClassifier
 
 from alpaca_desktop.domain.model import validate_model_manifest
 from alpaca_desktop.domain.paths import validate_relative_path
+from alpaca_desktop.domain.rf_training import validate_rf_estimator_structure
 from alpaca_desktop.persistence.integrity import sha256_file
 
 MAX_MODEL_JSON_BYTES = 4 * 1024 * 1024
@@ -50,6 +53,22 @@ class CnnModelStructure:
     normalization_config: dict[str, Any]
     window_length_samples: int
     sequence_length_frames: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class RfModelStructure:
+    model_id: str
+    classes: tuple[int, int]
+    class_to_index: dict[str, int]
+    target_probability_column: int
+    n_features: int
+    feature_names: tuple[str, ...]
+    feature_importances: tuple[float, ...]
+    feature_config: dict[str, Any]
+    threshold: float
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -178,6 +197,8 @@ def structurally_reload_cnn_directory(root: Path, model_id: str) -> CnnModelStru
     """Structurally verify a trusted staged or published CNN Model directory."""
     artifact = load_model_directory(root, model_id)
     manifest = artifact.manifest
+    if manifest["family"] != "cnn":
+        raise ValueError("CNN structural reload requires a CNN Model.")
     binary = artifact.root / manifest["artifact"]["path"]
     payload = toolbox_load_model(binary)
     required = {
@@ -241,4 +262,50 @@ def structurally_reload_cnn_directory(root: Path, model_id: str) -> CnnModelStru
         normalization_config=dict(metadata["normalization_config"]),
         window_length_samples=int(metadata["window_length_samples"]),
         sequence_length_frames=int(metadata["sequence_length_frames"]),
+    )
+
+
+def structurally_reload_rf_model(collection_root: Path, model_id: str) -> RfModelStructure:
+    """Verify manifest/hash, then deserialize trusted local RF estimator bytes."""
+    artifact = load_model(collection_root, model_id)
+    return structurally_reload_rf_directory(artifact.root, model_id)
+
+
+def structurally_reload_rf_directory(root: Path, model_id: str) -> RfModelStructure:
+    """Structurally verify a trusted staged or published RF Model directory."""
+    artifact = load_model_directory(root, model_id)
+    manifest = artifact.manifest
+    if manifest["family"] != "random_forest":
+        raise ValueError("RF structural reload requires a Random Forest Model.")
+    binary = artifact.root / manifest["artifact"]["path"]
+    estimator = joblib.load(binary)
+    if not isinstance(estimator, RandomForestClassifier):
+        raise ValueError("RF binary is not a supported RandomForestClassifier.")
+    rf = manifest["random_forest"]
+    estimator_spec = rf["estimator"]
+    feature_names = tuple(rf["features"]["names"])
+    class_order = tuple(estimator_spec["classes"])
+    validate_rf_estimator_structure(
+        estimator,
+        feature_names=feature_names,
+        probability_class_order=class_order,
+    )
+    parameters = estimator.get_params(deep=False)
+    for name, expected in estimator_spec["hyperparameters"].items():
+        if parameters.get(name) != expected:
+            raise ValueError(f"RF estimator hyperparameter disagrees with model.json: {name}")
+    importances = tuple(float(value) for value in estimator.feature_importances_)
+    declared = tuple(float(row["value"]) for row in manifest["results"]["feature_importances"])
+    if importances != declared:
+        raise ValueError("RF estimator importances disagree with model.json.")
+    return RfModelStructure(
+        model_id=model_id,
+        classes=(int(class_order[0]), int(class_order[1])),
+        class_to_index=dict(manifest["task"]["class_to_index"]),
+        target_probability_column=int(estimator_spec["target_probability_column"]),
+        n_features=int(estimator.n_features_in_),
+        feature_names=feature_names,
+        feature_importances=importances,
+        feature_config=dict(rf["features"]["config"]),
+        threshold=float(rf["decision_policy"]["threshold"]),
     )

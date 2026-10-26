@@ -96,10 +96,10 @@ set and six-dimension review are in
 | `IT-TRAIN-013` | Save/load full detailed overrides while **More settings** is closed; after restart and switching families the overrides are retained and reappear on expansion. Qt create/load/rename/duplicate/overwrite/delete saved config, confirm destructive action, restart and restore actual user-settings files in isolated OS test directory, handle invalid/corrupt/incompatible config; current Dataset and family drafts remain correctly isolated. | TD-PRESET, TD-UI, TD-FAIL |
 | `IT-TRAIN-014` | Start genuine training from loaded preset; snapshot resolved config into Run independently of later preset edits/deletion, confirm scientific execution and immutable Model export remain unchanged after restart. | TD-PRESET, TD-TRAIN, TD-EXPORT |
 
-**Reported status:** 05a covers `IT-TRAIN-010/011/013`; 05b covers `001` and CNN-only
-assertions for shared cases. `002/003` and the cross-family `004`–`009`/`012`/`014` (including
-package independence) remain for 05c. See [05b native evidence](design/evidence/README.md#spec-05b--real-cnn-training-and-common-model-foundation).
-Historical results do not establish current acceptance.
+**Reported status:** Spec 05c completes `IT-TRAIN-001`–`014` with genuine CNN and RF Workers on
+the same source-WAV-backed Dataset, trusted fresh-process reloads, package independence and reviewed
+native evidence. See the [Spec 05c ledger](design/evidence/README.md#spec-05c--real-rf-training-and-phase-05-acceptance)
+for the fresh commands and results; this index alone does not establish acceptance.
 
 Future Prediction inference cases are **reserved exclusively** in [PREDICTION](PREDICTION.md), outside this Trainer test index or any Trainer release gate.
 

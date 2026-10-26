@@ -141,6 +141,7 @@ def _name_and_start_model(
     window: MainWindow,
     output: Path,
     settle_ms: int,
+    label: str,
 ) -> str:
     captured = False
 
@@ -153,7 +154,7 @@ def _name_and_start_model(
         if dialog is None:
             QTimer.singleShot(50, capture_and_accept)
             return
-        dialog.setTextValue("Field evidence CNN")
+        dialog.setTextValue(label)
         _capture(window, output, settle_ms=settle_ms, foreground=dialog)
         captured = True
         dialog.accept()
@@ -161,7 +162,7 @@ def _name_and_start_model(
     QTimer.singleShot(100, capture_and_accept)
     window.training_page.start_button.click()
     if not captured or window.controller.active_run is None:
-        raise RuntimeError("Model naming or CNN Training launch was not captured.")
+        raise RuntimeError("Model naming or Training launch was not captured.")
     return window.controller.active_run.run_id
 
 
@@ -189,7 +190,7 @@ def main(argv: list[str] | None = None) -> int:
 
     app = create_application([])
     if sys.platform != "darwin" or QGuiApplication.platformName() != "cocoa":
-        raise SystemExit("Spec 05a evidence must be captured by native macOS Cocoa.")
+        raise SystemExit("Spec 05 evidence must be captured by native macOS Cocoa.")
     args.output_dir.mkdir(parents=True, exist_ok=True)
     print(
         f"macOS={platform.mac_ver()[0]} Python={platform.python_version()} "
@@ -287,6 +288,7 @@ def main(argv: list[str] | None = None) -> int:
             window,
             args.output_dir / "model-name.png",
             args.settle_ms,
+            "Field evidence CNN",
         )
         _wait_until(
             lambda: any(run.run_id == run_id and run.terminal for run in controller.runs),
@@ -318,6 +320,62 @@ def main(argv: list[str] | None = None) -> int:
         _capture(
             window,
             args.output_dir / "model-detail-narrow.png",
+            settle_ms=args.settle_ms,
+        )
+
+        window.resize(1280, 900)
+        _wait_until(lambda: not window.is_compact)
+        window.open_training(dataset.dataset_id)
+        page.family_input.setCurrentIndex(1)
+        for key, value in {
+            "n_estimators": 10,
+            "min_samples_leaf": 1,
+            "rf_threshold": 0.55,
+            "random_state": 42,
+            "n_jobs": 1,
+            "feature_config.sample_rate_hz": 8_000,
+            "feature_config.min_duration_s": 0.25,
+            "feature_config.n_fft": 256,
+            "feature_config.hop_length": 64,
+            "feature_config.n_mfcc": 4,
+            "feature_config.fmin_hz": 100.0,
+            "feature_config.fmax_hz": 3_500.0,
+        }.items():
+            page.set_field_value(key, value)
+        page.more_settings.setChecked(False)
+        page.verticalScrollBar().setValue(0)
+        rf_run_id = _name_and_start_model(
+            app,
+            window,
+            args.output_dir / "model-name-rf.png",
+            args.settle_ms,
+            "Field evidence Random Forest",
+        )
+        _wait_until(
+            lambda: any(run.run_id == rf_run_id and run.terminal for run in controller.runs),
+            timeout_ms=180_000,
+        )
+        rf_completed = next(run for run in controller.runs if run.run_id == rf_run_id)
+        if rf_completed.status.value != "completed":
+            raise RuntimeError(f"RF Training evidence Run failed: {rf_completed.error}")
+
+        window.open_run(rf_run_id)
+        window.run_detail_page.ensureWidgetVisible(
+            window.run_detail_page.training_plot,
+            20,
+            180,
+        )
+        _capture(
+            window,
+            args.output_dir / "run-rf-plot.png",
+            settle_ms=args.settle_ms,
+        )
+        window.navigate("models")
+        _capture(window, args.output_dir / "models.png", settle_ms=args.settle_ms)
+        window.open_model(rf_completed.output_id)
+        _capture(
+            window,
+            args.output_dir / "model-detail-rf.png",
             settle_ms=args.settle_ms,
         )
         window.close()
