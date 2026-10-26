@@ -52,6 +52,11 @@ After installation, the console command is equivalent:
 .venv/bin/biocall-studio-train
 ```
 
+To try the complete workflow without bringing a large Collection, follow the
+[manual end-to-end trial](docs/MANUAL_WORKFLOW.md). It generates a fresh, tiny real-WAV Collection
+outside the tracked fixtures and walks through Dataset Build, genuine CNN and Random Forest
+training, restart, and Model reopen.
+
 On Windows, use `.venv\Scripts\python.exe` instead of `.venv/bin/python`. Windows remains an
 unqualified development environment until the native installer milestone is complete. See
 [Development](docs/DEVELOPMENT.md) for environment troubleshooting and test commands.

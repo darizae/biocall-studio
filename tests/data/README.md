@@ -1,6 +1,14 @@
 # Local integration examples — tracked scientific data
 
-This directory contains a **real, tiny synthetic WAV Collection**. It is **not sourced from HPC**, not sensitive audio, and not proof that CNN/RF training is already implemented. The six WAVs in `example_collection/` are source bytes delivered in the ZIP, **intended for Git LFS at the first Git import**. File contents are checked by [`scripts/check_fixtures.py`](../../scripts/check_fixtures.py); [`SHA256SUMS`](SHA256SUMS) is the canonical per-file checksum list.
+This directory contains a **real, tiny synthetic WAV Collection**. It is **not sourced from HPC**,
+not sensitive audio, and its synthetic metrics are not evidence of a useful field detector. The
+six WAVs in `example_collection/` are source bytes delivered in the ZIP, **intended for Git LFS at
+the first Git import**. File contents are checked by
+[`scripts/check_fixtures.py`](../../scripts/check_fixtures.py); [`SHA256SUMS`](SHA256SUMS) is the
+canonical per-file checksum list. It is sufficient for a small Dataset plus genuine CNN/RF smoke
+workflow, but manual sessions should generate a disposable copy by following the
+[manual end-to-end trial](../../docs/MANUAL_WORKFLOW.md) so `.alpaca/` outputs do not dirty this
+tracked fixture.
 
 ## Versioned fixture register
 
