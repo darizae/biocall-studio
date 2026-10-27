@@ -93,16 +93,17 @@
     const selected = isModel ? state.modelSelected : state.rootSelected;
     const select = $(`#${kind}-state`);
     const box = $(`#${kind}-selection`);
+    const detail = $(":scope > div > span", box);
     const clear = $(`#clear-${kind}`);
     const record = (isModel ? demoModel : demoRoot)[select.value];
     clear.disabled = !selected;
     box.className = "selection-box";
     if (!selected) {
       $("strong", box).textContent = isModel ? "No Model selected" : "No folder selected";
-      $("div > span", box).textContent = isModel ? "Choose a Train CNN Model package" : "Choose the root containing source WAVs";
+      detail.textContent = isModel ? "Choose a Train CNN Model package" : "Choose the root containing source WAVs";
     } else {
       $("strong", box).textContent = record[0];
-      $("div > span", box).textContent = record[1];
+      detail.textContent = record[1];
       if (record[2] !== "success") box.classList.add(record[2]);
     }
     updateReadiness();
@@ -219,8 +220,31 @@
       $("#scan-percent").textContent = "100%";
       $("#scan-progress-bar").style.width = "100%";
       $("#scan-count").textContent = "68 / 68 files";
-      setTimeout(() => setInventoryState("ready"), 400);
+      setTimeout(() => {
+        state.rootSelected = true;
+        $("#root-state").value = "valid";
+        renderSelection("root");
+        setInventoryState("ready");
+      }, 400);
     }, 1100);
+  }
+
+  function setFolderDecision(decision) {
+    const included = decision === "Included";
+    const detail = $("#inventory-detail");
+    const values = $$("dd", detail);
+    const treeBadge = $("[data-folder='incoming'] .badge");
+    $(".overline", detail).textContent = "SELECTED FOLDER";
+    $("h2", detail).textContent = "incoming/";
+    $(".badge", values[0]).textContent = decision;
+    $(".badge", values[0]).className = `badge ${included ? "success" : "neutral"}`;
+    values[1].textContent = "1 WAV";
+    values[2].textContent = "17 min 42 s";
+    values[3].textContent = "Explicit Demo decision";
+    treeBadge.textContent = included ? "1 included" : "excluded";
+    treeBadge.className = `badge ${included ? "success" : "neutral"}`;
+    $("#included-count").textContent = included ? "43" : "42";
+    showToast(`Demo decision: incoming/ marked ${decision.toLowerCase()}; source unchanged.`);
   }
 
   function setResultView(next) {
@@ -347,8 +371,8 @@
       } else simulateScan();
     });
     $("#cancel-scan").addEventListener("click", () => { clearTimeout(state.scanTimer); setInventoryState("cancelled"); });
-    $("#include-folder").addEventListener("click", () => { $("#inventory-detail h2").textContent = "incoming/"; $("#inventory-detail dd .badge").textContent = "Included"; showToast("Demo decision: incoming/ marked included; source unchanged."); });
-    $("#exclude-folder").addEventListener("click", () => { $("#inventory-detail h2").textContent = "incoming/"; $("#inventory-detail dd .badge").textContent = "Excluded"; showToast("Demo decision: incoming/ marked excluded; source unchanged."); });
+    $("#include-folder").addEventListener("click", () => setFolderDecision("Included"));
+    $("#exclude-folder").addEventListener("click", () => setFolderDecision("Excluded"));
     $$(".tree-row").forEach((row) => row.addEventListener("click", () => {
       $$(".tree-row").forEach((item) => item.classList.remove("selected"));
       row.classList.add("selected");

@@ -145,7 +145,7 @@
 
             <div class="setup-grid">
               <article class="card source-card" id="model-card">
-                <div class="card-heading"><div><span class="step-number">1</span><h2>CNN Model</h2></div><button class="help-hint" type="button" data-help="JavaScript cannot inspect or verify a real Model package. Native Model intake and compatibility checks begin at ST-05." aria-expanded="false">?</button></div>
+                <div class="card-heading"><div><span class="step-number">1</span><h2>CNN Model</h2></div><button class="help-hint" type="button" data-help="JavaScript cannot inspect or verify a real Model package. Native Model intake and compatibility checks begin at ST-05." aria-label="More about CNN Model" aria-expanded="false">?</button></div>
                 <p class="muted">A verified binary Train Model starts first-pass detection.</p>
                 <div class="selection-box" id="model-selection"><span class="selection-icon" aria-hidden="true">◇</span><div><strong>No Model selected</strong><span>Choose a Train CNN Model package</span></div></div>
                 <div class="row-actions"><button class="button primary" id="choose-model" type="button">Choose demo Model</button><button class="button outline" id="clear-model" type="button" disabled>Clear</button></div>
@@ -153,7 +153,7 @@
               </article>
 
               <article class="card source-card" id="root-card">
-                <div class="card-heading"><div><span class="step-number">2</span><h2>Recording root</h2></div><button class="help-hint" type="button" data-help="Detect reads approved source WAVs in place. Its metadata is stored separately in application-owned storage." aria-expanded="false">?</button></div>
+                <div class="card-heading"><div><span class="step-number">2</span><h2>Recording root</h2></div><button class="help-hint" type="button" data-help="Detect reads approved source WAVs in place. Its metadata is stored separately in application-owned storage." aria-label="More about recording root" aria-expanded="false">?</button></div>
                 <p class="muted">The recognizable recordings/ folder is included by default.</p>
                 <div class="selection-box" id="root-selection"><span class="selection-icon" aria-hidden="true">□</span><div><strong>No folder selected</strong><span>Choose the root containing source WAVs</span></div></div>
                 <div class="row-actions"><button class="button primary" id="choose-root" type="button">Choose demo folder</button><button class="button outline" id="clear-root" type="button" disabled>Clear</button></div>
@@ -167,9 +167,9 @@
               <div class="card-heading"><div><span class="step-number">3</span><h2>CNN candidate settings</h2></div><span class="badge demo">Demo defaults</span></div>
               <p class="muted">These controls illustrate proposed settings; they are not scientifically validated inference parameters.</p>
               <div class="form-grid">
-                <label>Candidate threshold <button class="help-hint inline" type="button" data-help="Illustrative score cutoff only. A future native implementation must define score semantics and prove compatibility." aria-expanded="false">?</button><input id="threshold-input" type="number" min="0" max="1" step="0.01" value="0.72"></label>
-                <label>Window overlap <button class="help-hint inline" type="button" data-help="Illustrative overlap between adjacent CNN windows. Exact window and hop rules are deferred to real inference work." aria-expanded="false">?</button><select id="overlap-input"><option>50%</option><option>25%</option><option>75%</option></select></label>
-                <label>Merge nearby candidates <button class="help-hint inline" type="button" data-help="Illustrative gap used to group neighboring windows into source-time intervals." aria-expanded="false">?</button><select id="merge-input"><option>0.20 s</option><option>Do not merge</option><option>0.50 s</option></select></label>
+                <label>Candidate threshold <button class="help-hint inline" type="button" data-help="Illustrative score cutoff only. A future native implementation must define score semantics and prove compatibility." aria-label="More about candidate threshold" aria-expanded="false">?</button><input id="threshold-input" type="number" min="0" max="1" step="0.01" value="0.72"></label>
+                <label>Window overlap <button class="help-hint inline" type="button" data-help="Illustrative overlap between adjacent CNN windows. Exact window and hop rules are deferred to real inference work." aria-label="More about window overlap" aria-expanded="false">?</button><select id="overlap-input"><option>50%</option><option>25%</option><option>75%</option></select></label>
+                <label>Merge nearby candidates <button class="help-hint inline" type="button" data-help="Illustrative gap used to group neighboring windows into source-time intervals." aria-label="More about merging nearby candidates" aria-expanded="false">?</button><select id="merge-input"><option>0.20 s</option><option>Do not merge</option><option>0.50 s</option></select></label>
               </div>
               <details class="advanced-settings"><summary>Advanced settings <span>3 proposed controls</span></summary><div class="form-grid"><label>Batch size<input type="number" value="16" min="1" max="128"></label><label>Device<select><option>CPU · demonstration</option><option disabled>GPU · availability unknown</option></select></label><label>Nonfatal file failures<select><option>Continue and report</option><option>Stop Run</option></select></label></div></details>
             </article>
@@ -202,7 +202,7 @@
 
             <div class="inventory-grid">
               <article class="card tree-card">
-                <div class="card-heading"><div><h2>Rainforest_2026/</h2><p class="muted">/Volumes/Field/Rainforest_2026</p></div><button class="help-hint" type="button" data-help="Unknown folders stay undecided until explicitly included. Symlink traversal and path containment require native validation." aria-expanded="false">?</button></div>
+                <div class="card-heading"><div><h2>Rainforest_2026/</h2><p class="muted">/Volumes/Field/Rainforest_2026</p></div><button class="help-hint" type="button" data-help="Unknown folders stay undecided until explicitly included. Symlink traversal and path containment require native validation." aria-label="More about the inventory hierarchy" aria-expanded="false">?</button></div>
                 <div class="tree-toolbar"><button class="button outline small" id="include-folder" type="button">Include folder</button><button class="button outline small" id="exclude-folder" type="button">Exclude folder</button></div>
                 <ul class="file-tree" aria-label="Demonstration source hierarchy">
                   <li><button class="tree-row folder-row selected" type="button" data-folder="recordings"><span>▾</span><strong>recordings/</strong><span class="badge success">42 included</span></button>
@@ -310,7 +310,7 @@
                   <dl class="summary-list"><div><dt>Result</dt><dd id="export-result-name">CNN candidates · Demo</dd></div><div><dt>Selection</dt><dd>3 intervals from Dawn_A01.wav</dd></div><div><dt>Source time</dt><dd>Preserved in names and mapping</dd></div></dl>
                 </article>
                 <article class="card">
-                  <div class="card-heading"><div><span class="step-number">2</span><h2>Export format</h2></div><button class="help-hint" type="button" data-help="This prototype illustrates the three agreed outputs. Audio encoding, rounding, channel, sample-rate, collision, and atomic-publication rules remain ST-10 decisions." aria-expanded="false">?</button></div>
+                  <div class="card-heading"><div><span class="step-number">2</span><h2>Export format</h2></div><button class="help-hint" type="button" data-help="This prototype illustrates the three agreed outputs. Audio encoding, rounding, channel, sample-rate, collision, and atomic-publication rules remain ST-10 decisions." aria-label="More about export formats" aria-expanded="false">?</button></div>
                   <fieldset class="format-options"><legend class="sr-only">Corpus export format</legend><label><input type="radio" name="export-format" value="snippets"><span><strong>Individual WAV snippets</strong><small>One origin-linked file per interval</small></span></label><label><input type="radio" name="export-format" value="concat"><span><strong>Concatenated WAV + Raven TSV</strong><small>One waveform, selection table, and provenance map</small></span></label><label><input type="radio" name="export-format" value="both" checked><span><strong>Both</strong><small>Same frozen selection, two independent materializations</small></span></label></fieldset>
                 </article>
                 <article class="card">
