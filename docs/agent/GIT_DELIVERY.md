@@ -11,7 +11,7 @@ git branch --show-current
 git log -1 --oneline
 ```
 
-If no repository exists, initialize Git **once**, after installing Git LFS and verifying `.gitattributes` for `tests/data/**/*.wav`; inspect ignored/private files before adding anything. If Git exists, preserve its branches/history and resolve unrelated uncommitted changes before starting. Use `spec/NN-purpose` (or `spec/04.5-purpose`) for implementation, `docs/purpose` for documentation-only and `fix/purpose` for independent fixes. Continue an unmerged active spec branch rather than making a duplicate.
+If no repository exists, initialize Git **once**, after installing Git LFS and verifying `.gitattributes` for `tests/data/**/*.wav`; inspect ignored/private files before adding anything. If Git exists, preserve its branches/history and resolve unrelated uncommitted changes before starting. For Studio/Detect follow the [stage branches](../IMPLEMENTATION_SEQUENCE.md): `detect` from `main`, then `detect-stNN-purpose` from `detect`. For independent work use `docs/purpose` or `fix/purpose` as applicable. Continue an unmerged active spec branch rather than making a duplicate.
 
 ## Deliver
 
@@ -35,4 +35,4 @@ Replace `<reviewed-paths>` and the example message with the actual scope. `git l
 
 ## Multi-repository upstream fix
 
-For [Spec 04.5](../specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) or a pertinent scientific defect, follow the [upstream toolbox workflow](UPSTREAM_TOOLBOX_WORKFLOW.md). Commit independently in `../bioacoustics-dl-toolbox` and Trainer, reinstall/check the active `.venv`, rerun affected integration tests, and report **both** SHAs and import provenance. A release must package a wheel built from a committed toolbox revision, not depend on a sibling editable checkout.
+For [upstream workflow](UPSTREAM_TOOLBOX_WORKFLOW.md) or a pertinent scientific defect, follow the [upstream toolbox workflow](UPSTREAM_TOOLBOX_WORKFLOW.md). Commit independently in `../bioacoustics-dl-toolbox` and Trainer, reinstall/check the active `.venv`, rerun affected integration tests, and report **both** SHAs and import provenance. A release must package a wheel built from a committed toolbox revision, not depend on a sibling editable checkout.

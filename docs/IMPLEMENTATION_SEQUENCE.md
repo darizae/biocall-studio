@@ -1,22 +1,23 @@
-# Implementation sequence — native Trainer
+# BioCall Studio — implementation sequence
 
-This roadmap describes **phase order**, not the current Git state. Use [agent routing](agent/ROUTING.md) to choose one active spec based on actual acceptance evidence. Work in a reviewed branch and finish tests, documentation and a real commit before the next phase.
+**Branch policy:** create `detect` from a clean `main`; make each stage branch from the current `detect` (e.g., `detect-st01-prototype`, `detect-st02-shell`). A stage returns to `detect` only after owner review; do not merge automatically. `main` remains unaffected until unified qualification and explicit approval. Check branch existence and history before creating anything.
 
-| Phase | Acceptance outcome | Owned tests |
-|---|---|---|
-| [01 — Native shell](specs/01-shell-and-test-foundation.md) | `alp-ui` Select Collection, navigation, Wiki, Settings, native evidence; [closeout](specs/SPEC_01_CLOSEOUT.md) only if still deficient | `UT-PATH-*`, `IT-UI-*` |
-| [02 — Scan](specs/02-collection-scan-and-metadata.md) | Real WAV and filename validation, actionable errors, rebuildable metadata/cache | `UT-COL-*`, `IT-COL-*` |
-| [03 — Dataset](specs/03-dataset-build.md) | Protected `target`/`noise` extraction, source-grouped splits, immutable Dataset | `UT-DB-*`, `IT-DB-*` |
-| [04 — Worker](specs/04-runs-and-worker.md) | Real supervised QProcess lifecycle, one Active Run, cancellation/recovery | `UT-RUN-*`, `IT-RUN-*` |
-| [04.5 — Upstream audio](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) | Move reusable extraction into toolbox, preserve bytewise Dataset compatibility; two-repo test/commit | `UT-AUDIO-*`, `IT-AUDIO-*` |
-| [05a — Configuration/presets](specs/05a-training-configuration-and-presets.md) | Native small-form + detailed typed controls, validation and reusable saved presets; no fabricated training | `UT-TRAIN-007`–`010`, `IT-TRAIN-010`/`011`/`013` |
-| [05b — CNN + Model foundation](specs/05b-cnn-training-and-model-foundation.md) | Real binary CPU CNN through Worker, immutable common Model format + trusted CNN structural reload | `UT-TRAIN-001`/`004`/`005`, `IT-TRAIN-001`; shared family IDs remain open |
-| [05c — RF + joint acceptance](specs/05c-rf-training-and-cross-family-acceptance.md) | Genuine RF features/fit, exported RF and CNN/RF plots, two-family Model reload and end-to-end preset tests; **no inference** | `UT-TRAIN-002`/`003`/`006`, `IT-TRAIN-002`–`009`/`012`/`014`; recheck all Spec 05 IDs |
-| [05d — Logging + diagnostics](specs/05d-end-to-end-logging-and-diagnostics.md) | Privacy-safe bounded app/Worker JSONL, incremental stderr draining, contained native access and sanitized support export | `UT-LOG-*`, `IT-LOG-*`; recheck affected Run/Build/Training IDs |
-| [05e — Critical recovery verification](specs/05e-training-critical-path-and-recovery-verification.md) | Close focused training, publication and failure-recovery coverage gaps without changing scientific behavior | affected `IT-TRAIN-*`, `IT-RUN-*` |
-| [05f — UI/chart/scale/CLI closeout](specs/05f-ui-chart-scale-and-cli-coverage.md) | Complete native control, exact Plot binding, large-Collection responsiveness and CLI ownership coverage | affected `UT-CLI-*`, `IT-UI-*`, `IT-COL-*`, `IT-TRAIN-*` |
-| [05g — Long-running + safe exit](specs/05g-long-running-sessions-and-safe-exit.md) | Safe confirmed shutdown and owner-loss containment; explicit 10-minute real-Worker durability; truthful optional idle-sleep prevention | `UT-POWER-*`, `IT-POWER-*`, `IT-RUN-006`–`009` |
-| [06 — macOS](specs/06-macos-release-and-installer.md) | Reproducible signed/notarized installable `.dmg`, installed native/scientific validation | `IT-MAC-*`, `IT-E2E-*` |
-| [07 — Windows](specs/07-windows-release-and-installer.md) | Native Windows qualification and versioned `.exe` installer | `IT-WIN-*` |
+Only the **active** stage gets a detailed spec. The remaining rows are scoped acceptance targets to turn into specs *one at a time*. Do not implement a later row early.
 
-**Applies to each phase:** TDD at the owning seam; native UX evidence if visible UI changes; generated real WAVs or approved local fixtures (never live HPC); versioned validated publication and non-mutation; accurate test results and blockers; reviewed Git commit with clean tree. The authoritative procedures are [integration testing](INTEGRATION_TESTING.md), [prototype acceptance](design/PROTOTYPE_ACCEPTANCE.md), and [Git delivery](agent/GIT_DELIVERY.md). Do not declare a case implemented from its listing here.
+| Stage | Owns / acceptance outcome |
+|---|---|
+| **[ST-01](specs/ST-01-prototype.md)** | Interactive HTML/CSS/JS launchpad + Detect prototype; native Train reference; design decisions, UX matrix and states. **No Python or scientific implementation.** |
+| **ST-02 — Native shell** | Single `QApplication`, Studio launchpad and workspace navigation; Train integrated without behavior/visual regressions; Review placeholder. Native screenshots and Qt integration tests. |
+| **ST-03 — Detect workspace** | Independent app-owned storage, Collection identity/versioned metadata, source-root relinking and stale path checks, artifact ownership and publication. Path/storage tests. |
+| **ST-04 — WAV discovery** | Safe recursive enumeration, explicit inclusion/exclusion, Train-derived WAV avoidance, no symlink escape, deterministic order/duplicates, header validation and rescans. Real-WAV tests. |
+| **ST-05 — Model intake** | Verify Train CNN/RF packages, class mappings, preprocessing/feature schemas and safe loading; real inference parity research, with unavailable capabilities blocked. Fresh-process tests. |
+| **ST-06 — Detect Workers and logs** | Own Run state, nonblocking background work, cancel/crash/restart recovery, bounded privacy-safe JSONL diagnostics and safe output staging. Process/Qt tests. |
+| **ST-07 — CNN detection** | Compatible CNN sliding-window inference, validated thresholds/aggregation, source-time intervals and immutable result publication. Actual WAV and numerical parity tests. |
+| **ST-08 — Results UX** | Native recordings/interval exploration, Run history, failure/empty results, provenance and navigation. Qt/a11y/native screenshot tests. |
+| **ST-09 — RF refinement** | Optional RF assessment of existing CNN intervals; a new metadata result linked to its parent (accepted/rejected/unscored); preserve original artifact. Schema/science tests. |
+| **ST-10 — Corpus export** | Frozen result selection; WAV snippets, concatenated WAV + Raven TSV, or both; explicit destination, origin-to-export mapping, atomic output and collision rules. Real audio tests. |
+| **ST-11 — Cross-workflow qualification** | Unified Train/Detect regressions, visual parity, native platform test inventory; revise existing macOS/Windows release specs for Studio without claiming installers are built. |
+
+**Every implementation stage:** use indexed cases (`UT-STU-*`/`IT-STU-*` for Studio; `UT-DET-*`/`IT-DET-*` for Detect; keep Train cases), real `TD-*` fixture classes where needed, targeted tests and impacted regressions during implementation, and the full feasible ordinary suite before commit (excluding explicit soak/installer-only cases). Add each new case to existing test indexes only when its stage begins. Verify input immutability, safe failure/cancel and native screenshots for GUI stages. A skipped/unavailable test does not pass. The 10-minute soak and actual installer production need explicit qualification runs.
+
+**Release:** `docs/specs/06-macos-release-and-installer.md`, `07-windows-release-and-installer.md` and `docs/RELEASE_PROCESS.md` remain unexecuted release requirements. ST-11 updates their product-wide scope before any installation/release work.

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/branding/on-background/readme-header.png" alt="BioCall Studio Train" width="900" />
+  <img src="assets/branding/on-background/readme-header.png" alt="BioCall Studio" width="900" />
 </p>
 
 # BioCall Studio Train
@@ -24,8 +24,9 @@ configuration and provenance behind every published result.
 - Supports safe cancellation, recovery, local diagnostics, and an optional keep-awake setting for
   long runs.
 
-BioCall Studio Train creates models; it does not apply them to new recordings. Automated detection
-and expert review belong to the planned BioCall Studio Detect and Review applications.
+The current native Train workspace creates models; it does not apply them to new recordings.
+Automated detection and expert review belong to the planned Detect and Review workspaces in the
+same BioCall Studio application.
 
 ## Install and run from source
 
@@ -104,20 +105,19 @@ use integer milliseconds. The app validates the relationship before it publishes
 
    ![Completed CNN training Run with measured loss](docs/design/evidence/spec-05-native/run-cnn-plot.png)
 
-The [native evidence gallery](docs/design/evidence/README.md) contains the remaining normal,
-narrow, empty, error, cancellation, diagnostics, Random Forest, safe-exit, and keep-awake states.
-Its results come from generated real PCM WAV fixtures and genuine local training, not simulated
-scientific output.
+The native screenshots above document selected implemented Train states. Other behavior must
+be verified in the current code and tests; screenshots alone do not prove execution.
 
 ## Roadmap
 
 - **Available from source:** Collection validation, Dataset Build, persisted Runs, CNN and Random
   Forest training, Model verification, diagnostics, safe exit, and optional keep-awake.
-- **Next:** a signed, notarized, clean-install-tested macOS application and DMG.
-- **Later:** a native Windows installer and Windows-specific path, DPI, accessibility, and Worker
-  qualification.
-- **Separate future applications:** BioCall Studio Detect for applying models and BioCall Studio
-  Review for checking candidate calls.
+- **Current design stage:** a BioCall Studio launchpad with the existing Train workflow, Detect for
+  applying compatible models, and a future Review workspace.
+- **Next implementation stages:** native Studio navigation and Detect metadata, source inventory,
+  Model intake, Workers, candidate results, RF assessment, and corpus export.
+- **Release qualification:** macOS and Windows packaging follow the unified application stages and
+  explicit owner approval.
 
 ## Development
 
@@ -131,8 +131,8 @@ Run the fast repository checks with:
 
 Native GUI evidence must be captured on a real desktop; Qt offscreen output is supplemental only.
 Contributors should start with [AGENTS.md](AGENTS.md), then follow the
-[task router](docs/agent/ROUTING.md) to the single active specification. The current release phase
-is [Spec 06: macOS packaging and installer](docs/specs/06-macos-release-and-installer.md).
+[task router](docs/agent/ROUTING.md) to the single active specification. The current active stage
+is [ST-01: Studio launchpad + Detect interactive prototype](docs/specs/ST-01-prototype.md).
 
 Brand assets are copied into this repository and documented in
 [assets/branding](assets/branding/README.md); they are not a runtime dependency on the separate
