@@ -15,8 +15,8 @@ from alp_ui.components import (
     ProgressBar,
     Text,
 )
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer, Signal
-from PySide6.QtGui import QResizeEvent
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QDesktopServices, QResizeEvent
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -43,6 +43,7 @@ from biocall_studio.detect.inventory import (
     InventorySnapshot,
     RecordingStatus,
 )
+from biocall_studio.detect.runs import DetectRunStatus
 
 
 def _duration(row: InventoryRecording) -> str:
@@ -192,12 +193,15 @@ class DetectWorkspacePage(QScrollArea):
         self.setAccessibleName("Detect Collection setup")
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setWidgetResizable(True)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         self.content = QWidget()
         self.outer = QVBoxLayout(self.content)
         self.outer.setContentsMargins(48, 34, 48, 48)
         self.outer.setSpacing(22)
         self.outer.addLayout(self._build_heading())
+        self.run_header = self._build_run_header()
+        self.outer.addWidget(self.run_header)
         self.outer.addLayout(self._build_navigation())
         self.selection_error = QLabel()
         self.selection_error.setWordWrap(True)
@@ -247,8 +251,11 @@ class DetectWorkspacePage(QScrollArea):
         recordings_layout.addWidget(self.different_card)
         recordings_layout.addStretch()
 
+        self.run_view = self._build_run_view()
+
         self.route_stack.addWidget(self.setup_view)
         self.route_stack.addWidget(self.recordings_view)
+        self.route_stack.addWidget(self.run_view)
         self.outer.addWidget(self.route_stack)
         self.outer.addStretch()
         self.setWidget(self.content)
@@ -262,25 +269,29 @@ class DetectWorkspacePage(QScrollArea):
         self._set_route("setup")
         self._render()
 
-    def _build_heading(self) -> QHBoxLayout:
-        heading = QHBoxLayout()
-        copy = QVBoxLayout()
-        copy.setSpacing(5)
+    def _build_heading(self) -> QGridLayout:
+        heading = QGridLayout()
+        heading.setHorizontalSpacing(16)
+        heading.setVerticalSpacing(10)
+        self.heading_copy = QVBoxLayout()
+        self.heading_copy.setSpacing(5)
         self.page_overline = Text("DETECT SETUP", role="overline")
-        copy.addWidget(self.page_overline)
+        self.heading_copy.addWidget(self.page_overline)
         self.page_title = Text("Prepare candidate detection", role="title")
-        copy.addWidget(self.page_title)
+        self.heading_copy.addWidget(self.page_title)
         self.page_description = Text(
             "Choose a detection Model and recordings folder in either order.",
             role="body",
             word_wrap=True,
         )
-        copy.addWidget(self.page_description)
-        heading.addLayout(copy, 1)
+        self.heading_copy.addWidget(self.page_description)
+        heading.addLayout(self.heading_copy, 0, 0)
+        heading.setColumnStretch(0, 1)
         self.back_button = Button("Back to Studio", variant="outline")
         self.back_button.setAccessibleName("Back to Studio launchpad")
         self.back_button.clicked.connect(self.return_requested)
-        heading.addWidget(self.back_button, 0, Qt.AlignmentFlag.AlignTop)
+        heading.addWidget(self.back_button, 0, 1, Qt.AlignmentFlag.AlignTop)
+        self.heading_layout = heading
         return heading
 
     def _build_navigation(self) -> QHBoxLayout:
@@ -298,8 +309,119 @@ class DetectWorkspacePage(QScrollArea):
         self.recordings_button.setAutoExclusive(True)
         self.recordings_button.clicked.connect(lambda: self._set_route("recordings"))
         navigation.addWidget(self.recordings_button)
+        self.run_button = Button("Run", variant="outline", size="small")
+        self.run_button.setAccessibleName("Open Detect Run")
+        self.run_button.setCheckable(True)
+        self.run_button.setAutoExclusive(True)
+        self.run_button.clicked.connect(lambda: self._set_route("run"))
+        navigation.addWidget(self.run_button)
         navigation.addStretch()
         return navigation
+
+    def _build_run_header(self) -> Card:
+        card = Card()
+        card.setAccessibleName("Current Detect Run")
+        layout = QGridLayout()
+        layout.setHorizontalSpacing(12)
+        layout.setVerticalSpacing(8)
+        self.run_header_labels = QVBoxLayout()
+        self.run_header_labels.setSpacing(3)
+        self.run_header_labels.addWidget(Text("DETECT RUN", role="overline"))
+        self.active_run_label = Text("No active Run", role="subheading", word_wrap=True)
+        self.run_header_labels.addWidget(self.active_run_label)
+        layout.addLayout(self.run_header_labels, 0, 0)
+        layout.setColumnStretch(0, 1)
+        self.active_run_badge = Badge("Idle", intent="neutral")
+        self.active_run_badge.setAccessibleName("Detect Run status: Idle")
+        layout.addWidget(self.active_run_badge, 0, 1)
+        self.view_run_button = Button("View Run", variant="outline", size="small")
+        self.view_run_button.setAccessibleName("View current Detect Run")
+        self.view_run_button.clicked.connect(lambda: self._set_route("run"))
+        layout.addWidget(self.view_run_button, 0, 2)
+        self.run_header_layout = layout
+        card.content_layout.addLayout(layout)
+        return card
+
+    def _build_run_view(self) -> QWidget:
+        view = QWidget()
+        outer = QVBoxLayout(view)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(16)
+
+        self.run_guidance = QLabel()
+        self.run_guidance.setWordWrap(True)
+        self.run_guidance.setAccessibleName("Detect Run guidance")
+        self.run_guidance.setStyleSheet(
+            "padding: 12px; border: 1px solid #CBD5E1; border-left: 4px solid #2563EB; "
+            "border-radius: 7px;"
+        )
+        outer.addWidget(self.run_guidance)
+
+        self.run_layout = QGridLayout()
+        self.run_layout.setHorizontalSpacing(16)
+        self.run_layout.setVerticalSpacing(16)
+        self.run_progress_card = Card()
+        progress_heading = QHBoxLayout()
+        progress_labels = QVBoxLayout()
+        self.run_title = Text("Run not started", role="heading", word_wrap=True)
+        progress_labels.addWidget(self.run_title)
+        self.run_stage = Text("Waiting", role="body", word_wrap=True)
+        progress_labels.addWidget(self.run_stage)
+        progress_heading.addLayout(progress_labels, 1)
+        self.run_status_badge = Badge("Idle", intent="neutral")
+        self.run_status_badge.setAccessibleName("Run detail status: Idle")
+        progress_heading.addWidget(self.run_status_badge)
+        self.run_percent = Text("0%", role="subheading")
+        progress_heading.addWidget(self.run_percent)
+        self.run_progress_card.content_layout.addLayout(progress_heading)
+        self.run_progress_bar = ProgressBar(value=0)
+        self.run_progress_bar.setAccessibleName("Detect Run progress")
+        self.run_progress_card.content_layout.addWidget(self.run_progress_bar)
+        self.run_stage_list = QLabel()
+        self.run_stage_list.setWordWrap(True)
+        self.run_stage_list.setAccessibleName("Detect Run stages")
+        self.run_progress_card.content_layout.addWidget(self.run_stage_list)
+        actions = QHBoxLayout()
+        self.cancel_run_button = Button("Cancel Run", variant="danger")
+        self.cancel_run_button.setAccessibleDescription(
+            "Request cancellation, then stop the Worker within the bounded grace period."
+        )
+        self.cancel_run_button.clicked.connect(self.controller.cancel_active_run)
+        actions.addWidget(self.cancel_run_button)
+        actions.addStretch()
+        self.open_run_log_button = Button("Open Run log", variant="outline")
+        self.open_run_log_button.setAccessibleDescription(
+            "Open the existing privacy-safe diagnostic log for this Detect Run."
+        )
+        self.open_run_log_button.clicked.connect(self._open_run_log)
+        actions.addWidget(self.open_run_log_button)
+        self.run_progress_card.content_layout.addLayout(actions)
+
+        self.run_activity_card = Card()
+        self.run_activity_card.setAccessibleName("Detect Run activity")
+        self.run_activity_card.content_layout.addWidget(Text("Activity", role="heading"))
+        self.run_activity = QLabel("No activity yet.")
+        self.run_activity.setWordWrap(True)
+        self.run_activity.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByKeyboard
+        )
+        self.run_activity.setAccessibleName("Detect Run activity entries")
+        self.run_activity_card.content_layout.addWidget(self.run_activity)
+        self.run_layout.addWidget(self.run_progress_card, 0, 0)
+        self.run_layout.addWidget(self.run_activity_card, 0, 1)
+        self.run_layout.setColumnStretch(0, 2)
+        self.run_layout.setColumnStretch(1, 1)
+        outer.addLayout(self.run_layout)
+        outer.addStretch()
+        return view
+
+    def _open_run_log(self) -> None:
+        record = self.controller.current_run
+        if record is None:
+            return
+        path = self.controller.safe_run_log_path(record.run_id)
+        if path is not None:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
     def _build_model_card(self) -> Card:
         card = Card()
@@ -929,7 +1051,90 @@ class DetectWorkspacePage(QScrollArea):
             entry.key.rstrip("/"), is_folder=entry.is_folder
         )
 
+    def _render_run_header(self) -> None:
+        record = self.controller.current_run
+        if record is None:
+            self.active_run_label.setText("No active Run")
+            self.active_run_badge.setText("Idle")
+            self.active_run_badge.setAccessibleName("Detect Run status: Idle")
+            self.view_run_button.setVisible(False)
+            return
+        status = record.status.value.capitalize()
+        self.active_run_label.setText(record.title)
+        self.active_run_badge.setText(status)
+        self.active_run_badge.setAccessibleName(f"Detect Run status: {status}")
+        self.view_run_button.setVisible(self.current_route != "run")
+
+    def _render_run(self) -> None:
+        record = self.controller.current_run
+        if record is None:
+            self.run_title.setText("Run not started")
+            self.run_stage.setText("Waiting for verified setup")
+            self.run_status_badge.setText("Idle")
+            self.run_status_badge.setAccessibleName("Run detail status: Idle")
+            self.run_percent.setText("0%")
+            self.run_progress_bar.setValue(0)
+            self.run_stage_list.setText(
+                "○ Validate frozen inputs\n○ Run the supervised Worker\n○ Verify publication"
+            )
+            self.run_activity.setText("No activity yet.")
+            self.run_guidance.setText(
+                "No Run has started. Prepare a compatible Model and current recording inventory."
+            )
+            self.cancel_run_button.setEnabled(False)
+            self.open_run_log_button.setEnabled(False)
+            return
+
+        status = record.status.value.capitalize()
+        guidance = {
+            DetectRunStatus.PREPARING: "Preparing frozen inputs and starting the Worker.",
+            DetectRunStatus.RUNNING: "The supervised Worker is running.",
+            DetectRunStatus.CANCELLING: (
+                "Cancellation requested. Detect is waiting for the Worker to stop safely."
+            ),
+            DetectRunStatus.CANCELLED: (
+                "This Run was cancelled without publication. Review setup and start a new Run."
+            ),
+            DetectRunStatus.INTERRUPTED: (
+                "The Worker stopped unexpectedly. Review setup and start a new Run."
+            ),
+            DetectRunStatus.FAILED: (
+                record.error_message
+                or "The Run failed without publication. Review setup and start a new Run."
+            ),
+            DetectRunStatus.COMPLETED: (
+                "The immutable artifact and its publication receipt were verified."
+            ),
+        }[record.status]
+        self.run_title.setText(record.title)
+        self.run_stage.setText(record.current_stage)
+        self.run_status_badge.setText(status)
+        self.run_status_badge.setAccessibleName(f"Run detail status: {status}")
+        self.run_percent.setText(f"{record.progress}%")
+        self.run_progress_bar.setValue(record.progress)
+        stage_rows = []
+        for index, stage in enumerate(record.stages):
+            marker = (
+                "✓"
+                if index < record.stage_index
+                else ("●" if index == record.stage_index else "○")
+            )
+            if record.status is DetectRunStatus.COMPLETED:
+                marker = "✓"
+            stage_rows.append(f"{marker} {stage}")
+        self.run_stage_list.setText("\n".join(stage_rows))
+        self.run_activity.setText("\n".join(record.activity[-8:]) or "No activity yet.")
+        self.run_guidance.setText(guidance)
+        self.cancel_run_button.setEnabled(
+            record.status in {DetectRunStatus.PREPARING, DetectRunStatus.RUNNING}
+        )
+        self.open_run_log_button.setEnabled(
+            self.controller.safe_run_log_path(record.run_id) is not None
+        )
+
     def _render(self) -> None:
+        self._render_run_header()
+        self._render_run()
         self._render_model()
         collection = self.controller.active_collection
         proposal = self.controller.proposal
@@ -1017,7 +1222,7 @@ class DetectWorkspacePage(QScrollArea):
         self._render_readiness()
 
     def _set_route(self, route: str) -> None:
-        if route not in {"setup", "recordings"}:
+        if route not in {"setup", "recordings", "run"}:
             raise ValueError(f"Unknown Detect route: {route}")
         if route == "recordings" and not self.recordings_button.isEnabled():
             route = "setup"
@@ -1025,8 +1230,13 @@ class DetectWorkspacePage(QScrollArea):
         self.current_route = route
         self.setup_button.setChecked(route == "setup")
         self.recordings_button.setChecked(route == "recordings")
+        self.run_button.setChecked(route == "run")
         self.route_stack.setCurrentWidget(
-            self.setup_view if route == "setup" else self.recordings_view
+            {
+                "setup": self.setup_view,
+                "recordings": self.recordings_view,
+                "run": self.run_view,
+            }[route]
         )
         if route == "setup":
             self.page_overline.setText("DETECT SETUP")
@@ -1034,11 +1244,21 @@ class DetectWorkspacePage(QScrollArea):
             self.page_description.setText(
                 "Choose a detection Model and recordings folder in either order."
             )
-        else:
+        elif route == "recordings":
             self.page_overline.setText("SOURCE INVENTORY")
             self.page_title.setText("Recordings")
             self.page_description.setText(
                 "Approve the WAVs that belong to this Detect Collection."
+            )
+        else:
+            self.page_overline.setText("RUN · CANDIDATE DETECTION")
+            self.page_title.setText(
+                "Detect Run"
+                if self.controller.current_run is None
+                else self.controller.current_run.title
+            )
+            self.page_description.setText(
+                "Follow Worker progress, cancellation, recovery, and verified publication."
             )
         self.setup_button.setAccessibleDescription(
             "Current Detect page" if route == "setup" else "Open Detect setup"
@@ -1046,12 +1266,24 @@ class DetectWorkspacePage(QScrollArea):
         self.recordings_button.setAccessibleDescription(
             "Current Detect page" if route == "recordings" else "Open recordings folder"
         )
+        self.run_button.setAccessibleDescription(
+            "Current Detect page" if route == "run" else "Open Detect Run details"
+        )
+        self._render_run_header()
         if route_changed:
             QTimer.singleShot(0, lambda: self.verticalScrollBar().setValue(0))
 
     def focus_initial(self) -> None:
         if self.relink_card.isVisible():
             self.relink_confirm.setFocus()
+            return
+        if self.current_route == "run":
+            target = (
+                self.cancel_run_button
+                if self.cancel_run_button.isEnabled()
+                else self.run_button
+            )
+            target.setFocus()
             return
         picker = self.model_picker if self.current_route == "setup" else self.relink_picker
         buttons = picker.findChildren(QPushButton)
@@ -1067,6 +1299,27 @@ class DetectWorkspacePage(QScrollArea):
             self._compact = compact
             margin = 22 if compact else 48
             self.outer.setContentsMargins(margin, 26 if compact else 34, margin, 36)
+            self.heading_layout.removeItem(self.heading_copy)
+            self.heading_layout.removeWidget(self.back_button)
+            self.run_header_layout.removeItem(self.run_header_labels)
+            self.run_header_layout.removeWidget(self.active_run_badge)
+            self.run_header_layout.removeWidget(self.view_run_button)
+            if compact:
+                self.heading_layout.addLayout(self.heading_copy, 0, 0)
+                self.heading_layout.addWidget(
+                    self.back_button, 1, 0, Qt.AlignmentFlag.AlignLeft
+                )
+                self.run_header_layout.addLayout(self.run_header_labels, 0, 0, 1, 2)
+                self.run_header_layout.addWidget(self.active_run_badge, 1, 0)
+                self.run_header_layout.addWidget(self.view_run_button, 1, 1)
+            else:
+                self.heading_layout.addLayout(self.heading_copy, 0, 0)
+                self.heading_layout.addWidget(
+                    self.back_button, 0, 1, Qt.AlignmentFlag.AlignTop
+                )
+                self.run_header_layout.addLayout(self.run_header_labels, 0, 0)
+                self.run_header_layout.addWidget(self.active_run_badge, 0, 1)
+                self.run_header_layout.addWidget(self.view_run_button, 0, 2)
             self.setup_layout.removeWidget(self.model_card)
             self.setup_layout.removeWidget(self.collection_card)
             if compact:
@@ -1087,6 +1340,14 @@ class DetectWorkspacePage(QScrollArea):
             else:
                 self.inventory_layout.addWidget(self.inventory_table_card, 0, 0)
                 self.inventory_layout.addWidget(self.inventory_detail_card, 0, 1)
+            self.run_layout.removeWidget(self.run_progress_card)
+            self.run_layout.removeWidget(self.run_activity_card)
+            if compact:
+                self.run_layout.addWidget(self.run_progress_card, 0, 0)
+                self.run_layout.addWidget(self.run_activity_card, 1, 0)
+            else:
+                self.run_layout.addWidget(self.run_progress_card, 0, 0)
+                self.run_layout.addWidget(self.run_activity_card, 0, 1)
 
     @property
     def is_compact(self) -> bool:

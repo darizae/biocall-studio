@@ -65,11 +65,17 @@ class StudioCoordinator(QObject):
     def request_application_exit(self) -> None:
         if self._application_exit_finishing:
             return
-        if self.detect_controller.is_scanning or self.detect_controller.is_model_loading:
-            if self.detect_controller.is_scanning:
-                self.detect_controller.cancel_scan()
+        if (
+            self.detect_controller.is_scanning
+            or self.detect_controller.is_model_loading
+            or self.detect_controller.is_run_active
+            or not self.detect_controller.shutdown_is_ready
+        ):
+            self.detect_controller.request_shutdown()
             QTimer.singleShot(25, self.request_application_exit)
             return
+        if not self.detect_controller._shutdown_finished:
+            self.detect_controller.shutdown()
         if self.controller.active_run is not None or self.controller.is_scanning:
             self.open_workspace(WorkspaceRoute.TRAIN)
         self.train_window.close()
