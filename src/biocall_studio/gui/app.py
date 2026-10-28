@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from PySide6.QtCore import QStandardPaths
 from PySide6.QtWidgets import QApplication
 
 from biocall_studio.gui.branding import application_icon
@@ -25,15 +26,32 @@ def create_application(argv: list[str] | None = None) -> QApplication:
     return app
 
 
+def default_detect_data_dir() -> Path:
+    """Return the suite-owned per-user data root used by Detect."""
+    app = QApplication.instance()
+    if app is None:
+        app = create_application()
+    location = QStandardPaths.writableLocation(
+        QStandardPaths.StandardLocation.AppLocalDataLocation
+    )
+    if not location:
+        raise OSError("Qt could not locate BioCall Studio application-data storage.")
+    return Path(location)
+
+
 def run(settings_dir: Path | None = None, *, diagnostic_debug: bool = False) -> int:
     app = create_application()
     if settings_dir is None:
-        settings_dir = default_settings_dir()
-    diagnostics = DiagnosticSession(settings_dir, debug=diagnostic_debug)
+        train_settings_dir = default_settings_dir()
+        detect_data_dir = default_detect_data_dir()
+    else:
+        train_settings_dir = settings_dir
+        detect_data_dir = settings_dir
+    diagnostics = DiagnosticSession(train_settings_dir, debug=diagnostic_debug)
     hooks = DiagnosticHooks(diagnostics)
     try:
-        controller = WorkspaceController(settings_dir, diagnostics=diagnostics)
-        coordinator = StudioCoordinator(controller)
+        controller = WorkspaceController(train_settings_dir, diagnostics=diagnostics)
+        coordinator = StudioCoordinator(controller, detect_data_dir=detect_data_dir)
         coordinator.start()
         return app.exec()
     except Exception as exc:

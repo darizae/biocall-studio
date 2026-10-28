@@ -21,16 +21,19 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-STU-002` | Studio → real Train → Studio → Train reuses controller/window, preserves current Train route and live training draft, and leaves Collection bindings and input WAV unchanged. Return control works at compact widths. | TD-UI, TD-COL |
 | `IT-STU-003` | Real Train QProcess Run and scan remain active while visiting Studio; application Quit from either visible/hidden workspace preserves Train's single safe close/cancel/keep-open policy and releases Worker/lease/resources only after confirmed stop. | TD-RUN, TD-FAIL, TD-UI |
 | `IT-STU-004` | Canonical Studio entry, old Train CLI and Train `-m ... --worker` protocol coexist; settings path and validated binding survive app entrypoint/display-name change and restart, including isolated test settings. | TD-UI, TD-CACHE |
-| `IT-STU-005` | Detect landing and Review placeholder have reachable, keyboard-operable returns; no invented Model scan, prediction, simulated values, persisted Detect state or enabled detection action. | TD-UI |
+| `IT-STU-005` | Detect Collection setup and Review placeholder have reachable, keyboard-operable returns; Detect adds no invented Model, inventory, prediction, result, simulated value or enabled detection action. | TD-UI |
 | `IT-STU-006` | Real native Studio/Train/Detect/Review screenshots at normal and compact widths show checked-in branding, focus and contrast; no Train layout regression or inaccessible switch; report unavailable native platforms separately. | TD-UI, TD-OS |
 
 **Reported status:** ST-02 implements `IT-STU-001`–`006` in
 `tests/integration/test_studio_shell.py`. Genuine macOS Cocoa evidence and its environment/deviation
 record are under `design/evidence/st-02-native/`; installed and Windows qualification remain open.
 
-## 1b. Planned, stage-owned Detect integration cases (ST-03–ST-10)
+## 1b. Stage-owned Detect integration cases (ST-03–ST-10)
 
-All rows below are **planned, unexecuted acceptance contracts**. Each stage implements **only its own rows**, using genuine Qt/Worker/WAV/scientific boundaries where named. The whole-Studio E2E appears exclusively in ST-11. No planned case counts as covered.
+ST-03 implements `IT-DET-001`–`002` pending owner review; ST-04–ST-10 rows remain planned,
+unexecuted acceptance contracts. Each stage implements **only its own rows**, using genuine
+Qt/Worker/WAV/scientific boundaries where named. The whole-Studio E2E appears exclusively in ST-11.
+No planned case counts as covered.
 
 | Case ID | Public seam / expected result | Data | Spec |
 |---|---|---|---|

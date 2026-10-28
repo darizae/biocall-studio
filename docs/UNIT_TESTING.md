@@ -4,7 +4,7 @@ Use fast deterministic, Qt-free tests for pure behaviors: filename/path parsers,
 
 ## Naming and coverage
 
-An indexed case appears **exactly** in the asserting test function docstring, e.g. `"""Case: UT-COL-001."""`. Table rows below define intended cases, **not completion**. The ST-03–ST-11 case rows are **pre-registered planned contracts**; none is covered merely by being listed. A test counts as covered only after the exact behavior is asserted and an applicable run passes. Do not renumber an existing ID to reuse it for different behavior. Add edge variants under the same case where the invariant is unchanged; add an ID when the behavior is materially distinct.
+An indexed case appears **exactly** in the asserting test function docstring, e.g. `"""Case: UT-COL-001."""`. Table rows below define intended cases, **not completion**. ST-04–ST-11 rows remain pre-registered planned contracts; none is covered merely by being listed. A test counts as covered only after the exact behavior is asserted and an applicable run passes. Do not renumber an existing ID to reuse it for different behavior. Add edge variants under the same case where the invariant is unchanged; add an ID when the behavior is materially distinct.
 
 | Case ID | Pure behavior and failure contrasts | Data class | Spec |
 |---|---|---|---|
@@ -12,9 +12,9 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-PATH-002` | Unicode NFC/casefold filename collisions cannot silently resolve an identity | TD-PATH | 01 |
 | `UT-CLI-001` | Version/help and invalid-option handling complete without importing optional Qt/`alp-ui`; real GUI startup remains owned by `IT-UI-001` and uses isolated Application Settings | TD-UI | 01, 05f |
 | `UT-STU-001` | Pure workspace-route policy: Studio is the startup route; Train/Detect/Review and return transitions are explicit; unknown routes fail closed; navigation decisions do not mutate Train context or imply runnable Detect features. | TD-UI | ST-02 |
-| `UT-DET-001` | **Planned ST-03:** unique identity, schema migration/rejection, app-data ownership and root-reference serialization (no original path in exported metadata). | TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
-| `UT-DET-002` | **Planned ST-03:** valid/missing/inaccessible/changed/relink state decisions, confirmation and stale inventory invalidation; reject unrelated-root takeover. | TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
-| `UT-DET-003` | **Planned ST-03:** containment, Unicode/casefold/Windows-reserved path policy, atomic update and recovery decisions. | TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
+| `UT-DET-001` | unique identity, schema migration/rejection, app-data ownership and root-reference serialization (no original path in exported metadata). | TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
+| `UT-DET-002` | valid/missing/inaccessible/changed/relink state decisions, confirmation and stale inventory invalidation; reject unrelated-root takeover. | TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
+| `UT-DET-003` | containment, Unicode/casefold/Windows-reserved path policy, atomic update and recovery decisions. | TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
 | `UT-DET-004` | **Planned ST-04:** inclusion precedence, generated-data exclusions, undecided versus invalid, deterministic decisions and count aggregation. | TD-WAV, TD-PATH | [ST-04](specs/ST-04-wav-discovery.md) |
 | `UT-DET-005` | **Planned ST-04:** normalized identity, traversal/symlink/reparse and duplicate/hardlink/casefold collisions cannot silently collapse rows. | TD-WAV, TD-PATH | [ST-04](specs/ST-04-wav-discovery.md) |
 | `UT-DET-006` | **Planned ST-04:** header/freshness interpretation, add/remove/replace, cancellation and snapshot validation. | TD-WAV, TD-PATH | [ST-04](specs/ST-04-wav-discovery.md) |

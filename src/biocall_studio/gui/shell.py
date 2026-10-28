@@ -1,4 +1,4 @@
-"""Native Studio launchpad and truthful ST-02 workspace landing states."""
+"""Native Studio launchpad with retained Train and the staged Detect workspace."""
 
 from __future__ import annotations
 
@@ -18,7 +18,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from biocall_studio.detect.controller import DetectWorkspaceController
 from biocall_studio.gui.branding import application_icon
+from biocall_studio.gui.detect import DetectWorkspacePage
 from biocall_studio.navigation import WorkspaceRoute
 
 
@@ -209,7 +211,7 @@ class StudioWindow(QMainWindow):
     workspace_requested = Signal(str)
     application_exit_requested = Signal()
 
-    def __init__(self) -> None:
+    def __init__(self, detect_controller: DetectWorkspaceController) -> None:
         super().__init__()
         self.setObjectName("bioCallStudioWindow")
         self.setWindowTitle("BioCall Studio")
@@ -226,16 +228,7 @@ class StudioWindow(QMainWindow):
         layout.addWidget(self._build_header())
         self.pages = QStackedWidget()
         self.launchpad = LaunchpadPage()
-        self.detect_page = LandingPage(
-            workspace="Detect",
-            title="Candidate detection",
-            description=(
-                "Model and recording setup is not available yet. Train remains available now."
-            ),
-            status="Not available",
-            icon_name="search",
-            accent="#4C1D95",
-        )
+        self.detect_page = DetectWorkspacePage(detect_controller)
         self.review_page = LandingPage(
             workspace="Review",
             title="Review is coming later",
@@ -297,7 +290,7 @@ class StudioWindow(QMainWindow):
         if route is WorkspaceRoute.STUDIO:
             self.launchpad.train_card.action_button.setFocus()
         elif route is WorkspaceRoute.DETECT:
-            self.detect_page.back_button.setFocus()
+            self.detect_page.focus_initial()
         else:
             self.review_page.back_button.setFocus()
 

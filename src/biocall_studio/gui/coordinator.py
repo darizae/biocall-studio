@@ -5,6 +5,7 @@ from __future__ import annotations
 from PySide6.QtCore import QObject, QTimer
 from PySide6.QtWidgets import QApplication
 
+from biocall_studio.detect.controller import DetectWorkspaceController
 from biocall_studio.gui.shell import StudioWindow
 from biocall_studio.navigation import WorkspaceNavigation, WorkspaceRoute
 from biocall_studio_train.application.workspace import WorkspaceController
@@ -14,7 +15,9 @@ from biocall_studio_train.gui.window import MainWindow
 class StudioCoordinator(QObject):
     """Retain Train intact while the suite shell controls visibility and app exit."""
 
-    def __init__(self, controller: WorkspaceController):
+    def __init__(
+        self, controller: WorkspaceController, *, detect_data_dir=None
+    ):
         super().__init__()
         app = QApplication.instance()
         if not isinstance(app, QApplication):
@@ -22,7 +25,10 @@ class StudioCoordinator(QObject):
         self.app = app
         self.controller = controller
         self.navigation = WorkspaceNavigation()
-        self.shell_window = StudioWindow()
+        if detect_data_dir is None:
+            detect_data_dir = controller.settings_file.parent
+        self.detect_controller = DetectWorkspaceController(detect_data_dir)
+        self.shell_window = StudioWindow(self.detect_controller)
         self.train_window = MainWindow(controller, back_to_studio=self.show_studio)
         self._application_exit_finishing = False
 

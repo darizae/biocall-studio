@@ -11,7 +11,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--settings-dir",
         type=Path,
-        help="Isolate Train Application Settings in this directory.",
+        help="Isolate Studio application data, including Train settings, in this directory.",
     )
     parser.add_argument("--diagnostic-debug", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)

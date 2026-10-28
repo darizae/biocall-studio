@@ -6,12 +6,12 @@ from pathlib import Path
 from textwrap import dedent
 
 import pytest
+from alp_ui.components import FolderPicker, HelpHint
 from PySide6.QtCore import QProcess, Qt
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
     QLabel,
-    QLineEdit,
     QProgressBar,
     QPushButton,
     QTableView,
@@ -300,7 +300,7 @@ def test_entrypoints_worker_protocol_and_train_settings_binding_coexist(
     assert "canonical Studio entry retained Train settings" in result.stdout
 
 
-def test_detect_and_review_are_truthful_keyboard_reachable_placeholders(qtbot, tmp_path):
+def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(qtbot, tmp_path):
     """Case: IT-STU-005."""
     coordinator = _coordinator(qtbot, WorkspaceController(tmp_path / "settings"))
     shell = coordinator.shell_window
@@ -308,15 +308,16 @@ def test_detect_and_review_are_truthful_keyboard_reachable_placeholders(qtbot, t
     shell.launchpad.detect_card.action_button.setFocus()
     qtbot.keyClick(shell.launchpad.detect_card.action_button, Qt.Key.Key_Space)
     assert shell.current_workspace is WorkspaceRoute.DETECT
-    assert shell.detect_page.back_button.hasFocus()
+    assert isinstance(shell.detect_page.focusWidget(), QPushButton)
+    assert shell.detect_page.focusWidget().accessibleName() == "Choose Recordings folder"
+    assert len(shell.detect_page.findChildren(FolderPicker)) == 2
+    assert len(shell.detect_page.findChildren(HelpHint)) == 1
     assert shell.detect_page.findChildren(QComboBox) == []
-    assert shell.detect_page.findChildren(QLineEdit) == []
     assert shell.detect_page.findChildren(QProgressBar) == []
     assert shell.detect_page.findChildren(QTableView) == []
-    assert shell.detect_page.findChildren(QPushButton) == [shell.detect_page.back_button]
     detect_text = " ".join(label.text() for label in shell.detect_page.findChildren(QLabel))
-    assert "Not available" in detect_text
-    assert "result" not in detect_text.lower()
+    assert "Create a Detect Collection" in detect_text
+    assert all(word not in detect_text.lower() for word in ("model", "result", "start detection"))
     shell.detect_page.back_button.setFocus()
     qtbot.keyClick(shell.detect_page.back_button, Qt.Key.Key_Space)
     assert shell.current_workspace is WorkspaceRoute.STUDIO
