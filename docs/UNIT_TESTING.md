@@ -4,7 +4,7 @@ Use fast deterministic, Qt-free tests for pure behaviors: filename/path parsers,
 
 ## Naming and coverage
 
-An indexed case appears **exactly** in the asserting test function docstring, e.g. `"""Case: UT-COL-001."""`. Table rows below define intended cases, **not completion**. ST-04–ST-11 rows remain pre-registered planned contracts; none is covered merely by being listed. A test counts as covered only after the exact behavior is asserted and an applicable run passes. Do not renumber an existing ID to reuse it for different behavior. Add edge variants under the same case where the invariant is unchanged; add an ID when the behavior is materially distinct.
+An indexed case appears **exactly** in the asserting test function docstring, e.g. `"""Case: UT-COL-001."""`. Table rows below define intended cases, **not completion**. ST-05–ST-11 rows remain pre-registered planned contracts; none is covered merely by being listed. A test counts as covered only after the exact behavior is asserted and an applicable run passes. Do not renumber an existing ID to reuse it for different behavior. Add edge variants under the same case where the invariant is unchanged; add an ID when the behavior is materially distinct.
 
 | Case ID | Pure behavior and failure contrasts | Data class | Spec |
 |---|---|---|---|
@@ -15,9 +15,9 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-DET-001` | unique identity, schema migration/rejection, app-data ownership and root-reference serialization (no original path in exported metadata). | TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
 | `UT-DET-002` | valid/missing/inaccessible/changed/relink state decisions, confirmation and stale inventory invalidation; reject unrelated-root takeover. | TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
 | `UT-DET-003` | containment, Unicode/casefold/Windows-reserved path policy, atomic update and recovery decisions. | TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
-| `UT-DET-004` | **Planned ST-04:** inclusion precedence, generated-data exclusions, undecided versus invalid, deterministic decisions and count aggregation. | TD-WAV, TD-PATH | [ST-04](specs/ST-04-wav-discovery.md) |
-| `UT-DET-005` | **Planned ST-04:** normalized identity, traversal/symlink/reparse and duplicate/hardlink/casefold collisions cannot silently collapse rows. | TD-WAV, TD-PATH | [ST-04](specs/ST-04-wav-discovery.md) |
-| `UT-DET-006` | **Planned ST-04:** header/freshness interpretation, add/remove/replace, cancellation and snapshot validation. | TD-WAV, TD-PATH | [ST-04](specs/ST-04-wav-discovery.md) |
+| `UT-DET-004` | inclusion precedence, generated-data exclusions, undecided versus invalid, deterministic decisions and count aggregation. | TD-WAV, TD-PATH | [ST-04](specs/ST-04-wav-discovery.md) |
+| `UT-DET-005` | normalized identity, traversal/symlink/reparse and duplicate/hardlink/casefold collisions cannot silently collapse rows. | TD-WAV, TD-PATH | [ST-04](specs/ST-04-wav-discovery.md) |
+| `UT-DET-006` | header/freshness interpretation, add/remove/replace, cancellation and snapshot validation. | TD-WAV, TD-PATH | [ST-04](specs/ST-04-wav-discovery.md) |
 | `UT-DET-007` | **Planned ST-05:** immutable manifest schema/checksum/class mapping, family-specific required fields and rejected mismatch. | TD-EXPORT, TD-TRAIN | [ST-05](specs/ST-05-model-intake.md) |
 | `UT-DET-008` | **Planned ST-05:** trusted artifact policy, safe path/version/import semantics; binary not deserialized on untrusted/malformed input. | TD-EXPORT, TD-TRAIN | [ST-05](specs/ST-05-model-intake.md) |
 | `UT-DET-009` | **Planned ST-05:** precise compatibility state/reason and normalized typed handoff; unproven numerical parity remains flagged. | TD-EXPORT, TD-TRAIN | [ST-05](specs/ST-05-model-intake.md) |

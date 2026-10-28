@@ -311,10 +311,17 @@ def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(q
     assert isinstance(shell.detect_page.focusWidget(), QPushButton)
     assert shell.detect_page.focusWidget().accessibleName() == "Choose Recordings folder"
     assert len(shell.detect_page.findChildren(FolderPicker)) == 2
-    assert len(shell.detect_page.findChildren(HelpHint)) == 1
+    assert {
+        hint.accessibleName() for hint in shell.detect_page.findChildren(HelpHint)
+    } == {
+        "More about Detect Collection",
+        "More about Recording inclusion",
+    }
     assert shell.detect_page.findChildren(QComboBox) == []
-    assert shell.detect_page.findChildren(QProgressBar) == []
-    assert shell.detect_page.findChildren(QTableView) == []
+    assert all(
+        not widget.isVisible() for widget in shell.detect_page.findChildren(QProgressBar)
+    )
+    assert all(not widget.isVisible() for widget in shell.detect_page.findChildren(QTableView))
     detect_text = " ".join(label.text() for label in shell.detect_page.findChildren(QLabel))
     assert "Create a Detect Collection" in detect_text
     assert all(word not in detect_text.lower() for word in ("model", "result", "start detection"))

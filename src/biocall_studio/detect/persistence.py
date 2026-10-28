@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
+import shutil
 import tempfile
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -23,9 +26,21 @@ from biocall_studio.detect.domain import (
     validate_collection_id,
     validate_display_label,
 )
+from biocall_studio.detect.inventory import (
+    INVENTORY_SCHEMA_VERSION,
+    InventoryRecording,
+    InventorySnapshot,
+)
 
 _MAX_METADATA_BYTES = 1_048_576
 _SETTINGS_SCHEMA_VERSION = 1
+_MAX_INVENTORY_ROWS = 100_000
+_MAX_INVENTORY_PARTITIONS = 1_000
+_MAX_JSONL_LINE_BYTES = 65_536
+_MAX_JSONL_PARTITION_BYTES = 1_048_576
+_MAX_JSONL_PARTITION_ROWS = 1_000
+_INVENTORY_ID = re.compile(r"inv_[0-9a-f]{32}")
+_PARTITION_NAME = re.compile(r"records-[0-9]{5}\.jsonl")
 
 
 class WorkspaceMetadataError(ValueError):
@@ -40,6 +55,7 @@ class CollectionPaths:
     private_binding: Path
     last_good_manifest: Path
     last_good_binding: Path
+    inventories_directory: Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,6 +204,7 @@ class DetectWorkspaceStore:
             private_binding=directory / "binding.json",
             last_good_manifest=last_good / "collection.json",
             last_good_binding=last_good / "binding.json",
+            inventories_directory=directory / "inventories",
         )
 
     def _validate_source_separation(self, source_root: Path) -> None:
@@ -221,7 +238,7 @@ class DetectWorkspaceStore:
         paths = self.paths_for(ref.collection_id)
         paths.collection_directory.mkdir(mode=0o700)
         paths.collection_directory.chmod(0o700)
-        for namespace in ("runs", "results", "exports"):
+        for namespace in ("runs", "results", "exports", "inventories"):
             _ensure_directory(paths.collection_directory / namespace)
         _ensure_directory(paths.last_good_manifest.parent)
         try:
@@ -438,4 +455,249 @@ class DetectWorkspaceStore:
             if last_good_written:
                 _write_json_atomic(paths.last_good_manifest, current.ref.to_public_dict())
             raise
+        return PersistedDetectCollection(ref, current.binding)
+
+    def _inventory_directory(self, paths: CollectionPaths, inventory_id: str) -> Path:
+        if not isinstance(inventory_id, str) or _INVENTORY_ID.fullmatch(inventory_id) is None:
+            raise WorkspaceMetadataError("Inventory identifier is invalid.")
+        return paths.inventories_directory / inventory_id
+
+    def _publish_snapshot_directory(
+        self, paths: CollectionPaths, snapshot: InventorySnapshot
+    ) -> None:
+        if len(snapshot.recordings) > _MAX_INVENTORY_ROWS:
+            raise WorkspaceMetadataError(
+                f"Inventory exceeds the {_MAX_INVENTORY_ROWS:,}-row limit."
+            )
+        _ensure_directory(paths.inventories_directory)
+        destination = self._inventory_directory(paths, snapshot.inventory_id)
+        if destination.is_symlink():
+            raise WorkspaceMetadataError("Inventory directory cannot be a symlink.")
+        if destination.exists():
+            if self._load_inventory_id(paths, snapshot.inventory_id) != snapshot:
+                raise WorkspaceMetadataError(
+                    "An immutable inventory identifier already contains different data."
+                )
+            return
+
+        temporary = Path(
+            tempfile.mkdtemp(
+                prefix=f".{snapshot.inventory_id}.",
+                suffix=".tmp",
+                dir=paths.inventories_directory,
+            )
+        )
+        temporary.chmod(0o700)
+        partitions: list[dict[str, object]] = []
+        try:
+            pending: list[bytes] = []
+            pending_bytes = 0
+
+            def flush_partition() -> None:
+                nonlocal pending, pending_bytes
+                if not pending:
+                    return
+                index = len(partitions) + 1
+                if index > _MAX_INVENTORY_PARTITIONS:
+                    raise WorkspaceMetadataError("Inventory has too many JSONL partitions.")
+                name = f"records-{index:05d}.jsonl"
+                payload = b"".join(pending)
+                path = temporary / name
+                with path.open("xb") as stream:
+                    os.chmod(path, 0o600)
+                    stream.write(payload)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                partitions.append(
+                    {
+                        "path": name,
+                        "rows": len(pending),
+                        "bytes": len(payload),
+                        "sha256": hashlib.sha256(payload).hexdigest(),
+                    }
+                )
+                pending = []
+                pending_bytes = 0
+
+            for row in snapshot.recordings:
+                line = (
+                    json.dumps(
+                        row.to_dict(),
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        sort_keys=True,
+                    ).encode("utf-8")
+                    + b"\n"
+                )
+                if len(line) > _MAX_JSONL_LINE_BYTES:
+                    raise WorkspaceMetadataError("Inventory JSONL row exceeds the 64 KiB limit.")
+                if pending and (
+                    len(pending) >= _MAX_JSONL_PARTITION_ROWS
+                    or pending_bytes + len(line) > _MAX_JSONL_PARTITION_BYTES
+                ):
+                    flush_partition()
+                pending.append(line)
+                pending_bytes += len(line)
+            flush_partition()
+
+            manifest = {
+                "schema_version": snapshot.schema_version,
+                "collection_id": snapshot.collection_id,
+                "binding_revision": snapshot.binding_revision,
+                "inventory_id": snapshot.inventory_id,
+                "digest": snapshot.digest,
+                "scanned_at": snapshot.scanned_at,
+                "freshness_strategy": snapshot.freshness_strategy,
+                "conflict_policy": snapshot.conflict_policy,
+                "decision_rules": [
+                    rule.to_dict() for rule in snapshot.decision_rules
+                ],
+                "issues": [issue.to_dict() for issue in snapshot.issues],
+                "counts": snapshot.counts.to_dict(),
+                "partitions": partitions,
+            }
+            serialized_manifest = (
+                json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=False).encode(
+                    "utf-8"
+                )
+                + b"\n"
+            )
+            if len(serialized_manifest) > _MAX_METADATA_BYTES:
+                raise WorkspaceMetadataError("Inventory manifest exceeds the 1 MiB limit.")
+            _write_json_atomic(temporary / "inventory.json", manifest)
+            os.rename(temporary, destination)
+            destination.chmod(0o700)
+        finally:
+            if temporary.exists():
+                shutil.rmtree(temporary)
+
+    def _load_inventory_id(
+        self, paths: CollectionPaths, inventory_id: str
+    ) -> InventorySnapshot:
+        directory = self._inventory_directory(paths, inventory_id)
+        if (
+            paths.inventories_directory.is_symlink()
+            or directory.is_symlink()
+            or not directory.is_dir()
+        ):
+            raise WorkspaceMetadataError("Inventory snapshot is missing or unsafe.")
+        manifest = _read_json(directory / "inventory.json", label="Inventory manifest")
+        expected = {
+            "schema_version",
+            "collection_id",
+            "binding_revision",
+            "inventory_id",
+            "digest",
+            "scanned_at",
+            "freshness_strategy",
+            "conflict_policy",
+            "decision_rules",
+            "issues",
+            "counts",
+            "partitions",
+        }
+        if not isinstance(manifest, dict) or set(manifest) != expected:
+            raise WorkspaceMetadataError("Inventory manifest is unsupported or invalid.")
+        if manifest.get("schema_version") != INVENTORY_SCHEMA_VERSION:
+            raise WorkspaceMetadataError("Inventory manifest schema is unsupported.")
+        partitions = manifest["partitions"]
+        if not isinstance(partitions, list) or len(partitions) > _MAX_INVENTORY_PARTITIONS:
+            raise WorkspaceMetadataError("Inventory partition index is invalid.")
+
+        recordings: list[dict[str, object]] = []
+        total_rows = 0
+        for expected_index, part in enumerate(partitions, 1):
+            if not isinstance(part, dict) or set(part) != {
+                "path",
+                "rows",
+                "bytes",
+                "sha256",
+            }:
+                raise WorkspaceMetadataError("Inventory partition entry is invalid.")
+            name = part["path"]
+            if (
+                not isinstance(name, str)
+                or _PARTITION_NAME.fullmatch(name) is None
+                or name != f"records-{expected_index:05d}.jsonl"
+                or type(part["rows"]) is not int
+                or not 0 < part["rows"] <= _MAX_JSONL_PARTITION_ROWS
+                or type(part["bytes"]) is not int
+                or not 0 < part["bytes"] <= _MAX_JSONL_PARTITION_BYTES
+                or not isinstance(part["sha256"], str)
+            ):
+                raise WorkspaceMetadataError("Inventory partition entry is invalid.")
+            path = directory / name
+            if path.is_symlink() or not path.is_file() or path.stat().st_size != part["bytes"]:
+                raise WorkspaceMetadataError("Inventory partition is missing or changed.")
+            payload = path.read_bytes()
+            if hashlib.sha256(payload).hexdigest() != part["sha256"]:
+                raise WorkspaceMetadataError("Inventory partition checksum does not match.")
+            lines = payload.splitlines(keepends=True)
+            if len(lines) != part["rows"]:
+                raise WorkspaceMetadataError("Inventory partition row count does not match.")
+            for line in lines:
+                if len(line) > _MAX_JSONL_LINE_BYTES or not line.endswith(b"\n"):
+                    raise WorkspaceMetadataError("Inventory JSONL row is invalid.")
+                try:
+                    raw_row = json.loads(line)
+                    InventoryRecording.from_dict(raw_row)
+                except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+                    raise WorkspaceMetadataError("Inventory JSONL row is invalid.") from exc
+                recordings.append(raw_row)
+            total_rows += len(lines)
+            if total_rows > _MAX_INVENTORY_ROWS:
+                raise WorkspaceMetadataError("Inventory exceeds the bounded row limit.")
+
+        complete = dict(manifest)
+        complete.pop("partitions")
+        complete["recordings"] = recordings
+        try:
+            snapshot = InventorySnapshot.from_dict(complete)
+        except ValueError as exc:
+            raise WorkspaceMetadataError(f"Inventory snapshot is invalid: {exc}") from exc
+        if snapshot.inventory_id != inventory_id:
+            raise WorkspaceMetadataError("Inventory identifier does not match its directory.")
+        return snapshot
+
+    def load_inventory(
+        self, collection_id: str, inventory_id: str | None = None
+    ) -> InventorySnapshot:
+        current = self.load_collection(collection_id)
+        selected_id = inventory_id or current.ref.inventory_revision
+        if selected_id is None:
+            raise FileNotFoundError("This Detect Collection has no published inventory.")
+        snapshot = self._load_inventory_id(self.paths_for(collection_id), selected_id)
+        if snapshot.collection_id != collection_id:
+            raise WorkspaceMetadataError("Inventory belongs to a different Detect Collection.")
+        return snapshot
+
+    def publish_inventory(
+        self, collection_id: str, snapshot: InventorySnapshot
+    ) -> PersistedDetectCollection:
+        current = self.load_collection(collection_id)
+        if snapshot.collection_id != collection_id:
+            raise ValueError("Inventory belongs to a different Detect Collection.")
+        if snapshot.binding_revision != current.ref.binding_revision:
+            raise ValueError("Inventory was scanned from an outdated root binding.")
+        if self.root_decision(current) is not RootBindingDecision.VALID:
+            raise ValueError("The recordings folder changed before inventory publication.")
+        from biocall_studio.detect.discovery import snapshot_is_quickly_current
+
+        if not snapshot_is_quickly_current(current.source_root, snapshot):
+            raise ValueError("Recordings changed before inventory publication; rescan them.")
+        paths = self.paths_for(collection_id)
+        self._publish_snapshot_directory(paths, snapshot)
+        ref = replace(
+            current.ref,
+            updated_at=snapshot.scanned_at,
+            inventory_revision=snapshot.inventory_id,
+            inventory_binding_revision=snapshot.binding_revision,
+        )
+        self._write_pair(
+            paths,
+            ref,
+            current.binding,
+            update_last_good=True,
+            previous=current,
+        )
         return PersistedDetectCollection(ref, current.binding)

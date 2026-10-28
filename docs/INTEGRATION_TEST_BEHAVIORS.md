@@ -30,8 +30,9 @@ record are under `design/evidence/st-02-native/`; installed and Windows qualific
 
 ## 1b. Stage-owned Detect integration cases (ST-03–ST-10)
 
-ST-03 implements `IT-DET-001`–`002` pending owner review; ST-04–ST-10 rows remain planned,
-unexecuted acceptance contracts. Each stage implements **only its own rows**, using genuine
+ST-03 implements `IT-DET-001`–`002`; ST-04 implements `IT-DET-003`–`005` pending owner review;
+ST-05–ST-10 rows remain planned, unexecuted acceptance contracts. Each stage implements **only its
+own rows**, using genuine
 Qt/Worker/WAV/scientific boundaries where named. The whole-Studio E2E appears exclusively in ST-11.
 No planned case counts as covered.
 

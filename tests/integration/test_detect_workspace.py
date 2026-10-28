@@ -159,6 +159,7 @@ def test_app_owned_atomic_metadata_recovery_containment_and_source_nonmutation(
         "runs",
         "results",
         "exports",
+        "inventories",
         ".last-good",
     }
     for path in (paths.public_manifest, paths.private_binding, paths.last_good_manifest):

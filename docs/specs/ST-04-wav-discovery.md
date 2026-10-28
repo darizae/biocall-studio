@@ -1,6 +1,6 @@
 # ST-04 — Safe recording discovery and inventory
 
-**Branch:** `detect-st04-wav-discovery` from reviewed `detect`. **Predecessor:** ST-03 Collection contract. **Successor:** ST-05. **Status:** planned.
+**Branch:** `detect-st04-wav-discovery` from reviewed `detect`. **Predecessor:** ST-03 Collection contract. **Successor:** ST-05. **Status:** implemented; awaiting owner review.
 
 ## Scope and ownership
 
