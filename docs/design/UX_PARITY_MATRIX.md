@@ -29,3 +29,11 @@ Studio, retained Train, Detect landing and Review landing views at 1180 px and 7
 line icons replace the prototype's CSS-drawn workspace symbols; the card hierarchy, copy and action
 priority remain aligned. Detect deliberately stops at an unavailable landing without the prototype's
 future setup/sidebar controls. Windows and installed-application qualification remain unavailable.
+
+## Native implementation rules for ST-03–ST-11
+
+**ST-02 is owner-approved.** ST-01 prototype states remain visual/behavioral requirements without an automated browser-pass claim; native Qt tests at each owning stage establish working desktop behavior. Preserve the Train UI; use only verified public `alp-ui` components and appropriate layout composition, not a literal CSS screenshot clone.
+
+A screen must have a clear heading, purposeful controls and one unambiguous next action (when applicable). Do **not** introduce floating fine-print captions, repeated status disclaimers, unexplained acronyms, disconnected badges, fabricated progress/metrics or inert "future" actions. Explain technical choices with a short researcher-readable label and an adjacent keyboard-accessible `HelpHint`/tooltip **only when useful**; longer procedures go in Wiki/help. Labels, errors and statuses must say what the user can do, never mention stage numbers, libraries, backend details or implementation plans.
+
+Verify each owned route/state in real Qt, actual keyboard/focus, normal and compact layouts, readable/accessible typography and meaningful disabled/loading/error/cancel/retry states using real artifacts. Capture genuine native screenshots and document intentional prototype divergences briefly. Do not reopen already-approved ST-01 browser-automation as a prerequisite. **Whole-Studio Train→Detect→RF→Export interaction is reserved for ST-11**; earlier stages verify only their owned native surfaces.

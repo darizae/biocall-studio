@@ -1,18 +1,19 @@
-# Agent routing
+# Agent routing — read the minimum necessary
 
-Read `AGENTS.md` → [stage sequence](../IMPLEMENTATION_SEQUENCE.md) → **one active spec**. Do not preload future specs or entire sibling repositories. Check Git state and actual implementation before choosing work.
+**Start:** `AGENTS.md` → [sequence and branch gate](../IMPLEMENTATION_SEQUENCE.md) → **one current stage spec**. Verify paths, real Git state and code. **Do not preload other specs, all Train docs, all test indexes or entire sibling repositories.** ST-01 and ST-02 are owner-approved; next implementation stage is ST-03 unless the real reviewed branch shows otherwise.
 
-| Task | Authority |
+| Current work | Read only these authorities *when relevant* |
 |---|---|
-| Current stage: native Studio shell and Train integration | [ST-02 native shell](../specs/ST-02-native-shell.md) |
-| Future Studio/Detect stages | [ST-03…ST-11 outcomes](../IMPLEMENTATION_SEQUENCE.md); write a focused spec only when that stage is next |
-| New Studio/Detect UX | [UX parity matrix](../design/UX_PARITY_MATRIX.md), [prototype acceptance](../design/PROTOTYPE_ACCEPTANCE.md) |
-| Detect data, model, lineage, export | [Detect contract](../PREDICTION.md) |
-| Existing Train implementation | Relevant sections of [architecture](../ARCHITECTURE.md), [Model export](../science/MODEL_EXPORT_CONTRACT.md), and actual Python code |
-| Qt components/theme | [alp-ui mapping](../design/ALP_UI_CONSUMER_CONTRACT.md), installed `../alp-ui` public API and `gallery/showcase.py` |
-| Unit/integration case selection | Relevant indexed entries in [unit index](../UNIT_TESTING.md), [integration index](../INTEGRATION_TEST_BEHAVIORS.md), [test data](../INTEGRATION_TEST_DATA.md) |
-| Scientific upstream interfaces | [source map](SOURCE_MAP.md), then exact involved `../bioacoustics-dl-toolbox` or `../alpaca-pipelines` code |
-| Git and delivery | [Git delivery](GIT_DELIVERY.md) |
-| Platform packaging | [Release process](../RELEASE_PROCESS.md), only at ST-11 or an explicitly approved release stage |
+| ST-03 Collection/Relink | [ST-03](../specs/ST-03-detect-workspace.md), [Detect domain rules](../PREDICTION.md), actual settings/persistence + native shell |
+| ST-04 WAV inventory | [ST-04](../specs/ST-04-wav-discovery.md), accepted ST-03 handoff, real WAV/path scanner sources |
+| ST-05 Model intake | [ST-05](../specs/ST-05-model-intake.md), [Train Model export](../science/MODEL_EXPORT_CONTRACT.md), relevant producer code and **exact** upstream model/preprocessor functions |
+| ST-06 Worker/log | [ST-06](../specs/ST-06-detect-workers.md), Train Worker/diagnostics seams, accepted ST-04/05 handoffs |
+| ST-07 CNN | [ST-07](../specs/ST-07-cnn-detection.md), validated ST-04/05/06 handoffs, exact CNN toolbox source/tests |
+| ST-08 Results UI | [ST-08](../specs/ST-08-results-ux.md), ST-07 Result contract, [UX matrix](../design/UX_PARITY_MATRIX.md) |
+| ST-09 RF | [ST-09](../specs/ST-09-rf-refinement.md), RF Model/Result contracts, exact verified RF source/tests |
+| ST-10 export | [ST-10](../specs/ST-10-corpus-export.md), selected Result contract, actual WAV extraction/Raven reference |
+| ST-11 full qualification | [ST-11](../specs/ST-11-unified-qualification.md), existing [macOS](../specs/06-macos-release-and-installer.md)/[Windows](../specs/07-windows-release-and-installer.md) requirements, [release process](../RELEASE_PROCESS.md) |
 
-**Execution:** inspect → test/implement only owned scope → verify observed behavior → update impacted docs/evidence → commit and stop. An absent historical document is not a reason to invent its content.
+**Just-in-time references:** UI work → accepted [prototype](../design/prototypes/studio-detect/index.html), [UX parity matrix](../design/UX_PARITY_MATRIX.md), [public alp-ui contract](../design/ALP_UI_CONSUMER_CONTRACT.md), genuine Train screenshots; tests → **only owning rows** in [unit index](../UNIT_TESTING.md), [integration index](../INTEGRATION_TEST_BEHAVIORS.md), [TD fixtures](../INTEGRATION_TEST_DATA.md); upstream needed → [source map](SOURCE_MAP.md) and [upstream branch procedure](UPSTREAM_TOOLBOX_WORKFLOW.md); Git start/end → [delivery](GIT_DELIVERY.md). No broader reads unless a concrete dependency requires them.
+
+**Per-stage execution:** inspect the seam → write exact scoped failing test(s) → implement → run owned real-boundary and affected regressions → full feasible ordinary suites/ruff/audit before commit → review evidence/UX → record real commit/branch. Stage branches integrate to `detect` locally **only after owner approval**; ST-11 approval permits reviewed local `detect` → `main` merge. **No pushes, automatic merges, stage-skipping, fake prototype data in production or whole-Studio E2E before ST-11.** Historical missing files do not trigger speculative reconstruction.

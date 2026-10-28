@@ -4,7 +4,7 @@ Use fast deterministic, Qt-free tests for pure behaviors: filename/path parsers,
 
 ## Naming and coverage
 
-An indexed case appears **exactly** in the asserting test function docstring, e.g. `"""Case: UT-COL-001."""`. Table rows below define intended cases, **not completion**. A test counts as covered only after the exact behavior is asserted and an applicable run passes. Do not renumber an existing ID to reuse it for different behavior. Add edge variants under the same case where the invariant is unchanged; add an ID when the behavior is materially distinct.
+An indexed case appears **exactly** in the asserting test function docstring, e.g. `"""Case: UT-COL-001."""`. Table rows below define intended cases, **not completion**. The ST-03–ST-11 case rows are **pre-registered planned contracts**; none is covered merely by being listed. A test counts as covered only after the exact behavior is asserted and an applicable run passes. Do not renumber an existing ID to reuse it for different behavior. Add edge variants under the same case where the invariant is unchanged; add an ID when the behavior is materially distinct.
 
 | Case ID | Pure behavior and failure contrasts | Data class | Spec |
 |---|---|---|---|
@@ -12,6 +12,30 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-PATH-002` | Unicode NFC/casefold filename collisions cannot silently resolve an identity | TD-PATH | 01 |
 | `UT-CLI-001` | Version/help and invalid-option handling complete without importing optional Qt/`alp-ui`; real GUI startup remains owned by `IT-UI-001` and uses isolated Application Settings | TD-UI | 01, 05f |
 | `UT-STU-001` | Pure workspace-route policy: Studio is the startup route; Train/Detect/Review and return transitions are explicit; unknown routes fail closed; navigation decisions do not mutate Train context or imply runnable Detect features. | TD-UI | ST-02 |
+| `UT-DET-001` | **Planned ST-03:** unique identity, schema migration/rejection, app-data ownership and root-reference serialization (no original path in exported metadata). | TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
+| `UT-DET-002` | **Planned ST-03:** valid/missing/inaccessible/changed/relink state decisions, confirmation and stale inventory invalidation; reject unrelated-root takeover. | TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
+| `UT-DET-003` | **Planned ST-03:** containment, Unicode/casefold/Windows-reserved path policy, atomic update and recovery decisions. | TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
+| `UT-DET-004` | **Planned ST-04:** inclusion precedence, generated-data exclusions, undecided versus invalid, deterministic decisions and count aggregation. | TD-WAV, TD-PATH | [ST-04](specs/ST-04-wav-discovery.md) |
+| `UT-DET-005` | **Planned ST-04:** normalized identity, traversal/symlink/reparse and duplicate/hardlink/casefold collisions cannot silently collapse rows. | TD-WAV, TD-PATH | [ST-04](specs/ST-04-wav-discovery.md) |
+| `UT-DET-006` | **Planned ST-04:** header/freshness interpretation, add/remove/replace, cancellation and snapshot validation. | TD-WAV, TD-PATH | [ST-04](specs/ST-04-wav-discovery.md) |
+| `UT-DET-007` | **Planned ST-05:** immutable manifest schema/checksum/class mapping, family-specific required fields and rejected mismatch. | TD-EXPORT, TD-TRAIN | [ST-05](specs/ST-05-model-intake.md) |
+| `UT-DET-008` | **Planned ST-05:** trusted artifact policy, safe path/version/import semantics; binary not deserialized on untrusted/malformed input. | TD-EXPORT, TD-TRAIN | [ST-05](specs/ST-05-model-intake.md) |
+| `UT-DET-009` | **Planned ST-05:** precise compatibility state/reason and normalized typed handoff; unproven numerical parity remains flagged. | TD-EXPORT, TD-TRAIN | [ST-05](specs/ST-05-model-intake.md) |
+| `UT-DET-010` | **Planned ST-06:** state machine, Run input freeze, one-Active-Run reservation and terminal transitions. | TD-RUN, TD-FAIL | [ST-06](specs/ST-06-detect-workers.md) |
+| `UT-DET-011` | **Planned ST-06:** cancellation, crash, receipt/staging reconciliation and orphan recovery decisions. | TD-RUN, TD-FAIL | [ST-06](specs/ST-06-detect-workers.md) |
+| `UT-DET-012` | **Planned ST-06:** bounded diagnostics schema, privacy allowlist, rotation/read/symlink policy. | TD-RUN, TD-FAIL | [ST-06](specs/ST-06-detect-workers.md) |
+| `UT-DET-013` | **Planned ST-07:** exact source-frame/window/hop/overlap arithmetic, resample/padding boundary and invalid config rejection. | TD-WAV, TD-EXPORT | [ST-07](specs/ST-07-cnn-detection.md) |
+| `UT-DET-014` | **Planned ST-07:** target score/threshold semantics, interval merge/clamp, non-finite or ambiguous outputs fail. | TD-WAV, TD-EXPORT | [ST-07](specs/ST-07-cnn-detection.md) |
+| `UT-DET-015` | **Planned ST-07:** candidate source timestamps, deterministic IDs, immutable Result schema, per-file status validation. | TD-WAV, TD-EXPORT | [ST-07](specs/ST-07-cnn-detection.md) |
+| `UT-DET-016` | **Planned ST-08:** immutable Result-to-view projection, stable selection/Result digest mapping, no cross-Result bleed. | TD-UI, TD-RUN | [ST-08](specs/ST-08-results-ux.md) |
+| `UT-DET-017` | **Planned ST-08:** zero/no-source/file-error/partial/completed statuses and provenance visibility decisions. | TD-UI, TD-RUN | [ST-08](specs/ST-08-results-ux.md) |
+| `UT-DET-018` | **Planned ST-09:** exact ordered RF feature schema and class/probability-column validation; reject mismatch/nonfinite values. | TD-EXPORT, TD-TRAIN | [ST-09](specs/ST-09-rf-refinement.md) |
+| `UT-DET-019` | **Planned ST-09:** per-candidate accepted/rejected/unscored status and short/stale/error decisions. | TD-EXPORT, TD-TRAIN | [ST-09](specs/ST-09-rf-refinement.md) |
+| `UT-DET-020` | **Planned ST-09:** immutable parent→child lineage, candidate identity, time/provenance and checksum rules. | TD-EXPORT, TD-TRAIN | [ST-09](specs/ST-09-rf-refinement.md) |
+| `UT-DET-021` | **Planned ST-10:** exact frame/byte/TSV offset arithmetic and output representation without rounding drift. | TD-WAV, TD-PATH | [ST-10](specs/ST-10-corpus-export.md) |
+| `UT-DET-022` | **Planned ST-10:** frozen selected IDs/digests, parent lineage and reproducible provenance ordering. | TD-WAV, TD-PATH | [ST-10](specs/ST-10-corpus-export.md) |
+| `UT-DET-023` | **Planned ST-10:** collision-safe names, mixed-format decision and conservative publish/overwrite policy. | TD-WAV, TD-PATH | [ST-10](specs/ST-10-corpus-export.md) |
+| `UT-STU-002` | **Planned ST-11:** pure cross-workspace quit/admission policy and independent Train/Detect ownership; no duplicate Run IDs, hidden Worker's lifetime not inferred from visibility. | TD-UI, TD-RUN | [ST-11](specs/ST-11-unified-qualification.md) |
 | `UT-COL-001` | Positive name parses anchored complete stem, integer ms and unique label; reject malformed/missing fields and overflow | TD-COL | 02 |
 | `UT-COL-002` | Exact unique source-stem resolution; overlapping prefixes, duplicate names and same-source duplicate interval rejected | TD-COL | 02 |
 | `UT-COL-003` | Half-open bounds `0 ≤ start < end ≤ source duration`, integer ms to sample frames and honest rounding tolerance | TD-WAV | 02 |
