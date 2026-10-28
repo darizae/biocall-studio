@@ -23,6 +23,7 @@ def _base_application(argv: list[str] | None = None) -> QApplication:
     app.setApplicationName("biocall-studio-train")
     app.setApplicationDisplayName("BioCall Studio Train")
     app.setWindowIcon(application_icon())
+    app.setQuitOnLastWindowClosed(True)
     return app
 
 
@@ -40,7 +41,28 @@ def create_application(argv: list[str] | None = None) -> QApplication:
     return app
 
 
-class _DiagnosticHooks:
+def default_settings_dir() -> Path:
+    """Return Train's established Qt settings location, regardless of suite identity."""
+    app = QApplication.instance()
+    if app is None:
+        app = _base_application()
+    organization = app.organizationName()
+    application = app.applicationName()
+    try:
+        app.setOrganizationName("BioCall Studio")
+        app.setApplicationName("biocall-studio-train")
+        location = QStandardPaths.writableLocation(
+            QStandardPaths.StandardLocation.AppLocalDataLocation
+        )
+    finally:
+        app.setOrganizationName(organization)
+        app.setApplicationName(application)
+    if not location:
+        raise OSError("Qt could not locate Application Settings storage.")
+    return Path(location)
+
+
+class DiagnosticHooks:
     def __init__(self, diagnostics: DiagnosticSession):
         self.diagnostics = diagnostics
         self._previous_excepthook = sys.excepthook
@@ -88,14 +110,9 @@ class _DiagnosticHooks:
 def run(settings_dir: Path | None = None, *, diagnostic_debug: bool = False) -> int:
     app = _base_application()
     if settings_dir is None:
-        location = QStandardPaths.writableLocation(
-            QStandardPaths.StandardLocation.AppLocalDataLocation
-        )
-        if not location:
-            raise OSError("Qt could not locate Application Settings storage.")
-        settings_dir = Path(location)
+        settings_dir = default_settings_dir()
     diagnostics = DiagnosticSession(settings_dir, debug=diagnostic_debug)
-    hooks = _DiagnosticHooks(diagnostics)
+    hooks = DiagnosticHooks(diagnostics)
     try:
         _initialize_application(app)
         window = MainWindow(WorkspaceController(settings_dir, diagnostics=diagnostics))

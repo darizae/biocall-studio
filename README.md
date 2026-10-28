@@ -2,14 +2,14 @@
   <img src="assets/branding/on-background/readme-header.png" alt="BioCall Studio" width="900" />
 </p>
 
-# BioCall Studio Train
+# BioCall Studio
 
-Build and refine custom animal-call detectors from your own recordings, on your own computer.
+Move from recordings to evidence on your own computer.
 
-BioCall Studio Train guides bioacoustics researchers from a folder of WAV recordings and known
-positive examples to a reproducible training Dataset and a verified CNN or Random Forest Model.
-It keeps source audio in place and read-only, explains fixable data problems, and records the
-configuration and provenance behind every published result.
+BioCall Studio opens with native Train, Detect, and Review workspaces. Train is available now and
+guides bioacoustics researchers from WAV recordings and known positive examples to a reproducible
+Dataset and a verified CNN or Random Forest Model. Detect currently has an honest landing state;
+Review is coming later.
 
 > **Development preview:** the native macOS application is working from source. Packaged macOS
 > and Windows installers are on the roadmap and are not available yet.
@@ -44,12 +44,19 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -e '.[gui,test,integration]'
 .venv/bin/python -m pip install -e ../alp-ui
 
-.venv/bin/python -m biocall_studio_train
+.venv/bin/python -m biocall_studio
 ```
 
 After installation, the console command is equivalent:
 
 ```bash
+.venv/bin/biocall-studio
+```
+
+The existing direct Train entry remains available for focused training work and supervised Workers:
+
+```bash
+.venv/bin/python -m biocall_studio_train
 .venv/bin/biocall-studio-train
 ```
 
@@ -79,6 +86,11 @@ use integer milliseconds. The app validates the relationship before it publishes
 [Selecting a Collection](docs/wiki/SELECTING_A_COLLECTION.md) for the complete naming rules.
 
 ## A typical workflow
+
+Open BioCall Studio and choose a workspace. Train retains its route, draft, scan, and active work
+when you return to the launchpad.
+
+![BioCall Studio native launchpad](docs/design/evidence/st-02-native/studio-normal.png)
 
 1. **Select and check a Collection.** Choose the existing folder; BioCall Studio Train reads WAV
    headers without importing or moving audio.
@@ -112,10 +124,10 @@ be verified in the current code and tests; screenshots alone do not prove execut
 
 - **Available from source:** Collection validation, Dataset Build, persisted Runs, CNN and Random
   Forest training, Model verification, diagnostics, safe exit, and optional keep-awake.
-- **Current design stage:** a BioCall Studio launchpad with the existing Train workflow, Detect for
-  applying compatible models, and a future Review workspace.
-- **Next implementation stages:** native Studio navigation and Detect metadata, source inventory,
-  Model intake, Workers, candidate results, RF assessment, and corpus export.
+- **Available from source:** the native Studio launchpad and workspace switching, with retained
+  Train state and safe application exit.
+- **Next implementation stages:** Detect metadata, source inventory, Model intake, Workers,
+  candidate results, RF assessment, and corpus export.
 - **Release qualification:** macOS and Windows packaging follow the unified application stages and
   explicit owner approval.
 

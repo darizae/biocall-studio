@@ -4,9 +4,9 @@
 
 | Surface | Implemented ST-01 route and reachable prototype states | Verification when implemented natively |
 |---|---|---|
-| Studio launchpad | `#studio`; three concise keyboard-operable cards with Open Train, Open Detect and Coming later actions; suite branding; one global prototype banner | ST-02 Qt visual + navigation tests |
-| Train entry/return | `#train-reference`; genuine `spec-01-native/select.png` and `spec-05-native/train-cnn.png` presented as concise reference evidence; return to `#studio` | ST-02 actual Train regression + native screenshots |
-| Review placeholder | `#review`; Coming later only; return to `#studio` | Remains a placeholder until separately specified |
+| Studio launchpad | `#studio`; three concise keyboard-operable cards with Open Train, Open Detect and Coming later actions; suite branding; one global prototype banner | ST-02 uses native `alp-ui` cards/buttons and suite branding; Cocoa normal/compact evidence and `IT-STU-001`/`006` pass. The production UI correctly omits the prototype-only banner. |
+| Train entry/return | `#train-reference`; genuine `spec-01-native/select.png` and `spec-05-native/train-cnn.png` presented as concise reference evidence; return to `#studio` | ST-02 retains the actual Train window/controller and adds one optional header-level Back to Studio action that remains visible in its compact layout; `IT-STU-002`/`003` pass. |
+| Review placeholder | `#review`; Coming later only; return to `#studio` | ST-02 implements the native Coming later landing and return; no Review controls or state. |
 | Detect setup | `#detect/setup`; independent `#model-state` values `valid`, `loading`, `empty`, `incompatible`, `missing`; `#root-state` values `valid`, `loading`, `empty`, `invalid`, `changed`, `missing`; readiness combines Model, folder, inventory validation and score validity | ST-03/05/08 native integration |
 | Source inventory | `#detect/recordings`; `#inventory-state` values `ready`, `scanning`, `cancelled`, `invalid`, `stale`, `missing`; hierarchy, selected folder/file detail, folder decisions with live counts, included/undecided/excluded/invalid rows, duplicate, progress, cancel and rescan | ST-04 real-WAV integration |
 | Detection configuration | `#detect/setup`; Minimum detection score, Window overlap and Combine nearby candidates with researcher-facing keyboard/click HelpHints; collapsed advanced section; values explicitly illustrative; RF absent as a recording-wide option | ST-05/07 scientific and Qt tests |
@@ -23,3 +23,9 @@
 **Evidence:** the prototype uses the genuine Train screenshots above. Browser review must exercise every route, the documented prototype states, selection-dependent recording and export data, original/refined Result independence, keyboard navigation, HelpHint/guide dismissal, cancellation, Show in folder, and normal/narrow desktop widths. Store representative screenshots under the prototype's `evidence/` folder when that review is completed. For the 2026-10-27 UX revision, local HTTP assets were served successfully and the Brave tab was visible, but the Browser Use origin gate denied page observation; browser flows and screenshots remain explicitly blocked rather than claimed. Use [prototype acceptance](PROTOTYPE_ACCEPTANCE.md) and the route/state IDs in this table as the durable acceptance record. Browser interaction does not establish scientific or native correctness.
 
 **Acceptance boundary:** owner approved the ST-01 design direction on 2026-10-28; automated browser interaction remained blocked. Treat each prototype state as a design requirement, not executed evidence. ST-02 verifies the native Studio/Train switch; later stages verify their own Detect interactions.
+
+**ST-02 native observation:** `docs/design/evidence/st-02-native/` records genuine macOS Cocoa
+Studio, retained Train, Detect landing and Review landing views at 1180 px and 700 px widths. Native
+line icons replace the prototype's CSS-drawn workspace symbols; the card hierarchy, copy and action
+priority remain aligned. Detect deliberately stops at an unavailable landing without the prototype's
+future setup/sidebar controls. Windows and installed-application qualification remain unavailable.

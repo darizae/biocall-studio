@@ -43,6 +43,10 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-LOG-003` | App/Run log containment rejects traversal and symlink escapes; diagnostics readers/exporters revalidate records and never copy corrupt or unknown fields verbatim | TD-PATH, TD-FAIL | 05d |
 | `UT-LOG-004` | App/Worker byte budgets, bounded rotation, age/total pruning, stderr storm bounds and non-recursive degraded-sink fallback | TD-RUN, TD-FAIL | 05d |
 
+**Reported status:** ST-02 implements `UT-STU-001` in
+`tests/unit/test_studio_navigation.py`; the stage handoff records the fresh command and result.
+Listing the ID here is not independent passing evidence.
+
 **Reported status:** Spec 05c completes `UT-TRAIN-001`–`010`, including exact ordered RF feature
 schema, explicit positive-probability mapping, undefined metrics and structural estimator rejection.
 The [Spec 05 evidence](design/evidence/README.md#spec-05c--real-rf-training-and-phase-05-acceptance)

@@ -24,6 +24,10 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-STU-005` | Detect landing and Review placeholder have reachable, keyboard-operable returns; no invented Model scan, prediction, simulated values, persisted Detect state or enabled detection action. | TD-UI |
 | `IT-STU-006` | Real native Studio/Train/Detect/Review screenshots at normal and compact widths show checked-in branding, focus and contrast; no Train layout regression or inaccessible switch; report unavailable native platforms separately. | TD-UI, TD-OS |
 
+**Reported status:** ST-02 implements `IT-STU-001`–`006` in
+`tests/integration/test_studio_shell.py`. Genuine macOS Cocoa evidence and its environment/deviation
+record are under `design/evidence/st-02-native/`; installed and Windows qualification remain open.
+
 ## 2. Collection Scan and metadata (spec 02)
 
 | Case ID | Public seam / expected result | Data |

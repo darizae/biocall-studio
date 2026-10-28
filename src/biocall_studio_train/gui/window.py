@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 
 from alp_ui.components import (
@@ -19,7 +20,7 @@ from alp_ui.components import (
     Text,
 )
 from alp_ui.theme import ALPACA_LIGHT, interactions, make_icon
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer, QUrl
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer, QUrl, Signal
 from PySide6.QtGui import QCloseEvent, QDesktopServices, QFontDatabase, QResizeEvent
 from PySide6.QtWidgets import (
     QBoxLayout,
@@ -507,7 +508,14 @@ class SettingsPage(QScrollArea):
 class MainWindow(QMainWindow):
     """Native Collection-first shell with background Scan navigation."""
 
-    def __init__(self, controller: WorkspaceController):
+    application_exit_completed = Signal()
+
+    def __init__(
+        self,
+        controller: WorkspaceController,
+        *,
+        back_to_studio: Callable[[], None] | None = None,
+    ):
         super().__init__()
         self.controller = controller
         self.current_route = "select"
@@ -523,6 +531,8 @@ class MainWindow(QMainWindow):
         self._close_stop_button = None
         self._exit_requested = False
         self._exit_ready = False
+        self._exit_completed_emitted = False
+        self._back_to_studio = back_to_studio
 
         central = QWidget()
         self._root_layout = QBoxLayout(QBoxLayout.Direction.LeftToRight, central)
@@ -654,6 +664,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
         if self._exit_ready:
             event.accept()
+            self._emit_exit_completed()
             super().closeEvent(event)
             return
         if self._exit_requested:
@@ -669,7 +680,14 @@ class MainWindow(QMainWindow):
             return
         self.controller.finalize_shutdown()
         event.accept()
+        self._emit_exit_completed()
         super().closeEvent(event)
+
+    def _emit_exit_completed(self) -> None:
+        if self._exit_completed_emitted:
+            return
+        self._exit_completed_emitted = True
+        self.application_exit_completed.emit()
 
     def _show_active_close_dialog(self) -> None:
         if self.close_dialog is not None and self.close_dialog.isVisible():
@@ -815,6 +833,16 @@ class MainWindow(QMainWindow):
         icon = QLabel()
         icon.setPixmap(make_icon("list", color=ALPACA_LIGHT.colors.primary).pixmap(22, 22))
         layout.addWidget(icon)
+        if self._back_to_studio is not None:
+            self.back_to_studio_button = Button("Back to Studio", variant="outline", size="small")
+            self.back_to_studio_button.setAccessibleDescription(
+                "Return to the BioCall Studio workspace launchpad without stopping Train work."
+            )
+            self.back_to_studio_button.clicked.connect(self._back_to_studio)
+            layout.addSpacing(10)
+            layout.addWidget(self.back_to_studio_button)
+        else:
+            self.back_to_studio_button = None
         layout.addStretch()
         self.open_draft_button = Button("Training setup · Open →", variant="outline", size="small")
         self.open_draft_button.clicked.connect(lambda: self.navigate("training"))
