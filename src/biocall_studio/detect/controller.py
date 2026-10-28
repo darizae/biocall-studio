@@ -5,6 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from pathlib import Path
 from threading import Event
+from time import sleep
 
 from PySide6.QtCore import QObject, QThread, Signal
 
@@ -23,6 +24,11 @@ from biocall_studio.detect.inventory import (
     clear_decision,
     revise_decision,
 )
+from biocall_studio.detect.models import (
+    VerifiedModelReference,
+    inspect_model_directory,
+    recheck_model_reference,
+)
 from biocall_studio.detect.persistence import (
     DetectWorkspaceStore,
     PersistedDetectCollection,
@@ -39,6 +45,47 @@ class InventoryState(StrEnum):
     INVALID = "invalid"
     STALE = "stale"
     MISSING = "missing"
+
+
+class ModelIntakeState(StrEnum):
+    EMPTY = "empty"
+    LOADING = "loading"
+    COMPATIBLE = "compatible"
+    INCOMPATIBLE = "incompatible"
+    MISSING = "missing"
+
+
+class _ModelIntakeThread(QThread):
+    reference_ready = Signal(object)
+    missing = Signal(str)
+    failed = Signal(str)
+
+    def __init__(
+        self,
+        root: Path,
+        previous: VerifiedModelReference | None,
+        step_delay_seconds: float,
+    ):
+        super().__init__()
+        self.root = root
+        self.previous = previous
+        self.step_delay_seconds = step_delay_seconds
+
+    def run(self) -> None:
+        try:
+            if self.step_delay_seconds:
+                sleep(self.step_delay_seconds)
+            reference = (
+                inspect_model_directory(self.root)
+                if self.previous is None
+                else recheck_model_reference(self.previous)
+            )
+        except FileNotFoundError as exc:
+            self.missing.emit(str(exc))
+        except Exception as exc:  # compatibility text is rendered without a traceback
+            self.failed.emit(str(exc))
+        else:
+            self.reference_ready.emit(reference)
 
 
 class _InventoryScanThread(QThread):
@@ -91,6 +138,7 @@ class DetectWorkspaceController(QObject):
         application_data_root: Path,
         *,
         scan_step_delay_seconds: float = 0.0,
+        model_step_delay_seconds: float = 0.0,
     ):
         super().__init__()
         self.store = DetectWorkspaceStore(application_data_root)
@@ -102,14 +150,37 @@ class DetectWorkspaceController(QObject):
         self.inventory_error = ""
         self.snapshot: InventorySnapshot | None = None
         self.inventory_state = InventoryState.EMPTY
+        self.model_reference: VerifiedModelReference | None = None
+        self.selected_model_root: Path | None = None
+        self.model_state = ModelIntakeState.EMPTY
+        self.model_reason = "Choose a CNN Model published by Train."
         self.scan_progress = InventoryScanProgress("Idle", 0, 0, 0, 0)
         self._scan_thread: _InventoryScanThread | None = None
+        self._model_thread: _ModelIntakeThread | None = None
         self._scan_step_delay_seconds = scan_step_delay_seconds
+        self._model_step_delay_seconds = model_step_delay_seconds
         self.refresh(emit=False)
 
     @property
     def is_scanning(self) -> bool:
         return self._scan_thread is not None and self._scan_thread.isRunning()
+
+    @property
+    def is_model_loading(self) -> bool:
+        return self._model_thread is not None and self._model_thread.isRunning()
+
+    @property
+    def inputs_ready(self) -> bool:
+        return (
+            self.model_state is ModelIntakeState.COMPATIBLE
+            and self.model_reference is not None
+            and self.root_decision is RootBindingDecision.VALID
+            and self.inventory_state is InventoryState.READY
+            and self.snapshot is not None
+            and self.snapshot.counts.included > 0
+            and not self.is_scanning
+            and not self.is_model_loading
+        )
 
     def _state_for_snapshot(self, snapshot: InventorySnapshot) -> InventoryState:
         invalid_included = any(
@@ -167,7 +238,125 @@ class DetectWorkspaceController(QObject):
             self.root_decision = None
             self.metadata_error = str(exc)
         self._load_inventory()
+        self._load_model_selection()
         if emit:
+            self.state_changed.emit()
+
+    def _load_model_selection(self) -> None:
+        if self.is_model_loading:
+            return
+        try:
+            reference = self.store.load_model_reference()
+        except WorkspaceMetadataError as exc:
+            self.model_reference = None
+            self.selected_model_root = None
+            self.model_state = ModelIntakeState.INCOMPATIBLE
+            self.model_reason = str(exc)
+            return
+        if reference is None:
+            self.model_reference = None
+            self.selected_model_root = None
+            self.model_state = ModelIntakeState.EMPTY
+            self.model_reason = "Choose a CNN Model published by Train."
+            return
+        self.model_reference = reference
+        self.selected_model_root = reference.root
+        self._start_model_inspection(reference.root, previous=reference)
+
+    def _start_model_inspection(
+        self,
+        root: Path,
+        *,
+        previous: VerifiedModelReference | None = None,
+    ) -> None:
+        self.model_state = ModelIntakeState.LOADING
+        self.model_reason = "Checking Model information, checksums, and runtime structure."
+        thread = _ModelIntakeThread(root, previous, self._model_step_delay_seconds)
+        self._model_thread = thread
+        thread.reference_ready.connect(self._model_ready)
+        thread.missing.connect(self._model_missing)
+        thread.failed.connect(self._model_failed)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(lambda: self._model_finished(thread))
+        thread.start()
+
+    def choose_model_root(self, value: str) -> None:
+        if not value or self.is_model_loading:
+            return
+        candidate = Path(value).expanduser()
+        if (
+            self.selected_model_root is not None
+            and candidate.resolve(strict=False) == self.selected_model_root.resolve(strict=False)
+        ):
+            return
+        try:
+            self.store.clear_model_reference()
+        except (OSError, WorkspaceMetadataError) as exc:
+            self.model_state = ModelIntakeState.INCOMPATIBLE
+            self.model_reason = f"The Model selection could not be updated: {exc}"
+            self.state_changed.emit()
+            return
+        self.model_reference = None
+        self.selected_model_root = candidate.resolve(strict=False)
+        self._start_model_inspection(candidate)
+        self.state_changed.emit()
+
+    def clear_model_selection(self) -> None:
+        if self.is_model_loading:
+            return
+        try:
+            self.store.clear_model_reference()
+        except (OSError, WorkspaceMetadataError) as exc:
+            self.model_state = ModelIntakeState.INCOMPATIBLE
+            self.model_reason = f"The Model selection could not be cleared: {exc}"
+        else:
+            self.model_reference = None
+            self.selected_model_root = None
+            self.model_state = ModelIntakeState.EMPTY
+            self.model_reason = "Choose a CNN Model published by Train."
+        self.state_changed.emit()
+
+    def _model_ready(self, reference: VerifiedModelReference) -> None:
+        try:
+            self.store.save_model_reference(reference)
+        except (OSError, ValueError, WorkspaceMetadataError) as exc:
+            self.model_reference = None
+            self.model_state = ModelIntakeState.INCOMPATIBLE
+            self.model_reason = f"Verified Model information could not be saved: {exc}"
+        else:
+            self.model_reference = reference
+            self.selected_model_root = reference.root
+            if reference.snapshot.primary_detection_compatible:
+                self.model_state = ModelIntakeState.COMPATIBLE
+                self.model_reason = (
+                    "Model files and runtime structure are verified. Numerical prediction "
+                    "behavior is checked again before a detection Run."
+                )
+            else:
+                self.model_state = ModelIntakeState.INCOMPATIBLE
+                self.model_reason = (
+                    "This Random Forest Model can refine candidate intervals but cannot start "
+                    "candidate detection. Choose a CNN Model."
+                )
+        self.state_changed.emit()
+
+    def _model_missing(self, message: str) -> None:
+        self.model_state = ModelIntakeState.MISSING
+        self.model_reason = (
+            "The selected Model folder or a declared file is missing. Choose the Model again."
+        )
+        if message and "artifact" in message.casefold():
+            self.model_reason = "A declared Model file is missing. Choose a complete Train Model."
+        self.state_changed.emit()
+
+    def _model_failed(self, message: str) -> None:
+        self.model_state = ModelIntakeState.INCOMPATIBLE
+        self.model_reason = message or "The selected Model is not compatible."
+        self.state_changed.emit()
+
+    def _model_finished(self, thread: _ModelIntakeThread) -> None:
+        if self._model_thread is thread:
+            self._model_thread = None
             self.state_changed.emit()
 
     def choose_source_root(self, value: str) -> None:
@@ -396,6 +585,12 @@ class DetectWorkspaceController(QObject):
 
     def wait_for_scan(self, milliseconds: int = 3_000) -> bool:
         thread = self._scan_thread
+        if thread is None:
+            return True
+        return thread.wait(milliseconds)
+
+    def wait_for_model(self, milliseconds: int = 3_000) -> bool:
+        thread = self._model_thread
         if thread is None:
             return True
         return thread.wait(milliseconds)

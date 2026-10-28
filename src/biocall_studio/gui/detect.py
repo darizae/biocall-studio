@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 from biocall_studio.detect.controller import (
     DetectWorkspaceController,
     InventoryState,
+    ModelIntakeState,
 )
 from biocall_studio.detect.domain import RootBindingDecision
 from biocall_studio.detect.inventory import (
@@ -206,11 +207,31 @@ class DetectWorkspacePage(QScrollArea):
 
         self.route_stack = QStackedWidget()
         self.setup_view = QWidget()
-        setup_layout = QVBoxLayout(self.setup_view)
-        setup_layout.setContentsMargins(0, 0, 0, 0)
+        setup_view_layout = QVBoxLayout(self.setup_view)
+        setup_view_layout.setContentsMargins(0, 0, 0, 0)
+        setup_view_layout.setSpacing(16)
+        self.setup_layout = QGridLayout()
+        self.setup_layout.setHorizontalSpacing(16)
+        self.setup_layout.setVerticalSpacing(16)
+        self.model_card = self._build_model_card()
         self.collection_card = self._build_collection_card()
-        setup_layout.addWidget(self.collection_card)
-        setup_layout.addStretch()
+        self.setup_layout.addWidget(self.model_card, 0, 0)
+        self.setup_layout.addWidget(self.collection_card, 0, 1)
+        self.setup_layout.setColumnStretch(0, 1)
+        self.setup_layout.setColumnStretch(1, 1)
+        setup_view_layout.addLayout(self.setup_layout)
+        self.readiness_card = Card()
+        self.readiness_card.setAccessibleName("Detect setup readiness")
+        self.readiness_title = Text("Setup needs attention", role="subheading")
+        self.readiness_detail = Text(
+            "Choose a compatible CNN Model and recordings folder.",
+            role="body",
+            word_wrap=True,
+        )
+        self.readiness_card.content_layout.addWidget(self.readiness_title)
+        self.readiness_card.content_layout.addWidget(self.readiness_detail)
+        setup_view_layout.addWidget(self.readiness_card)
+        setup_view_layout.addStretch()
 
         self.recordings_view = QWidget()
         recordings_layout = QVBoxLayout(self.recordings_view)
@@ -234,6 +255,7 @@ class DetectWorkspacePage(QScrollArea):
 
         self.controller.state_changed.connect(self._render)
         self.controller.scan_progress_changed.connect(lambda _progress: self._render_scan())
+        self.model_picker.folderChanged.connect(self.controller.choose_model_root)
         self.folder_picker.folderChanged.connect(self.controller.choose_source_root)
         self.relink_picker.folderChanged.connect(self.controller.choose_source_root)
         self.current_route = "setup"
@@ -249,9 +271,9 @@ class DetectWorkspacePage(QScrollArea):
         self.page_title = Text("Prepare candidate detection", role="title")
         copy.addWidget(self.page_title)
         self.page_description = Text(
-                "Choose the recordings folder for this Detect Collection.",
-                role="body",
-                word_wrap=True,
+            "Choose a detection Model and recordings folder in either order.",
+            role="body",
+            word_wrap=True,
         )
         copy.addWidget(self.page_description)
         heading.addLayout(copy, 1)
@@ -279,10 +301,65 @@ class DetectWorkspacePage(QScrollArea):
         navigation.addStretch()
         return navigation
 
+    def _build_model_card(self) -> Card:
+        card = Card()
+        card.setAccessibleName("Detection Model selection")
+        header = QHBoxLayout()
+        labels = QVBoxLayout()
+        labels.setSpacing(4)
+        labels.addWidget(Text("Detection Model", role="heading"))
+        labels.addWidget(
+            Text(
+                "Choose the trained CNN Model that will search your recordings.",
+                role="body",
+                word_wrap=True,
+            )
+        )
+        header.addLayout(labels, 1)
+        header.addWidget(
+            HelpHint(
+                "Detect verifies the Train manifest, checksums, binary class mapping, and "
+                "runtime structure. Numerical prediction behavior is rechecked before a Run.",
+                subject="Detection Model",
+            ),
+            0,
+            Qt.AlignmentFlag.AlignTop,
+        )
+        self.model_status_badge = Badge("Not selected", intent="neutral")
+        self.model_status_badge.setAccessibleName("Detection Model status: Not selected")
+        header.addWidget(self.model_status_badge, 0, Qt.AlignmentFlag.AlignTop)
+        card.content_layout.addLayout(header)
+
+        self.model_name = Text("No Model selected", role="subheading", word_wrap=True)
+        card.content_layout.addWidget(self.model_name)
+        self.model_detail = QLabel("Choose a CNN Model published by Train.")
+        self.model_detail.setWordWrap(True)
+        self.model_detail.setAccessibleName("Detection Model compatibility detail")
+        card.content_layout.addWidget(self.model_detail)
+        self.selected_model_path = QLabel("Choose a Train Model folder.")
+        self.selected_model_path.setWordWrap(True)
+        self.selected_model_path.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByKeyboard
+        )
+        self.selected_model_path.setAccessibleName("Selected Model folder")
+        card.content_layout.addWidget(self.selected_model_path)
+
+        self.model_picker = FolderPicker(label="Train Model folder")
+        self.model_picker.setAccessibleDescription(
+            "Choose one Model folder published inside a local Train Collection."
+        )
+        card.content_layout.addWidget(self.model_picker)
+        actions = QHBoxLayout()
+        actions.addStretch()
+        self.clear_model_button = Button("Clear Model", variant="outline", size="small")
+        self.clear_model_button.clicked.connect(self.controller.clear_model_selection)
+        actions.addWidget(self.clear_model_button)
+        card.content_layout.addLayout(actions)
+        return card
+
     def _build_collection_card(self) -> Card:
         card = Card()
         card.setAccessibleName("Detect Collection source")
-        card.setMaximumWidth(940)
         header = QHBoxLayout()
         labels = QVBoxLayout()
         labels.setSpacing(4)
@@ -686,6 +763,71 @@ class DetectWorkspacePage(QScrollArea):
         has_snapshot = snapshot is not None and self.inventory_model.rowCount() > 0
         self.inventory_table.setEnabled(has_snapshot and not self.controller.is_scanning)
 
+    def _render_model(self) -> None:
+        state = self.controller.model_state
+        status = {
+            ModelIntakeState.EMPTY: "Not selected",
+            ModelIntakeState.LOADING: "Checking",
+            ModelIntakeState.COMPATIBLE: "Compatible",
+            ModelIntakeState.INCOMPATIBLE: "Incompatible",
+            ModelIntakeState.MISSING: "Missing files",
+        }[state]
+        reference = self.controller.model_reference
+        selected = self.controller.selected_model_root
+        self.model_status_badge.setText(status)
+        self.model_status_badge.setAccessibleName(f"Detection Model status: {status}")
+        if reference is not None:
+            self.model_name.setText(reference.snapshot.label)
+        elif selected is not None:
+            self.model_name.setText(selected.name or "Selected Model")
+        else:
+            self.model_name.setText("No Model selected")
+        self.model_detail.setText(self.controller.model_reason)
+        self.selected_model_path.setText(
+            "Choose a Train Model folder." if selected is None else str(selected)
+        )
+        self.model_picker.setEnabled(state is not ModelIntakeState.LOADING)
+        self.clear_model_button.setEnabled(
+            selected is not None and state is not ModelIntakeState.LOADING
+        )
+        if state is not ModelIntakeState.LOADING:
+            self.model_picker.setFolderPath("" if selected is None else str(selected))
+
+    def _render_readiness(self) -> None:
+        if self.controller.inputs_ready:
+            self.readiness_title.setText("Setup inputs verified")
+            self.readiness_detail.setText(
+                f"Compatible CNN Model · {self.controller.snapshot.counts.included:,} included "
+                "WAV recordings."
+            )
+            return
+        if self.controller.model_state is ModelIntakeState.LOADING:
+            title = "Checking Detection Model"
+            detail = self.controller.model_reason
+        elif self.controller.model_state in {
+            ModelIntakeState.INCOMPATIBLE,
+            ModelIntakeState.MISSING,
+        }:
+            title = "Detection Model needs attention"
+            detail = self.controller.model_reason
+        elif self.controller.model_state is ModelIntakeState.EMPTY:
+            title = "Choose a compatible CNN Model"
+            detail = "Select a Model published by Train."
+        elif self.controller.active_collection is None:
+            title = "Choose a recordings folder"
+            detail = "Create a Detect Collection and review its WAV inventory."
+        elif self.controller.root_decision is not RootBindingDecision.VALID:
+            title = "Recordings folder needs attention"
+            detail = "Relink or restore the recordings folder before using this setup."
+        elif self.controller.inventory_state is not InventoryState.READY:
+            title = "Recording review is not ready"
+            detail = "Complete a current inventory with at least one included WAV recording."
+        else:
+            title = "No recordings included"
+            detail = "Include at least one valid WAV recording."
+        self.readiness_title.setText(title)
+        self.readiness_detail.setText(detail)
+
     def _select_inventory_row(self, row: int) -> None:
         entry = self.inventory_model.entry_at(row)
         self.selected_key = None if entry is None else entry.key
@@ -788,6 +930,7 @@ class DetectWorkspacePage(QScrollArea):
         )
 
     def _render(self) -> None:
+        self._render_model()
         collection = self.controller.active_collection
         proposal = self.controller.proposal
         self.relink_card.setVisible(
@@ -816,6 +959,7 @@ class DetectWorkspacePage(QScrollArea):
             self.root_path.setText("Choose a folder to create a Detect Collection.")
             self.folder_picker.setFolderPath("")
             self._render_inventory()
+            self._render_readiness()
             return
 
         self.recordings_button.setEnabled(True)
@@ -870,6 +1014,7 @@ class DetectWorkspacePage(QScrollArea):
         elif self.controller.inventory_state is InventoryState.SCANNING:
             self._set_route("recordings")
         self._render_inventory()
+        self._render_readiness()
 
     def _set_route(self, route: str) -> None:
         if route not in {"setup", "recordings"}:
@@ -887,7 +1032,7 @@ class DetectWorkspacePage(QScrollArea):
             self.page_overline.setText("DETECT SETUP")
             self.page_title.setText("Prepare candidate detection")
             self.page_description.setText(
-                "Choose the recordings folder for this Detect Collection."
+                "Choose a detection Model and recordings folder in either order."
             )
         else:
             self.page_overline.setText("SOURCE INVENTORY")
@@ -908,7 +1053,7 @@ class DetectWorkspacePage(QScrollArea):
         if self.relink_card.isVisible():
             self.relink_confirm.setFocus()
             return
-        picker = self.folder_picker if self.current_route == "setup" else self.relink_picker
+        picker = self.model_picker if self.current_route == "setup" else self.relink_picker
         buttons = picker.findChildren(QPushButton)
         if buttons:
             buttons[0].setFocus()
@@ -922,6 +1067,18 @@ class DetectWorkspacePage(QScrollArea):
             self._compact = compact
             margin = 22 if compact else 48
             self.outer.setContentsMargins(margin, 26 if compact else 34, margin, 36)
+            self.setup_layout.removeWidget(self.model_card)
+            self.setup_layout.removeWidget(self.collection_card)
+            if compact:
+                self.setup_layout.addWidget(self.model_card, 0, 0)
+                self.setup_layout.addWidget(self.collection_card, 1, 0)
+                self.setup_layout.setColumnStretch(0, 1)
+                self.setup_layout.setColumnStretch(1, 0)
+            else:
+                self.setup_layout.addWidget(self.model_card, 0, 0)
+                self.setup_layout.addWidget(self.collection_card, 0, 1)
+                self.setup_layout.setColumnStretch(0, 1)
+                self.setup_layout.setColumnStretch(1, 1)
             self.inventory_layout.removeWidget(self.inventory_table_card)
             self.inventory_layout.removeWidget(self.inventory_detail_card)
             if compact:

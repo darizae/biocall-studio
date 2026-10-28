@@ -18,9 +18,9 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-DET-004` | inclusion precedence, generated-data exclusions, undecided versus invalid, deterministic decisions and count aggregation. | TD-WAV, TD-PATH | [ST-04](specs/ST-04-wav-discovery.md) |
 | `UT-DET-005` | normalized identity, traversal/symlink/reparse and duplicate/hardlink/casefold collisions cannot silently collapse rows. | TD-WAV, TD-PATH | [ST-04](specs/ST-04-wav-discovery.md) |
 | `UT-DET-006` | header/freshness interpretation, add/remove/replace, cancellation and snapshot validation. | TD-WAV, TD-PATH | [ST-04](specs/ST-04-wav-discovery.md) |
-| `UT-DET-007` | **Planned ST-05:** immutable manifest schema/checksum/class mapping, family-specific required fields and rejected mismatch. | TD-EXPORT, TD-TRAIN | [ST-05](specs/ST-05-model-intake.md) |
-| `UT-DET-008` | **Planned ST-05:** trusted artifact policy, safe path/version/import semantics; binary not deserialized on untrusted/malformed input. | TD-EXPORT, TD-TRAIN | [ST-05](specs/ST-05-model-intake.md) |
-| `UT-DET-009` | **Planned ST-05:** precise compatibility state/reason and normalized typed handoff; unproven numerical parity remains flagged. | TD-EXPORT, TD-TRAIN | [ST-05](specs/ST-05-model-intake.md) |
+| `UT-DET-007` | immutable manifest schema/checksum/class mapping, family-specific required fields and rejected mismatch. | TD-EXPORT, TD-TRAIN | [ST-05](specs/ST-05-model-intake.md) |
+| `UT-DET-008` | trusted artifact policy, safe path/version/import semantics; binary not deserialized on untrusted/malformed input. | TD-EXPORT, TD-TRAIN | [ST-05](specs/ST-05-model-intake.md) |
+| `UT-DET-009` | precise compatibility state/reason and normalized typed handoff; unproven numerical parity remains flagged. | TD-EXPORT, TD-TRAIN | [ST-05](specs/ST-05-model-intake.md) |
 | `UT-DET-010` | **Planned ST-06:** state machine, Run input freeze, one-Active-Run reservation and terminal transitions. | TD-RUN, TD-FAIL | [ST-06](specs/ST-06-detect-workers.md) |
 | `UT-DET-011` | **Planned ST-06:** cancellation, crash, receipt/staging reconciliation and orphan recovery decisions. | TD-RUN, TD-FAIL | [ST-06](specs/ST-06-detect-workers.md) |
 | `UT-DET-012` | **Planned ST-06:** bounded diagnostics schema, privacy allowlist, rotation/read/symlink policy. | TD-RUN, TD-FAIL | [ST-06](specs/ST-06-detect-workers.md) |

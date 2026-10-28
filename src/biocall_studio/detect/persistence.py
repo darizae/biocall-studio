@@ -31,6 +31,7 @@ from biocall_studio.detect.inventory import (
     InventoryRecording,
     InventorySnapshot,
 )
+from biocall_studio.detect.models import ModelSnapshot, VerifiedModelReference
 
 _MAX_METADATA_BYTES = 1_048_576
 _SETTINGS_SCHEMA_VERSION = 1
@@ -41,6 +42,8 @@ _MAX_JSONL_PARTITION_BYTES = 1_048_576
 _MAX_JSONL_PARTITION_ROWS = 1_000
 _INVENTORY_ID = re.compile(r"inv_[0-9a-f]{32}")
 _PARTITION_NAME = re.compile(r"records-[0-9]{5}\.jsonl")
+_MODEL_SNAPSHOT_ID = re.compile(r"mdl_[0-9a-f]{32}")
+_MODEL_SELECTION_SCHEMA_VERSION = 1
 
 
 class WorkspaceMetadataError(ValueError):
@@ -181,6 +184,8 @@ class DetectWorkspaceStore:
         self.workspace_root = detect_workspace_path(self.application_data_root)
         self.collections_root = self.workspace_root / "collections"
         self.settings_path = self.workspace_root / "settings.json"
+        self.model_snapshots_root = self.workspace_root / "model-snapshots"
+        self.model_selection_path = self.workspace_root / "model-selection.json"
 
     def _ensure_storage(self) -> None:
         self.application_data_root.mkdir(parents=True, exist_ok=True)
@@ -190,8 +195,70 @@ class DetectWorkspaceStore:
             self.application_data_root / "detect",
             self.workspace_root,
             self.collections_root,
+            self.model_snapshots_root,
         ):
             _ensure_directory(path)
+
+    def save_model_reference(self, reference: VerifiedModelReference) -> None:
+        """Persist one private selected path and one immutable path-free snapshot."""
+        self._ensure_storage()
+        snapshot_path = self.model_snapshots_root / f"{reference.snapshot.snapshot_id}.json"
+        if snapshot_path.is_symlink():
+            raise WorkspaceMetadataError("ModelSnapshot path cannot be a symlink.")
+        if snapshot_path.exists():
+            try:
+                existing = ModelSnapshot.from_dict(
+                    _read_json(snapshot_path, label="ModelSnapshot")
+                )
+            except ValueError as exc:
+                raise WorkspaceMetadataError(f"Stored ModelSnapshot is invalid: {exc}") from exc
+            if existing != reference.snapshot:
+                raise WorkspaceMetadataError(
+                    "Stored ModelSnapshot identifier refers to different compatibility evidence."
+                )
+        else:
+            _write_json_atomic(snapshot_path, reference.snapshot.to_dict())
+        _write_json_atomic(
+            self.model_selection_path,
+            {
+                "schema_version": _MODEL_SELECTION_SCHEMA_VERSION,
+                "model_root_uri": reference.root.as_uri(),
+                "snapshot_id": reference.snapshot.snapshot_id,
+            },
+        )
+
+    def load_model_reference(self) -> VerifiedModelReference | None:
+        if not self.model_selection_path.exists() and not self.model_selection_path.is_symlink():
+            return None
+        raw = _read_json(self.model_selection_path, label="Detect Model selection")
+        expected = {"schema_version", "model_root_uri", "snapshot_id"}
+        if (
+            not isinstance(raw, dict)
+            or raw.get("schema_version") != _MODEL_SELECTION_SCHEMA_VERSION
+            or set(raw) != expected
+            or not isinstance(raw.get("snapshot_id"), str)
+            or _MODEL_SNAPSHOT_ID.fullmatch(raw["snapshot_id"]) is None
+            or not isinstance(raw.get("model_root_uri"), str)
+        ):
+            raise WorkspaceMetadataError("Detect Model selection is unsupported or invalid.")
+        try:
+            root = path_from_file_uri(raw["model_root_uri"])
+            snapshot = ModelSnapshot.from_dict(
+                _read_json(
+                    self.model_snapshots_root / f"{raw['snapshot_id']}.json",
+                    label="ModelSnapshot",
+                )
+            )
+        except (ValueError, WorkspaceMetadataError) as exc:
+            raise WorkspaceMetadataError(f"Detect Model selection is invalid: {exc}") from exc
+        if snapshot.snapshot_id != raw["snapshot_id"]:
+            raise WorkspaceMetadataError("Detect Model selection and ModelSnapshot disagree.")
+        return VerifiedModelReference(root, snapshot)
+
+    def clear_model_reference(self) -> None:
+        if self.model_selection_path.is_symlink():
+            raise WorkspaceMetadataError("Detect Model selection cannot be a symlink.")
+        self.model_selection_path.unlink(missing_ok=True)
 
     def paths_for(self, collection_id: str) -> CollectionPaths:
         safe_id = validate_collection_id(collection_id)
