@@ -132,7 +132,7 @@ Run the fast repository checks with:
 Native GUI evidence must be captured on a real desktop; Qt offscreen output is supplemental only.
 Contributors should start with [AGENTS.md](AGENTS.md), then follow the
 [task router](docs/agent/ROUTING.md) to the single active specification. The current active stage
-is [ST-01: Studio launchpad + Detect interactive prototype](docs/specs/ST-01-prototype.md).
+is [ST-02: native Studio shell](docs/specs/ST-02-native-shell.md).
 
 Brand assets are copied into this repository and documented in
 [assets/branding](assets/branding/README.md); they are not a runtime dependency on the separate

@@ -18,4 +18,4 @@ BioCall Studio is one PySide6/`alp-ui` desktop application with **Train**, **Det
 - Before an implementation-stage commit, run the feasible ordinary full suite (unit + integration, excluding explicit soak/installer-only cases), plus affected targeted tests. Record unavailable platforms as blockers, not passes.
 - Follow [Git delivery](docs/agent/GIT_DELIVERY.md): real branch, clean status, reviewed diff, real commit SHA; never merge, push or start another stage without approval.
 
-**Source of stage order:** [Implementation sequence](docs/IMPLEMENTATION_SEQUENCE.md). **Active spec:** [ST-01](docs/specs/ST-01-prototype.md).
+**Source of stage order:** [Implementation sequence](docs/IMPLEMENTATION_SEQUENCE.md). **Active spec:** [ST-02](docs/specs/ST-02-native-shell.md).

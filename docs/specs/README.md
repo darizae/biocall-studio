@@ -1,3 +1,3 @@
 # Implementation specs
 
-[Stage order and scoped acceptance outcomes](../IMPLEMENTATION_SEQUENCE.md) are authoritative. Open only the [active ST-01 prototype spec](ST-01-prototype.md). Create the detailed ST-02 spec after ST-01 acceptance, then proceed one stage at a time.
+[Stage order](../IMPLEMENTATION_SEQUENCE.md) is authoritative. **Active:** [ST-02 native shell](ST-02-native-shell.md). [ST-01 prototype](ST-01-prototype.md) is owner-approved as the design reference; automated browser interaction was not verified. Write later implementation specs at their own stage gate.

@@ -12,6 +12,18 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-UI-004` | Prototype Select/Wiki/empty-state structure is exercised with real `alp-ui` Widgets, an accessible inline Wiki action, keyboard Tab/Space and HelpHint, and no demo scientific completions. **Separately required native macOS evidence:** persist real Trainer screenshots (not only pytest tmp files), compare side by side with both bundled prototype and sibling Showcase, log deviations and update README with truthful native shots before claiming UI acceptance. | TD-UI |
 | `IT-UI-005` | The UI-pass revision uses readable `alp-ui` typography, concise non-redundant copy with no user-facing internal IDs, a top-right Run state, and top-to-bottom numbered preparation. A Training draft stays visibly reopenable until discarded or launched. Dataset/Model/Run names are editable; Collection unbind and Dataset/Model/terminal-Run delete actions are confirmed, contained, and non-cascading. Active Run activity sits beside progress and Output remains below. | TD-UI, TD-PATH, TD-RUN |
 
+
+## 1a. Studio shell (ST-02)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-STU-001` | New Studio entry creates one themed `QApplication`, shows branded launchpad; accessible cards, keyboard/focus and visible Studio identity use native Qt/`alp-ui`. | TD-UI |
+| `IT-STU-002` | Studio → real Train → Studio → Train reuses controller/window, preserves current Train route and live training draft, and leaves Collection bindings and input WAV unchanged. Return control works at compact widths. | TD-UI, TD-COL |
+| `IT-STU-003` | Real Train QProcess Run and scan remain active while visiting Studio; application Quit from either visible/hidden workspace preserves Train's single safe close/cancel/keep-open policy and releases Worker/lease/resources only after confirmed stop. | TD-RUN, TD-FAIL, TD-UI |
+| `IT-STU-004` | Canonical Studio entry, old Train CLI and Train `-m ... --worker` protocol coexist; settings path and validated binding survive app entrypoint/display-name change and restart, including isolated test settings. | TD-UI, TD-CACHE |
+| `IT-STU-005` | Detect landing and Review placeholder have reachable, keyboard-operable returns; no invented Model scan, prediction, simulated values, persisted Detect state or enabled detection action. | TD-UI |
+| `IT-STU-006` | Real native Studio/Train/Detect/Review screenshots at normal and compact widths show checked-in branding, focus and contrast; no Train layout regression or inaccessible switch; report unavailable native platforms separately. | TD-UI, TD-OS |
+
 ## 2. Collection Scan and metadata (spec 02)
 
 | Case ID | Public seam / expected result | Data |

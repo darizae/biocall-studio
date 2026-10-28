@@ -4,8 +4,8 @@ Read `AGENTS.md` → [stage sequence](../IMPLEMENTATION_SEQUENCE.md) → **one a
 
 | Task | Authority |
 |---|---|
-| Current stage: launchpad + interactive Detect design | [ST-01 prototype](../specs/ST-01-prototype.md) |
-| Future Studio/Detect stages | [ST-02…ST-11 outcomes](../IMPLEMENTATION_SEQUENCE.md); write a focused spec only when that stage is next |
+| Current stage: native Studio shell and Train integration | [ST-02 native shell](../specs/ST-02-native-shell.md) |
+| Future Studio/Detect stages | [ST-03…ST-11 outcomes](../IMPLEMENTATION_SEQUENCE.md); write a focused spec only when that stage is next |
 | New Studio/Detect UX | [UX parity matrix](../design/UX_PARITY_MATRIX.md), [prototype acceptance](../design/PROTOTYPE_ACCEPTANCE.md) |
 | Detect data, model, lineage, export | [Detect contract](../PREDICTION.md) |
 | Existing Train implementation | Relevant sections of [architecture](../ARCHITECTURE.md), [Model export](../science/MODEL_EXPORT_CONTRACT.md), and actual Python code |

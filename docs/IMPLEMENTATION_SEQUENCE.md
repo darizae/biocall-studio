@@ -6,8 +6,8 @@ Only the **active** stage gets a detailed spec. The remaining rows are scoped ac
 
 | Stage | Owns / acceptance outcome |
 |---|---|
-| **[ST-01](specs/ST-01-prototype.md)** | Interactive HTML/CSS/JS launchpad + Detect prototype; native Train reference; design decisions, UX matrix and states. **No Python or scientific implementation.** |
-| **ST-02 — Native shell** | Single `QApplication`, Studio launchpad and workspace navigation; Train integrated without behavior/visual regressions; Review placeholder. Native screenshots and Qt integration tests. |
+| **[ST-01](specs/ST-01-prototype.md)** | Owner-approved interactive HTML/CSS/JS launchpad + Detect prototype; browser automation not qualified. **No Python or scientific implementation.** |
+| **[ST-02](specs/ST-02-native-shell.md) — Native shell** | Single `QApplication`, Studio launchpad and workspace switching; protected Train entry, Detect/Review placeholders, safe quit. Native screenshots and Qt/Worker integration tests. |
 | **ST-03 — Detect workspace** | Independent app-owned storage, Collection identity/versioned metadata, source-root relinking and stale path checks, artifact ownership and publication. Path/storage tests. |
 | **ST-04 — WAV discovery** | Safe recursive enumeration, explicit inclusion/exclusion, Train-derived WAV avoidance, no symlink escape, deterministic order/duplicates, header validation and rescans. Real-WAV tests. |
 | **ST-05 — Model intake** | Verify Train CNN/RF packages, class mappings, preprocessing/feature schemas and safe loading; real inference parity research, with unavailable capabilities blocked. Fresh-process tests. |

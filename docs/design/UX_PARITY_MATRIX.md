@@ -1,6 +1,6 @@
 # BioCall Studio — UX parity matrix
 
-**Native visual anchor:** current Train Python UI + genuine screenshots under `docs/design/evidence/spec-*-native/`; `../alp-ui/gallery/showcase.py` and installed public components. **New interaction reference:** ST-01's `docs/design/prototypes/studio-detect/` once accepted. Train must retain its present navigation, controls and behavior. Browser data/progress are illustrative, never scientific proof.
+**Native visual anchor:** current Train Python UI + genuine screenshots under `docs/design/evidence/spec-*-native/`; `../alp-ui/gallery/showcase.py` and installed public components. **New interaction reference:** the owner-approved ST-01 `docs/design/prototypes/studio-detect/`. Train must retain its present navigation, controls and behavior. Browser data/progress are illustrative, never scientific proof.
 
 | Surface | Implemented ST-01 route and reachable prototype states | Verification when implemented natively |
 |---|---|---|
@@ -21,3 +21,5 @@
 **Deliberate ST-01 boundaries:** browser buttons provide example picker and navigation outcomes because the prototype does not verify Model packages, inspect source recordings or materialize exports. Train remains a screenshot-backed reference rather than a browser clone. Result audio playback/waveforms are omitted because Results are metadata-first. Scientific configuration values are illustrative, not approved defaults.
 
 **Evidence:** the prototype uses the genuine Train screenshots above. Browser review must exercise every route, the documented prototype states, selection-dependent recording and export data, original/refined Result independence, keyboard navigation, HelpHint/guide dismissal, cancellation, Show in folder, and normal/narrow desktop widths. Store representative screenshots under the prototype's `evidence/` folder when that review is completed. For the 2026-10-27 UX revision, local HTTP assets were served successfully and the Brave tab was visible, but the Browser Use origin gate denied page observation; browser flows and screenshots remain explicitly blocked rather than claimed. Use [prototype acceptance](PROTOTYPE_ACCEPTANCE.md) and the route/state IDs in this table as the durable acceptance record. Browser interaction does not establish scientific or native correctness.
+
+**Acceptance boundary:** owner approved the ST-01 design direction on 2026-10-28; automated browser interaction remained blocked. Treat each prototype state as a design requirement, not executed evidence. ST-02 verifies the native Studio/Train switch; later stages verify their own Detect interactions.
