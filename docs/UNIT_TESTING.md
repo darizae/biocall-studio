@@ -32,9 +32,9 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-DET-018` | exact ordered RF feature schema and class/probability-column validation; reject mismatch/nonfinite values. | TD-EXPORT, TD-TRAIN | [ST-09](specs/ST-09-rf-refinement.md) |
 | `UT-DET-019` | per-candidate accepted/rejected/unscored status and short/stale/error decisions. | TD-EXPORT, TD-TRAIN | [ST-09](specs/ST-09-rf-refinement.md) |
 | `UT-DET-020` | immutable parent→child lineage, candidate identity, time/provenance and checksum rules. | TD-EXPORT, TD-TRAIN | [ST-09](specs/ST-09-rf-refinement.md) |
-| `UT-DET-021` | **Planned ST-10:** exact frame/byte/TSV offset arithmetic and output representation without rounding drift. | TD-WAV, TD-PATH | [ST-10](specs/ST-10-corpus-export.md) |
-| `UT-DET-022` | **Planned ST-10:** frozen selected IDs/digests, parent lineage and reproducible provenance ordering. | TD-WAV, TD-PATH | [ST-10](specs/ST-10-corpus-export.md) |
-| `UT-DET-023` | **Planned ST-10:** collision-safe names, mixed-format decision and conservative publish/overwrite policy. | TD-WAV, TD-PATH | [ST-10](specs/ST-10-corpus-export.md) |
+| `UT-DET-021` | exact frame/byte/TSV offset arithmetic and output representation without rounding drift. | TD-WAV, TD-PATH | [ST-10](specs/ST-10-corpus-export.md) |
+| `UT-DET-022` | frozen selected IDs/digests, parent lineage and reproducible provenance ordering. | TD-WAV, TD-PATH | [ST-10](specs/ST-10-corpus-export.md) |
+| `UT-DET-023` | collision-safe names, mixed-format decision and conservative publish/overwrite policy. | TD-WAV, TD-PATH | [ST-10](specs/ST-10-corpus-export.md) |
 | `UT-STU-002` | **Planned ST-11:** pure cross-workspace quit/admission policy and independent Train/Detect ownership; no duplicate Run IDs, hidden Worker's lifetime not inferred from visibility. | TD-UI, TD-RUN | [ST-11](specs/ST-11-unified-qualification.md) |
 | `UT-COL-001` | Positive name parses anchored complete stem, integer ms and unique label; reject malformed/missing fields and overflow | TD-COL | 02 |
 | `UT-COL-002` | Exact unique source-stem resolution; overlapping prefixes, duplicate names and same-source duplicate interval rejected | TD-COL | 02 |

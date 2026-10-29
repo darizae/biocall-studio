@@ -48,6 +48,7 @@ from biocall_studio.detect.inventory import (
     RecordingStatus,
 )
 from biocall_studio.detect.runs import DetectRunStatus
+from biocall_studio.gui.detect_export import ExportPage
 from biocall_studio.gui.detect_results import ResultExplorer
 
 
@@ -269,11 +270,15 @@ class DetectWorkspacePage(QScrollArea):
         self.result_explorer.recordings_requested.connect(
             lambda: self._set_route("recordings")
         )
+        self.result_explorer.export_requested.connect(self._open_export)
+        self.export_page = ExportPage(self.controller)
+        self.export_page.results_requested.connect(lambda: self._set_route("results"))
 
         self.route_stack.addWidget(self.setup_view)
         self.route_stack.addWidget(self.recordings_view)
         self.route_stack.addWidget(self.run_view)
         self.route_stack.addWidget(self.result_explorer)
+        self.route_stack.addWidget(self.export_page)
         self.outer.addWidget(self.route_stack)
         self.outer.addStretch()
         self.setWidget(self.content)
@@ -447,8 +452,30 @@ class DetectWorkspacePage(QScrollArea):
         self.results_button.setAutoExclusive(True)
         self.results_button.clicked.connect(lambda: self._set_route("results"))
         navigation.addWidget(self.results_button)
+        self.export_button = Button("Export", variant="outline", size="small")
+        self.export_button.setAccessibleName("Open frozen corpus export")
+        self.export_button.setCheckable(True)
+        self.export_button.setAutoExclusive(True)
+        self.export_button.clicked.connect(self._navigate_export)
+        navigation.addWidget(self.export_button)
         navigation.addStretch()
         return navigation
+
+    def _open_export(self) -> None:
+        try:
+            self.controller.prepare_export_plan()
+        except (RuntimeError, ValueError) as exc:
+            self.selection_error.setText(str(exc))
+            self.selection_error.setVisible(True)
+            self._set_route("results")
+            return
+        self._set_route("export")
+
+    def _navigate_export(self) -> None:
+        if self.controller.export_selection is None:
+            self._open_export()
+            return
+        self._set_route("export")
 
     def _build_run_header(self) -> Card:
         card = Card()
@@ -603,7 +630,7 @@ class DetectWorkspacePage(QScrollArea):
         self.selected_model_path.setAccessibleName("Selected Model folder")
         card.content_layout.addWidget(self.selected_model_path)
 
-        self.model_picker = FolderPicker(label="Train Model folder")
+        self.model_picker = FolderPicker(label="Train Model folder", show_hidden=True)
         self.model_picker.setAccessibleDescription(
             "Choose one Model folder published inside a local Train Collection."
         )
@@ -1305,6 +1332,19 @@ class DetectWorkspacePage(QScrollArea):
         self._render_model()
         self.results_button.setEnabled(bool(self.controller.result_history))
         self.result_explorer.render()
+        projection = self.controller.selected_result_projection
+        selection = self.controller.result_selection
+        can_plan_export = (
+            projection is not None
+            and projection.source_state.value == "available"
+            and selection is not None
+            and bool(selection.candidate_ids)
+            and not self.controller.is_export_active
+        )
+        self.export_button.setEnabled(
+            can_plan_export or self.controller.export_selection is not None
+        )
+        self.export_page.render()
         collection = self.controller.active_collection
         proposal = self.controller.proposal
         self.relink_card.setVisible(
@@ -1397,24 +1437,28 @@ class DetectWorkspacePage(QScrollArea):
         self._render_readiness()
 
     def _set_route(self, route: str) -> None:
-        if route not in {"setup", "recordings", "run", "results"}:
+        if route not in {"setup", "recordings", "run", "results", "export"}:
             raise ValueError(f"Unknown Detect route: {route}")
         if route == "recordings" and not self.recordings_button.isEnabled():
             route = "setup"
         if route == "results" and not self.results_button.isEnabled():
             route = "run"
+        if route == "export" and self.controller.export_selection is None:
+            route = "results"
         route_changed = getattr(self, "current_route", None) != route
         self.current_route = route
         self.setup_button.setChecked(route == "setup")
         self.recordings_button.setChecked(route == "recordings")
         self.run_button.setChecked(route == "run")
         self.results_button.setChecked(route == "results")
+        self.export_button.setChecked(route == "export")
         self.route_stack.setCurrentWidget(
             {
                 "setup": self.setup_view,
                 "recordings": self.recordings_view,
                 "run": self.run_view,
                 "results": self.result_explorer,
+                "export": self.export_page,
             }[route]
         )
         if route == "setup":
@@ -1439,12 +1483,19 @@ class DetectWorkspacePage(QScrollArea):
             self.page_description.setText(
                 "Follow Worker progress, cancellation, recovery, and verified publication."
             )
-        else:
+        elif route == "results":
             self.page_overline.setText("METADATA-ONLY RESULTS")
             self.page_title.setText("Candidate intervals")
             self.page_description.setText(
                 "Explore immutable intervals in original recording time. No audio is copied "
                 "into a Result."
+            )
+        else:
+            self.page_overline.setText("CORPUS EXPORT")
+            self.page_title.setText("Materialize a frozen selection")
+            self.page_description.setText(
+                "Choose what to create and where to publish it. Source-time provenance "
+                "travels with every output."
             )
         self.setup_button.setAccessibleDescription(
             "Current Detect page" if route == "setup" else "Open Detect setup"
@@ -1457,6 +1508,9 @@ class DetectWorkspacePage(QScrollArea):
         )
         self.results_button.setAccessibleDescription(
             "Current Detect page" if route == "results" else "Open Detect Results"
+        )
+        self.export_button.setAccessibleDescription(
+            "Current Detect page" if route == "export" else "Open corpus export"
         )
         self._render_run_header()
         if route_changed:
@@ -1476,6 +1530,9 @@ class DetectWorkspacePage(QScrollArea):
             return
         if self.current_route == "results":
             self.result_explorer.focus_initial()
+            return
+        if self.current_route == "export":
+            self.export_page.focus_initial()
             return
         picker = self.model_picker if self.current_route == "setup" else self.relink_picker
         buttons = picker.findChildren(QPushButton)
@@ -1558,6 +1615,7 @@ class DetectWorkspacePage(QScrollArea):
                 self.run_layout.addWidget(self.run_progress_card, 0, 0)
                 self.run_layout.addWidget(self.run_activity_card, 0, 1)
             self.result_explorer.set_compact(compact)
+            self.export_page.set_compact(compact)
             for layout in (
                 self.setup_layout,
                 self.settings_layout,
@@ -1567,6 +1625,7 @@ class DetectWorkspacePage(QScrollArea):
                 self.run_layout,
                 self.run_view.layout(),
                 self.result_explorer.layout(),
+                self.export_page.layout(),
             ):
                 layout.invalidate()
                 layout.activate()
@@ -1577,6 +1636,7 @@ class DetectWorkspacePage(QScrollArea):
                 self.recordings_view,
                 self.run_view,
                 self.result_explorer,
+                self.export_page,
                 self.route_stack,
                 self.content,
             ):

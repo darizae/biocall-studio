@@ -369,7 +369,7 @@ def test_native_model_selection_reopen_states_and_readiness_without_worker(
     )[:2] == (1, 0)
 
     before = controller.model_reference
-    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args, **kwargs: "")
+    monkeypatch.setattr(QFileDialog, "exec", lambda *_args, **_kwargs: 0)
     browse = next(
         button
         for button in page.model_picker.findChildren(QPushButton)

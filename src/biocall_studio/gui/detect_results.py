@@ -281,6 +281,7 @@ class CandidateResultModel(QAbstractTableModel):
 class ResultExplorer(QWidget):
     run_requested = Signal()
     recordings_requested = Signal()
+    export_requested = Signal()
 
     def __init__(self, controller: DetectWorkspaceController):
         super().__init__()
@@ -370,6 +371,10 @@ class ResultExplorer(QWidget):
         self.review_recordings_button = Button("Review recordings", variant="outline")
         self.review_recordings_button.clicked.connect(self.recordings_requested)
         footer.addWidget(self.review_recordings_button)
+        self.export_button = Button("Plan corpus export", variant="primary")
+        self.export_button.setAccessibleName("Plan export from selected Result intervals")
+        self.export_button.clicked.connect(self.export_requested)
+        footer.addWidget(self.export_button)
         footer.addStretch()
         outer.addLayout(footer)
 
@@ -494,7 +499,9 @@ class ResultExplorer(QWidget):
         heading.addWidget(self.refinement_status_badge, 0, Qt.AlignmentFlag.AlignTop)
         card.content_layout.addLayout(heading)
 
-        self.refinement_picker = FolderPicker(label="Train RF Model folder")
+        self.refinement_picker = FolderPicker(
+            label="Train RF Model folder", show_hidden=True
+        )
         self.refinement_picker.setAccessibleDescription(
             "Choose a trusted Random Forest Model to assess existing candidate intervals."
         )
@@ -879,6 +886,7 @@ class ResultExplorer(QWidget):
             self.state_title = self.no_results_state.title_widget
 
     def render(self) -> None:
+        self.export_button.setEnabled(False)
         self._render_history()
         item = self.controller.selected_result_item
         projection = self.controller.selected_result_projection
@@ -958,6 +966,11 @@ class ResultExplorer(QWidget):
         revision = 0 if selection is None else selection.selection_revision
         self.selection_summary.setText(
             f"{len(selected_ids):,} selected in this Result · selection revision {revision}"
+        )
+        self.export_button.setEnabled(
+            bool(selected_ids)
+            and projection.source_state is ResultSourceState.AVAILABLE
+            and not self.controller.is_export_active
         )
         self.selection_message.setText(
             self.controller.selection_error or self.controller.selection_notice

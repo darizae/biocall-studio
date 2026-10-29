@@ -310,7 +310,7 @@ def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(q
     assert shell.current_workspace is WorkspaceRoute.DETECT
     assert isinstance(shell.detect_page.focusWidget(), QPushButton)
     assert shell.detect_page.focusWidget().accessibleName() == "Choose Train Model folder"
-    assert len(shell.detect_page.findChildren(FolderPicker)) == 4
+    assert len(shell.detect_page.findChildren(FolderPicker)) == 5
     assert {
         "More about Detection Model",
         "More about Detect Collection",
@@ -318,6 +318,7 @@ def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(q
         "More about Minimum detection score",
         "More about Window overlap",
         "More about Combine nearby candidates",
+        "More about Corpus export formats",
     } <= {
         hint.accessibleName() for hint in shell.detect_page.findChildren(HelpHint)
     }

@@ -27,6 +27,18 @@ from biocall_studio.detect.discovery import (
     snapshot_is_quickly_current,
 )
 from biocall_studio.detect.domain import RootBindingDecision
+from biocall_studio.detect.exports import (
+    ExportCancelledError,
+    ExportConflictError,
+    ExportMode,
+    ExportReceipt,
+    ExportSnapshot,
+    ExportStaleSourceError,
+    ExportState,
+    freeze_export_snapshot,
+    publish_export,
+    verify_export_directory,
+)
 from biocall_studio.detect.inventory import (
     DecisionRule,
     InclusionDecision,
@@ -167,6 +179,47 @@ class _InventoryScanThread(QThread):
             self.snapshot_ready.emit(snapshot)
 
 
+class _ExportThread(QThread):
+    succeeded = Signal(object, object)
+    failed = Signal(object)
+
+    def __init__(
+        self,
+        *,
+        result: ResultArtifact,
+        selection: FrozenResultSelection,
+        mode: ExportMode,
+        source_root: Path,
+        destination_parent: Path,
+    ):
+        super().__init__()
+        self.result = result
+        self.selection = selection
+        self.mode = mode
+        self.source_root = source_root
+        self.destination_parent = destination_parent
+        self.cancel_event = Event()
+
+    def run(self) -> None:
+        try:
+            snapshot = freeze_export_snapshot(
+                result=self.result,
+                selection=self.selection,
+                mode=self.mode,
+                source_root=self.source_root,
+                destination_parent=self.destination_parent,
+            )
+            receipt = publish_export(
+                snapshot,
+                source_root=self.source_root,
+                cancel_requested=self.cancel_event,
+            )
+        except Exception as exc:  # failure class is mapped to researcher-facing state on Qt thread
+            self.failed.emit(exc)
+        else:
+            self.succeeded.emit(snapshot, receipt)
+
+
 class DetectWorkspaceController(QObject):
     state_changed = Signal()
     scan_progress_changed = Signal(object)
@@ -225,6 +278,13 @@ class DetectWorkspaceController(QObject):
         self._run_stderr = BoundedStderrCapture()
         self._run_error_code = ""
         self._protocol_error = ""
+        self.export_result: ResultArtifact | None = None
+        self.export_selection: FrozenResultSelection | None = None
+        self.export_snapshot: ExportSnapshot | None = None
+        self.export_receipt: ExportReceipt | None = None
+        self.export_state = ExportState.READY
+        self.export_message = "Freeze selected Result intervals and choose a destination."
+        self._export_thread: _ExportThread | None = None
         self._shutdown_requested = False
         self._shutdown_finished = False
         self.refresh(emit=False)
@@ -243,6 +303,10 @@ class DetectWorkspaceController(QObject):
             self._refinement_model_thread is not None
             and self._refinement_model_thread.isRunning()
         )
+
+    @property
+    def is_export_active(self) -> bool:
+        return self._export_thread is not None and self._export_thread.isRunning()
 
     @property
     def reservation_owner_id(self) -> str:
@@ -555,6 +619,113 @@ class DetectWorkspaceController(QObject):
         if item is None or item.result is None or selection is None:
             raise ValueError("Choose an available Result before freezing its selection.")
         return freeze_result_selection(item.result, selection)
+
+    def prepare_export_plan(self) -> FrozenResultSelection:
+        item = self.selected_result_item
+        projection = self.selected_result_projection
+        if item is None or item.result is None or projection is None:
+            raise ValueError("Choose an available Result before planning an export.")
+        if projection.source_state is not ResultSourceState.AVAILABLE:
+            raise ValueError("Check or relink the source recordings before exporting.")
+        frozen = self.freeze_selected_result_selection()
+        if not frozen.candidate_ids:
+            raise ValueError("Select at least one interval before planning an export.")
+        if self.is_export_active:
+            raise RuntimeError("An export is already running.")
+        self.export_result = item.result
+        self.export_selection = frozen
+        self.export_snapshot = None
+        self.export_receipt = None
+        self.export_state = ExportState.READY
+        self.export_message = (
+            "Review the frozen selection and choose a persistent destination folder."
+        )
+        self.state_changed.emit()
+        return frozen
+
+    def start_export(self, mode: ExportMode, destination_parent: Path) -> None:
+        if self.is_export_active:
+            raise RuntimeError("An export is already running.")
+        if self.export_result is None or self.export_selection is None:
+            raise ValueError("Freeze a Result selection before exporting.")
+        collection = self.active_collection
+        if collection is None or self.root_decision is not RootBindingDecision.VALID:
+            raise ValueError("The recordings folder is unavailable or stale.")
+        thread = _ExportThread(
+            result=self.export_result,
+            selection=self.export_selection,
+            mode=ExportMode(mode),
+            source_root=collection.source_root,
+            destination_parent=Path(destination_parent),
+        )
+        self._export_thread = thread
+        self.export_snapshot = None
+        self.export_receipt = None
+        self.export_state = ExportState.RUNNING
+        self.export_message = "Writing and verifying the frozen selection before publication."
+        thread.succeeded.connect(self._export_succeeded)
+        thread.failed.connect(self._export_failed)
+        thread.finished.connect(lambda: self._export_finished(thread))
+        thread.start()
+        self.state_changed.emit()
+
+    def cancel_export(self) -> None:
+        thread = self._export_thread
+        if thread is None or not thread.isRunning():
+            return
+        thread.cancel_event.set()
+        self.export_message = "Cancelling before publication and cleaning private staging."
+        self.state_changed.emit()
+
+    def _export_succeeded(
+        self, snapshot: ExportSnapshot, receipt: ExportReceipt
+    ) -> None:
+        self.export_snapshot = snapshot
+        self.export_receipt = receipt
+        self.export_state = ExportState.SUCCESS
+        self.export_message = receipt.final_destination
+        self.state_changed.emit()
+
+    def _export_failed(self, error: Exception) -> None:
+        self.export_snapshot = None
+        self.export_receipt = None
+        if isinstance(error, ExportCancelledError):
+            self.export_state = ExportState.CANCELLED
+            self.export_message = (
+                "No new output was published. Existing destination files are unchanged."
+            )
+        elif isinstance(error, ExportConflictError):
+            self.export_state = ExportState.CONFLICT
+            self.export_message = str(error)
+        elif isinstance(error, ExportStaleSourceError):
+            self.export_state = ExportState.STALE
+            self.export_message = f"{error} Rescan and create a new Result before exporting."
+        else:
+            self.export_state = ExportState.ERROR
+            self.export_message = str(error)
+        self.state_changed.emit()
+
+    def _export_finished(self, thread: _ExportThread) -> None:
+        if self._export_thread is thread:
+            self._export_thread = None
+        thread.deleteLater()
+        self.state_changed.emit()
+        self._maybe_finish_shutdown()
+
+    def wait_for_export(self, milliseconds: int = 10_000) -> bool:
+        thread = self._export_thread
+        if thread is None:
+            return True
+        return thread.wait(milliseconds)
+
+    def verify_export_receipt(self) -> ExportReceipt:
+        receipt = self.export_receipt
+        if receipt is None:
+            raise ValueError("No successful export is available to show.")
+        verified = verify_export_directory(Path(receipt.final_destination))
+        if verified != receipt:
+            raise ValueError("The reopened export does not match its verified receipt.")
+        return verified
 
     def selected_source_path(self, recording_id: str) -> Path:
         projection = self.selected_result_projection
@@ -1862,6 +2033,7 @@ class DetectWorkspaceController(QObject):
             and not self.is_scanning
             and not self.is_model_loading
             and not self.is_refinement_model_loading
+            and not self.is_export_active
         )
 
     def request_shutdown(self) -> None:
@@ -1870,6 +2042,8 @@ class DetectWorkspaceController(QObject):
             self.cancel_scan()
         if self.is_run_active:
             self.cancel_active_run()
+        if self.is_export_active:
+            self.cancel_export()
         self._maybe_finish_shutdown()
 
     def _maybe_finish_shutdown(self) -> None:
@@ -1884,6 +2058,13 @@ class DetectWorkspaceController(QObject):
     def shutdown(self) -> None:
         if self._shutdown_finished:
             return
+        export_thread = self._export_thread
+        if export_thread is not None and export_thread.isRunning():
+            export_thread.cancel_event.set()
+            export_thread.wait(10_000)
+            if not export_thread.isRunning():
+                self._export_thread = None
+                export_thread.deleteLater()
         process = self._run_process
         record = self.current_run
         repository = self._run_repository
