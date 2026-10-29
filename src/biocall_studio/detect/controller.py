@@ -47,6 +47,18 @@ from biocall_studio.detect.persistence import (
     RootBindingProposal,
     WorkspaceMetadataError,
 )
+from biocall_studio.detect.result_views import (
+    FrozenResultSelection,
+    ResultHistoryItem,
+    ResultHistoryState,
+    ResultSelection,
+    ResultSelectionError,
+    ResultSelectionStore,
+    ResultSourceState,
+    ResultViewProjection,
+    freeze_result_selection,
+    project_result,
+)
 from biocall_studio.detect.results import DetectionResult
 from biocall_studio.detect.run_persistence import DetectRunRepository
 from biocall_studio.detect.runs import (
@@ -195,6 +207,12 @@ class DetectWorkspaceController(QObject):
         self.runs: tuple[DetectRunRecord, ...] = ()
         self.current_run: DetectRunRecord | None = None
         self.current_result: DetectionResult | None = None
+        self.result_history: tuple[ResultHistoryItem, ...] = ()
+        self.selected_result_id: str | None = None
+        self.result_selection: ResultSelection | None = None
+        self.selection_notice = ""
+        self.selection_error = ""
+        self._selection_store: ResultSelectionStore | None = None
         self._run_repository: DetectRunRepository | None = None
         self._run_process: QProcess | None = None
         self._run_stdout_buffer = b""
@@ -307,6 +325,10 @@ class DetectWorkspaceController(QObject):
             self.runs = ()
             self.current_run = None
             self.current_result = None
+            self.result_history = ()
+            self.selected_result_id = None
+            self.result_selection = None
+            self._selection_store = None
             return
         try:
             repository = DetectRunRepository(
@@ -317,9 +339,15 @@ class DetectWorkspaceController(QObject):
             self._run_repository = None
             self.runs = ()
             self.current_run = None
+            self.current_result = None
+            self.result_history = ()
+            self.selected_result_id = None
+            self.result_selection = None
+            self._selection_store = None
             self.metadata_error = f"Detect Run history could not be opened: {exc}"
             return
         self._run_repository = repository
+        self._selection_store = ResultSelectionStore(repository.collection_root)
         self.runs = runs
         self.current_run = next((run for run in runs if run.active), runs[0] if runs else None)
         self.current_result = None
@@ -329,6 +357,219 @@ class DetectWorkspaceController(QObject):
             except ValueError:
                 # ST-06 lifecycle fixtures intentionally are not scientific Results.
                 pass
+        self._reload_result_history()
+
+    def _is_detection_run(
+        self, repository: DetectRunRepository, record: DetectRunRecord
+    ) -> bool:
+        try:
+            request = repository.load_request(record.run_id)
+            DetectionSettings.from_mapping(dict(request.settings))
+        except (OSError, TypeError, ValueError):
+            return False
+        return True
+
+    def _reload_result_history(self, *, preferred_result_id: str | None = None) -> None:
+        repository = self._run_repository
+        if repository is None:
+            self.result_history = ()
+            self.selected_result_id = None
+            self.result_selection = None
+            return
+        history: list[ResultHistoryItem] = []
+        for record in self.runs:
+            if not self._is_detection_run(repository, record):
+                continue
+            if record.status is DetectRunStatus.COMPLETED:
+                try:
+                    result = repository.load_detection_result(record)
+                except (OSError, ValueError):
+                    history.append(
+                        ResultHistoryItem(
+                            record.artifact_id,
+                            record.run_id,
+                            record.created_at,
+                            ResultHistoryState.UNAVAILABLE,
+                            None,
+                            "This Result cannot be verified. Its Run and provenance remain "
+                            "available, but candidate metadata is not shown.",
+                        )
+                    )
+                else:
+                    history.append(
+                        ResultHistoryItem(
+                            result.result_id,
+                            result.run_id,
+                            result.completed_at,
+                            ResultHistoryState.AVAILABLE,
+                            result,
+                            "",
+                        )
+                    )
+            elif (
+                record.status is DetectRunStatus.FAILED
+                and record.error_code == "publication_invalid"
+            ):
+                history.append(
+                    ResultHistoryItem(
+                        record.artifact_id,
+                        record.run_id,
+                        record.created_at,
+                        ResultHistoryState.UNAVAILABLE,
+                        None,
+                        "This Result is missing or changed and can no longer be verified. "
+                        "Start a new Run after checking the recordings.",
+                    )
+                )
+        self.result_history = tuple(history)
+        available_ids = {item.result_id for item in self.result_history}
+        selected = preferred_result_id or self.selected_result_id
+        if selected not in available_ids:
+            selected = self.result_history[0].result_id if self.result_history else None
+        self.selected_result_id = selected
+        self._load_result_selection()
+
+    @property
+    def selected_result_item(self) -> ResultHistoryItem | None:
+        return next(
+            (
+                item
+                for item in self.result_history
+                if item.result_id == self.selected_result_id
+            ),
+            None,
+        )
+
+    def _source_state_for(self, result: DetectionResult) -> ResultSourceState:
+        collection = self.active_collection
+        snapshot = self.snapshot
+        if collection is None or self.root_decision is not RootBindingDecision.VALID:
+            return ResultSourceState.UNAVAILABLE
+        if (
+            snapshot is None
+            or self.inventory_state is not InventoryState.READY
+            or collection.ref.binding_revision != result.binding_revision
+            or snapshot.inventory_id != result.inventory_id
+            or snapshot.digest != result.inventory_digest
+        ):
+            return ResultSourceState.STALE
+        return ResultSourceState.AVAILABLE
+
+    @property
+    def selected_result_projection(self) -> ResultViewProjection | None:
+        item = self.selected_result_item
+        if item is None or item.result is None:
+            return None
+        return project_result(
+            item.result,
+            source_state=self._source_state_for(item.result),
+        )
+
+    def _load_result_selection(self) -> None:
+        self.selection_notice = ""
+        self.selection_error = ""
+        item = self.selected_result_item
+        store = self._selection_store
+        if item is None or item.result is None or store is None:
+            self.result_selection = None
+            return
+        try:
+            resolved = store.read(item.result)
+        except ResultSelectionError as exc:
+            self.result_selection = ResultSelection.empty(item.result)
+            self.selection_error = str(exc)
+            return
+        self.result_selection = resolved.selection
+        self.selection_notice = resolved.message
+
+    def select_result(self, result_id: str) -> None:
+        if not any(item.result_id == result_id for item in self.result_history):
+            raise ValueError("The selected Result is not in this Collection history.")
+        self.selected_result_id = result_id
+        self._load_result_selection()
+        self.state_changed.emit()
+
+    def set_candidate_selected(self, candidate_id: str, selected: bool) -> None:
+        item = self.selected_result_item
+        store = self._selection_store
+        selection = self.result_selection
+        if item is None or item.result is None:
+            raise ValueError("Choose an available Result before changing its selection.")
+        if store is None:
+            raise ValueError("Result selection storage is unavailable.")
+        if selection is None:
+            raise ValueError("Result selection metadata is unavailable.")
+        candidate_ids = set(selection.candidate_ids)
+        if selected:
+            candidate_ids.add(candidate_id)
+        else:
+            candidate_ids.discard(candidate_id)
+        try:
+            self.result_selection = store.replace(item.result, candidate_ids)
+        except ResultSelectionError as exc:
+            self.selection_error = str(exc)
+            self.state_changed.emit()
+            raise
+        self.selection_error = ""
+        self.selection_notice = ""
+        self.state_changed.emit()
+
+    def freeze_selected_result_selection(self) -> FrozenResultSelection:
+        item = self.selected_result_item
+        selection = self.result_selection
+        if item is None or item.result is None or selection is None:
+            raise ValueError("Choose an available Result before freezing its selection.")
+        return freeze_result_selection(item.result, selection)
+
+    def selected_source_path(self, recording_id: str) -> Path:
+        projection = self.selected_result_projection
+        collection = self.active_collection
+        snapshot = self.snapshot
+        if (
+            projection is None
+            or not projection.source_navigation_enabled
+            or collection is None
+            or snapshot is None
+        ):
+            raise ValueError("The original recording is unavailable or stale.")
+        recording = next(
+            (row for row in projection.recordings if row.recording_id == recording_id),
+            None,
+        )
+        if recording is None:
+            raise ValueError("The selected recording is not part of this Result.")
+        inventory_row = next(
+            (
+                row
+                for row in snapshot.recordings
+                if row.recording_key == recording.source_relative_name
+            ),
+            None,
+        )
+        if (
+            inventory_row is None
+            or inventory_row.content_sha256 != recording.source_sha256
+        ):
+            raise ValueError("The original recording no longer matches this Result.")
+        root = collection.source_root.resolve(strict=True)
+        if not snapshot_is_quickly_current(root, snapshot):
+            self.inventory_state = InventoryState.STALE
+            self.inventory_error = (
+                "Recordings changed after this Result. Rescan before source navigation."
+            )
+            self.state_changed.emit()
+            raise ValueError("The original recording changed after this Result.")
+        candidate = root / recording.source_relative_name
+        relative = candidate.relative_to(root)
+        cursor = root
+        for part in relative.parts:
+            cursor = cursor / part
+            if cursor.is_symlink():
+                raise ValueError("The original recording path is unsafe.")
+        path = candidate.resolve(strict=True)
+        if not path.is_file() or not path.is_relative_to(root):
+            raise ValueError("The original recording path is missing or unsafe.")
+        return path
 
     def _active_run_blocks_input_change(self) -> bool:
         if not self.is_run_active:
@@ -868,6 +1109,7 @@ class DetectWorkspaceController(QObject):
             ),
         )
         self._run_repository = repository
+        self._selection_store = ResultSelectionStore(repository.collection_root)
         self.current_result = None
         self._cache_run(record, persist=False)
         self._diagnostic(
@@ -1182,6 +1424,9 @@ class DetectWorkspaceController(QObject):
         if updated.status is not DetectRunStatus.COMPLETED:
             repository.cleanup_staging(updated)
         self._cache_run(updated)
+        if receipt is not None and receipt.artifact_kind == "detection_result":
+            self._reload_result_history(preferred_result_id=receipt.artifact_id)
+            self.state_changed.emit()
         self._diagnostic(
             event,
             "Detect Run reached a verified terminal state",

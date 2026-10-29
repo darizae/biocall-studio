@@ -8,8 +8,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from alp_ui.components import HelpHint
+from alp_ui.components import DataTable, HelpHint
 from bioacoustics_dl_toolbox.prediction import predict_windows
+from PySide6.QtCore import Qt
 
 from biocall_studio.detect.controller import DetectWorkspaceController, ModelIntakeState
 from biocall_studio.detect.detection import (
@@ -17,10 +18,19 @@ from biocall_studio.detect.detection import (
     merge_candidate_windows,
     predict_recording_windows,
 )
+from biocall_studio.detect.inventory import InclusionDecision
 from biocall_studio.detect.models import inspect_model_directory
+from biocall_studio.detect.result_views import (
+    CandidateViewRow,
+    RecordingViewRow,
+    ResultContentState,
+    ResultSourceState,
+)
+from biocall_studio.detect.results import FileOutcomeStatus
 from biocall_studio.detect.run_persistence import DetectRunRepository
 from biocall_studio.detect.runs import DetectRunStatus
 from biocall_studio.gui.detect import DetectWorkspacePage
+from biocall_studio.gui.detect_results import CandidateResultModel
 from biocall_studio_train.application.collection_scan import scan_collection
 from biocall_studio_train.domain.dataset import BuildConfig
 from biocall_studio_train.domain.training import (
@@ -272,6 +282,243 @@ def test_real_run_publishes_reopenable_metadata_result_and_native_controls(
     assert reopened.wait_for_model(30_000)
     reopened.shutdown()
     controller.shutdown()
+
+
+@pytest.mark.qt
+def test_native_result_history_recording_candidates_selection_and_keyboard_navigation(
+    qapp, qtbot, genuine_cnn, tmp_path, monkeypatch
+):
+    """Case: IT-DET-015."""
+    source = tmp_path / "result-source"
+    shutil.copytree(genuine_cnn.root / "recordings", source / "recordings")
+    app_data = tmp_path / "application-data"
+    controller = DetectWorkspaceController(app_data)
+    _select_inputs(qtbot, controller, genuine_cnn.model.root, source)
+    page = DetectWorkspacePage(controller)
+    qtbot.addWidget(page)
+    page.resize(1180, 790)
+    page.show()
+    qtbot.waitExposed(page)
+    page.raise_()
+    page.activateWindow()
+
+    controller.start_detection(DetectionSettings(0.0, 50, 0, 4))
+    first_run = _wait_terminal(qtbot, controller)
+    assert first_run.status is DetectRunStatus.COMPLETED
+    assert controller.current_result is not None
+    assert controller.current_result.candidate_count >= 2
+    first_result = controller.current_result
+    result_path = DetectRunRepository(
+        app_data, controller.active_collection.ref.collection_id
+    ).result_path(first_result.result_id) / "result.json"
+    immutable_bytes = result_path.read_bytes()
+
+    assert page.results_button.isEnabled()
+    page.results_button.click()
+    assert page.current_route == "results"
+    explorer = page.result_explorer
+    page.focus_initial()
+    qtbot.waitUntil(lambda: explorer.history_select.control.hasFocus())
+    assert {
+        hint.accessibleName() for hint in explorer.findChildren(HelpHint)
+    } >= {"More about Result lineage", "More about Result selection"}
+    assert isinstance(explorer.recording_table, DataTable)
+    assert isinstance(explorer.candidate_table, DataTable)
+    assert explorer.history_select.count() == 2  # original + prepared ST-09 placeholder
+    assert explorer.recording_model.rowCount() == len(first_result.recordings)
+
+    successful_rows = [
+        index
+        for index, recording in enumerate(controller.selected_result_projection.recordings)
+        if recording.candidates
+    ]
+    assert len(successful_rows) >= 2
+    first_recording_row, second_recording_row = successful_rows[:2]
+    explorer.recording_table.setCurrentIndex(
+        explorer.recording_model.index(first_recording_row, 0)
+    )
+    first_recording_id = explorer.selected_recording_id
+    assert explorer.candidate_model.rowCount() > 0
+    opened_urls = []
+    monkeypatch.setattr(
+        "biocall_studio.gui.detect_results.QDesktopServices.openUrl",
+        lambda url: opened_urls.append(url) or True,
+    )
+    explorer.show_source_button.click()
+    assert Path(opened_urls[0].toLocalFile()) == source / "recordings"
+    first_candidate_id = explorer.candidate_model.candidate_at(0).candidate_id
+    explorer.candidate_table.setCurrentIndex(explorer.candidate_model.index(0, 0))
+    explorer.candidate_table.setFocus()
+    qtbot.keyClick(explorer.candidate_table, Qt.Key.Key_Space)
+    assert controller.result_selection.candidate_ids == (first_candidate_id,)
+    assert explorer.candidate_detail_id.text() == first_candidate_id
+
+    explorer.recording_table.setFocus()
+    assert second_recording_row == first_recording_row + 1
+    qtbot.keyClick(explorer.recording_table, Qt.Key.Key_Down)
+    assert explorer.recording_table.currentIndex().row() == second_recording_row
+    assert explorer.selected_recording_id != first_recording_id
+    assert all(
+        candidate.recording_id == explorer.selected_recording_id
+        for candidate in explorer.candidate_model.visible_candidates
+    )
+    explorer.recording_table.setCurrentIndex(
+        explorer.recording_model.index(first_recording_row, 0)
+    )
+    assert explorer.candidate_model.data(
+        explorer.candidate_model.index(0, 0), Qt.ItemDataRole.CheckStateRole
+    ) == Qt.CheckState.Checked
+
+    controller.start_detection(DetectionSettings(1.0, 50, 0, 4))
+    second_run = _wait_terminal(qtbot, controller)
+    assert second_run.status is DetectRunStatus.COMPLETED
+    assert controller.current_result.candidate_count == 0
+    assert len(controller.result_history) == 2
+    assert explorer.history_select.count() == 3  # two Results + prepared placeholder
+    assert controller.result_selection.candidate_ids == ()
+    controller.select_result(first_result.result_id)
+    assert controller.result_selection.candidate_ids == (first_candidate_id,)
+    assert result_path.read_bytes() == immutable_bytes
+    frozen = controller.freeze_selected_result_selection()
+    assert frozen.result_id == first_result.result_id
+    assert frozen.candidate_ids == (first_candidate_id,)
+    controller.shutdown()
+
+
+@pytest.mark.qt
+def test_large_candidate_model_is_paged_without_source_audio_access(qapp):
+    """Case: IT-DET-015."""
+    recording_id = "rec_" + "1" * 32
+    candidates = tuple(
+        CandidateViewRow(
+            candidate_id=f"cand_{index:032x}",
+            recording_id=recording_id,
+            start_frame=index * 32,
+            end_frame=index * 32 + 16,
+            start_time_ns=index * 2_000_000,
+            end_time_ns=index * 2_000_000 + 1_000_000,
+            max_target_score=0.75,
+            contributing_windows=1,
+        )
+        for index in range(10_050)
+    )
+    recording = RecordingViewRow(
+        recording_id=recording_id,
+        source_relative_name="recordings/scale.wav",
+        source_sha256="2" * 64,
+        sample_rate_hz=16_000,
+        frame_count=400_000,
+        channels=1,
+        outcome=FileOutcomeStatus.SUCCEEDED,
+        error_code="",
+        candidates=candidates,
+    )
+    changed: list[tuple[str, bool]] = []
+    model = CandidateResultModel(selection_changed=lambda *value: changed.append(value))
+    model.set_recording(recording, ())
+    assert model.rowCount() == 200
+    assert len(model.visible_candidates) == 200
+    assert model.canFetchMore()
+    model.fetchMore()
+    assert model.rowCount() == 400
+    assert model.candidate_at(399).candidate_id == candidates[399].candidate_id
+    assert not changed
+
+
+@pytest.mark.qt
+def test_result_empty_partial_missing_corrupt_persistence_and_native_screenshots(
+    qapp, qtbot, genuine_cnn, tmp_path
+):
+    """Case: IT-DET-016."""
+    source = tmp_path / "result-source"
+    shutil.copytree(genuine_cnn.root / "recordings", source / "recordings")
+    app_data = tmp_path / "application-data"
+    controller = DetectWorkspaceController(app_data)
+    _select_inputs(qtbot, controller, genuine_cnn.model.root, source)
+
+    controller.start_detection(DetectionSettings(0.0, 50, 0, 4))
+    partial_run = _wait_terminal(qtbot, controller)
+    partial_result = controller.current_result
+    assert partial_result.failed_files == 1
+    assert controller.selected_result_projection.content_state is ResultContentState.PARTIAL
+    first_candidate = next(
+        candidate
+        for recording in partial_result.recordings
+        for candidate in recording.candidates
+    )
+    controller.set_candidate_selected(first_candidate.candidate_id, True)
+    selection_revision = controller.result_selection.selection_revision
+    partial_path = DetectRunRepository(
+        app_data, controller.active_collection.ref.collection_id
+    ).result_path(partial_run.artifact_id) / "result.json"
+    partial_bytes = partial_path.read_bytes()
+
+    controller.set_inventory_decision(
+        "recordings/BROKEN.wav",
+        is_folder=False,
+        decision=InclusionDecision.EXCLUDED,
+    )
+    assert controller.inputs_ready
+    controller.start_detection(DetectionSettings(1.0, 50, 0, 4))
+    empty_run = _wait_terminal(qtbot, controller)
+    empty_result = controller.current_result
+    assert empty_result.failed_files == 0
+    assert empty_result.candidate_count == 0
+    assert controller.selected_result_projection.content_state is ResultContentState.EMPTY
+
+    controller.select_result(partial_result.result_id)
+    assert controller.result_selection.selection_revision == selection_revision
+    assert controller.result_selection.candidate_ids == (first_candidate.candidate_id,)
+    controller.shutdown()
+
+    missing = tmp_path / "source-offline"
+    source.rename(missing)
+    reopened = DetectWorkspaceController(app_data)
+    assert reopened.selected_result_projection.source_state is ResultSourceState.UNAVAILABLE
+    reopened.select_result(partial_result.result_id)
+    assert reopened.result_selection.candidate_ids == (first_candidate.candidate_id,)
+    page = DetectWorkspacePage(reopened)
+    qtbot.addWidget(page)
+    page.resize(1180, 790)
+    page.show()
+    page._set_route("results")
+    qtbot.waitUntil(lambda: page.result_explorer.current_state_key == "source-unavailable")
+    assert page.result_explorer.provenance_card.isVisible()
+    candidate_recording_row = next(
+        index
+        for index, recording in enumerate(
+            reopened.selected_result_projection.recordings
+        )
+        if recording.candidates
+    )
+    page.result_explorer.recording_table.setCurrentIndex(
+        page.result_explorer.recording_model.index(candidate_recording_row, 0)
+    )
+    assert page.result_explorer.candidate_model.rowCount() > 0
+    assert not page.result_explorer.show_source_button.isEnabled()
+    normal = tmp_path / "results-unavailable-normal.png"
+    assert page.grab().save(str(normal), "PNG") and normal.stat().st_size > 10_000
+    page.resize(700, 780)
+    qtbot.waitUntil(lambda: page.is_compact)
+    qtbot.waitUntil(lambda: page.horizontalScrollBar().maximum() == 0)
+    compact = tmp_path / "results-unavailable-compact.png"
+    assert page.grab().save(str(compact), "PNG") and compact.stat().st_size > 10_000
+    assert partial_path.read_bytes() == partial_bytes
+
+    empty_path = DetectRunRepository(
+        app_data, reopened.active_collection.ref.collection_id
+    ).result_path(empty_run.artifact_id) / "result.json"
+    empty_path.write_bytes(b"{corrupt")
+    reopened.refresh()
+    reopened.select_result(empty_result.result_id)
+    page._set_route("results")
+    assert page.result_explorer.current_state_key == "result-error"
+    assert "unavailable" in page.result_explorer.state_title.text().casefold()
+    assert page.result_explorer.result_error_state.title_widget.isVisible()
+    assert reopened.current_run.error_code == "publication_invalid"
+    assert partial_path.read_bytes() == partial_bytes
+    assert reopened.wait_for_model(30_000)
+    reopened.shutdown()
 
 
 @pytest.mark.qt

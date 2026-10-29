@@ -321,7 +321,12 @@ def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(q
     } <= {
         hint.accessibleName() for hint in shell.detect_page.findChildren(HelpHint)
     }
-    assert len(shell.detect_page.findChildren(QComboBox)) == 2
+    assert len(shell.detect_page.findChildren(QComboBox)) == 3
+    assert not shell.detect_page.result_explorer.history_select.isEnabled()
+    assert (
+        shell.detect_page.result_explorer.history_select.accessibleName()
+        == "Result history"
+    )
     assert not shell.detect_page.start_detection_button.isEnabled()
     assert all(
         not widget.isVisible() for widget in shell.detect_page.findChildren(QProgressBar)

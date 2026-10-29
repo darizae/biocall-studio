@@ -1,6 +1,6 @@
 # ST-08 — Native Results exploration
 
-**Branch:** `detect-st08-results-ux` from reviewed `detect`. **Predecessor:** verified immutable ST-07 Results. **Successor:** ST-09. **Status:** planned.
+**Branch:** `detect-st08-results-ux` from reviewed `detect`. **Predecessor:** verified immutable ST-07 Results. **Successor:** ST-09. **Status:** implemented; awaiting owner review.
 
 ## Scope and ownership
 

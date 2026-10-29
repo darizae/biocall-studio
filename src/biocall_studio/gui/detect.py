@@ -48,6 +48,7 @@ from biocall_studio.detect.inventory import (
     RecordingStatus,
 )
 from biocall_studio.detect.runs import DetectRunStatus
+from biocall_studio.gui.detect_results import ResultExplorer
 
 
 def _duration(row: InventoryRecording) -> str:
@@ -263,10 +264,16 @@ class DetectWorkspacePage(QScrollArea):
         recordings_layout.addStretch()
 
         self.run_view = self._build_run_view()
+        self.result_explorer = ResultExplorer(self.controller)
+        self.result_explorer.run_requested.connect(lambda: self._set_route("run"))
+        self.result_explorer.recordings_requested.connect(
+            lambda: self._set_route("recordings")
+        )
 
         self.route_stack.addWidget(self.setup_view)
         self.route_stack.addWidget(self.recordings_view)
         self.route_stack.addWidget(self.run_view)
+        self.route_stack.addWidget(self.result_explorer)
         self.outer.addWidget(self.route_stack)
         self.outer.addStretch()
         self.setWidget(self.content)
@@ -434,6 +441,12 @@ class DetectWorkspacePage(QScrollArea):
         self.run_button.setAutoExclusive(True)
         self.run_button.clicked.connect(lambda: self._set_route("run"))
         navigation.addWidget(self.run_button)
+        self.results_button = Button("Results", variant="outline", size="small")
+        self.results_button.setAccessibleName("Open Detect Results")
+        self.results_button.setCheckable(True)
+        self.results_button.setAutoExclusive(True)
+        self.results_button.clicked.connect(lambda: self._set_route("results"))
+        navigation.addWidget(self.results_button)
         navigation.addStretch()
         return navigation
 
@@ -1290,6 +1303,8 @@ class DetectWorkspacePage(QScrollArea):
         self._render_run_header()
         self._render_run()
         self._render_model()
+        self.results_button.setEnabled(bool(self.controller.result_history))
+        self.result_explorer.render()
         collection = self.controller.active_collection
         proposal = self.controller.proposal
         self.relink_card.setVisible(
@@ -1368,28 +1383,38 @@ class DetectWorkspacePage(QScrollArea):
             self.new_path.setText(str(proposal.candidate_root))
             self.relink_confirm.setChecked(False)
             self.confirm_relink_button.setEnabled(False)
-        if proposal is not None or decision is not RootBindingDecision.VALID:
+        if (
+            (proposal is not None or decision is not RootBindingDecision.VALID)
+            and self.current_route != "results"
+        ):
             self._set_route("recordings")
-        elif self.controller.inventory_state is InventoryState.SCANNING:
+        elif (
+            self.controller.inventory_state is InventoryState.SCANNING
+            and self.current_route != "results"
+        ):
             self._set_route("recordings")
         self._render_inventory()
         self._render_readiness()
 
     def _set_route(self, route: str) -> None:
-        if route not in {"setup", "recordings", "run"}:
+        if route not in {"setup", "recordings", "run", "results"}:
             raise ValueError(f"Unknown Detect route: {route}")
         if route == "recordings" and not self.recordings_button.isEnabled():
             route = "setup"
+        if route == "results" and not self.results_button.isEnabled():
+            route = "run"
         route_changed = getattr(self, "current_route", None) != route
         self.current_route = route
         self.setup_button.setChecked(route == "setup")
         self.recordings_button.setChecked(route == "recordings")
         self.run_button.setChecked(route == "run")
+        self.results_button.setChecked(route == "results")
         self.route_stack.setCurrentWidget(
             {
                 "setup": self.setup_view,
                 "recordings": self.recordings_view,
                 "run": self.run_view,
+                "results": self.result_explorer,
             }[route]
         )
         if route == "setup":
@@ -1404,7 +1429,7 @@ class DetectWorkspacePage(QScrollArea):
             self.page_description.setText(
                 "Approve the WAVs that belong to this Detect Collection."
             )
-        else:
+        elif route == "run":
             self.page_overline.setText("RUN · CANDIDATE DETECTION")
             self.page_title.setText(
                 "Detect Run"
@@ -1414,6 +1439,13 @@ class DetectWorkspacePage(QScrollArea):
             self.page_description.setText(
                 "Follow Worker progress, cancellation, recovery, and verified publication."
             )
+        else:
+            self.page_overline.setText("METADATA-ONLY RESULTS")
+            self.page_title.setText("Candidate intervals")
+            self.page_description.setText(
+                "Explore immutable intervals in original recording time. No audio is copied "
+                "into a Result."
+            )
         self.setup_button.setAccessibleDescription(
             "Current Detect page" if route == "setup" else "Open Detect setup"
         )
@@ -1422,6 +1454,9 @@ class DetectWorkspacePage(QScrollArea):
         )
         self.run_button.setAccessibleDescription(
             "Current Detect page" if route == "run" else "Open Detect Run details"
+        )
+        self.results_button.setAccessibleDescription(
+            "Current Detect page" if route == "results" else "Open Detect Results"
         )
         self._render_run_header()
         if route_changed:
@@ -1438,6 +1473,9 @@ class DetectWorkspacePage(QScrollArea):
                 else self.run_button
             )
             target.setFocus()
+            return
+        if self.current_route == "results":
+            self.result_explorer.focus_initial()
             return
         picker = self.model_picker if self.current_route == "setup" else self.relink_picker
         buttons = picker.findChildren(QPushButton)
@@ -1519,6 +1557,7 @@ class DetectWorkspacePage(QScrollArea):
             else:
                 self.run_layout.addWidget(self.run_progress_card, 0, 0)
                 self.run_layout.addWidget(self.run_activity_card, 0, 1)
+            self.result_explorer.set_compact(compact)
             for layout in (
                 self.setup_layout,
                 self.settings_layout,
@@ -1527,6 +1566,7 @@ class DetectWorkspacePage(QScrollArea):
                 self.recordings_view.layout(),
                 self.run_layout,
                 self.run_view.layout(),
+                self.result_explorer.layout(),
             ):
                 layout.invalidate()
                 layout.activate()
@@ -1536,6 +1576,7 @@ class DetectWorkspacePage(QScrollArea):
                 self.setup_view,
                 self.recordings_view,
                 self.run_view,
+                self.result_explorer,
                 self.route_stack,
                 self.content,
             ):

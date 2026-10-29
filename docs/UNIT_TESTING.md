@@ -27,8 +27,8 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-DET-013` | exact source-frame/window/hop/overlap arithmetic, resample/padding boundary and invalid config rejection. | TD-WAV, TD-EXPORT | [ST-07](specs/ST-07-cnn-detection.md) |
 | `UT-DET-014` | target score/threshold semantics, interval merge/clamp, non-finite or ambiguous outputs fail. | TD-WAV, TD-EXPORT | [ST-07](specs/ST-07-cnn-detection.md) |
 | `UT-DET-015` | candidate source timestamps, deterministic IDs, immutable Result schema, per-file status validation. | TD-WAV, TD-EXPORT | [ST-07](specs/ST-07-cnn-detection.md) |
-| `UT-DET-016` | **Planned ST-08:** immutable Result-to-view projection, stable selection/Result digest mapping, no cross-Result bleed. | TD-UI, TD-RUN | [ST-08](specs/ST-08-results-ux.md) |
-| `UT-DET-017` | **Planned ST-08:** zero/no-source/file-error/partial/completed statuses and provenance visibility decisions. | TD-UI, TD-RUN | [ST-08](specs/ST-08-results-ux.md) |
+| `UT-DET-016` | immutable Result-to-view projection, stable selection/Result digest mapping, no cross-Result bleed. | TD-UI, TD-RUN | [ST-08](specs/ST-08-results-ux.md) |
+| `UT-DET-017` | zero/no-source/file-error/partial/completed statuses and provenance visibility decisions. | TD-UI, TD-RUN | [ST-08](specs/ST-08-results-ux.md) |
 | `UT-DET-018` | **Planned ST-09:** exact ordered RF feature schema and class/probability-column validation; reject mismatch/nonfinite values. | TD-EXPORT, TD-TRAIN | [ST-09](specs/ST-09-rf-refinement.md) |
 | `UT-DET-019` | **Planned ST-09:** per-candidate accepted/rejected/unscored status and short/stale/error decisions. | TD-EXPORT, TD-TRAIN | [ST-09](specs/ST-09-rf-refinement.md) |
 | `UT-DET-020` | **Planned ST-09:** immutable parent→child lineage, candidate identity, time/provenance and checksum rules. | TD-EXPORT, TD-TRAIN | [ST-09](specs/ST-09-rf-refinement.md) |
