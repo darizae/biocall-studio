@@ -174,6 +174,10 @@ class ModelSnapshot:
     def primary_detection_compatible(self) -> bool:
         return self.role is ModelRole.PRIMARY_DETECTION
 
+    @property
+    def interval_refinement_compatible(self) -> bool:
+        return self.role is ModelRole.INTERVAL_REFINEMENT
+
     def to_dict(self) -> dict[str, object]:
         return {
             "schema_version": self.schema_version,

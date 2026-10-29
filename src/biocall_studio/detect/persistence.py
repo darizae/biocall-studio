@@ -186,6 +186,9 @@ class DetectWorkspaceStore:
         self.settings_path = self.workspace_root / "settings.json"
         self.model_snapshots_root = self.workspace_root / "model-snapshots"
         self.model_selection_path = self.workspace_root / "model-selection.json"
+        self.refinement_model_selection_path = (
+            self.workspace_root / "refinement-model-selection.json"
+        )
 
     def _ensure_storage(self) -> None:
         self.application_data_root.mkdir(parents=True, exist_ok=True)
@@ -199,8 +202,9 @@ class DetectWorkspaceStore:
         ):
             _ensure_directory(path)
 
-    def save_model_reference(self, reference: VerifiedModelReference) -> None:
-        """Persist one private selected path and one immutable path-free snapshot."""
+    def _save_model_reference(
+        self, reference: VerifiedModelReference, selection_path: Path
+    ) -> None:
         self._ensure_storage()
         snapshot_path = self.model_snapshots_root / f"{reference.snapshot.snapshot_id}.json"
         if snapshot_path.is_symlink():
@@ -219,7 +223,7 @@ class DetectWorkspaceStore:
         else:
             _write_json_atomic(snapshot_path, reference.snapshot.to_dict())
         _write_json_atomic(
-            self.model_selection_path,
+            selection_path,
             {
                 "schema_version": _MODEL_SELECTION_SCHEMA_VERSION,
                 "model_root_uri": reference.root.as_uri(),
@@ -227,10 +231,20 @@ class DetectWorkspaceStore:
             },
         )
 
-    def load_model_reference(self) -> VerifiedModelReference | None:
-        if not self.model_selection_path.exists() and not self.model_selection_path.is_symlink():
+    def save_model_reference(self, reference: VerifiedModelReference) -> None:
+        """Persist the primary CNN selection and immutable path-free snapshot."""
+        self._save_model_reference(reference, self.model_selection_path)
+
+    def save_refinement_model_reference(self, reference: VerifiedModelReference) -> None:
+        """Persist the independent optional RF refinement Model selection."""
+        self._save_model_reference(reference, self.refinement_model_selection_path)
+
+    def _load_model_reference(
+        self, selection_path: Path, *, label: str
+    ) -> VerifiedModelReference | None:
+        if not selection_path.exists() and not selection_path.is_symlink():
             return None
-        raw = _read_json(self.model_selection_path, label="Detect Model selection")
+        raw = _read_json(selection_path, label=label)
         expected = {"schema_version", "model_root_uri", "snapshot_id"}
         if (
             not isinstance(raw, dict)
@@ -240,7 +254,7 @@ class DetectWorkspaceStore:
             or _MODEL_SNAPSHOT_ID.fullmatch(raw["snapshot_id"]) is None
             or not isinstance(raw.get("model_root_uri"), str)
         ):
-            raise WorkspaceMetadataError("Detect Model selection is unsupported or invalid.")
+            raise WorkspaceMetadataError(f"{label} is unsupported or invalid.")
         try:
             root = path_from_file_uri(raw["model_root_uri"])
             snapshot = ModelSnapshot.from_dict(
@@ -250,15 +264,31 @@ class DetectWorkspaceStore:
                 )
             )
         except (ValueError, WorkspaceMetadataError) as exc:
-            raise WorkspaceMetadataError(f"Detect Model selection is invalid: {exc}") from exc
+            raise WorkspaceMetadataError(f"{label} is invalid: {exc}") from exc
         if snapshot.snapshot_id != raw["snapshot_id"]:
-            raise WorkspaceMetadataError("Detect Model selection and ModelSnapshot disagree.")
+            raise WorkspaceMetadataError(f"{label} and ModelSnapshot disagree.")
         return VerifiedModelReference(root, snapshot)
+
+    def load_model_reference(self) -> VerifiedModelReference | None:
+        return self._load_model_reference(
+            self.model_selection_path, label="Detect Model selection"
+        )
+
+    def load_refinement_model_reference(self) -> VerifiedModelReference | None:
+        return self._load_model_reference(
+            self.refinement_model_selection_path,
+            label="RF refinement Model selection",
+        )
 
     def clear_model_reference(self) -> None:
         if self.model_selection_path.is_symlink():
             raise WorkspaceMetadataError("Detect Model selection cannot be a symlink.")
         self.model_selection_path.unlink(missing_ok=True)
+
+    def clear_refinement_model_reference(self) -> None:
+        if self.refinement_model_selection_path.is_symlink():
+            raise WorkspaceMetadataError("RF refinement Model selection cannot be a symlink.")
+        self.refinement_model_selection_path.unlink(missing_ok=True)
 
     def paths_for(self, collection_id: str) -> CollectionPaths:
         safe_id = validate_collection_id(collection_id)

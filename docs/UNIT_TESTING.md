@@ -29,9 +29,9 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-DET-015` | candidate source timestamps, deterministic IDs, immutable Result schema, per-file status validation. | TD-WAV, TD-EXPORT | [ST-07](specs/ST-07-cnn-detection.md) |
 | `UT-DET-016` | immutable Result-to-view projection, stable selection/Result digest mapping, no cross-Result bleed. | TD-UI, TD-RUN | [ST-08](specs/ST-08-results-ux.md) |
 | `UT-DET-017` | zero/no-source/file-error/partial/completed statuses and provenance visibility decisions. | TD-UI, TD-RUN | [ST-08](specs/ST-08-results-ux.md) |
-| `UT-DET-018` | **Planned ST-09:** exact ordered RF feature schema and class/probability-column validation; reject mismatch/nonfinite values. | TD-EXPORT, TD-TRAIN | [ST-09](specs/ST-09-rf-refinement.md) |
-| `UT-DET-019` | **Planned ST-09:** per-candidate accepted/rejected/unscored status and short/stale/error decisions. | TD-EXPORT, TD-TRAIN | [ST-09](specs/ST-09-rf-refinement.md) |
-| `UT-DET-020` | **Planned ST-09:** immutable parent→child lineage, candidate identity, time/provenance and checksum rules. | TD-EXPORT, TD-TRAIN | [ST-09](specs/ST-09-rf-refinement.md) |
+| `UT-DET-018` | exact ordered RF feature schema and class/probability-column validation; reject mismatch/nonfinite values. | TD-EXPORT, TD-TRAIN | [ST-09](specs/ST-09-rf-refinement.md) |
+| `UT-DET-019` | per-candidate accepted/rejected/unscored status and short/stale/error decisions. | TD-EXPORT, TD-TRAIN | [ST-09](specs/ST-09-rf-refinement.md) |
+| `UT-DET-020` | immutable parent→child lineage, candidate identity, time/provenance and checksum rules. | TD-EXPORT, TD-TRAIN | [ST-09](specs/ST-09-rf-refinement.md) |
 | `UT-DET-021` | **Planned ST-10:** exact frame/byte/TSV offset arithmetic and output representation without rounding drift. | TD-WAV, TD-PATH | [ST-10](specs/ST-10-corpus-export.md) |
 | `UT-DET-022` | **Planned ST-10:** frozen selected IDs/digests, parent lineage and reproducible provenance ordering. | TD-WAV, TD-PATH | [ST-10](specs/ST-10-corpus-export.md) |
 | `UT-DET-023` | **Planned ST-10:** collision-safe names, mixed-format decision and conservative publish/overwrite policy. | TD-WAV, TD-PATH | [ST-10](specs/ST-10-corpus-export.md) |

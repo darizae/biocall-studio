@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import struct
 import wave
 from dataclasses import dataclass
 from pathlib import Path
 
+import joblib
+import librosa
+import numpy as np
 import pytest
 from alp_ui.components import DataTable, HelpHint
+from bioacoustics_dl_toolbox.audio import load_audio_file
 from bioacoustics_dl_toolbox.prediction import predict_windows
+from bioacoustics_dl_toolbox.rf import compute_rf_features
 from PySide6.QtCore import Qt
 
 from biocall_studio.detect.controller import DetectWorkspaceController, ModelIntakeState
@@ -19,7 +25,7 @@ from biocall_studio.detect.detection import (
     predict_recording_windows,
 )
 from biocall_studio.detect.inventory import InclusionDecision
-from biocall_studio.detect.models import inspect_model_directory
+from biocall_studio.detect.models import ModelFamily, inspect_model_directory
 from biocall_studio.detect.result_views import (
     CandidateViewRow,
     RecordingViewRow,
@@ -27,6 +33,10 @@ from biocall_studio.detect.result_views import (
     ResultSourceState,
 )
 from biocall_studio.detect.results import FileOutcomeStatus
+from biocall_studio.detect.rf_refinement import (
+    RefinementStatus,
+    extract_candidate_features,
+)
 from biocall_studio.detect.run_persistence import DetectRunRepository
 from biocall_studio.detect.runs import DetectRunStatus
 from biocall_studio.gui.detect import DetectWorkspacePage
@@ -40,9 +50,11 @@ from biocall_studio_train.domain.training import (
     freeze_training_config,
 )
 from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio_train.persistence.datasets import load_dataset
 from biocall_studio_train.persistence.models import ModelArtifact
 from biocall_studio_train.workflows.cnn_training import CnnTrainingRequest, train_cnn_model
 from biocall_studio_train.workflows.dataset_build import build_dataset
+from biocall_studio_train.workflows.rf_training import RfTrainingRequest, train_rf_model
 
 pytestmark = pytest.mark.integration
 
@@ -86,6 +98,27 @@ def _cnn_draft() -> TrainingDraft:
         "training.early_stopping_patience_epochs": 2,
         "training.epochs_per_eval": 1,
         "training.pin_memory": False,
+    }.items():
+        draft.set(key, value)
+    return draft
+
+
+def _rf_draft() -> TrainingDraft:
+    draft = TrainingDraft.defaults("rf")
+    for key, value in {
+        "n_estimators": 12,
+        "min_samples_leaf": 1,
+        "rf_threshold": 0.55,
+        "random_state": 42,
+        "n_jobs": 1,
+        "feature_config.sample_rate_hz": 8_000,
+        "feature_config.min_duration_s": 0.5,
+        "feature_config.pad_short_segments": False,
+        "feature_config.n_fft": 256,
+        "feature_config.hop_length": 64,
+        "feature_config.n_mfcc": 4,
+        "feature_config.fmin_hz": 100.0,
+        "feature_config.fmax_hz": 3_500.0,
     }.items():
         draft.set(key, value)
     return draft
@@ -152,6 +185,28 @@ def genuine_cnn(tmp_path_factory) -> _GenuineCnn:
     # libsndfile explicitly rejects the extreme channel count at the decode boundary.
     _write_wav(root / "recordings" / "BROKEN.wav", frames=1, channels=2_048)
     return _GenuineCnn(root, model, parity_wav)
+
+
+@pytest.fixture(scope="module")
+def genuine_rf(genuine_cnn) -> ModelArtifact:
+    dataset = load_dataset(genuine_cnn.root, "dataset-st07-cnn")
+    config = freeze_training_config(
+        _rf_draft(),
+        TrainingDataset.from_artifact(dataset),
+        DeviceCapabilities(cuda=False, mps=False, cpu_count=8),
+    )
+    return train_rf_model(
+        genuine_cnn.root,
+        RfTrainingRequest(
+            run_id="run-st09-rf",
+            request_id="request-st09-rf",
+            collection_root=str(genuine_cnn.root),
+            collection_id=dataset.manifest["collection_id"],
+            config=config,
+            model_id="model-st09-rf",
+            model_label="Genuine ST-09 RF",
+        ),
+    )
 
 
 def _select_inputs(
@@ -318,13 +373,13 @@ def test_native_result_history_recording_candidates_selection_and_keyboard_navig
     assert page.current_route == "results"
     explorer = page.result_explorer
     page.focus_initial()
-    qtbot.waitUntil(lambda: explorer.history_select.control.hasFocus())
+    qtbot.waitUntil(lambda: page.focusWidget() is explorer.history_select.control)
     assert {
         hint.accessibleName() for hint in explorer.findChildren(HelpHint)
     } >= {"More about Result lineage", "More about Result selection"}
     assert isinstance(explorer.recording_table, DataTable)
     assert isinstance(explorer.candidate_table, DataTable)
-    assert explorer.history_select.count() == 2  # original + prepared ST-09 placeholder
+    assert explorer.history_select.count() == 1
     assert explorer.recording_model.rowCount() == len(first_result.recordings)
 
     successful_rows = [
@@ -374,7 +429,7 @@ def test_native_result_history_recording_candidates_selection_and_keyboard_navig
     assert second_run.status is DetectRunStatus.COMPLETED
     assert controller.current_result.candidate_count == 0
     assert len(controller.result_history) == 2
-    assert explorer.history_select.count() == 3  # two Results + prepared placeholder
+    assert explorer.history_select.count() == 2
     assert controller.result_selection.candidate_ids == ()
     controller.select_result(first_result.result_id)
     assert controller.result_selection.candidate_ids == (first_candidate_id,)
@@ -641,4 +696,456 @@ def test_model_replacement_after_freeze_is_rejected_before_result(
     assert record.error_code == "model_changed"
     repository = DetectRunRepository(app_data, controller.active_collection.ref.collection_id)
     assert not repository.result_path(record.artifact_id).exists()
+    controller.shutdown()
+
+
+def _canonical_rf_reference(raw: dict[str, float], *, n_mfcc: int) -> dict[str, float]:
+    robust = (
+        "Dur 90% (s)",
+        "Dur 50% (s)",
+        "Center Freq (Hz)",
+        "Freq 5% (Hz)",
+        "Freq 25% (Hz)",
+        "Freq 75% (Hz)",
+        "Freq 95% (Hz)",
+        "BW 50% (Hz)",
+        "BW 90% (Hz)",
+        "Avg Entropy (bits)",
+        "Agg Entropy (bits)",
+    )
+    mapped = {name: raw[name] for name in robust}
+    for toolbox_prefix, canonical_prefix in (
+        ("MFCC", "mfcc"),
+        ("ΔMFCC", "d_mfcc"),
+        ("ΔΔMFCC", "dd_mfcc"),
+    ):
+        for coefficient in range(1, n_mfcc + 1):
+            mapped[f"{canonical_prefix}{coefficient}_mean"] = raw[
+                f"{toolbox_prefix} {coefficient:02d} mean"
+            ]
+            mapped[f"{canonical_prefix}{coefficient}_std"] = raw[
+                f"{toolbox_prefix} {coefficient:02d} std"
+            ]
+    return mapped
+
+
+@pytest.mark.qt
+def test_real_rf_reference_probability_persists_independent_native_derived_result(
+    qapp, qtbot, genuine_cnn, genuine_rf, tmp_path
+):
+    """Case: IT-DET-017."""
+    source = tmp_path / "rf-result-source"
+    shutil.copytree(genuine_cnn.root / "recordings", source / "recordings")
+    app_data = tmp_path / "application-data"
+    controller = DetectWorkspaceController(app_data)
+    _select_inputs(qtbot, controller, genuine_cnn.model.root, source)
+    controller.start_detection(DetectionSettings(0.0, 0, 0, 4))
+    parent_run = _wait_terminal(qtbot, controller)
+    assert parent_run.status is DetectRunStatus.COMPLETED
+    parent = controller.current_result
+    assert parent is not None and parent.candidate_count > 0
+    repository = DetectRunRepository(app_data, parent.collection_id)
+    parent_path = repository.result_path(parent.result_id) / "result.json"
+    parent_bytes = parent_path.read_bytes()
+    source_bytes = {
+        path.relative_to(source).as_posix(): path.read_bytes()
+        for path in (source / "recordings").glob("*.wav")
+    }
+
+    controller.choose_refinement_model_root(str(genuine_rf.root))
+    qtbot.waitUntil(
+        lambda: controller.refinement_model_state is ModelIntakeState.COMPATIBLE,
+        timeout=30_000,
+    )
+    assert controller.refinement_model_reference is not None
+    assert controller.refinement_model_reference.snapshot.family is ModelFamily.RANDOM_FOREST
+    rf_reference = controller.refinement_model_reference
+
+    controller.start_refinement()
+    child_run = _wait_terminal(qtbot, controller)
+    assert child_run.status is DetectRunStatus.COMPLETED
+    child = repository.load_derived_result(child_run)
+    child.verify_parent(parent)
+    assert child.parent_result_id == parent.result_id
+    assert child.parent_result_digest == parent.result_digest
+    assert child.result_id != parent.result_id
+    assert child.candidate_count == parent.candidate_count
+    assert child.accepted_count + child.rejected_count + child.unscored_count == (
+        parent.candidate_count
+    )
+    assert repository.load_detection_result(parent_run) == parent
+    assert parent_path.read_bytes() == parent_bytes
+    assert source_bytes == {
+        path.relative_to(source).as_posix(): path.read_bytes()
+        for path in (source / "recordings").glob("*.wav")
+    }
+
+    scored = next(
+        candidate
+        for recording in child.recordings
+        for candidate in recording.candidates
+        if candidate.status is not RefinementStatus.UNSCORED
+    )
+    parent_recording = next(
+        recording
+        for recording in parent.recordings
+        if recording.recording_ref == scored.recording_ref
+    )
+    config = dict(rf_reference.snapshot.rf_feature_config)
+    source_path = source / parent_recording.recording_key
+    observed = extract_candidate_features(
+        source_path,
+        source_sample_rate_hz=parent_recording.sample_rate_hz,
+        source_frame_count=parent_recording.frame_count,
+        start_frame=scored.start_frame,
+        end_frame=scored.end_frame,
+        snapshot=rf_reference.snapshot,
+    )
+    assert observed is not None
+
+    signal = np.asarray(load_audio_file(str(source_path), sample_rate=None, mono=True)[0])
+    target_rate = int(config["sample_rate_hz"])
+    if parent_recording.sample_rate_hz != target_rate:
+        signal = np.asarray(
+            librosa.resample(
+                signal,
+                orig_sr=parent_recording.sample_rate_hz,
+                target_sr=target_rate,
+                res_type="soxr_hq",
+                fix=True,
+                scale=False,
+            ),
+            dtype=np.float32,
+        )
+        signal = signal[
+            : round(parent_recording.frame_count * target_rate / parent_recording.sample_rate_hz)
+        ]
+    start = round(scored.start_frame * target_rate / parent_recording.sample_rate_hz)
+    end = round(scored.end_frame * target_rate / parent_recording.sample_rate_hz)
+    segment = signal[start:end]
+    minimum = round(target_rate * float(config["min_duration_s"]))
+    assert segment.shape[0] >= minimum
+    raw = compute_rf_features(
+        segment,
+        target_rate,
+        0.0,
+        segment.shape[0] / target_rate,
+        low_hz=float(config["fmin_hz"]),
+        high_hz=float(config["fmax_hz"]),
+        n_fft=int(config["n_fft"]),
+        hop_length=int(config["hop_length"]),
+        n_mfcc=int(config["n_mfcc"]),
+        include_deltas=bool(config["include_deltas"]),
+        window="hann",
+        center=True,
+    )
+    expected = _canonical_rf_reference(raw, n_mfcc=int(config["n_mfcc"]))
+    assert tuple(expected) == rf_reference.snapshot.rf_feature_names
+    assert observed == pytest.approx(expected, rel=0, abs=1e-10)
+    estimator = joblib.load(
+        rf_reference.root / rf_reference.snapshot.artifact_relative_path
+    )
+    vector = np.asarray([[expected[name] for name in expected]], dtype=np.float64)
+    target_column = list(map(int, estimator.classes_)).index(1)
+    reference_score = float(estimator.predict_proba(vector)[0, target_column])
+    assert scored.rf_target_score == pytest.approx(reference_score, rel=0, abs=1e-12)
+    evidence_value = os.environ.get("BIOCALL_ST09_EVIDENCE_DIR")
+    if evidence_value:
+        evidence = Path(evidence_value)
+        evidence.mkdir(parents=True, exist_ok=True)
+        (evidence / "rf-reference.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "source_recording_key": parent_recording.recording_key,
+                    "source_sha256": parent_recording.source_sha256,
+                    "source_sample_rate_hz": parent_recording.sample_rate_hz,
+                    "source_frame_count": parent_recording.frame_count,
+                    "candidate_id": scored.candidate_id,
+                    "candidate_start_frame": scored.start_frame,
+                    "candidate_end_frame": scored.end_frame,
+                    "toolbox_revision": rf_reference.snapshot.source_revision,
+                    "feature_family": rf_reference.snapshot.rf_feature_family,
+                    "feature_config": config,
+                    "ordered_feature_names": list(expected),
+                    "ordered_feature_values": list(expected.values()),
+                    "estimator_classes": list(map(int, estimator.classes_)),
+                    "target_probability_column": target_column,
+                    "reference_target_probability": reference_score,
+                    "derived_result_target_probability": scored.rf_target_score,
+                    "saved_threshold": child.threshold,
+                    "decision": scored.status.value,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    page = DetectWorkspacePage(controller)
+    qtbot.addWidget(page)
+    page.resize(1180, 790)
+    page.show()
+    page._set_route("results")
+    explorer = page.result_explorer
+    assert explorer.history_select.count() == 2
+    assert {
+        hint.accessibleName() for hint in explorer.findChildren(HelpHint)
+    } >= {"More about RF refinement"}
+    assert explorer.provenance_badge.text() == "Refined"
+    assert child.parent_result_id in explorer.provenance_values["parent"].text()
+    assert explorer.candidate_model.refinement_visible
+    explorer.history_select.control.setFocus()
+    qtbot.keyClick(explorer.history_select.control, Qt.Key.Key_Down)
+    assert controller.selected_result_id == parent.result_id
+    assert not explorer.candidate_model.refinement_visible
+    qtbot.keyClick(explorer.history_select.control, Qt.Key.Key_Up)
+    assert controller.selected_result_id == child.result_id
+    assert explorer.candidate_model.refinement_visible
+    controller.select_result(parent.result_id)
+    assert not explorer.candidate_model.refinement_visible
+    controller.select_result(child.result_id)
+    first_id = next(
+        candidate.candidate_id
+        for recording in child.recordings
+        for candidate in recording.candidates
+    )
+    controller.set_candidate_selected(first_id, True)
+    assert controller.result_selection.candidate_ids == (first_id,)
+    controller.select_result(parent.result_id)
+    assert controller.result_selection.candidate_ids == ()
+    controller.select_result(child.result_id)
+    frozen = controller.freeze_selected_result_selection()
+    assert frozen.result_kind == "derived"
+    assert frozen.parent_result_id == parent.result_id
+    assert frozen.parent_result_digest == parent.result_digest
+    assert frozen.candidate_ids == (first_id,)
+    evidence_value = os.environ.get("BIOCALL_ST09_EVIDENCE_DIR")
+    if evidence_value:
+        evidence = Path(evidence_value)
+        evidence.mkdir(parents=True, exist_ok=True)
+        for result_id, label in (
+            (parent.result_id, "results-original"),
+            (child.result_id, "results-refined"),
+        ):
+            controller.select_result(result_id)
+            candidate_row = next(
+                index
+                for index, recording in enumerate(
+                    controller.selected_result_projection.recordings
+                )
+                if recording.candidates
+            )
+            explorer.recording_table.setCurrentIndex(
+                explorer.recording_model.index(candidate_row, 0)
+            )
+            page.resize(1180, 790)
+            qtbot.waitUntil(lambda: not page.is_compact)
+            page.verticalScrollBar().setValue(0)
+            normal = evidence / f"{label}-normal.png"
+            assert page.grab().save(str(normal), "PNG") and normal.stat().st_size > 10_000
+            page.verticalScrollBar().setValue(page.verticalScrollBar().maximum())
+            normal_detail = evidence / f"{label}-detail-normal.png"
+            assert (
+                page.grab().save(str(normal_detail), "PNG")
+                and normal_detail.stat().st_size > 10_000
+            )
+            page.verticalScrollBar().setValue(page.verticalScrollBar().maximum() * 3 // 5)
+            normal_intervals = evidence / f"{label}-intervals-normal.png"
+            assert (
+                page.grab().save(str(normal_intervals), "PNG")
+                and normal_intervals.stat().st_size > 10_000
+            )
+            page.resize(700, 780)
+            qtbot.waitUntil(lambda: page.is_compact)
+            qtbot.waitUntil(lambda: page.horizontalScrollBar().maximum() == 0)
+            page.verticalScrollBar().setValue(0)
+            compact = evidence / f"{label}-compact.png"
+            assert page.grab().save(str(compact), "PNG") and compact.stat().st_size > 10_000
+            page.verticalScrollBar().setValue(page.verticalScrollBar().maximum())
+            compact_detail = evidence / f"{label}-detail-compact.png"
+            assert (
+                page.grab().save(str(compact_detail), "PNG")
+                and compact_detail.stat().st_size > 10_000
+            )
+            page.verticalScrollBar().setValue(page.verticalScrollBar().maximum() * 3 // 5)
+            compact_intervals = evidence / f"{label}-intervals-compact.png"
+            assert (
+                page.grab().save(str(compact_intervals), "PNG")
+                and compact_intervals.stat().st_size > 10_000
+            )
+    controller.shutdown()
+
+
+@pytest.mark.qt
+def test_rf_wrong_model_unscored_cancel_crash_stale_and_publication_are_atomic(
+    qapp, qtbot, genuine_cnn, genuine_rf, tmp_path
+):
+    """Case: IT-DET-018."""
+    source = tmp_path / "rf-failure-source"
+    shutil.copytree(genuine_cnn.root / "recordings", source / "recordings")
+    app_data = tmp_path / "application-data"
+    controller = DetectWorkspaceController(app_data)
+    _select_inputs(qtbot, controller, genuine_cnn.model.root, source)
+
+    reference = inspect_model_directory(genuine_cnn.model.root)
+    candidate_scores = []
+    for path in sorted((source / "recordings").glob("*.wav")):
+        if path.name == "BROKEN.wav":
+            continue
+        candidate_scores.extend(
+            item.target_score
+            for item in predict_recording_windows(
+                reference, path, DetectionSettings(0.0, 0, 0, 4)
+            )
+        )
+    controller.start_detection(DetectionSettings(max(candidate_scores), 0, 0, 4))
+    parent_run = _wait_terminal(qtbot, controller)
+    assert parent_run.status is DetectRunStatus.COMPLETED
+    parent = controller.current_result
+    assert parent is not None and parent.candidate_count > 0
+    repository = DetectRunRepository(app_data, parent.collection_id)
+    parent_path = repository.result_path(parent.result_id) / "result.json"
+    parent_bytes = parent_path.read_bytes()
+
+    bad_train = tmp_path / "bad-train"
+    bad_models = bad_train / ".alpaca" / "models"
+    bad_models.mkdir(parents=True)
+    shutil.copy2(genuine_cnn.root / ".alpaca" / "collection.json", bad_train / ".alpaca")
+    bad_rf = bad_models / genuine_rf.model_id
+    shutil.copytree(genuine_rf.root, bad_rf)
+    manifest_path = bad_rf / "model.json"
+    manifest = json.loads(manifest_path.read_text())
+    names = manifest["random_forest"]["features"]["names"]
+    names[0], names[1] = names[1], names[0]
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True))
+    controller.choose_refinement_model_root(str(bad_rf))
+    qtbot.waitUntil(
+        lambda: controller.refinement_model_state is ModelIntakeState.INCOMPATIBLE,
+        timeout=30_000,
+    )
+    assert "schema" in controller.refinement_model_reason.casefold()
+    assert parent_path.read_bytes() == parent_bytes
+
+    controller.choose_refinement_model_root(str(genuine_rf.root))
+    qtbot.waitUntil(
+        lambda: controller.refinement_model_state is ModelIntakeState.COMPATIBLE,
+        timeout=30_000,
+    )
+    controller.start_refinement()
+    unscored_run = _wait_terminal(qtbot, controller)
+    assert unscored_run.status is DetectRunStatus.COMPLETED
+    child = repository.load_derived_result(unscored_run)
+    assert child.unscored_count > 0
+    assert {
+        candidate.unscored_reason
+        for recording in child.recordings
+        for candidate in recording.candidates
+        if candidate.status is RefinementStatus.UNSCORED
+    } == {"short_segment"}
+    assert parent_path.read_bytes() == parent_bytes
+
+    page = DetectWorkspacePage(controller)
+    qtbot.addWidget(page)
+    page.resize(1180, 790)
+    page.show()
+    page._set_route("results")
+    explorer = page.result_explorer
+    unscored_recording_id = next(
+        recording.recording_ref
+        for recording in child.recordings
+        if any(
+            candidate.status is RefinementStatus.UNSCORED
+            for candidate in recording.candidates
+        )
+    )
+    unscored_row = explorer.recording_model.row_for_id(unscored_recording_id)
+    explorer.recording_table.setCurrentIndex(
+        explorer.recording_model.index(unscored_row, 0)
+    )
+    unscored_candidate_row = next(
+        row
+        for row, candidate in enumerate(explorer.candidate_model.visible_candidates)
+        if candidate.refinement_status is RefinementStatus.UNSCORED
+    )
+    assert explorer.candidate_model.data(
+        explorer.candidate_model.index(unscored_candidate_row, 4)
+    ) == "Could not assess"
+    explorer.candidate_table.setCurrentIndex(
+        explorer.candidate_model.index(unscored_candidate_row, 0)
+    )
+    assert "shorter" in explorer.candidate_detail_refinement.text()
+    evidence_value = os.environ.get("BIOCALL_ST09_EVIDENCE_DIR")
+    if evidence_value:
+        evidence = Path(evidence_value)
+        evidence.mkdir(parents=True, exist_ok=True)
+        page.verticalScrollBar().setValue(page.verticalScrollBar().maximum() * 3 // 5)
+        unscored_image = evidence / "results-refined-unscored-normal.png"
+        assert (
+            page.grab().save(str(unscored_image), "PNG")
+            and unscored_image.stat().st_size > 10_000
+        )
+
+    controller.select_result(parent.result_id)
+    controller._worker_step_delay_seconds = 0.2
+    controller.start_refinement()
+    qtbot.waitUntil(lambda: controller.is_run_active, timeout=10_000)
+    controller.cancel_active_run()
+    cancelled = _wait_terminal(qtbot, controller)
+    assert cancelled.status is DetectRunStatus.CANCELLED
+    assert not repository.result_path(cancelled.artifact_id).exists()
+    assert parent_path.read_bytes() == parent_bytes
+
+    controller.start_refinement()
+    qtbot.waitUntil(
+        lambda: controller.run_process is not None and controller.run_process.processId() > 0,
+        timeout=10_000,
+    )
+    controller.run_process.kill()
+    crashed = _wait_terminal(qtbot, controller)
+    assert crashed.status is DetectRunStatus.INTERRUPTED
+    assert not repository.result_path(crashed.artifact_id).exists()
+    assert parent_path.read_bytes() == parent_bytes
+
+    request = controller.freeze_refinement_request()
+    collision = repository.result_path(request.artifact_id)
+    collision.mkdir()
+    marker = collision / "existing.txt"
+    marker.write_text("existing\n")
+    controller.start_refinement_request(request)
+    failed = _wait_terminal(qtbot, controller)
+    assert failed.status is DetectRunStatus.FAILED
+    assert failed.error_code == "publication_failed"
+    assert marker.read_text() == "existing\n"
+    assert not repository.staging_path(failed.launch_id).exists()
+    assert parent_path.read_bytes() == parent_bytes
+
+    changed_key = next(
+        recording.recording_key for recording in parent.recordings if recording.candidates
+    )
+    changed_path = source / changed_key
+    unchanged = changed_path.read_bytes()
+    original_stat = changed_path.stat()
+    controller.start_refinement()
+    changed_path.unlink()
+    missing = _wait_terminal(qtbot, controller)
+    assert missing.status is DetectRunStatus.FAILED
+    assert missing.error_code == "input_changed"
+    assert not repository.result_path(missing.artifact_id).exists()
+    assert parent_path.read_bytes() == parent_bytes
+    changed_path.write_bytes(unchanged)
+    os.utime(
+        changed_path,
+        ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns),
+    )
+
+    controller.start_refinement()
+    changed_path.write_bytes(unchanged + b"changed")
+    stale = _wait_terminal(qtbot, controller)
+    assert stale.status is DetectRunStatus.FAILED
+    assert stale.error_code == "input_changed"
+    assert not repository.result_path(stale.artifact_id).exists()
+    assert parent_path.read_bytes() == parent_bytes
+    changed_path.write_bytes(unchanged)
     controller.shutdown()

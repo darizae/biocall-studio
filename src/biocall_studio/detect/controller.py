@@ -60,6 +60,7 @@ from biocall_studio.detect.result_views import (
     project_result,
 )
 from biocall_studio.detect.results import DetectionResult
+from biocall_studio.detect.rf_refinement import ResultArtifact
 from biocall_studio.detect.run_persistence import DetectRunRepository
 from biocall_studio.detect.runs import (
     DetectRunRecord,
@@ -199,6 +200,11 @@ class DetectWorkspaceController(QObject):
         self.scan_progress = InventoryScanProgress("Idle", 0, 0, 0, 0)
         self._scan_thread: _InventoryScanThread | None = None
         self._model_thread: _ModelIntakeThread | None = None
+        self.refinement_model_reference: VerifiedModelReference | None = None
+        self.selected_refinement_model_root: Path | None = None
+        self.refinement_model_state = ModelIntakeState.EMPTY
+        self.refinement_model_reason = "Choose a Random Forest Model published by Train."
+        self._refinement_model_thread: _ModelIntakeThread | None = None
         self._scan_step_delay_seconds = scan_step_delay_seconds
         self._model_step_delay_seconds = model_step_delay_seconds
         self._worker_step_delay_seconds = worker_step_delay_seconds
@@ -206,7 +212,7 @@ class DetectWorkspaceController(QObject):
         self._kill_grace_ms = kill_grace_ms
         self.runs: tuple[DetectRunRecord, ...] = ()
         self.current_run: DetectRunRecord | None = None
-        self.current_result: DetectionResult | None = None
+        self.current_result: ResultArtifact | None = None
         self.result_history: tuple[ResultHistoryItem, ...] = ()
         self.selected_result_id: str | None = None
         self.result_selection: ResultSelection | None = None
@@ -230,6 +236,13 @@ class DetectWorkspaceController(QObject):
     @property
     def is_model_loading(self) -> bool:
         return self._model_thread is not None and self._model_thread.isRunning()
+
+    @property
+    def is_refinement_model_loading(self) -> bool:
+        return (
+            self._refinement_model_thread is not None
+            and self._refinement_model_thread.isRunning()
+        )
 
     @property
     def reservation_owner_id(self) -> str:
@@ -314,6 +327,7 @@ class DetectWorkspaceController(QObject):
             self.metadata_error = str(exc)
         self._load_inventory()
         self._load_model_selection()
+        self._load_refinement_model_selection()
         self._load_runs()
         if emit:
             self.state_changed.emit()
@@ -353,18 +367,23 @@ class DetectWorkspaceController(QObject):
         self.current_result = None
         if self.current_run is not None and self.current_run.status is DetectRunStatus.COMPLETED:
             try:
-                self.current_result = repository.load_detection_result(self.current_run)
+                self.current_result = repository.load_result(self.current_run)
             except ValueError:
                 # ST-06 lifecycle fixtures intentionally are not scientific Results.
                 pass
         self._reload_result_history()
 
-    def _is_detection_run(
+    def _is_result_run(
         self, repository: DetectRunRepository, record: DetectRunRecord
     ) -> bool:
         try:
             request = repository.load_request(record.run_id)
-            DetectionSettings.from_mapping(dict(request.settings))
+            settings = dict(request.settings)
+            try:
+                DetectionSettings.from_mapping(settings)
+            except (TypeError, ValueError):
+                if settings.get("run_kind") != "rf_refinement":
+                    return False
         except (OSError, TypeError, ValueError):
             return False
         return True
@@ -378,11 +397,11 @@ class DetectWorkspaceController(QObject):
             return
         history: list[ResultHistoryItem] = []
         for record in self.runs:
-            if not self._is_detection_run(repository, record):
+            if not self._is_result_run(repository, record):
                 continue
             if record.status is DetectRunStatus.COMPLETED:
                 try:
-                    result = repository.load_detection_result(record)
+                    result = repository.load_result(record)
                 except (OSError, ValueError):
                     history.append(
                         ResultHistoryItem(
@@ -440,7 +459,7 @@ class DetectWorkspaceController(QObject):
             None,
         )
 
-    def _source_state_for(self, result: DetectionResult) -> ResultSourceState:
+    def _source_state_for(self, result: ResultArtifact) -> ResultSourceState:
         collection = self.active_collection
         snapshot = self.snapshot
         if collection is None or self.root_decision is not RootBindingDecision.VALID:
@@ -463,6 +482,22 @@ class DetectWorkspaceController(QObject):
         return project_result(
             item.result,
             source_state=self._source_state_for(item.result),
+        )
+
+    @property
+    def can_refine_selected_result(self) -> bool:
+        item = self.selected_result_item
+        projection = self.selected_result_projection
+        return (
+            item is not None
+            and isinstance(item.result, DetectionResult)
+            and item.result.candidate_count > 0
+            and projection is not None
+            and projection.source_state is ResultSourceState.AVAILABLE
+            and self.refinement_model_state is ModelIntakeState.COMPATIBLE
+            and self.refinement_model_reference is not None
+            and not self.is_refinement_model_loading
+            and not self.is_run_active
         )
 
     def _load_result_selection(self) -> None:
@@ -693,6 +728,138 @@ class DetectWorkspaceController(QObject):
     def _model_finished(self, thread: _ModelIntakeThread) -> None:
         if self._model_thread is thread:
             self._model_thread = None
+            self.state_changed.emit()
+            self._maybe_finish_shutdown()
+
+    def _load_refinement_model_selection(self) -> None:
+        if self.is_refinement_model_loading:
+            return
+        try:
+            reference = self.store.load_refinement_model_reference()
+        except WorkspaceMetadataError as exc:
+            self.refinement_model_reference = None
+            self.selected_refinement_model_root = None
+            self.refinement_model_state = ModelIntakeState.INCOMPATIBLE
+            self.refinement_model_reason = str(exc)
+            return
+        if reference is None:
+            self.refinement_model_reference = None
+            self.selected_refinement_model_root = None
+            self.refinement_model_state = ModelIntakeState.EMPTY
+            self.refinement_model_reason = (
+                "Choose a Random Forest Model published by Train."
+            )
+            return
+        self.refinement_model_reference = reference
+        self.selected_refinement_model_root = reference.root
+        self._start_refinement_model_inspection(reference.root, previous=reference)
+
+    def _start_refinement_model_inspection(
+        self,
+        root: Path,
+        *,
+        previous: VerifiedModelReference | None = None,
+    ) -> None:
+        self.refinement_model_state = ModelIntakeState.LOADING
+        self.refinement_model_reason = (
+            "Checking RF Model information, checksums, features, and class order."
+        )
+        thread = _ModelIntakeThread(root, previous, self._model_step_delay_seconds)
+        self._refinement_model_thread = thread
+        thread.reference_ready.connect(self._refinement_model_ready)
+        thread.missing.connect(self._refinement_model_missing)
+        thread.failed.connect(self._refinement_model_failed)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(lambda: self._refinement_model_finished(thread))
+        thread.start()
+
+    def choose_refinement_model_root(self, value: str) -> None:
+        if (
+            not value
+            or self.is_refinement_model_loading
+            or self._active_run_blocks_input_change()
+        ):
+            return
+        candidate = Path(value).expanduser()
+        if (
+            self.selected_refinement_model_root is not None
+            and candidate.resolve(strict=False)
+            == self.selected_refinement_model_root.resolve(strict=False)
+        ):
+            return
+        try:
+            self.store.clear_refinement_model_reference()
+        except (OSError, WorkspaceMetadataError) as exc:
+            self.refinement_model_state = ModelIntakeState.INCOMPATIBLE
+            self.refinement_model_reason = (
+                f"The RF Model selection could not be updated: {exc}"
+            )
+            self.state_changed.emit()
+            return
+        self.refinement_model_reference = None
+        self.selected_refinement_model_root = candidate.resolve(strict=False)
+        self._start_refinement_model_inspection(candidate)
+        self.state_changed.emit()
+
+    def clear_refinement_model_selection(self) -> None:
+        if self.is_refinement_model_loading or self._active_run_blocks_input_change():
+            return
+        try:
+            self.store.clear_refinement_model_reference()
+        except (OSError, WorkspaceMetadataError) as exc:
+            self.refinement_model_state = ModelIntakeState.INCOMPATIBLE
+            self.refinement_model_reason = (
+                f"The RF Model selection could not be cleared: {exc}"
+            )
+        else:
+            self.refinement_model_reference = None
+            self.selected_refinement_model_root = None
+            self.refinement_model_state = ModelIntakeState.EMPTY
+            self.refinement_model_reason = (
+                "Choose a Random Forest Model published by Train."
+            )
+        self.state_changed.emit()
+
+    def _refinement_model_ready(self, reference: VerifiedModelReference) -> None:
+        try:
+            self.store.save_refinement_model_reference(reference)
+        except (OSError, ValueError, WorkspaceMetadataError) as exc:
+            self.refinement_model_reference = None
+            self.refinement_model_state = ModelIntakeState.INCOMPATIBLE
+            self.refinement_model_reason = (
+                f"Verified RF Model information could not be saved: {exc}"
+            )
+        else:
+            self.refinement_model_reference = reference
+            self.selected_refinement_model_root = reference.root
+            if reference.snapshot.interval_refinement_compatible:
+                self.refinement_model_state = ModelIntakeState.COMPATIBLE
+                self.refinement_model_reason = (
+                    "RF Model files, ordered features, and class mapping are verified."
+                )
+            else:
+                self.refinement_model_state = ModelIntakeState.INCOMPATIBLE
+                self.refinement_model_reason = (
+                    "This CNN Model finds candidates but cannot refine candidate intervals. "
+                    "Choose a Random Forest Model."
+                )
+        self.state_changed.emit()
+
+    def _refinement_model_missing(self, _message: str) -> None:
+        self.refinement_model_state = ModelIntakeState.MISSING
+        self.refinement_model_reason = (
+            "The selected RF Model folder or a declared file is missing. Choose it again."
+        )
+        self.state_changed.emit()
+
+    def _refinement_model_failed(self, message: str) -> None:
+        self.refinement_model_state = ModelIntakeState.INCOMPATIBLE
+        self.refinement_model_reason = message or "The selected RF Model is not compatible."
+        self.state_changed.emit()
+
+    def _refinement_model_finished(self, thread: _ModelIntakeThread) -> None:
+        if self._refinement_model_thread is thread:
+            self._refinement_model_thread = None
             self.state_changed.emit()
             self._maybe_finish_shutdown()
 
@@ -946,6 +1113,12 @@ class DetectWorkspaceController(QObject):
             return True
         return thread.wait(milliseconds)
 
+    def wait_for_refinement_model(self, milliseconds: int = 3_000) -> bool:
+        thread = self._refinement_model_thread
+        if thread is None:
+            return True
+        return thread.wait(milliseconds)
+
     def start_lifecycle_fixture(
         self,
         request: DetectRunRequest,
@@ -1145,6 +1318,159 @@ class DetectWorkspaceController(QObject):
         )
         return record.run_id
 
+    def freeze_refinement_request(self) -> DetectRunRequest:
+        """Freeze one original CNN Result and one independently selected RF Model."""
+        item = self.selected_result_item
+        parent = None if item is None else item.result
+        collection = self.active_collection
+        snapshot = self.snapshot
+        model = self.refinement_model_reference
+        if (
+            not self.can_refine_selected_result
+            or not isinstance(parent, DetectionResult)
+            or collection is None
+            or snapshot is None
+            or model is None
+        ):
+            raise ValueError(
+                "Choose an available original Result and compatible RF Model before refining."
+            )
+        token = uuid.uuid4().hex
+        selected_keys = tuple(
+            sorted(
+                recording.recording_key
+                for recording in parent.recordings
+                if recording.candidates
+            )
+        )
+        return DetectRunRequest.create(
+            run_id=f"drun_{token}",
+            request_id=f"dreq_{uuid.uuid4().hex}",
+            launch_id=f"launch_{uuid.uuid4().hex}",
+            reservation_owner_id=self.reservation_owner_id,
+            collection_id=parent.collection_id,
+            binding_revision=parent.binding_revision,
+            inventory_id=parent.inventory_id,
+            inventory_digest=parent.inventory_digest,
+            selected_recording_keys=selected_keys,
+            model_snapshot_id=model.snapshot.snapshot_id,
+            model_digest=canonical_digest(model.snapshot.to_dict()),
+            settings={
+                "parent_result_digest": parent.result_digest,
+                "parent_result_id": parent.result_id,
+                "run_kind": "rf_refinement",
+            },
+            artifact_id=f"pub_{uuid.uuid4().hex}",
+        )
+
+    def start_refinement(self) -> str:
+        return self.start_refinement_request(self.freeze_refinement_request())
+
+    def start_refinement_request(self, request: DetectRunRequest) -> str:
+        """Launch RF scoring only for candidates in one immutable original Result."""
+        item = self.selected_result_item
+        parent = None if item is None else item.result
+        collection = self.active_collection
+        snapshot = self.snapshot
+        model = self.refinement_model_reference
+        if (
+            not isinstance(parent, DetectionResult)
+            or collection is None
+            or snapshot is None
+            or model is None
+        ):
+            raise ValueError("An original Result, inventory, and RF Model are required.")
+        if self.is_scanning or self.is_model_loading or self.is_refinement_model_loading:
+            raise RunConflictError("Wait for current input preparation before refining.")
+        if self.is_run_active or (
+            self._run_process is not None
+            and self._run_process.state() is not QProcess.ProcessState.NotRunning
+        ):
+            raise RunConflictError("Only one Active Detect Run is allowed.")
+        selected_keys = tuple(
+            sorted(
+                recording.recording_key
+                for recording in parent.recordings
+                if recording.candidates
+            )
+        )
+        if (
+            dict(request.settings)
+            != {
+                "parent_result_digest": parent.result_digest,
+                "parent_result_id": parent.result_id,
+                "run_kind": "rf_refinement",
+            }
+            or request.reservation_owner_id != self.reservation_owner_id
+            or request.collection_id != parent.collection_id
+            or request.collection_id != collection.ref.collection_id
+            or request.binding_revision != parent.binding_revision
+            or request.binding_revision != collection.ref.binding_revision
+            or request.inventory_id != parent.inventory_id
+            or request.inventory_id != snapshot.inventory_id
+            or request.inventory_digest != parent.inventory_digest
+            or request.inventory_digest != snapshot.digest
+            or request.selected_recording_keys != selected_keys
+            or request.model_snapshot_id != model.snapshot.snapshot_id
+            or request.model_digest != canonical_digest(model.snapshot.to_dict())
+        ):
+            raise ValueError("RF refinement request does not match its frozen inputs.")
+        if (
+            self._source_state_for(parent) is not ResultSourceState.AVAILABLE
+            or self.root_decision is not RootBindingDecision.VALID
+            or not snapshot_is_quickly_current(collection.source_root, snapshot)
+        ):
+            raise ValueError("Recordings changed; rescan before refining this Result.")
+
+        repository = DetectRunRepository(
+            self.store.application_data_root, collection.ref.collection_id
+        )
+        record = repository.create(
+            request,
+            title="Refine candidate intervals",
+            stages=(
+                "Verify parent and RF Model",
+                "Assess candidate intervals",
+                "Verify immutable child Result",
+            ),
+        )
+        self._run_repository = repository
+        self._selection_store = ResultSelectionStore(repository.collection_root)
+        self.current_result = None
+        self._cache_run(record, persist=False)
+        self._diagnostic(
+            "run_reserved",
+            "RF refinement Run inputs frozen and reserved",
+            record=record,
+            status=record.status.value,
+        )
+
+        process = QProcess(self)
+        self._run_process = process
+        self._run_stdout_buffer = b""
+        self._run_stderr = BoundedStderrCapture()
+        self._run_error_code = ""
+        self._protocol_error = ""
+        process.setProcessChannelMode(QProcess.ProcessChannelMode.SeparateChannels)
+        process.started.connect(self._on_run_process_started)
+        process.readyReadStandardOutput.connect(self._on_run_stdout)
+        process.readyReadStandardError.connect(self._on_run_stderr)
+        process.errorOccurred.connect(self._on_run_process_error)
+        process.finished.connect(self._on_run_finished)
+        program, arguments = self._refinement_worker_command(
+            repository.request_path(record.run_id)
+        )
+        process.setProgram(program)
+        process.setArguments(arguments)
+        process.start()
+        self._diagnostic(
+            "worker_launch_requested",
+            "RF candidate refinement Worker launch requested",
+            record=record,
+            status=record.status.value,
+        )
+        return record.run_id
+
     def _fixture_worker_command(self, request_path: Path, behavior: str) -> tuple[str, list[str]]:
         return (
             sys.executable,
@@ -1168,6 +1494,21 @@ class DetectWorkspaceController(QObject):
             [
                 "-m",
                 "biocall_studio.detect.detection_worker",
+                "--request",
+                str(request_path),
+                "--owner-lease",
+                str(self._owner_lease.path),
+                "--step-delay",
+                str(self._worker_step_delay_seconds),
+            ],
+        )
+
+    def _refinement_worker_command(self, request_path: Path) -> tuple[str, list[str]]:
+        return (
+            sys.executable,
+            [
+                "-m",
+                "biocall_studio.detect.refinement_worker",
                 "--request",
                 str(request_path),
                 "--owner-lease",
@@ -1294,6 +1635,9 @@ class DetectWorkspaceController(QObject):
                 "Frozen inputs validated",
                 "Analyzing recordings",
                 "Verifying immutable Result",
+                "Parent, recordings, and RF Model verified",
+                "Assessing candidate intervals",
+                "Verifying immutable child Result",
             }
             message = event.get("message")
             if message not in messages:
@@ -1318,6 +1662,7 @@ class DetectWorkspaceController(QObject):
                 "publication_failed",
                 "input_changed",
                 "model_changed",
+                "parent_changed",
                 "no_successful_files",
             }:
                 self._run_error_code = code
@@ -1365,8 +1710,8 @@ class DetectWorkspaceController(QObject):
 
         receipt = repository.verified_receipt(record, recover_missing=True)
         if receipt is not None:
-            if receipt.artifact_kind == "detection_result":
-                self.current_result = repository.load_detection_result(record)
+            if receipt.artifact_kind in {"detection_result", "derived_result"}:
+                self.current_result = repository.load_result(record)
                 message = "Completed · metadata-only Result verified and published"
             else:
                 self.current_result = None
@@ -1403,6 +1748,9 @@ class DetectWorkspaceController(QObject):
                     "A frozen recording changed or became unavailable. Rescan before retrying."
                 ),
                 "model_changed": "The selected Model changed. Choose and verify it again.",
+                "parent_changed": (
+                    "The original Result is missing or changed and cannot be refined."
+                ),
                 "no_successful_files": (
                     "No recording could be analyzed successfully; no Result was published."
                 ),
@@ -1424,7 +1772,10 @@ class DetectWorkspaceController(QObject):
         if updated.status is not DetectRunStatus.COMPLETED:
             repository.cleanup_staging(updated)
         self._cache_run(updated)
-        if receipt is not None and receipt.artifact_kind == "detection_result":
+        if receipt is not None and receipt.artifact_kind in {
+            "detection_result",
+            "derived_result",
+        }:
             self._reload_result_history(preferred_result_id=receipt.artifact_id)
             self.state_changed.emit()
         self._diagnostic(
@@ -1510,6 +1861,7 @@ class DetectWorkspaceController(QObject):
             and not self.is_run_active
             and not self.is_scanning
             and not self.is_model_loading
+            and not self.is_refinement_model_loading
         )
 
     def request_shutdown(self) -> None:

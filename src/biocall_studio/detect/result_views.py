@@ -15,12 +15,18 @@ from biocall_studio.detect.results import (
     DetectionResult,
     FileOutcomeStatus,
     RecordingOutcome,
-    ResultCompleteness,
+)
+from biocall_studio.detect.rf_refinement import (
+    DerivedRecording,
+    DerivedResult,
+    RefinedCandidate,
+    RefinementStatus,
+    ResultArtifact,
 )
 from biocall_studio.detect.runs import utc_now
 
 RESULT_SELECTION_SCHEMA_VERSION = 1
-FROZEN_RESULT_SELECTION_SCHEMA_VERSION = 1
+FROZEN_RESULT_SELECTION_SCHEMA_VERSION = 2
 MAX_SELECTED_CANDIDATES = 100_000
 MAX_SELECTION_BYTES = 1_048_576
 _RESULT_ID = re.compile(r"pub_[0-9a-f]{32}")
@@ -65,6 +71,9 @@ class CandidateViewRow:
     end_time_ns: int
     max_target_score: float
     contributing_windows: int
+    refinement_status: RefinementStatus | None = None
+    rf_target_score: float | None = None
+    unscored_reason: str = ""
 
     @classmethod
     def from_candidate(cls, candidate: CandidateInterval) -> CandidateViewRow:
@@ -77,6 +86,22 @@ class CandidateViewRow:
             end_time_ns=candidate.end_time_ns,
             max_target_score=candidate.max_target_score,
             contributing_windows=candidate.contributing_windows,
+        )
+
+    @classmethod
+    def from_refined_candidate(cls, candidate: RefinedCandidate) -> CandidateViewRow:
+        return cls(
+            candidate_id=candidate.candidate_id,
+            recording_id=candidate.recording_ref,
+            start_frame=candidate.start_frame,
+            end_frame=candidate.end_frame,
+            start_time_ns=candidate.start_time_ns,
+            end_time_ns=candidate.end_time_ns,
+            max_target_score=candidate.max_target_score,
+            contributing_windows=candidate.contributing_windows,
+            refinement_status=candidate.status,
+            rf_target_score=candidate.rf_target_score,
+            unscored_reason=candidate.unscored_reason,
         )
 
 
@@ -109,9 +134,27 @@ class RecordingViewRow:
             ),
         )
 
+    @classmethod
+    def from_derived(cls, outcome: DerivedRecording) -> RecordingViewRow:
+        return cls(
+            recording_id=outcome.recording_ref,
+            source_relative_name=outcome.recording_key,
+            source_sha256=outcome.source_sha256,
+            sample_rate_hz=outcome.sample_rate_hz,
+            frame_count=outcome.frame_count,
+            channels=outcome.channels,
+            outcome=outcome.parent_status,
+            error_code=outcome.parent_error_code,
+            candidates=tuple(
+                CandidateViewRow.from_refined_candidate(candidate)
+                for candidate in outcome.candidates
+            ),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class ResultViewProjection:
+    result_kind: str
     result_id: str
     result_digest: str
     run_id: str
@@ -130,6 +173,12 @@ class ResultViewProjection:
     score_semantics: str
     source_time_semantics: str
     recordings: tuple[RecordingViewRow, ...]
+    parent_result_id: str | None
+    parent_result_digest: str | None
+    accepted_count: int | None
+    rejected_count: int | None
+    unscored_count: int | None
+    threshold: float | None
 
     @property
     def provenance_visible(self) -> bool:
@@ -154,7 +203,7 @@ class ResultHistoryItem:
     run_id: str
     created_at: str
     state: ResultHistoryState
-    result: DetectionResult | None
+    result: ResultArtifact | None
     message: str
 
     def __post_init__(self) -> None:
@@ -176,17 +225,17 @@ class ResultHistoryItem:
 
 
 def project_result(
-    result: DetectionResult,
+    result: ResultArtifact,
     *,
     source_state: ResultSourceState,
 ) -> ResultViewProjection:
     """Copy only persisted immutable facts into a Qt-independent view contract."""
-    if not isinstance(result, DetectionResult):
-        raise TypeError("Result projection requires a DetectionResult.")
+    if not isinstance(result, (DetectionResult, DerivedResult)):
+        raise TypeError("Result projection requires a persisted scientific Result.")
     source_state = ResultSourceState(source_state)
     content_state = (
         ResultContentState.PARTIAL
-        if result.completeness is ResultCompleteness.PARTIAL
+        if result.failed_files
         else (
             ResultContentState.EMPTY
             if result.candidate_count == 0
@@ -194,6 +243,7 @@ def project_result(
         )
     )
     return ResultViewProjection(
+        result_kind="derived" if isinstance(result, DerivedResult) else "original",
         result_id=result.result_id,
         result_digest=result.result_digest,
         run_id=result.run_id,
@@ -201,8 +251,14 @@ def project_result(
         binding_revision=result.binding_revision,
         inventory_id=result.inventory_id,
         inventory_digest=result.inventory_digest,
-        model_id=result.model_id,
-        model_snapshot_id=result.model_snapshot_id,
+        model_id=(
+            result.rf_model_id if isinstance(result, DerivedResult) else result.model_id
+        ),
+        model_snapshot_id=(
+            result.rf_model_snapshot_id
+            if isinstance(result, DerivedResult)
+            else result.model_snapshot_id
+        ),
         completed_at=result.completed_at,
         content_state=content_state,
         source_state=source_state,
@@ -212,9 +268,29 @@ def project_result(
         score_semantics=result.score_semantics,
         source_time_semantics=result.source_time_semantics,
         recordings=tuple(
-            RecordingViewRow.from_outcome(recording)
+            (
+                RecordingViewRow.from_derived(recording)
+                if isinstance(recording, DerivedRecording)
+                else RecordingViewRow.from_outcome(recording)
+            )
             for recording in result.recordings
         ),
+        parent_result_id=(
+            result.parent_result_id if isinstance(result, DerivedResult) else None
+        ),
+        parent_result_digest=(
+            result.parent_result_digest if isinstance(result, DerivedResult) else None
+        ),
+        accepted_count=(
+            result.accepted_count if isinstance(result, DerivedResult) else None
+        ),
+        rejected_count=(
+            result.rejected_count if isinstance(result, DerivedResult) else None
+        ),
+        unscored_count=(
+            result.unscored_count if isinstance(result, DerivedResult) else None
+        ),
+        threshold=result.threshold if isinstance(result, DerivedResult) else None,
     )
 
 
@@ -254,7 +330,7 @@ class ResultSelection:
             raise ResultSelectionError("Result selection timestamp must be UTC.")
 
     @classmethod
-    def empty(cls, result: DetectionResult) -> ResultSelection:
+    def empty(cls, result: ResultArtifact) -> ResultSelection:
         return cls(
             RESULT_SELECTION_SCHEMA_VERSION,
             result.result_id,
@@ -309,6 +385,9 @@ class FrozenResultSelection:
     schema_version: int
     result_id: str
     result_digest: str
+    result_kind: str
+    parent_result_id: str | None
+    parent_result_digest: str | None
     selection_revision: int
     candidate_ids: tuple[str, ...]
 
@@ -322,6 +401,18 @@ class FrozenResultSelection:
             or _SHA256.fullmatch(self.result_digest) is None
         ):
             raise ResultSelectionError("Frozen Result selection digest is invalid.")
+        if self.result_kind not in {"original", "derived"}:
+            raise ResultSelectionError("Frozen Result selection kind is invalid.")
+        if self.result_kind == "original":
+            if self.parent_result_id is not None or self.parent_result_digest is not None:
+                raise ResultSelectionError("Original Result selection cannot contain lineage.")
+        elif (
+            not isinstance(self.parent_result_id, str)
+            or _RESULT_ID.fullmatch(self.parent_result_id) is None
+            or not isinstance(self.parent_result_digest, str)
+            or _SHA256.fullmatch(self.parent_result_digest) is None
+        ):
+            raise ResultSelectionError("Derived Result selection requires parent lineage.")
         if type(self.selection_revision) is not int or self.selection_revision < 0:
             raise ResultSelectionError("Frozen Result selection revision is invalid.")
         if (
@@ -340,6 +431,9 @@ class FrozenResultSelection:
             "schema_version": self.schema_version,
             "result_id": self.result_id,
             "result_digest": self.result_digest,
+            "result_kind": self.result_kind,
+            "parent_result_id": self.parent_result_id,
+            "parent_result_digest": self.parent_result_digest,
             "selection_revision": self.selection_revision,
             "candidate_ids": list(self.candidate_ids),
         }
@@ -350,6 +444,9 @@ class FrozenResultSelection:
             "schema_version",
             "result_id",
             "result_digest",
+            "result_kind",
+            "parent_result_id",
+            "parent_result_digest",
             "selection_revision",
             "candidate_ids",
         }
@@ -365,7 +462,7 @@ class FrozenResultSelection:
 
 
 def _ordered_candidate_ids(
-    result: DetectionResult, candidate_ids: tuple[str, ...] | list[str] | set[str]
+    result: ResultArtifact, candidate_ids: tuple[str, ...] | list[str] | set[str]
 ) -> tuple[str, ...]:
     requested = tuple(candidate_ids)
     if len(requested) != len(set(requested)):
@@ -383,7 +480,7 @@ def _ordered_candidate_ids(
 
 
 def freeze_result_selection(
-    result: DetectionResult, selection: ResultSelection
+    result: ResultArtifact, selection: ResultSelection
 ) -> FrozenResultSelection:
     if (
         selection.result_id != result.result_id
@@ -395,6 +492,9 @@ def freeze_result_selection(
         FROZEN_RESULT_SELECTION_SCHEMA_VERSION,
         result.result_id,
         result.result_digest,
+        "derived" if isinstance(result, DerivedResult) else "original",
+        result.parent_result_id if isinstance(result, DerivedResult) else None,
+        result.parent_result_digest if isinstance(result, DerivedResult) else None,
         selection.selection_revision,
         ordered,
     )
@@ -484,7 +584,7 @@ class ResultSelectionStore:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
 
-    def read(self, result: DetectionResult) -> ResolvedResultSelection:
+    def read(self, result: ResultArtifact) -> ResolvedResultSelection:
         stored = self._load(result.result_id)
         if stored is None:
             return ResolvedResultSelection(
@@ -534,7 +634,7 @@ class ResultSelectionStore:
 
     def replace(
         self,
-        result: DetectionResult,
+        result: ResultArtifact,
         candidate_ids: tuple[str, ...] | list[str] | set[str],
     ) -> ResultSelection:
         ordered = _ordered_candidate_ids(result, candidate_ids)

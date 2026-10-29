@@ -12,10 +12,13 @@ from pathlib import Path
 from biocall_studio.detect.domain import detect_workspace_path, validate_collection_id
 from biocall_studio.detect.publication import (
     discard_staging,
+    load_derived_result,
     load_detection_result,
+    load_result_artifact,
     publication_matches_request,
 )
 from biocall_studio.detect.results import DetectionResult
+from biocall_studio.detect.rf_refinement import DerivedResult, ResultArtifact
 from biocall_studio.detect.runs import (
     DetectRunRecord,
     DetectRunRequest,
@@ -400,6 +403,39 @@ class DetectRunRepository:
             or result.model_snapshot_digest != request.model_digest
         ):
             raise ValueError("Detection Result does not match its immutable Run request.")
+        return result
+
+    def load_derived_result(self, record: DetectRunRecord) -> DerivedResult:
+        """Independently reopen a child Result and its checksum-valid parent lineage."""
+        receipt = self.load_receipt(record)
+        if receipt.artifact_kind != "derived_result":
+            raise ValueError("The completed Run did not publish a Derived Result.")
+        result = load_derived_result(self.collection_root, receipt.artifact_id)
+        request = self.load_request(record.run_id)
+        if (
+            result.run_id != request.run_id
+            or result.request_id != request.request_id
+            or result.collection_id != request.collection_id
+            or result.binding_revision != request.binding_revision
+            or result.inventory_id != request.inventory_id
+            or result.inventory_digest != request.inventory_digest
+            or result.rf_model_snapshot_id != request.model_snapshot_id
+            or result.rf_model_snapshot_digest != request.model_digest
+            or dict(request.settings)
+            != {
+                "parent_result_digest": result.parent_result_digest,
+                "parent_result_id": result.parent_result_id,
+                "run_kind": "rf_refinement",
+            }
+        ):
+            raise ValueError("Derived Result does not match its immutable Run request.")
+        return result
+
+    def load_result(self, record: DetectRunRecord) -> ResultArtifact:
+        receipt = self.load_receipt(record)
+        result = load_result_artifact(self.collection_root, receipt.artifact_id)
+        if result.run_id != record.run_id:
+            raise ValueError("Scientific Result does not match its completed Run.")
         return result
 
     def cleanup_staging(self, record: DetectRunRecord) -> None:

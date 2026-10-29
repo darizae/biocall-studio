@@ -13,6 +13,7 @@ from alp_ui.components import (
     Card,
     DataTable,
     EmptyState,
+    FolderPicker,
     HelpHint,
     SelectInput,
     Text,
@@ -25,7 +26,7 @@ from PySide6.QtCore import (
     QUrl,
     Signal,
 )
-from PySide6.QtGui import QDesktopServices, QStandardItemModel
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QGridLayout,
@@ -38,7 +39,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from biocall_studio.detect.controller import DetectWorkspaceController
+from biocall_studio.detect.controller import DetectWorkspaceController, ModelIntakeState
 from biocall_studio.detect.result_views import (
     CandidateViewRow,
     RecordingViewRow,
@@ -48,6 +49,7 @@ from biocall_studio.detect.result_views import (
     ResultViewProjection,
 )
 from biocall_studio.detect.results import FileOutcomeStatus
+from biocall_studio.detect.rf_refinement import DerivedResult, RefinementStatus
 
 
 def _source_time(nanoseconds: int) -> str:
@@ -102,10 +104,10 @@ class RecordingResultModel(QAbstractTableModel):
         outcome = (
             "File error"
             if recording.outcome is FileOutcomeStatus.FAILED
-            else ("Completed · none found" if not recording.candidates else "Completed")
+            else ("None found" if not recording.candidates else "Completed")
         )
         values = (
-            recording.source_relative_name,
+            Path(recording.source_relative_name).name,
             outcome,
             "—" if recording.outcome is FileOutcomeStatus.FAILED else len(recording.candidates),
             _duration(recording),
@@ -128,7 +130,8 @@ class RecordingResultModel(QAbstractTableModel):
 
 
 class CandidateResultModel(QAbstractTableModel):
-    HEADERS = ("SELECT", "CANDIDATE ID", "START", "END", "DETECTION SCORE")
+    ORIGINAL_HEADERS = ("SELECT", "START", "END", "DETECTION SCORE")
+    REFINED_HEADERS = (*ORIGINAL_HEADERS, "REFINEMENT")
 
     def __init__(
         self,
@@ -143,6 +146,11 @@ class CandidateResultModel(QAbstractTableModel):
         self._candidates: tuple[CandidateViewRow, ...] = ()
         self._selected_ids: frozenset[str] = frozenset()
         self._visible = 0
+        self.refinement_visible = False
+
+    @property
+    def headers(self) -> tuple[str, ...]:
+        return self.REFINED_HEADERS if self.refinement_visible else self.ORIGINAL_HEADERS
 
     @property
     def visible_candidates(self) -> tuple[CandidateViewRow, ...]:
@@ -152,9 +160,16 @@ class CandidateResultModel(QAbstractTableModel):
         self,
         recording: RecordingViewRow | None,
         selected_ids: tuple[str, ...],
+        *,
+        refined: bool | None = None,
     ) -> None:
         self.beginResetModel()
         self._candidates = () if recording is None else recording.candidates
+        self.refinement_visible = (
+            any(candidate.refinement_status is not None for candidate in self._candidates)
+            if refined is None
+            else refined
+        )
         self._selected_ids = frozenset(selected_ids)
         self._visible = min(self._page_size, len(self._candidates))
         self.endResetModel()
@@ -175,7 +190,7 @@ class CandidateResultModel(QAbstractTableModel):
         return 0 if parent.isValid() else self._visible
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
-        return 0 if parent.isValid() else len(self.HEADERS)
+        return 0 if parent.isValid() else len(self.headers)
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole):
         if not index.isValid() or index.row() >= self._visible:
@@ -193,12 +208,22 @@ class CandidateResultModel(QAbstractTableModel):
             return None
         values = (
             "",
-            candidate.candidate_id,
             _source_time(candidate.start_time_ns),
             _source_time(candidate.end_time_ns),
             f"{candidate.max_target_score:.3f}",
+            self._refinement_label(candidate),
         )
         return values[index.column()]
+
+    @staticmethod
+    def _refinement_label(candidate: CandidateViewRow) -> str:
+        if candidate.refinement_status is RefinementStatus.ACCEPTED:
+            return "Accepted"
+        if candidate.refinement_status is RefinementStatus.REJECTED:
+            return "Rejected"
+        if candidate.refinement_status is RefinementStatus.UNSCORED:
+            return "Could not assess"
+        return ""
 
     def setData(self, index, value, role=Qt.ItemDataRole.EditRole):  # noqa: N802
         if (
@@ -227,7 +252,7 @@ class CandidateResultModel(QAbstractTableModel):
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):  # noqa: N802
         if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
-            return self.HEADERS[section]
+            return self.headers[section]
         return None
 
     def canFetchMore(self, parent: QModelIndex = QModelIndex()) -> bool:  # noqa: N802
@@ -432,7 +457,74 @@ class ResultExplorer(QWidget):
         self.results_layout.setColumnStretch(0, 2)
         self.results_layout.setColumnStretch(1, 3)
         layout.addLayout(self.results_layout)
+        self.refinement_card = self._build_refinement_card()
+        layout.addWidget(self.refinement_card)
         return content
+
+    def _build_refinement_card(self) -> Card:
+        card = Card()
+        card.setAccessibleName("Optional RF candidate refinement")
+        heading = QHBoxLayout()
+        copy = QVBoxLayout()
+        copy.addWidget(Text("OPTIONAL REFINEMENT", role="overline"))
+        copy.addWidget(
+            Text("Refine candidate intervals with another model", role="heading")
+        )
+        copy.addWidget(
+            Text(
+                "Creates a separate metadata-only Result. The original remains selectable "
+                "and unchanged.",
+                role="body",
+                word_wrap=True,
+            )
+        )
+        heading.addLayout(copy, 1)
+        heading.addWidget(
+            HelpHint(
+                "A compatible Random Forest (RF) Model evaluates only the candidate "
+                "intervals in the selected original Result. Accepted means its target score "
+                "meets the Model's saved threshold; Rejected means it does not; Could not "
+                "assess reports a specific feature or duration reason.",
+                subject="RF refinement",
+            ),
+            0,
+            Qt.AlignmentFlag.AlignTop,
+        )
+        self.refinement_status_badge = Badge("Not selected", intent="neutral")
+        heading.addWidget(self.refinement_status_badge, 0, Qt.AlignmentFlag.AlignTop)
+        card.content_layout.addLayout(heading)
+
+        self.refinement_picker = FolderPicker(label="Train RF Model folder")
+        self.refinement_picker.setAccessibleDescription(
+            "Choose a trusted Random Forest Model to assess existing candidate intervals."
+        )
+        self.refinement_picker.folderChanged.connect(
+            self.controller.choose_refinement_model_root
+        )
+        card.content_layout.addWidget(self.refinement_picker)
+        self.refinement_model_detail = Text("", role="body", word_wrap=True)
+        card.content_layout.addWidget(self.refinement_model_detail)
+
+        actions = QHBoxLayout()
+        self.clear_refinement_model_button = Button("Clear RF Model", variant="outline")
+        self.clear_refinement_model_button.clicked.connect(
+            self.controller.clear_refinement_model_selection
+        )
+        actions.addWidget(self.clear_refinement_model_button)
+        actions.addStretch()
+        self.refinement_button = Button("Create refined Result", variant="primary")
+        self.refinement_button.clicked.connect(self._start_refinement)
+        actions.addWidget(self.refinement_button)
+        card.content_layout.addLayout(actions)
+        return card
+
+    def _start_refinement(self) -> None:
+        try:
+            self.controller.start_refinement()
+        except (OSError, RuntimeError, ValueError) as exc:
+            self.refinement_model_detail.setText(str(exc))
+            return
+        self.run_requested.emit()
 
     def _build_recording_card(self) -> Card:
         card = Card()
@@ -506,10 +598,7 @@ class ResultExplorer(QWidget):
         self.candidate_table.setAccessibleName("Candidate intervals in original source time")
         self.candidate_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.candidate_table.setMinimumHeight(230)
-        self.candidate_table.horizontalHeader().setSectionResizeMode(
-            1, QHeaderView.ResizeMode.Stretch
-        )
-        for column in (0, 2, 3, 4):
+        for column in range(len(self.candidate_model.ORIGINAL_HEADERS)):
             self.candidate_table.horizontalHeader().setSectionResizeMode(
                 column, QHeaderView.ResizeMode.ResizeToContents
             )
@@ -553,6 +642,20 @@ class ResultExplorer(QWidget):
             value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByKeyboard)
             detail.addWidget(name, row, 0, Qt.AlignmentFlag.AlignTop)
             detail.addWidget(value, row, 1)
+        self.candidate_detail_refinement_label = QLabel("Refinement")
+        self.candidate_detail_refinement_label.setStyleSheet("font-weight: 600;")
+        self.candidate_detail_refinement = QLabel("—")
+        self.candidate_detail_refinement.setWordWrap(True)
+        self.candidate_detail_refinement.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByKeyboard
+        )
+        detail.addWidget(
+            self.candidate_detail_refinement_label,
+            5,
+            0,
+            Qt.AlignmentFlag.AlignTop,
+        )
+        detail.addWidget(self.candidate_detail_refinement, 5, 1)
         detail.setColumnStretch(1, 1)
         card.content_layout.addLayout(detail)
         return card
@@ -610,11 +713,44 @@ class ResultExplorer(QWidget):
             strict=True,
         ):
             widget.setText(value)
+        refined = candidate is not None and candidate.refinement_status is not None
+        self.candidate_detail_refinement_label.setVisible(refined)
+        self.candidate_detail_refinement.setVisible(refined)
+        if not refined or candidate is None:
+            self.candidate_detail_refinement.setText("—")
+        elif candidate.refinement_status is RefinementStatus.UNSCORED:
+            reason = {
+                "short_segment": "the interval is shorter than this Model can assess",
+                "feature_extraction_failed": "acoustic features could not be calculated",
+                "non_finite_features": "calculated features were not finite",
+            }.get(candidate.unscored_reason, "the interval could not be assessed")
+            self.candidate_detail_refinement.setText(f"Could not assess · {reason}")
+        else:
+            projection = self.controller.selected_result_projection
+            threshold = None if projection is None else projection.threshold
+            status = (
+                "Accepted"
+                if candidate.refinement_status is RefinementStatus.ACCEPTED
+                else "Rejected"
+            )
+            self.candidate_detail_refinement.setText(
+                f"{status} · target score {candidate.rf_target_score:.6f} · "
+                f"saved threshold {threshold:.6f}"
+            )
 
     def _render_recording(self, recording: RecordingViewRow | None) -> None:
         selection = self.controller.result_selection
         selected_ids = () if selection is None else selection.candidate_ids
-        self.candidate_model.set_recording(recording, selected_ids)
+        projection = self.controller.selected_result_projection
+        self.candidate_model.set_recording(
+            recording,
+            selected_ids,
+            refined=projection is not None and projection.result_kind == "derived",
+        )
+        if self.candidate_model.refinement_visible:
+            self.candidate_table.horizontalHeader().setSectionResizeMode(
+                4, QHeaderView.ResizeMode.ResizeToContents
+            )
         if recording is None:
             self.recording_title.setText("Choose a recording")
             self.candidate_stack.setCurrentWidget(self.candidate_empty)
@@ -622,7 +758,6 @@ class ResultExplorer(QWidget):
             self._render_candidate_detail(None)
             return
         self.recording_title.setText(recording.source_relative_name)
-        projection = self.controller.selected_result_projection
         self.show_source_button.setEnabled(
             recording.outcome is FileOutcomeStatus.SUCCEEDED
             and projection is not None
@@ -671,6 +806,13 @@ class ResultExplorer(QWidget):
         if item.result is None:
             return f"Unavailable Result · {_completed_label(item.created_at)}"
         count = item.result.candidate_count
+        if isinstance(item.result, DerivedResult):
+            return (
+                f"Refined Result · {_completed_label(item.result.completed_at)} · "
+                f"{item.result.accepted_count:,} accepted · "
+                f"{item.result.rejected_count:,} rejected · "
+                f"{item.result.unscored_count:,} could not assess"
+            )
         return (
             f"Original Result · {_completed_label(item.result.completed_at)} · "
             f"{count:,} candidate{'s' if count != 1 else ''}"
@@ -684,13 +826,45 @@ class ResultExplorer(QWidget):
                 self.history_select.addItem(self._history_label(item), item.result_id)
                 if item.result_id == self.controller.selected_result_id:
                     selected_index = index
-            self.history_select.addItem("Refined Result · not created")
-            model = self.history_select.model()
-            if isinstance(model, QStandardItemModel):
-                placeholder = model.item(model.rowCount() - 1)
-                placeholder.setEnabled(False)
             self.history_select.setCurrentIndex(selected_index)
         self.history_select.setEnabled(bool(self.controller.result_history))
+
+    def _render_refinement_controls(
+        self, projection: ResultViewProjection | None
+    ) -> None:
+        state = self.controller.refinement_model_state
+        status = {
+            ModelIntakeState.EMPTY: "Not selected",
+            ModelIntakeState.LOADING: "Checking",
+            ModelIntakeState.COMPATIBLE: "Compatible",
+            ModelIntakeState.INCOMPATIBLE: "Incompatible",
+            ModelIntakeState.MISSING: "Missing files",
+        }[state]
+        self.refinement_status_badge.setText(status)
+        self.refinement_status_badge.setAccessibleName(f"RF Model status: {status}")
+        selected = self.controller.selected_refinement_model_root
+        if state is not ModelIntakeState.LOADING:
+            self.refinement_picker.setFolderPath(
+                "" if selected is None else str(selected)
+            )
+        self.refinement_picker.setEnabled(
+            state is not ModelIntakeState.LOADING and not self.controller.is_run_active
+        )
+        self.clear_refinement_model_button.setEnabled(
+            selected is not None
+            and state is not ModelIntakeState.LOADING
+            and not self.controller.is_run_active
+        )
+        detail = self.controller.refinement_model_reason
+        if projection is not None and projection.result_kind == "derived":
+            detail = (
+                "This is a refined Result. Select its original parent to create another "
+                "independent refinement."
+            )
+        elif projection is not None and projection.candidate_count == 0:
+            detail = "This original Result has no candidate intervals to refine."
+        self.refinement_model_detail.setText(detail)
+        self.refinement_button.setEnabled(self.controller.can_refine_selected_result)
 
     def _set_state(self, key: str) -> None:
         self.current_state_key = key
@@ -708,6 +882,7 @@ class ResultExplorer(QWidget):
         self._render_history()
         item = self.controller.selected_result_item
         projection = self.controller.selected_result_projection
+        self._render_refinement_controls(projection)
         if item is None:
             self._set_state("no-results")
             self.content_stack.setCurrentWidget(self.no_results_state)
@@ -732,8 +907,23 @@ class ResultExplorer(QWidget):
         self._set_state(state_key)
         self.content_stack.setCurrentWidget(self.result_content)
         self.provenance_card.setVisible(True)
+        refined = projection.result_kind == "derived"
+        self.provenance_badge.setText("Refined" if refined else "Original")
+        self.alerts["available"].title_widget.setText(
+            "Refined Result" if refined else "Original Result"
+        )
+        self.alerts["available"].text_widget.setText(
+            "Each candidate retains its original recording position and explicit RF "
+            "assessment."
+            if refined
+            else "Candidate intervals retain their original recording positions."
+        )
         self.lineage_label.setText(
-            f"Detection Model · {projection.model_id}  →  Result · {projection.result_id}"
+            f"Parent Result · {projection.parent_result_id}  →  RF Model · "
+            f"{projection.model_id}  →  Result · {projection.result_id}"
+            if refined
+            else f"Detection Model · {projection.model_id}  →  Result · "
+            f"{projection.result_id}"
         )
         self.provenance_values["completed"].setText(
             _completed_label(projection.completed_at)
@@ -742,7 +932,13 @@ class ResultExplorer(QWidget):
             f"{projection.inventory_id} · frozen for this Run"
         )
         self.provenance_values["intervals"].setText(
-            f"{projection.candidate_count:,} candidate intervals · digest "
+            f"{projection.candidate_count:,} candidate intervals · "
+            f"{projection.accepted_count:,} accepted · "
+            f"{projection.rejected_count:,} rejected · "
+            f"{projection.unscored_count:,} could not assess · digest "
+            f"{projection.result_digest}"
+            if refined
+            else f"{projection.candidate_count:,} candidate intervals · digest "
             f"{projection.result_digest}"
         )
         self.provenance_values["files"].setText(
@@ -752,7 +948,11 @@ class ResultExplorer(QWidget):
         self.provenance_values["metadata"].setText(
             "App-owned Result; source audio unchanged"
         )
-        self.provenance_values["parent"].setText("None · original Result")
+        self.provenance_values["parent"].setText(
+            f"{projection.parent_result_id} · digest {projection.parent_result_digest}"
+            if refined
+            else "None · original Result"
+        )
         selection = self.controller.result_selection
         selected_ids = () if selection is None else selection.candidate_ids
         revision = 0 if selection is None else selection.selection_revision
