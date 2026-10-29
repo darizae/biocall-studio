@@ -351,9 +351,8 @@ def test_native_model_selection_reopen_states_and_readiness_without_worker(
     qtbot.waitUntil(lambda: controller.snapshot is not None, timeout=30_000)
     assert controller.inputs_ready
     assert page.readiness_title.text() == "Setup inputs verified"
-    assert not any(
-        button.text() == "Start detection" for button in page.findChildren(QPushButton)
-    )
+    assert page.start_detection_button.isEnabled()
+    assert controller.current_run is None
 
     assert any(
         hint.accessibleName() == "More about Detection Model"

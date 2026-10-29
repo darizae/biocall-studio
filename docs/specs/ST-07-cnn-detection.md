@@ -1,6 +1,6 @@
 # ST-07 — CNN first-pass candidate detection
 
-**Branch:** `detect-st07-cnn-detection` from reviewed `detect`. **Predecessors:** ST-04 inventory, ST-05 trusted CNN Model, ST-06 Worker. **Successor:** ST-08. **Status:** planned.
+**Branch:** `detect-st07-cnn-detection` from reviewed `detect`. **Predecessors:** ST-04 inventory, ST-05 trusted CNN Model, ST-06 Worker. **Successor:** ST-08. **Status:** implemented; awaiting owner review.
 
 ## Scope and ownership
 

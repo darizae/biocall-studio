@@ -24,9 +24,9 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-DET-010` | state machine, Run input freeze, one-Active-Run reservation and terminal transitions. | TD-RUN, TD-FAIL | [ST-06](specs/ST-06-detect-workers.md) |
 | `UT-DET-011` | cancellation, crash, receipt/staging reconciliation and orphan recovery decisions. | TD-RUN, TD-FAIL | [ST-06](specs/ST-06-detect-workers.md) |
 | `UT-DET-012` | bounded diagnostics schema, privacy allowlist, rotation/read/symlink policy. | TD-RUN, TD-FAIL | [ST-06](specs/ST-06-detect-workers.md) |
-| `UT-DET-013` | **Planned ST-07:** exact source-frame/window/hop/overlap arithmetic, resample/padding boundary and invalid config rejection. | TD-WAV, TD-EXPORT | [ST-07](specs/ST-07-cnn-detection.md) |
-| `UT-DET-014` | **Planned ST-07:** target score/threshold semantics, interval merge/clamp, non-finite or ambiguous outputs fail. | TD-WAV, TD-EXPORT | [ST-07](specs/ST-07-cnn-detection.md) |
-| `UT-DET-015` | **Planned ST-07:** candidate source timestamps, deterministic IDs, immutable Result schema, per-file status validation. | TD-WAV, TD-EXPORT | [ST-07](specs/ST-07-cnn-detection.md) |
+| `UT-DET-013` | exact source-frame/window/hop/overlap arithmetic, resample/padding boundary and invalid config rejection. | TD-WAV, TD-EXPORT | [ST-07](specs/ST-07-cnn-detection.md) |
+| `UT-DET-014` | target score/threshold semantics, interval merge/clamp, non-finite or ambiguous outputs fail. | TD-WAV, TD-EXPORT | [ST-07](specs/ST-07-cnn-detection.md) |
+| `UT-DET-015` | candidate source timestamps, deterministic IDs, immutable Result schema, per-file status validation. | TD-WAV, TD-EXPORT | [ST-07](specs/ST-07-cnn-detection.md) |
 | `UT-DET-016` | **Planned ST-08:** immutable Result-to-view projection, stable selection/Result digest mapping, no cross-Result bleed. | TD-UI, TD-RUN | [ST-08](specs/ST-08-results-ux.md) |
 | `UT-DET-017` | **Planned ST-08:** zero/no-source/file-error/partial/completed statuses and provenance visibility decisions. | TD-UI, TD-RUN | [ST-08](specs/ST-08-results-ux.md) |
 | `UT-DET-018` | **Planned ST-09:** exact ordered RF feature schema and class/probability-column validation; reject mismatch/nonfinite values. | TD-EXPORT, TD-TRAIN | [ST-09](specs/ST-09-rf-refinement.md) |

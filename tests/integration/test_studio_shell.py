@@ -312,13 +312,17 @@ def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(q
     assert shell.detect_page.focusWidget().accessibleName() == "Choose Train Model folder"
     assert len(shell.detect_page.findChildren(FolderPicker)) == 3
     assert {
-        hint.accessibleName() for hint in shell.detect_page.findChildren(HelpHint)
-    } == {
         "More about Detection Model",
         "More about Detect Collection",
         "More about Recording inclusion",
+        "More about Minimum detection score",
+        "More about Window overlap",
+        "More about Combine nearby candidates",
+    } <= {
+        hint.accessibleName() for hint in shell.detect_page.findChildren(HelpHint)
     }
-    assert shell.detect_page.findChildren(QComboBox) == []
+    assert len(shell.detect_page.findChildren(QComboBox)) == 2
+    assert not shell.detect_page.start_detection_button.isEnabled()
     assert all(
         not widget.isVisible() for widget in shell.detect_page.findChildren(QProgressBar)
     )
@@ -326,7 +330,7 @@ def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(q
     detect_text = " ".join(label.text() for label in shell.detect_page.findChildren(QLabel))
     assert "Create a Detect Collection" in detect_text
     assert "Detection Model" in detect_text
-    assert all(word not in detect_text.lower() for word in ("result", "start detection"))
+    assert shell.detect_page.start_detection_button.text() == "Start detection"
     shell.detect_page.back_button.setFocus()
     qtbot.keyClick(shell.detect_page.back_button, Qt.Key.Key_Space)
     assert shell.current_workspace is WorkspaceRoute.STUDIO
@@ -334,7 +338,7 @@ def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(q
     shell.launchpad.review_card.action_button.setFocus()
     qtbot.keyClick(shell.launchpad.review_card.action_button, Qt.Key.Key_Space)
     assert shell.current_workspace is WorkspaceRoute.REVIEW
-    assert shell.review_page.back_button.hasFocus()
+    qtbot.waitUntil(shell.review_page.back_button.hasFocus)
     assert shell.review_page.findChildren(QComboBox) == []
     review_text = " ".join(label.text() for label in shell.review_page.findChildren(QLabel))
     assert "Review is coming later" in review_text

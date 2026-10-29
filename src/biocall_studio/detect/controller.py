@@ -13,6 +13,7 @@ from time import sleep
 
 from PySide6.QtCore import QObject, QProcess, QThread, QTimer, Signal
 
+from biocall_studio.detect.detection import DetectionSettings
 from biocall_studio.detect.diagnostics import (
     BoundedJsonlLog,
     BoundedStderrCapture,
@@ -46,6 +47,7 @@ from biocall_studio.detect.persistence import (
     RootBindingProposal,
     WorkspaceMetadataError,
 )
+from biocall_studio.detect.results import DetectionResult
 from biocall_studio.detect.run_persistence import DetectRunRepository
 from biocall_studio.detect.runs import (
     DetectRunRecord,
@@ -192,6 +194,7 @@ class DetectWorkspaceController(QObject):
         self._kill_grace_ms = kill_grace_ms
         self.runs: tuple[DetectRunRecord, ...] = ()
         self.current_run: DetectRunRecord | None = None
+        self.current_result: DetectionResult | None = None
         self._run_repository: DetectRunRepository | None = None
         self._run_process: QProcess | None = None
         self._run_stdout_buffer = b""
@@ -303,6 +306,7 @@ class DetectWorkspaceController(QObject):
             self._run_repository = None
             self.runs = ()
             self.current_run = None
+            self.current_result = None
             return
         try:
             repository = DetectRunRepository(
@@ -318,6 +322,13 @@ class DetectWorkspaceController(QObject):
         self._run_repository = repository
         self.runs = runs
         self.current_run = next((run for run in runs if run.active), runs[0] if runs else None)
+        self.current_result = None
+        if self.current_run is not None and self.current_run.status is DetectRunStatus.COMPLETED:
+            try:
+                self.current_result = repository.load_detection_result(self.current_run)
+            except ValueError:
+                # ST-06 lifecycle fixtures intentionally are not scientific Results.
+                pass
 
     def _active_run_blocks_input_change(self) -> bool:
         if not self.is_run_active:
@@ -803,6 +814,95 @@ class DetectWorkspaceController(QObject):
             artifact_id=f"pub_{uuid.uuid4().hex}",
         )
 
+    def freeze_detection_request(self, settings: DetectionSettings) -> DetectRunRequest:
+        """Freeze the explicit ST-07 science settings with accepted input handoffs."""
+        if not isinstance(settings, DetectionSettings):
+            raise TypeError("CNN first-pass settings must be a DetectionSettings value.")
+        return self.freeze_run_request(settings.to_mapping())
+
+    def start_detection(self, settings: DetectionSettings) -> str:
+        request = self.freeze_detection_request(settings)
+        return self.start_detection_request(request)
+
+    def start_detection_request(self, request: DetectRunRequest) -> str:
+        """Launch the real scientific CNN Worker through the ST-06 QProcess boundary."""
+        collection = self.active_collection
+        snapshot = self.snapshot
+        model = self.model_reference
+        if collection is None or snapshot is None or model is None:
+            raise ValueError("A current Model and recording inventory are required.")
+        if self.is_scanning or self.is_model_loading:
+            raise RunConflictError("Wait for current input preparation before starting a Run.")
+        if self.is_run_active or (
+            self._run_process is not None
+            and self._run_process.state() is not QProcess.ProcessState.NotRunning
+        ):
+            raise RunConflictError("Only one Active Detect Run is allowed.")
+        DetectionSettings.from_mapping(dict(request.settings))
+        if (
+            request.reservation_owner_id != self.reservation_owner_id
+            or request.collection_id != collection.ref.collection_id
+            or request.binding_revision != collection.ref.binding_revision
+            or request.inventory_id != snapshot.inventory_id
+            or request.inventory_digest != snapshot.digest
+            or request.selected_recording_keys != snapshot.included_keys
+            or request.model_snapshot_id != model.snapshot.snapshot_id
+            or request.model_digest != canonical_digest(model.snapshot.to_dict())
+        ):
+            raise ValueError("Detection request does not match the frozen Detect inputs.")
+        if self.root_decision is not RootBindingDecision.VALID or not snapshot_is_quickly_current(
+            collection.source_root, snapshot
+        ):
+            raise ValueError("Recordings changed; rescan before starting a Detect Run.")
+
+        repository = DetectRunRepository(
+            self.store.application_data_root, collection.ref.collection_id
+        )
+        record = repository.create(
+            request,
+            title="Find candidate calls",
+            stages=(
+                "Validate frozen inputs",
+                "Analyze recordings",
+                "Verify immutable Result",
+            ),
+        )
+        self._run_repository = repository
+        self.current_result = None
+        self._cache_run(record, persist=False)
+        self._diagnostic(
+            "run_reserved",
+            "CNN first-pass Run inputs frozen and reserved",
+            record=record,
+            status=record.status.value,
+        )
+
+        process = QProcess(self)
+        self._run_process = process
+        self._run_stdout_buffer = b""
+        self._run_stderr = BoundedStderrCapture()
+        self._run_error_code = ""
+        self._protocol_error = ""
+        process.setProcessChannelMode(QProcess.ProcessChannelMode.SeparateChannels)
+        process.started.connect(self._on_run_process_started)
+        process.readyReadStandardOutput.connect(self._on_run_stdout)
+        process.readyReadStandardError.connect(self._on_run_stderr)
+        process.errorOccurred.connect(self._on_run_process_error)
+        process.finished.connect(self._on_run_finished)
+        program, arguments = self._detection_worker_command(
+            repository.request_path(record.run_id)
+        )
+        process.setProgram(program)
+        process.setArguments(arguments)
+        process.start()
+        self._diagnostic(
+            "worker_launch_requested",
+            "CNN first-pass Worker launch requested",
+            record=record,
+            status=record.status.value,
+        )
+        return record.run_id
+
     def _fixture_worker_command(self, request_path: Path, behavior: str) -> tuple[str, list[str]]:
         return (
             sys.executable,
@@ -815,6 +915,21 @@ class DetectWorkspaceController(QObject):
                 str(self._owner_lease.path),
                 "--behavior",
                 behavior,
+                "--step-delay",
+                str(self._worker_step_delay_seconds),
+            ],
+        )
+
+    def _detection_worker_command(self, request_path: Path) -> tuple[str, list[str]]:
+        return (
+            sys.executable,
+            [
+                "-m",
+                "biocall_studio.detect.detection_worker",
+                "--request",
+                str(request_path),
+                "--owner-lease",
+                str(self._owner_lease.path),
                 "--step-delay",
                 str(self._worker_step_delay_seconds),
             ],
@@ -934,6 +1049,9 @@ class DetectWorkspaceController(QObject):
                 "Frozen inputs accepted",
                 "Worker lifecycle active",
                 "Verifying immutable publication",
+                "Frozen inputs validated",
+                "Analyzing recordings",
+                "Verifying immutable Result",
             }
             message = event.get("message")
             if message not in messages:
@@ -953,7 +1071,13 @@ class DetectWorkspaceController(QObject):
                 self._cache_run(updated)
         elif name == "error":
             code = event.get("error_code")
-            if code in {"fixture_failed", "publication_failed"}:
+            if code in {
+                "fixture_failed",
+                "publication_failed",
+                "input_changed",
+                "model_changed",
+                "no_successful_files",
+            }:
                 self._run_error_code = code
             else:
                 self._set_protocol_error("worker_protocol_invalid")
@@ -999,7 +1123,13 @@ class DetectWorkspaceController(QObject):
 
         receipt = repository.verified_receipt(record, recover_missing=True)
         if receipt is not None:
-            updated = complete_run(record, receipt, now=utc_now())
+            if receipt.artifact_kind == "detection_result":
+                self.current_result = repository.load_detection_result(record)
+                message = "Completed · metadata-only Result verified and published"
+            else:
+                self.current_result = None
+                message = "Completed · artifact verified and published"
+            updated = complete_run(record, receipt, now=utc_now(), message=message)
             event = "run_completed"
             level = "INFO"
         elif record.status is DetectRunStatus.CANCELLING:
@@ -1027,6 +1157,13 @@ class DetectWorkspaceController(QObject):
             guidance = {
                 "publication_failed": "The Run artifact could not be published safely.",
                 "fixture_failed": "The Worker reported a controlled lifecycle failure.",
+                "input_changed": (
+                    "A frozen recording changed or became unavailable. Rescan before retrying."
+                ),
+                "model_changed": "The selected Model changed. Choose and verify it again.",
+                "no_successful_files": (
+                    "No recording could be analyzed successfully; no Result was published."
+                ),
                 "worker_protocol_invalid": "The Worker returned invalid progress information.",
                 "worker_protocol_overflow": "The Worker returned too much progress information.",
                 "worker_launch_failed": "The Worker could not be started.",

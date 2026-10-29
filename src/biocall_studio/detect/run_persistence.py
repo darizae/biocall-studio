@@ -12,8 +12,10 @@ from pathlib import Path
 from biocall_studio.detect.domain import detect_workspace_path, validate_collection_id
 from biocall_studio.detect.publication import (
     discard_staging,
+    load_detection_result,
     publication_matches_request,
 )
+from biocall_studio.detect.results import DetectionResult
 from biocall_studio.detect.runs import (
     DetectRunRecord,
     DetectRunRequest,
@@ -180,6 +182,11 @@ class DetectRunRepository:
         if not isinstance(artifact_id, str) or _ARTIFACT_ID.fullmatch(artifact_id) is None:
             raise ValueError("Detect publication ID is invalid.")
         return self.publications_root / artifact_id
+
+    def result_path(self, artifact_id: str) -> Path:
+        if not isinstance(artifact_id, str) or _ARTIFACT_ID.fullmatch(artifact_id) is None:
+            raise ValueError("Detection Result ID is invalid.")
+        return self.results_root / artifact_id
 
     def staging_directories(self) -> tuple[Path, ...]:
         return tuple(
@@ -374,6 +381,26 @@ class DetectRunRepository:
         if receipt is None:
             raise ValueError("Detect Run publication receipt or artifact is invalid.")
         return receipt
+
+    def load_detection_result(self, record: DetectRunRecord) -> DetectionResult:
+        """Independently reopen the completed receipt and metadata-only Result."""
+        receipt = self.load_receipt(record)
+        if receipt.artifact_kind != "detection_result":
+            raise ValueError("The completed Run did not publish a Detection Result.")
+        result = load_detection_result(self.collection_root, receipt.artifact_id)
+        request = self.load_request(record.run_id)
+        if (
+            result.run_id != request.run_id
+            or result.request_id != request.request_id
+            or result.collection_id != request.collection_id
+            or result.binding_revision != request.binding_revision
+            or result.inventory_id != request.inventory_id
+            or result.inventory_digest != request.inventory_digest
+            or result.model_snapshot_id != request.model_snapshot_id
+            or result.model_snapshot_digest != request.model_digest
+        ):
+            raise ValueError("Detection Result does not match its immutable Run request.")
+        return result
 
     def cleanup_staging(self, record: DetectRunRecord) -> None:
         discard_staging(self.collection_root, record.launch_id)

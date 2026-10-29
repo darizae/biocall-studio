@@ -10,6 +10,7 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
+from biocall_studio.detect.results import DetectionResult
 from biocall_studio.detect.runs import (
     DetectRunRequest,
     PublicationReceipt,
@@ -23,6 +24,7 @@ MAX_PUBLICATION_BYTES = 64 * 1024 * 1024
 _ARTIFACT_ID = re.compile(r"pub_[0-9a-f]{32}")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _FILE_NAME = re.compile(r"[a-z][a-z0-9_.-]{0,127}")
+_ARTIFACT_KINDS = frozenset({"lifecycle_fixture", "detection_result"})
 
 
 def _fsync_directory(path: Path) -> None:
@@ -81,8 +83,8 @@ class PublicationIdentity:
             raise ValueError("Unsupported publication identity schema.")
         if _ARTIFACT_ID.fullmatch(self.artifact_id) is None:
             raise ValueError("Publication artifact ID is invalid.")
-        if self.artifact_kind != "lifecycle_fixture":
-            raise ValueError("Publication artifact kind is not owned by this stage.")
+        if self.artifact_kind not in _ARTIFACT_KINDS:
+            raise ValueError("Publication artifact kind is unsupported.")
         if not self.files or len(self.files) > MAX_PUBLICATION_FILES:
             raise ValueError("Publication file index is invalid.")
         if tuple(sorted(self.files, key=lambda item: item.path)) != self.files:
@@ -128,6 +130,7 @@ class PublicationIdentity:
         request: DetectRunRequest,
         files: tuple[PublicationFile, ...],
         *,
+        artifact_kind: str = "lifecycle_fixture",
         published_at: str | None = None,
     ) -> PublicationIdentity:
         moment = published_at or utc_now()
@@ -137,7 +140,7 @@ class PublicationIdentity:
             "request_id": request.request_id,
             "launch_id": request.launch_id,
             "artifact_id": request.artifact_id,
-            "artifact_kind": "lifecycle_fixture",
+            "artifact_kind": artifact_kind,
             "files": [item.to_dict() for item in files],
             "published_at": moment,
         }
@@ -147,7 +150,7 @@ class PublicationIdentity:
             request.request_id,
             request.launch_id,
             request.artifact_id,
-            "lifecycle_fixture",
+            artifact_kind,
             files,
             canonical_digest(unsigned),
             moment,
@@ -264,6 +267,59 @@ def stage_lifecycle_artifact(
     return identity
 
 
+def stage_detection_result(
+    collection_root: Path,
+    staging_path: Path,
+    request: DetectRunRequest,
+    result: DetectionResult,
+) -> PublicationIdentity:
+    """Stage one complete metadata-only Result and its checksum index."""
+    if (
+        result.result_id != request.artifact_id
+        or result.run_id != request.run_id
+        or result.request_id != request.request_id
+        or result.collection_id != request.collection_id
+        or result.binding_revision != request.binding_revision
+        or result.inventory_id != request.inventory_id
+        or result.inventory_digest != request.inventory_digest
+        or result.model_snapshot_id != request.model_snapshot_id
+        or result.model_snapshot_digest != request.model_digest
+        or result.settings.to_mapping() != dict(request.settings)
+    ):
+        raise ValueError("DetectionResult does not match its frozen Run request.")
+    collection = Path(collection_root).resolve(strict=True)
+    staging_root = _validate_directory(collection, collection / ".staging", label="Staging root")
+    stage = Path(staging_path)
+    if stage.exists() or stage.is_symlink():
+        raise FileExistsError("The launch staging directory already exists.")
+    if stage.parent.resolve(strict=True) != staging_root:
+        raise ValueError("The launch staging directory is not contained.")
+    stage.mkdir(mode=0o700)
+    payload_path = stage / "result.json"
+    payload = (
+        json.dumps(result.to_dict(), sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode()
+    if len(payload) > MAX_PUBLICATION_BYTES:
+        raise ValueError("DetectionResult exceeds the publication byte limit.")
+    descriptor = os.open(payload_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    try:
+        os.write(descriptor, payload)
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+    files = (
+        PublicationFile("result.json", len(payload), hashlib.sha256(payload).hexdigest()),
+    )
+    identity = PublicationIdentity.create(
+        request,
+        files,
+        artifact_kind="detection_result",
+    )
+    _write_new_json(stage / "publication.json", identity.to_dict())
+    _fsync_directory(stage)
+    return identity
+
+
 def _load_identity(directory: Path) -> PublicationIdentity:
     identity = PublicationIdentity.from_dict(_read_json(directory / "publication.json"))
     expected_names = {"publication.json", *(item.path for item in identity.files)}
@@ -281,7 +337,24 @@ def _load_identity(directory: Path) -> PublicationIdentity:
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         if digest != item.sha256:
             raise ValueError("Publication file checksum changed.")
+    if identity.artifact_kind == "detection_result":
+        if tuple(item.path for item in identity.files) != ("result.json",):
+            raise ValueError("Detection Result publication file index is invalid.")
+        result = DetectionResult.from_dict(
+            _read_json(directory / "result.json", limit=MAX_PUBLICATION_BYTES)
+        )
+        if (
+            result.result_id != identity.artifact_id
+            or result.run_id != identity.run_id
+            or result.request_id != identity.request_id
+        ):
+            raise ValueError("Detection Result and publication identity disagree.")
     return identity
+
+
+def _publication_root(collection: Path, artifact_kind: str) -> Path:
+    name = "results" if artifact_kind == "detection_result" else "publications"
+    return _validate_directory(collection, collection / name, label="Publication root")
 
 
 def publish_staged_artifact(
@@ -299,12 +372,18 @@ def publish_staged_artifact(
         or identity.artifact_id != request.artifact_id
     ):
         raise ValueError("Staged publication identity does not match its Run request.")
-    publications = _validate_directory(
-        collection, collection / "publications", label="Publication root"
+    roots = tuple(
+        _publication_root(collection, artifact_kind)
+        for artifact_kind in ("detection_result", "lifecycle_fixture")
     )
-    destination = publications / request.artifact_id
-    if destination.exists() or destination.is_symlink():
+    if any(
+        (root / request.artifact_id).exists()
+        or (root / request.artifact_id).is_symlink()
+        for root in roots
+    ):
         raise FileExistsError("The immutable Detect publication already exists.")
+    publications = _publication_root(collection, identity.artifact_kind)
+    destination = publications / request.artifact_id
     os.rename(stage, destination)
     _fsync_directory(publications)
     return _load_identity(destination)
@@ -317,15 +396,37 @@ def load_publication_identity(
     if _ARTIFACT_ID.fullmatch(artifact_id) is None:
         raise ValueError("Publication artifact ID is invalid.")
     collection = Path(collection_root).resolve(strict=True)
-    publications = _validate_directory(
-        collection, collection / "publications", label="Publication root"
-    )
-    directory = publications / artifact_id
+    candidates: list[tuple[Path, Path]] = []
+    for artifact_kind in ("detection_result", "lifecycle_fixture"):
+        root = _publication_root(collection, artifact_kind)
+        candidate = root / artifact_id
+        if candidate.exists() or candidate.is_symlink():
+            candidates.append((root, candidate))
+    if len(candidates) != 1:
+        raise ValueError("Publication is missing or has an ambiguous storage location.")
+    publications, directory = candidates[0]
     _validate_directory(publications, directory, label="Publication")
     identity = _load_identity(directory)
     if identity.artifact_id != artifact_id:
         raise ValueError("Publication directory and identity disagree.")
     return identity
+
+
+def load_detection_result(collection_root: Path, artifact_id: str) -> DetectionResult:
+    """Reopen a checksum-valid Result from its app-owned immutable namespace."""
+    identity = load_publication_identity(collection_root, artifact_id)
+    if identity.artifact_kind != "detection_result":
+        raise ValueError("The published artifact is not a Detection Result.")
+    collection = Path(collection_root).resolve(strict=True)
+    result = DetectionResult.from_dict(
+        _read_json(
+            collection / "results" / artifact_id / "result.json",
+            limit=MAX_PUBLICATION_BYTES,
+        )
+    )
+    if result.result_id != artifact_id:
+        raise ValueError("Detection Result identity does not match its directory.")
+    return result
 
 
 def publication_matches_request(

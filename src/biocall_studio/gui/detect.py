@@ -12,7 +12,9 @@ from alp_ui.components import (
     DataTable,
     FolderPicker,
     HelpHint,
+    NumberInput,
     ProgressBar,
+    SelectInput,
     Text,
 )
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer, QUrl, Signal
@@ -25,6 +27,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -35,6 +38,7 @@ from biocall_studio.detect.controller import (
     InventoryState,
     ModelIntakeState,
 )
+from biocall_studio.detect.detection import DetectionSettings
 from biocall_studio.detect.domain import RootBindingDecision
 from biocall_studio.detect.inventory import (
     DecisionOrigin,
@@ -210,6 +214,11 @@ class DetectWorkspacePage(QScrollArea):
         self.outer.addWidget(self.selection_error)
 
         self.route_stack = QStackedWidget()
+        self.route_stack.setMinimumWidth(0)
+        self.route_stack.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Preferred,
+        )
         self.setup_view = QWidget()
         setup_view_layout = QVBoxLayout(self.setup_view)
         setup_view_layout.setContentsMargins(0, 0, 0, 0)
@@ -224,6 +233,8 @@ class DetectWorkspacePage(QScrollArea):
         self.setup_layout.setColumnStretch(0, 1)
         self.setup_layout.setColumnStretch(1, 1)
         setup_view_layout.addLayout(self.setup_layout)
+        self.settings_card = self._build_settings_card()
+        setup_view_layout.addWidget(self.settings_card)
         self.readiness_card = Card()
         self.readiness_card.setAccessibleName("Detect setup readiness")
         self.readiness_title = Text("Setup needs attention", role="subheading")
@@ -268,6 +279,114 @@ class DetectWorkspacePage(QScrollArea):
         self.current_route = "setup"
         self._set_route("setup")
         self._render()
+
+    def _setting_row(self, field: QWidget, help_text: str, subject: str) -> QWidget:
+        row = QWidget()
+        field.setMinimumWidth(0)
+        field.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Preferred,
+        )
+        row.setMinimumWidth(0)
+        row.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Preferred,
+        )
+        layout = QGridLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setHorizontalSpacing(8)
+        layout.addWidget(field, 0, 0)
+        layout.addWidget(
+            HelpHint(help_text, subject=subject),
+            0,
+            1,
+            Qt.AlignmentFlag.AlignTop,
+        )
+        layout.setColumnStretch(0, 1)
+        return row
+
+    def _build_settings_card(self) -> Card:
+        card = Card()
+        card.setAccessibleName("Candidate detection settings")
+        card.content_layout.addWidget(Text("Candidate settings", role="heading"))
+        card.content_layout.addWidget(
+            Text(
+                "Set how the CNN scans recordings and joins candidate intervals.",
+                role="body",
+                word_wrap=True,
+            )
+        )
+        self.minimum_score = NumberInput(
+            kind="decimal",
+            value=0.5,
+            minimum=0.0,
+            maximum=1.0,
+            step=0.01,
+            decimals=2,
+            label="Minimum detection score",
+        )
+        self.minimum_score_row = self._setting_row(
+            self.minimum_score,
+            "Includes windows whose binary target score meets this value. A score is not a "
+            "certainty percentage; higher values usually return fewer candidates.",
+            "Minimum detection score",
+        )
+        self.window_overlap = SelectInput(
+            ("0%", "25%", "50%", "75%"),
+            label="Window overlap",
+        )
+        self.window_overlap_row = self._setting_row(
+            self.window_overlap,
+            "Controls how often neighboring portions of a recording are examined. More overlap "
+            "adds analysis windows and can increase processing time.",
+            "Window overlap",
+        )
+        self.combine_nearby = SelectInput(
+            ("Do not combine across gaps", "0.20 s", "0.50 s"),
+            label="Combine nearby candidates",
+        )
+        self.combine_nearby_row = self._setting_row(
+            self.combine_nearby,
+            "Joins candidate intervals when the source-time gap between them is no greater "
+            "than the selected value. Overlapping candidates are always joined.",
+            "Combine nearby candidates",
+        )
+        self.settings_layout = QGridLayout()
+        self.settings_layout.setHorizontalSpacing(16)
+        self.settings_layout.setVerticalSpacing(14)
+        self.settings_layout.addWidget(self.minimum_score_row, 0, 0)
+        self.settings_layout.addWidget(self.window_overlap_row, 0, 1)
+        self.settings_layout.addWidget(self.combine_nearby_row, 0, 2)
+        for column in range(3):
+            self.settings_layout.setColumnStretch(column, 1)
+        card.content_layout.addLayout(self.settings_layout)
+        actions = QHBoxLayout()
+        actions.addStretch()
+        self.start_detection_button = Button("Start detection", variant="primary")
+        self.start_detection_button.setAccessibleDescription(
+            "Freeze the verified setup and run CNN candidate detection."
+        )
+        self.start_detection_button.clicked.connect(self._start_detection)
+        actions.addWidget(self.start_detection_button)
+        card.content_layout.addLayout(actions)
+        return card
+
+    def _start_detection(self) -> None:
+        overlaps = (0, 25, 50, 75)
+        gaps = (0, 200, 500)
+        settings = DetectionSettings(
+            minimum_score=float(self.minimum_score.value()),
+            window_overlap_percent=overlaps[self.window_overlap.currentIndex()],
+            combine_gap_ms=gaps[self.combine_nearby.currentIndex()],
+            batch_size=16,
+        )
+        try:
+            self.controller.start_detection(settings)
+        except (OSError, RuntimeError, ValueError) as exc:
+            self.selection_error.setText(str(exc))
+            self.selection_error.setVisible(True)
+            return
+        self._set_route("run")
 
     def _build_heading(self) -> QGridLayout:
         heading = QGridLayout()
@@ -460,6 +579,11 @@ class DetectWorkspacePage(QScrollArea):
         card.content_layout.addWidget(self.model_detail)
         self.selected_model_path = QLabel("Choose a Train Model folder.")
         self.selected_model_path.setWordWrap(True)
+        self.selected_model_path.setMinimumWidth(0)
+        self.selected_model_path.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Preferred,
+        )
         self.selected_model_path.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByKeyboard
         )
@@ -510,6 +634,11 @@ class DetectWorkspacePage(QScrollArea):
         card.content_layout.addWidget(self.root_caption)
         self.root_path = QLabel("Choose a folder to create a Detect Collection.")
         self.root_path.setWordWrap(True)
+        self.root_path.setMinimumWidth(0)
+        self.root_path.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Preferred,
+        )
         self.root_path.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByKeyboard)
         self.root_path.setAccessibleName("Current recordings folder")
         card.content_layout.addWidget(self.root_path)
@@ -538,6 +667,11 @@ class DetectWorkspacePage(QScrollArea):
         card.content_layout.addWidget(Text("LINKED LOCATION", role="overline"))
         self.recordings_path = QLabel()
         self.recordings_path.setWordWrap(True)
+        self.recordings_path.setMinimumWidth(0)
+        self.recordings_path.setSizePolicy(
+            QSizePolicy.Policy.Ignored,
+            QSizePolicy.Policy.Preferred,
+        )
         self.recordings_path.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByKeyboard
         )
@@ -916,6 +1050,14 @@ class DetectWorkspacePage(QScrollArea):
             self.model_picker.setFolderPath("" if selected is None else str(selected))
 
     def _render_readiness(self) -> None:
+        settings_locked = self.controller.is_run_active
+        for field in (
+            self.minimum_score,
+            self.window_overlap,
+            self.combine_nearby,
+        ):
+            field.setEnabled(not settings_locked)
+        self.start_detection_button.setEnabled(self.controller.inputs_ready)
         if self.controller.inputs_ready:
             self.readiness_title.setText("Setup inputs verified")
             self.readiness_detail.setText(
@@ -1086,6 +1228,7 @@ class DetectWorkspacePage(QScrollArea):
             return
 
         status = record.status.value.capitalize()
+        result = self.controller.current_result
         guidance = {
             DetectRunStatus.PREPARING: "Preparing frozen inputs and starting the Worker.",
             DetectRunStatus.RUNNING: "The supervised Worker is running.",
@@ -1103,7 +1246,18 @@ class DetectWorkspacePage(QScrollArea):
                 or "The Run failed without publication. Review setup and start a new Run."
             ),
             DetectRunStatus.COMPLETED: (
-                "The immutable artifact and its publication receipt were verified."
+                (
+                    f"The metadata-only Result was verified and published: "
+                    f"{result.candidate_count:,} candidate intervals across "
+                    f"{result.successful_files:,} recordings"
+                    + (
+                        f"; {result.failed_files:,} recording files failed separately."
+                        if result.failed_files
+                        else "."
+                    )
+                )
+                if result is not None
+                else "The immutable artifact and its publication receipt were verified."
             ),
         }[record.status]
         self.run_title.setText(record.title)
@@ -1322,16 +1476,33 @@ class DetectWorkspacePage(QScrollArea):
                 self.run_header_layout.addWidget(self.view_run_button, 0, 2)
             self.setup_layout.removeWidget(self.model_card)
             self.setup_layout.removeWidget(self.collection_card)
+            for row in (
+                self.minimum_score_row,
+                self.window_overlap_row,
+                self.combine_nearby_row,
+            ):
+                self.settings_layout.removeWidget(row)
             if compact:
                 self.setup_layout.addWidget(self.model_card, 0, 0)
                 self.setup_layout.addWidget(self.collection_card, 1, 0)
                 self.setup_layout.setColumnStretch(0, 1)
                 self.setup_layout.setColumnStretch(1, 0)
+                self.settings_layout.addWidget(self.minimum_score_row, 0, 0)
+                self.settings_layout.addWidget(self.window_overlap_row, 1, 0)
+                self.settings_layout.addWidget(self.combine_nearby_row, 2, 0)
+                self.settings_layout.setColumnStretch(0, 1)
+                self.settings_layout.setColumnStretch(1, 0)
+                self.settings_layout.setColumnStretch(2, 0)
             else:
                 self.setup_layout.addWidget(self.model_card, 0, 0)
                 self.setup_layout.addWidget(self.collection_card, 0, 1)
                 self.setup_layout.setColumnStretch(0, 1)
                 self.setup_layout.setColumnStretch(1, 1)
+                self.settings_layout.addWidget(self.minimum_score_row, 0, 0)
+                self.settings_layout.addWidget(self.window_overlap_row, 0, 1)
+                self.settings_layout.addWidget(self.combine_nearby_row, 0, 2)
+                for column in range(3):
+                    self.settings_layout.setColumnStretch(column, 1)
             self.inventory_layout.removeWidget(self.inventory_table_card)
             self.inventory_layout.removeWidget(self.inventory_detail_card)
             if compact:
@@ -1348,6 +1519,27 @@ class DetectWorkspacePage(QScrollArea):
             else:
                 self.run_layout.addWidget(self.run_progress_card, 0, 0)
                 self.run_layout.addWidget(self.run_activity_card, 0, 1)
+            for layout in (
+                self.setup_layout,
+                self.settings_layout,
+                self.setup_view.layout(),
+                self.inventory_layout,
+                self.recordings_view.layout(),
+                self.run_layout,
+                self.run_view.layout(),
+            ):
+                layout.invalidate()
+                layout.activate()
+            self.route_stack.layout().invalidate()
+            self.route_stack.layout().activate()
+            for widget in (
+                self.setup_view,
+                self.recordings_view,
+                self.run_view,
+                self.route_stack,
+                self.content,
+            ):
+                widget.updateGeometry()
 
     @property
     def is_compact(self) -> bool:
