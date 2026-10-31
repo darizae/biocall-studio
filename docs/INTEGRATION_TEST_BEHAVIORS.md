@@ -61,7 +61,21 @@ No planned case counts as covered.
 | `IT-DET-020` | real concatenated WAV plus Raven TSV offsets and both-mode receipt on distinct sources; reopen all outputs | TD-WAV, TD-FAIL | [ST-10](specs/ST-10-corpus-export.md) |
 | `IT-DET-021` | real stale/permission/collision/disk error/cancel and destination Show in folder in native Qt; no partial visible success or source mutation | TD-UI, TD-PATH, TD-FAIL, TD-RUN | [ST-10](specs/ST-10-corpus-export.md) |
 
-## 1c. Planned whole-Studio integration (ST-11 ONLY)
+## 1c. Planned post-ST-10 revision integration (REV-01–REV-03)
+
+These cases execute only after the owning revision's predecessor is reviewed. They remain scoped
+package, workflow or widget-boundary checks; they do not introduce the whole-Studio scientific E2E
+reserved for ST-11.
+
+| Case ID | Public seam / expected result | Data | Spec |
+|---|---|---|---|
+| `IT-STU-009` | Build and clean-install the unified wheel; only `biocall_studio` and the canonical command are exposed, the removed package/command fail, the native shell starts, and real Train/Detect supervised Workers launch through canonical private modes with unchanged input WAV bytes and equivalent fresh artifacts. | TD-UI, TD-RUN, TD-WAV, TD-TRAIN, TD-EXPORT | [REV-01](specs/manual_revision_specs/REV-01-project-consolidation.md) |
+| `IT-DET-023` | Real Qt stepper and Back/forward focus exercise Setup→Recordings→Run preparation, Start without returning to Setup, active/completed Run transition, bulk inclusion confirmation, CNN/RF semantic badges, and selection-free Export planning with no artifact publication at normal/compact widths. | TD-UI, TD-WAV, TD-RUN, TD-FAIL | [REV-02](specs/manual_revision_specs/REV-02-detect-guided-workflow.md) |
+| `IT-UI-006` | Native Studio launch uses only approved launch copy and one readable light theme under host dark appearance, exposes no theme control and preserves keyboard/focus behavior at normal/compact widths and 100%/150% scaling. | TD-UI, TD-OS | [REV-03](specs/manual_revision_specs/REV-03-interface-language-and-theme.md) |
+| `IT-TRAIN-015` | Every Train page and all 67 configuration fields expose the owner-approved contextual/configuration/disabled-choice tooltip decisions through real keyboard-accessible Qt HelpHints and descriptions; removed hints and rejected visible copy are absent. | TD-CONFIG, TD-UI | [REV-03](specs/manual_revision_specs/REV-03-interface-language-and-theme.md) |
+| `IT-DET-024` | Every final Detect route/state uses approved HelpHints and recordings-folder terminology, removes duplicate prompts/alerts and renders concise actionable Model/Result states while preserving missing/empty/stale/partial distinctions. | TD-UI, TD-FAIL, TD-CACHE | [REV-03](specs/manual_revision_specs/REV-03-interface-language-and-theme.md) |
+
+## 1d. Planned whole-Studio integration (ST-11 ONLY)
 
 | Case ID | Public seam / expected result | Data | Spec |
 |---|---|---|---|

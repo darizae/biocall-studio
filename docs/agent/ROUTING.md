@@ -12,6 +12,9 @@
 | ST-08 Results UI | [ST-08](../specs/ST-08-results-ux.md), ST-07 Result contract, [UX matrix](../design/UX_PARITY_MATRIX.md) |
 | ST-09 RF | [ST-09](../specs/ST-09-rf-refinement.md), RF Model/Result contracts, exact verified RF source/tests |
 | ST-10 export | [ST-10](../specs/ST-10-corpus-export.md), selected Result contract, actual WAV extraction/Raven reference |
+| REV-01 consolidation | [REV-01](../specs/manual_revision_specs/REV-01-project-consolidation.md), reviewed ST-10 handoff, actual package/build/import/Worker seams and live source instructions |
+| REV-02 Detect workflow | [REV-02](../specs/manual_revision_specs/REV-02-detect-guided-workflow.md), accepted REV-01 layout, current Detect controller/Qt routes and installed public `alp-ui` source |
+| REV-03 copy/theme | [REV-03](../specs/manual_revision_specs/REV-03-interface-language-and-theme.md), accepted REV-02 routes, exact tooltip inventory and owner-approved copy table |
 | ST-11 full qualification | [ST-11](../specs/ST-11-unified-qualification.md), existing [macOS](../specs/06-macos-release-and-installer.md)/[Windows](../specs/07-windows-release-and-installer.md) requirements, [release process](../RELEASE_PROCESS.md) |
 
 **Just-in-time references:** UI work → accepted [prototype](../design/prototypes/studio-detect/index.html), [UX parity matrix](../design/UX_PARITY_MATRIX.md), [public alp-ui contract](../design/ALP_UI_CONSUMER_CONTRACT.md), genuine Train screenshots; tests → **only owning rows** in [unit index](../UNIT_TESTING.md), [integration index](../INTEGRATION_TEST_BEHAVIORS.md), [TD fixtures](../INTEGRATION_TEST_DATA.md); upstream needed → [source map](SOURCE_MAP.md) and [upstream branch procedure](UPSTREAM_TOOLBOX_WORKFLOW.md); Git start/end → [delivery](GIT_DELIVERY.md). No broader reads unless a concrete dependency requires them.

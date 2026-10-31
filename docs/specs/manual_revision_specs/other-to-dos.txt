@@ -1,0 +1,6 @@
+- Changing the project and repo name to biocall-studio
+- Root README is bloated and most commands don't even work when I run them manually
+-Need to reorganize folder structure; right now it doesn’t make sense. Extract common things also, more modular and domain-driven.
+    - Doesn't make sense that src/biocall_studio is separate from biocall_studio_train. Bro train is a subset of biocall_studio. And there should be common things between train, detect and eventually review (not sure, I would image). REFACTOR.
+- Do manual review; UI pass, trim down and get rid of stuff (Random text on UI that doesn’t need to be there or is just very weird machine-like phrasing, very user-unfriendly phrasing and wording, Remove!All these little captions and shit are so distracting and don’t contribute anything)
+- No fucking dark mode whatsoever

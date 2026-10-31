@@ -1,6 +1,6 @@
 # ST-10 — Frozen corpus export (WAV and Raven TSV)
 
-**Branch:** `detect-st10-corpus-export` from reviewed `detect`. **Predecessors:** ST-07 immutable Result, ST-08 selection, optional ST-09 derived Result. **Successor:** ST-11. **Status:** planned.
+**Branch:** `detect-st10-corpus-export` from reviewed `detect`. **Predecessors:** ST-07 immutable Result, ST-08 selection, optional ST-09 derived Result. **Successor:** REV-01. **Status:** planned.
 
 ## Scope and ownership
 

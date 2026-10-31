@@ -1,0 +1,28 @@
+**Rephrase**
+
+- “From recordings to evidence” → “From raw audio to corpora”
+- Tooltips are ABSOLUTE SHIT. They are NOT user friendly AT ALL. Examples: “"Detect verifies the Train manifest, checksums, binary class mapping, and " "runtime structure. Numerical prediction behavior is rechecked before a Run.",”, “hint = HelpHint( "A Detect Collection keeps a stable identity if its recordings folder moves. " "A different recordings folder creates a different Collection.", subject="Detect Collection", )” → also fucking retarded. Bro, if I see “Detect Collection” (which is shit naming btw), I’d expect the tooltip to tell me WHAT A DETECT COLLECTION EVEN IS. NOT THIS FUCKING BULLSHIT OF STABLE IDENTITY OR WHATEVER. FFS.
+    - THINK LIKE A USER. A VERY DUMB USER. LAYMAN TERMS, CONSISTENT TERMINOLOGY. WHAT WOULD I WANT TO KNOW BY LOOKING AT THE TOOLTIP? THAT’S WHAT WE WANT.
+    - Create a list of all tooltips right now, and your proposed rephrasing.
+    - All tooltips in general are shit.
+
+**Remove**
+
+Bunch of distracting, bloating shit the user shouldn’t event care about. Examples:
+
+- <p class="overline">CHOOSE A WORKSPACE</p>
+- subtitle = Text( "Train models, detect candidate calls, and review results in one workspace.", role="body", word_wrap=True, )
+- "Choose a CNN Model published by Train.” → all these little hyper redundant helper text is UNNEEDED. Cut down on these HEAVILY.
+- Choose a Train Model folder.
+- self.model_reason = ( "Model files and runtime structure are verified. Numerical prediction " "behavior is checked again before a detection Run." )
+- Choose a folder. Detect stores its metadata separately and l
+- self.alerts = { "available": Alert( "Candidate intervals retain their original recording positions.", title="Original Result", intent="info", ), "partial": Alert( "Successful recordings remain available; file errors are reported separately.", title="Completed with file errors", intent="warning", ),
+- "stale": Alert( "Candidate metadata is preserved, but source navigation is disabled until the " "recording inventory is checked again.", title="Recordings changed after this Result", intent="warning", ), "source-unavailable": Alert( "Candidate metadata is preserved, but the recordings folder must be relinked " "before source navigation is available.", title="Recordings folder unavailable", intent="danger", ), ⇒ fucking nuke all shit like this
+
+**Other things**
+
+- In choosing a folder with train models, the “Incompatible” is almost imperceptible. Has no color in red or warning something to indicate that the folder is invalid.
+- Goin from Setup to Run to Recordings is not too intuitive. There should be arrows to pinpoint to the user that you can go back and forward
+- Even more unintuitive → after selecting the two folders in setup, you’re routed to “Recordings”, and then you need to go back to setup to start the detection? Fucking stupid. The window to start the detection after the two previous steps should be its own page.
+- Also in recordings, there should be the button to just select all.
+- I can’t even access the page to plan the corpus export. Wtf?
