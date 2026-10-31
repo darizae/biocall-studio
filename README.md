@@ -1,151 +1,34 @@
-<p align="center">
-  <img src="assets/branding/on-background/readme-header.png" alt="BioCall Studio" width="900" />
-</p>
-
 # BioCall Studio
 
-Move from recordings to evidence on your own computer.
+BioCall Studio is a native desktop application for bioacoustics research. Its Train workflow
+builds reproducible Datasets and CNN or Random Forest Models from labeled recordings. Detect
+validates those Models, inventories unseen WAV files, finds and refines candidate calls, and
+exports selected source-time audio and Raven tables. Review remains an honest shell placeholder.
 
-BioCall Studio opens with native Train, Detect, and Review workspaces. Train is available now and
-guides bioacoustics researchers from WAV recordings and known positive examples to a reproducible
-Dataset and a verified CNN or Random Forest Model. Detect currently has an honest landing state;
-Review is coming later.
+BioCall Studio supports Python **3.11–3.13**. Source development requires Git and adjacent,
+owner-reviewed checkouts of:
 
-> **Development preview:** the native macOS application is working from source. Packaged macOS
-> and Windows installers are on the roadmap and are not available yet.
+- `../bioacoustics-dl-toolbox` at the revision recorded in `pyproject.toml`;
+- `../alp-ui` at the revision recorded in `pyproject.toml`.
 
-## What it does
+## Install and launch from source
 
-- Checks real WAV headers and positive-example filenames before training.
-- Builds balanced, source-grouped Datasets without copying or changing source recordings.
-- Trains genuine local CPU CNN and Random Forest models with measured validation results.
-- Keeps immutable Datasets, Runs, Models, logs, and provenance in the Collection's `.alpaca/`
-  workspace.
-- Supports safe cancellation, recovery, local diagnostics, and an optional keep-awake setting for
-  long runs.
-
-The current native Train workspace creates models; it does not apply them to new recordings.
-Automated detection and expert review belong to the planned Detect and Review workspaces in the
-same BioCall Studio application.
-
-## Install and run from source
-
-You need Python **3.11–3.13**, Git, and adjacent checkouts of
-`bioacoustics-dl-toolbox` and `alp-ui`. The commands below create a project-local environment and
-do not install packages globally.
+From a BioCall Studio checkout with those siblings in place, create a clean environment:
 
 ```bash
-git clone git@github.com:darizae/biocall-studio-train.git
-cd biocall-studio-train
-
-python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -e '../bioacoustics-dl-toolbox[rf]'
-.venv/bin/python -m pip install -e '.[gui,test,integration]'
-.venv/bin/python -m pip install -e ../alp-ui
-
-.venv/bin/python -m biocall_studio
+python3.12 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e '../bioacoustics-dl-toolbox[rf]'
+python -m pip install -e ../alp-ui
+python -m pip install -e '.[test,integration]'
+python -m biocall_studio
 ```
 
-After installation, the console command is equivalent:
+The equivalent installed console command is `biocall-studio`. It is the only public application
+command. Windows source and packaging commands remain unqualified until they are exercised on
+native Windows; see [development guidance](docs/DEVELOPMENT.md).
 
-```bash
-.venv/bin/biocall-studio
-```
-
-The existing direct Train entry remains available for focused training work and supervised Workers:
-
-```bash
-.venv/bin/python -m biocall_studio_train
-.venv/bin/biocall-studio-train
-```
-
-To try the complete workflow without bringing a large Collection, follow the
-[manual end-to-end trial](docs/MANUAL_WORKFLOW.md). It generates a fresh, tiny real-WAV Collection
-outside the tracked fixtures and walks through Dataset Build, genuine CNN and Random Forest
-training, restart, and Model reopen.
-
-On Windows, use `.venv\Scripts\python.exe` instead of `.venv/bin/python`. Windows remains an
-unqualified development environment until the native installer milestone is complete. See
-[Development](docs/DEVELOPMENT.md) for environment troubleshooting and test commands.
-
-## Prepare a Collection
-
-Point the app at one folder containing your original recordings and exported positive examples:
-
-```text
-Rainforest-dawn/
-  recordings/
-    SITE_001.wav
-  positives/
-    SITE_001__start-012500ms__end-014900ms__call01.wav
-```
-
-The timestamps in a positive filename identify its interval in the original Source Recording and
-use integer milliseconds. The app validates the relationship before it publishes metadata. Read
-[Selecting a Collection](docs/wiki/SELECTING_A_COLLECTION.md) for the complete naming rules.
-
-## A typical workflow
-
-Open BioCall Studio and choose a workspace. Train retains its route, draft, scan, and active work
-when you return to the launchpad.
-
-![BioCall Studio native launchpad](docs/design/evidence/st-02-native/studio-normal.png)
-
-1. **Select and check a Collection.** Choose the existing folder; BioCall Studio Train reads WAV
-   headers without importing or moving audio.
-
-   ![BioCall Studio Train Collection selection](docs/design/evidence/spec-01-native/select.png)
-
-2. **Fix clear input problems.** The Collection view points to individual files and explains what
-   needs attention before Dataset Build is enabled.
-
-   ![Validated Collection overview](docs/design/evidence/spec-02-native/collection-valid.png)
-
-3. **Build a reproducible Dataset.** Choose source recordings, negative-window policy, split, and
-   seed. Recordings stay grouped so one source cannot leak across train and validation.
-
-   ![Dataset Builder](docs/design/evidence/spec-03-native/builder.png)
-
-4. **Configure and train.** Start with the compact controls, open detailed settings only when you
-   need them, and save useful presets.
-
-   ![CNN training configuration](docs/design/evidence/spec-05-native/train-cnn.png)
-
-5. **Inspect the evidence.** Follow measured loss or feature importance, then reopen the verified
-   Model together with its Dataset, Run, metrics, and provenance.
-
-   ![Completed CNN training Run with measured loss](docs/design/evidence/spec-05-native/run-cnn-plot.png)
-
-The native screenshots above document selected implemented Train states. Other behavior must
-be verified in the current code and tests; screenshots alone do not prove execution.
-
-## Roadmap
-
-- **Available from source:** Collection validation, Dataset Build, persisted Runs, CNN and Random
-  Forest training, Model verification, diagnostics, safe exit, and optional keep-awake.
-- **Available from source:** the native Studio launchpad and workspace switching, with retained
-  Train state and safe application exit.
-- **Next implementation stages:** Detect metadata, source inventory, Model intake, Workers,
-  candidate results, RF assessment, and corpus export.
-- **Release qualification:** macOS and Windows packaging follow the unified application stages and
-  explicit owner approval.
-
-## Development
-
-Run the fast repository checks with:
-
-```bash
-.venv/bin/python scripts/verify_handoff.py
-.venv/bin/python -m pytest -q tests/unit
-.venv/bin/python -m pytest -q tests/integration
-```
-
-Native GUI evidence must be captured on a real desktop; Qt offscreen output is supplemental only.
-Contributors should start with [AGENTS.md](AGENTS.md), then follow the
-[task router](docs/agent/ROUTING.md) to the single active specification. The current active stage
-is [ST-02: native Studio shell](docs/specs/ST-02-native-shell.md).
-
-Brand assets are copied into this repository and documented in
-[assets/branding](assets/branding/README.md); they are not a runtime dependency on the separate
-brand-kit checkout.
+For test commands, dependency checks, and platform status, see
+[Development](docs/DEVELOPMENT.md). For a genuine local workflow using deterministic audio, see
+[Manual workflow](docs/MANUAL_WORKFLOW.md).

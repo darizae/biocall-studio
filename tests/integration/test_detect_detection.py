@@ -18,43 +18,44 @@ from bioacoustics_dl_toolbox.prediction import predict_windows
 from bioacoustics_dl_toolbox.rf import compute_rf_features
 from PySide6.QtCore import Qt
 
-from biocall_studio.detect.controller import DetectWorkspaceController, ModelIntakeState
-from biocall_studio.detect.detection import (
+from biocall_studio.detect.application.controller import DetectWorkspaceController, ModelIntakeState
+from biocall_studio.detect.application.model_intake import inspect_model_directory
+from biocall_studio.detect.domain.detection import (
     DetectionSettings,
     merge_candidate_windows,
     predict_recording_windows,
 )
-from biocall_studio.detect.inventory import InclusionDecision
-from biocall_studio.detect.models import ModelFamily, inspect_model_directory
-from biocall_studio.detect.result_views import (
+from biocall_studio.detect.domain.inventory import InclusionDecision
+from biocall_studio.detect.domain.models import ModelFamily
+from biocall_studio.detect.domain.result_views import (
     CandidateViewRow,
     RecordingViewRow,
     ResultContentState,
     ResultSourceState,
 )
-from biocall_studio.detect.results import FileOutcomeStatus
-from biocall_studio.detect.rf_refinement import (
+from biocall_studio.detect.domain.results import FileOutcomeStatus
+from biocall_studio.detect.domain.rf_refinement import (
     RefinementStatus,
     extract_candidate_features,
 )
-from biocall_studio.detect.run_persistence import DetectRunRepository
-from biocall_studio.detect.runs import DetectRunStatus
-from biocall_studio.gui.detect import DetectWorkspacePage
-from biocall_studio.gui.detect_results import CandidateResultModel
-from biocall_studio_train.application.collection_scan import scan_collection
-from biocall_studio_train.domain.dataset import BuildConfig
-from biocall_studio_train.domain.training import (
+from biocall_studio.detect.domain.runs import DetectRunStatus
+from biocall_studio.detect.gui.results import CandidateResultModel
+from biocall_studio.detect.gui.workspace import DetectWorkspacePage
+from biocall_studio.detect.persistence.runs import DetectRunRepository
+from biocall_studio.train.application.collection_scan import scan_collection
+from biocall_studio.train.domain.dataset import BuildConfig
+from biocall_studio.train.domain.training import (
     DeviceCapabilities,
     TrainingDataset,
     TrainingDraft,
     freeze_training_config,
 )
-from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
-from biocall_studio_train.persistence.datasets import load_dataset
-from biocall_studio_train.persistence.models import ModelArtifact
-from biocall_studio_train.workflows.cnn_training import CnnTrainingRequest, train_cnn_model
-from biocall_studio_train.workflows.dataset_build import build_dataset
-from biocall_studio_train.workflows.rf_training import RfTrainingRequest, train_rf_model
+from biocall_studio.train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio.train.persistence.datasets import load_dataset
+from biocall_studio.train.persistence.models import ModelArtifact
+from biocall_studio.train.workflows.cnn_training import CnnTrainingRequest, train_cnn_model
+from biocall_studio.train.workflows.dataset_build import build_dataset
+from biocall_studio.train.workflows.rf_training import RfTrainingRequest, train_rf_model
 
 pytestmark = pytest.mark.integration
 
@@ -267,7 +268,7 @@ def test_real_wav_cpu_cnn_matches_verified_upstream_reference(genuine_cnn):
 def test_real_run_publishes_reopenable_metadata_result_and_native_controls(
     qapp, qtbot, genuine_cnn, tmp_path
 ):
-    """Case: IT-DET-013."""
+    """Cases: IT-DET-013, IT-STU-009."""
     app_data = tmp_path / "application-data"
     controller = DetectWorkspaceController(app_data)
     page = DetectWorkspacePage(controller)
@@ -396,7 +397,7 @@ def test_native_result_history_recording_candidates_selection_and_keyboard_navig
     assert explorer.candidate_model.rowCount() > 0
     opened_urls = []
     monkeypatch.setattr(
-        "biocall_studio.gui.detect_results.QDesktopServices.openUrl",
+        "biocall_studio.detect.gui.results.QDesktopServices.openUrl",
         lambda url: opened_urls.append(url) or True,
     )
     explorer.show_source_button.click()
@@ -733,7 +734,7 @@ def _canonical_rf_reference(raw: dict[str, float], *, n_mfcc: int) -> dict[str, 
 def test_real_rf_reference_probability_persists_independent_native_derived_result(
     qapp, qtbot, genuine_cnn, genuine_rf, tmp_path
 ):
-    """Case: IT-DET-017."""
+    """Cases: IT-DET-017, IT-STU-009."""
     source = tmp_path / "rf-result-source"
     shutil.copytree(genuine_cnn.root / "recordings", source / "recordings")
     app_data = tmp_path / "application-data"

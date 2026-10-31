@@ -12,4 +12,4 @@ Train's current PySide6 code and genuine native screenshots are authoritative fo
 - `docs/design/evidence/spec-05-native/train-cnn.png`
 - `docs/design/evidence/spec-05-native/run-cnn-plot.png`
 
-Inspect `src/biocall_studio_train/gui/`, `application/workspace.py` and relevant real tests for functional acceptance. [Studio UX matrix](UX_PARITY_MATRIX.md) owns *new* screen acceptance; [Model export contract](../science/MODEL_EXPORT_CONTRACT.md) owns Model facts. No changes to Train are authorized by ST-01.
+Inspect `src/biocall_studio/train/gui/`, `application/workspace.py` and relevant real tests for functional acceptance. [Studio UX matrix](UX_PARITY_MATRIX.md) owns *new* screen acceptance; [Model export contract](../science/MODEL_EXPORT_CONTRACT.md) owns Model facts. No changes to Train are authorized by ST-01.

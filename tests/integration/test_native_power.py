@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from biocall_studio_train.application.power import KeepAwakeManager, native_power_adapter
+from biocall_studio.train.application.power import KeepAwakeManager, native_power_adapter
 
 pytestmark = pytest.mark.integration
 
@@ -35,7 +35,7 @@ def test_native_idle_sleep_acquisition_release_and_process_death():
 
     code = """
 import time
-from biocall_studio_train.application.power import KeepAwakeManager, native_power_adapter
+from biocall_studio.train.application.power import KeepAwakeManager, native_power_adapter
 manager = KeepAwakeManager(native_power_adapter())
 state = manager.apply_requested(True)
 assert state.active, state.error

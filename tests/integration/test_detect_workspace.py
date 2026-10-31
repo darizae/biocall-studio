@@ -9,15 +9,15 @@ import pytest
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFileDialog, QPushButton
 
-from biocall_studio.detect.controller import DetectWorkspaceController
+from biocall_studio.detect.application.controller import DetectWorkspaceController
 from biocall_studio.detect.domain import RootBindingDecision
+from biocall_studio.detect.gui.workspace import DetectWorkspacePage
 from biocall_studio.detect.persistence import (
     DetectWorkspaceStore,
     WorkspaceMetadataError,
 )
-from biocall_studio.gui.app import create_application, default_detect_data_dir
-from biocall_studio.gui.detect import DetectWorkspacePage
-from biocall_studio_train.gui.app import default_settings_dir
+from biocall_studio.studio.application.app import create_application, default_suite_data_root
+from biocall_studio.studio.application.storage import SuiteDataPaths
 
 pytestmark = [pytest.mark.integration, pytest.mark.qt]
 
@@ -147,8 +147,10 @@ def test_app_owned_atomic_metadata_recovery_containment_and_source_nonmutation(
     paths = store.paths_for(collection.ref.collection_id)
 
     create_application()
-    assert default_detect_data_dir().name == "biocall-studio"
-    assert default_detect_data_dir() != default_settings_dir()
+    suite_paths = SuiteDataPaths.from_root(default_suite_data_root())
+    assert suite_paths.root.name == "biocall-studio"
+    assert suite_paths.train == suite_paths.root / "train" / "v1"
+    assert suite_paths.detect == suite_paths.root / "detect" / "v1"
     assert paths.workspace_root == application_data / "detect" / "v1"
     assert paths.collection_directory.is_relative_to(paths.workspace_root)
     assert store.settings_path.parent == paths.workspace_root

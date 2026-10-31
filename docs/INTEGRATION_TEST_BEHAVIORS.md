@@ -20,7 +20,7 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-STU-001` | New Studio entry creates one themed `QApplication`, shows branded launchpad; accessible cards, keyboard/focus and visible Studio identity use native Qt/`alp-ui`. | TD-UI |
 | `IT-STU-002` | Studio → real Train → Studio → Train reuses controller/window, preserves current Train route and live training draft, and leaves Collection bindings and input WAV unchanged. Return control works at compact widths. | TD-UI, TD-COL |
 | `IT-STU-003` | Real Train QProcess Run and scan remain active while visiting Studio; application Quit from either visible/hidden workspace preserves Train's single safe close/cancel/keep-open policy and releases Worker/lease/resources only after confirmed stop. | TD-RUN, TD-FAIL, TD-UI |
-| `IT-STU-004` | Canonical Studio entry, old Train CLI and Train `-m ... --worker` protocol coexist; settings path and validated binding survive app entrypoint/display-name change and restart, including isolated test settings. | TD-UI, TD-CACHE |
+| `IT-STU-004` | Canonical Studio entry retains a validated Train binding under isolated suite data while supervised Train work launches through the canonical private Worker protocol. | TD-UI, TD-CACHE |
 | `IT-STU-005` | Detect Collection setup and Review placeholder have reachable, keyboard-operable returns; Detect adds no invented Model, inventory, prediction, result, simulated value or enabled detection action. | TD-UI |
 | `IT-STU-006` | Real native Studio/Train/Detect/Review screenshots at normal and compact widths show checked-in branding, focus and contrast; no Train layout regression or inaccessible switch; report unavailable native platforms separately. | TD-UI, TD-OS |
 

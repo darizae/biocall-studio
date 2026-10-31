@@ -12,15 +12,15 @@ from alp_ui.components import DataTable, HelpHint, NumberInput, ProgressBar, Sel
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QInputDialog, QMessageBox
 
-from biocall_studio_train.application.collection_scan import scan_collection
-from biocall_studio_train.application.workspace import WorkspaceController
-from biocall_studio_train.domain.dataset import BuildConfig, Interval, protected_intervals
-from biocall_studio_train.gui.app import create_application
-from biocall_studio_train.gui.dataset import DatasetBuilderPage, DatasetDetailPage
-from biocall_studio_train.gui.window import MainWindow
-from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
-from biocall_studio_train.persistence.datasets import delete_dataset, list_datasets, load_dataset
-from biocall_studio_train.workflows.dataset_build import (
+from biocall_studio.studio.application.app import create_application
+from biocall_studio.train.application.collection_scan import scan_collection
+from biocall_studio.train.application.workspace import WorkspaceController
+from biocall_studio.train.domain.dataset import BuildConfig, Interval, protected_intervals
+from biocall_studio.train.gui.dataset import DatasetBuilderPage, DatasetDetailPage
+from biocall_studio.train.gui.window import MainWindow
+from biocall_studio.train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio.train.persistence.datasets import delete_dataset, list_datasets, load_dataset
+from biocall_studio.train.workflows.dataset_build import (
     DatasetBuildCancelled,
     DatasetBuildError,
     DatasetBuildUnderfill,
@@ -70,7 +70,7 @@ def _wav_frames(path: Path) -> bytes:
 def test_real_source_audio_is_materialized_with_protected_windows_and_grouped_splits(
     tmp_path, wav_factory
 ):
-    """Cases: IT-DB-001, IT-AUDIO-003."""
+    """Cases: IT-DB-001, IT-AUDIO-003, IT-STU-009."""
     root = _collection(tmp_path / "collection", wav_factory)
     result = _published(root)
     source_bytes = {path: path.read_bytes() for path in root.glob("recordings/*.wav")}

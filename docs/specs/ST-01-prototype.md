@@ -5,7 +5,7 @@
 ## Entry inspection (scoped)
 
 1. Follow `AGENTS.md` and `docs/agent/ROUTING.md`; verify real Git status and the ST-01 branch base. Check actual files before following docs; historical paths may be absent.
-2. Inspect current Train navigation/screen composition in `src/biocall_studio_train/gui/`, relevant controller state, and genuine native screenshots under `docs/design/evidence/spec-*-native/`. Read the smallest necessary slices of Model export, `docs/PREDICTION.md`, `docs/design/UX_PARITY_MATRIX.md`.
+2. Inspect current Train navigation/screen composition in `src/biocall_studio/train/gui/`, relevant controller state, and genuine native screenshots under `docs/design/evidence/spec-*-native/`. Read the smallest necessary slices of Model export, `docs/PREDICTION.md`, `docs/design/UX_PARITY_MATRIX.md`.
 3. Inspect **`/Users/danie/repos/BioCall-Studio`** for the provided **full branding asset folder**. Compare it with the repository's existing `assets/branding/`; synchronize the supplied asset set into that established location, preserving its useful directory structure, updating matching files only after comparison, and avoiding duplicate copies. The prototype references the repository assets by relative path. Do not invent replacement branding. Inspect the installed `../alp-ui` public components/Showcase and existing Train styling.
 
 ## Deliverable

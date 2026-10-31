@@ -56,7 +56,7 @@ and cannot be presented as candidate output.
 ## Required ST-07 consumer work
 
 ST-07 must add a separate scientific Worker; do not put inference in
-`biocall_studio.detect.fixture_worker`. It must:
+`biocall_studio.detect.workflows.fixture`. It must:
 
 1. consume a `freeze_run_request()` built from the current ST-04 Inventory and ST-05 CNN
    ModelSnapshot plus the ST-07-owned explicit settings;

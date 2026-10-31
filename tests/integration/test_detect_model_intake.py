@@ -16,26 +16,26 @@ from alp_ui.components import HelpHint
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFileDialog, QPushButton
 
-from biocall_studio.detect.controller import DetectWorkspaceController, ModelIntakeState
-from biocall_studio.detect.models import (
+from biocall_studio.detect.application.controller import DetectWorkspaceController, ModelIntakeState
+from biocall_studio.detect.application.model_intake import inspect_model_directory
+from biocall_studio.detect.domain.models import (
     ModelFamily,
     ScientificEvidenceState,
-    inspect_model_directory,
 )
-from biocall_studio.gui.detect import DetectWorkspacePage
-from biocall_studio_train.application.collection_scan import scan_collection
-from biocall_studio_train.domain.dataset import BuildConfig
-from biocall_studio_train.domain.training import (
+from biocall_studio.detect.gui.workspace import DetectWorkspacePage
+from biocall_studio.train.application.collection_scan import scan_collection
+from biocall_studio.train.domain.dataset import BuildConfig
+from biocall_studio.train.domain.training import (
     DeviceCapabilities,
     TrainingDataset,
     TrainingDraft,
     freeze_training_config,
 )
-from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
-from biocall_studio_train.persistence.models import ModelArtifact
-from biocall_studio_train.workflows.cnn_training import CnnTrainingRequest, train_cnn_model
-from biocall_studio_train.workflows.dataset_build import build_dataset
-from biocall_studio_train.workflows.rf_training import RfTrainingRequest, train_rf_model
+from biocall_studio.train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio.train.persistence.models import ModelArtifact
+from biocall_studio.train.workflows.cnn_training import CnnTrainingRequest, train_cnn_model
+from biocall_studio.train.workflows.dataset_build import build_dataset
+from biocall_studio.train.workflows.rf_training import RfTrainingRequest, train_rf_model
 
 pytestmark = pytest.mark.integration
 
@@ -225,7 +225,7 @@ def test_genuine_train_exports_inspect_in_fresh_process_with_installed_toolbox_w
         import sys
         import bioacoustics_dl_toolbox
         from pathlib import Path
-        from biocall_studio.detect.models import inspect_model_directory
+        from biocall_studio.detect.application.model_intake import inspect_model_directory
 
         snapshots = [
             inspect_model_directory(Path(path)).snapshot.to_dict()
@@ -292,7 +292,7 @@ def test_invalid_or_untrusted_genuine_exports_are_denied(
         other_binary = genuine_exports.rf.root / "random_forest.joblib"
         shutil.copy2(other_binary, binary)
         manifest["artifact"]["size_bytes"] = binary.stat().st_size
-        from biocall_studio_train.persistence.integrity import sha256_file
+        from biocall_studio.shared.integrity import sha256_file
 
         manifest["artifact"]["sha256"] = sha256_file(binary)
         manifest_path.write_text(json.dumps(manifest))

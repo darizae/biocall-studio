@@ -15,20 +15,22 @@ from bioacoustics_dl_toolbox.config import (
     SpectrogramConfig,
 )
 
-from biocall_studio.detect import models
-from biocall_studio.detect.models import (
+from biocall_studio.detect.application import model_intake as models
+from biocall_studio.detect.application.model_intake import (
+    inspect_model_directory,
+    recheck_model_reference,
+)
+from biocall_studio.detect.domain.models import (
     ModelFamily,
     ModelRole,
     ModelSnapshot,
     ScientificEvidenceState,
-    inspect_model_directory,
-    recheck_model_reference,
 )
-from biocall_studio_train.domain.model import (
+from biocall_studio.train.domain.model import (
     MODEL_SCIENTIFIC_REFERENCE,
     MODEL_TOOLBOX_REVISION,
 )
-from biocall_studio_train.domain.rf_training import rf_feature_names
+from biocall_studio.train.domain.rf_training import rf_feature_names
 
 
 def _collection_manifest() -> dict[str, object]:
@@ -163,8 +165,8 @@ def _cnn_manifest(model_id: str, binary: Path) -> dict:
             },
             "provenance": {
                 "trainer": {
-                    "distribution": "biocall-studio-train",
-                    "version": version("biocall-studio-train"),
+                    "distribution": "biocall-studio",
+                    "version": version("biocall-studio"),
                 },
                 "toolbox": {
                     "distribution": "bioacoustics-dl-toolbox",
@@ -279,8 +281,8 @@ def _rf_manifest(model_id: str, binary: Path) -> dict:
             },
             "provenance": {
                 "trainer": {
-                    "distribution": "biocall-studio-train",
-                    "version": version("biocall-studio-train"),
+                    "distribution": "biocall-studio",
+                    "version": version("biocall-studio"),
                 },
                 "toolbox": {
                     "distribution": "bioacoustics-dl-toolbox",

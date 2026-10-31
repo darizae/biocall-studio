@@ -5,16 +5,15 @@ from dataclasses import FrozenInstanceError, replace
 
 import pytest
 
-from biocall_studio.detect.detection import DetectionSettings
-from biocall_studio.detect.result_views import (
+from biocall_studio.detect.domain.detection import DetectionSettings
+from biocall_studio.detect.domain.result_views import (
     ResultContentState,
-    ResultSelectionStore,
     ResultSourceState,
     SelectionReconciliation,
     freeze_result_selection,
     project_result,
 )
-from biocall_studio.detect.results import (
+from biocall_studio.detect.domain.results import (
     CandidateInterval,
     DetectionResult,
     FileOutcomeStatus,
@@ -22,6 +21,7 @@ from biocall_studio.detect.results import (
     candidate_identity,
     recording_identity,
 )
+from biocall_studio.detect.persistence.selection import ResultSelectionStore
 
 
 def _outcome(

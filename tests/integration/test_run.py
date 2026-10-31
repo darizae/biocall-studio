@@ -7,23 +7,23 @@ from alp_ui.components import Alert, Badge, Button, DataTable, ProgressBar, Text
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QInputDialog, QMessageBox
 
-from biocall_studio_train.application.collection_scan import scan_collection
-from biocall_studio_train.application.workspace import WorkspaceController
-from biocall_studio_train.domain.dataset import BuildConfig
-from biocall_studio_train.domain.run import (
+from biocall_studio.studio.application.app import create_application
+from biocall_studio.train.application.collection_scan import scan_collection
+from biocall_studio.train.application.workspace import WorkspaceController
+from biocall_studio.train.domain.dataset import BuildConfig
+from biocall_studio.train.domain.run import (
     RunConflictError,
     RunKind,
     RunStatus,
     new_run,
     transition_run,
 )
-from biocall_studio_train.gui.app import create_application
-from biocall_studio_train.gui.run import RunDetailPage, RunListPage
-from biocall_studio_train.gui.window import MainWindow
-from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
-from biocall_studio_train.persistence.datasets import list_datasets
-from biocall_studio_train.persistence.runs import create_run, load_run, reconcile_runs
-from biocall_studio_train.workflows.dataset_build import build_dataset
+from biocall_studio.train.gui.run import RunDetailPage, RunListPage
+from biocall_studio.train.gui.window import MainWindow
+from biocall_studio.train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio.train.persistence.datasets import list_datasets
+from biocall_studio.train.persistence.runs import create_run, load_run, reconcile_runs
+from biocall_studio.train.workflows.dataset_build import build_dataset
 
 pytestmark = pytest.mark.integration
 

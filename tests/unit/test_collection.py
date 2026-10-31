@@ -1,6 +1,6 @@
 import pytest
 
-from biocall_studio_train.domain.collection import (
+from biocall_studio.train.domain.collection import (
     MAX_TIMESTAMP_MS,
     InventoryEntry,
     WavHeader,
@@ -11,7 +11,7 @@ from biocall_studio_train.domain.collection import (
     validate_source_match,
     validate_wav_header,
 )
-from biocall_studio_train.persistence.collection_metadata import validate_collection_manifest
+from biocall_studio.train.persistence.collection_metadata import validate_collection_manifest
 
 
 def _header(*, frames=16_000, rate=16_000, channels=1, width=2, codec="PCM"):

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from biocall_studio.detect.diagnostics import (
+from biocall_studio.detect.persistence.diagnostics import (
     BoundedJsonlLog,
     BoundedStderrCapture,
     encode_diagnostic_record,

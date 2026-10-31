@@ -1,1 +1,1 @@
-"""Detect-owned workspace identity, persistence, and application state."""
+"""BioCall Studio Detect workflow."""

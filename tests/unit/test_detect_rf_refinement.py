@@ -5,15 +5,15 @@ from dataclasses import FrozenInstanceError
 import numpy as np
 import pytest
 
-from biocall_studio.detect.detection import DetectionSettings
-from biocall_studio.detect.results import (
+from biocall_studio.detect.domain.detection import DetectionSettings
+from biocall_studio.detect.domain.results import (
     CandidateInterval,
     DetectionResult,
     RecordingOutcome,
     candidate_identity,
     recording_identity,
 )
-from biocall_studio.detect.rf_refinement import (
+from biocall_studio.detect.domain.rf_refinement import (
     DerivedResult,
     RefinementDecision,
     RefinementStatus,

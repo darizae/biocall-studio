@@ -12,21 +12,21 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import Qt, QTimer
 
-from biocall_studio_train.application.collection_scan import scan_collection
-from biocall_studio_train.application.workspace import WorkspaceController
-from biocall_studio_train.domain.dataset import BuildConfig
-from biocall_studio_train.domain.run import RunStatus
-from biocall_studio_train.domain.training import (
+from biocall_studio.studio.application.app import create_application
+from biocall_studio.train.application.collection_scan import scan_collection
+from biocall_studio.train.application.workspace import WorkspaceController
+from biocall_studio.train.domain.dataset import BuildConfig
+from biocall_studio.train.domain.run import RunStatus
+from biocall_studio.train.domain.training import (
     DeviceCapabilities,
     TrainingDataset,
     TrainingDraft,
     freeze_training_config,
 )
-from biocall_studio_train.gui.app import create_application
-from biocall_studio_train.gui.window import MainWindow
-from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
-from biocall_studio_train.persistence.models import load_model
-from biocall_studio_train.workflows.dataset_build import build_dataset
+from biocall_studio.train.gui.window import MainWindow
+from biocall_studio.train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio.train.persistence.models import load_model
+from biocall_studio.train.workflows.dataset_build import build_dataset
 
 pytestmark = [pytest.mark.integration, pytest.mark.qt, pytest.mark.soak]
 
@@ -214,7 +214,7 @@ def test_ten_minute_real_cnn_run_remains_responsive_reloads_and_reuses(
 
     reload_code = """
 from pathlib import Path
-from biocall_studio_train.persistence.models import load_model, structurally_reload_cnn_model
+from biocall_studio.train.persistence.models import load_model, structurally_reload_cnn_model
 root = Path(__import__('sys').argv[1])
 artifact = load_model(root, 'model-soak-cnn')
 structurally_reload_cnn_model(root, artifact.model_id)

@@ -16,14 +16,14 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QWidget
 
-from biocall_studio_train.application.collection_scan import scan_collection
-from biocall_studio_train.application.power import PowerInhibitionUnavailable
-from biocall_studio_train.application.workspace import WorkspaceController
-from biocall_studio_train.domain.dataset import BuildConfig
-from biocall_studio_train.gui.app import create_application
-from biocall_studio_train.gui.window import MainWindow
-from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
-from biocall_studio_train.workflows.dataset_build import build_dataset
+from biocall_studio.studio.application.app import create_application
+from biocall_studio.train.application.collection_scan import scan_collection
+from biocall_studio.train.application.power import PowerInhibitionUnavailable
+from biocall_studio.train.application.workspace import WorkspaceController
+from biocall_studio.train.domain.dataset import BuildConfig
+from biocall_studio.train.gui.window import MainWindow
+from biocall_studio.train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio.train.workflows.dataset_build import build_dataset
 
 
 class UnavailablePowerAdapter:
@@ -105,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     with tempfile.TemporaryDirectory(
-        prefix="biocall-studio-train-spec05g-", dir="/tmp"
+        prefix="biocall-studio-spec05g-", dir="/tmp"
     ) as temporary:
         temporary_root = Path(temporary)
         root = temporary_root / "Spec05gExample"

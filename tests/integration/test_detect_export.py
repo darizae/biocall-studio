@@ -10,27 +10,29 @@ from alp_ui.components import FolderPicker, HelpHint
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QDesktopServices
 
-from biocall_studio.detect.detection import DetectionSettings
-from biocall_studio.detect.exports import (
+from biocall_studio.detect.domain.detection import DetectionSettings
+from biocall_studio.detect.domain.exports import (
     ExportCancelledError,
     ExportConflictError,
     ExportError,
     ExportMode,
     ExportStaleSourceError,
-    freeze_export_snapshot,
-    publish_export,
-    verify_export_directory,
 )
-from biocall_studio.detect.result_views import ResultSelection, freeze_result_selection
-from biocall_studio.detect.results import (
+from biocall_studio.detect.domain.result_views import ResultSelection, freeze_result_selection
+from biocall_studio.detect.domain.results import (
     CandidateInterval,
     DetectionResult,
     RecordingOutcome,
     candidate_identity,
     recording_identity,
 )
-from biocall_studio.detect.runs import canonical_digest
-from biocall_studio.gui.detect_export import ExportPage
+from biocall_studio.detect.domain.runs import canonical_digest
+from biocall_studio.detect.gui.export import ExportPage
+from biocall_studio.detect.workflows.exports import (
+    freeze_export_snapshot,
+    publish_export,
+    verify_export_directory,
+)
 
 pytestmark = [pytest.mark.integration]
 
@@ -156,7 +158,7 @@ def _freeze(
 def test_real_snippet_pcm_headers_checksums_and_source_frames_are_exact(
     tmp_path, wav_factory
 ):
-    """Case: IT-DET-019."""
+    """Cases: IT-DET-019, IT-STU-009."""
     source = tmp_path / "source"
     mono = wav_factory(source / "recordings" / "mono.wav", frames=64, rate=8_000)
     stereo = wav_factory(
@@ -311,7 +313,7 @@ def test_stale_permission_collision_disk_error_and_cancel_publish_nothing(
         destination.chmod(0o700)
 
     disk = _freeze(result, source, destination, ExportMode.SNIPPETS, token="6")
-    import biocall_studio.detect.exports as exports_module
+    import biocall_studio.detect.workflows.exports as exports_module
 
     original_writer = exports_module._write_wave_segment
 

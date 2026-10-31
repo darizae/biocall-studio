@@ -46,10 +46,11 @@ Snippets.
 
 ## Start as a first-time source user
 
-Use isolated Application Settings so this trial does not replace your usual Collection binding:
+Use an isolated suite application-data root so this trial does not replace your usual Train or
+Detect bindings:
 
 ```bash
-.venv/bin/python -m biocall_studio_train \
+.venv/bin/python -m biocall_studio \
   --settings-dir work/manual-e2e/app-settings
 ```
 
@@ -95,8 +96,8 @@ Then follow the native UI:
    ```
 
 The endpoint is two structurally verified training Models with their Dataset, Runs, measurements,
-configuration and provenance. Applying either Model to unseen recordings belongs to the separate
-BioCall Studio Detect application and is intentionally not part of Trainer.
+configuration and provenance. Return to the Studio launchpad to use either Model in the Detect
+workflow; Train and Detect keep separate state inside the same application.
 
 ## What this represents for actual field data
 

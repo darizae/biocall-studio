@@ -1,6 +1,6 @@
 import pytest
 
-from biocall_studio.navigation import WorkspaceNavigation, WorkspaceRoute
+from biocall_studio.studio.application.navigation import WorkspaceNavigation, WorkspaceRoute
 
 
 def test_studio_route_policy_is_explicit_fail_closed_and_context_free():

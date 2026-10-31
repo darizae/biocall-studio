@@ -17,19 +17,24 @@ from PySide6.QtWidgets import (
     QTableView,
 )
 
-from biocall_studio.gui.app import create_application as create_studio_application
-from biocall_studio.gui.coordinator import StudioCoordinator
-from biocall_studio.gui.shell import WorkspaceCard
-from biocall_studio.navigation import WorkspaceRoute
-from biocall_studio_train.application.collection_scan import scan_collection
-from biocall_studio_train.application.workspace import WorkspaceController
-from biocall_studio_train.domain.dataset import BuildConfig
-from biocall_studio_train.domain.run import RunStatus
-from biocall_studio_train.gui.app import default_settings_dir
-from biocall_studio_train.gui.window import MainWindow
-from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
-from biocall_studio_train.persistence.settings import ApplicationSettings, SettingsStore
-from biocall_studio_train.workflows.dataset_build import build_dataset
+from biocall_studio.studio.application.app import (
+    create_application as create_studio_application,
+)
+from biocall_studio.studio.application.app import (
+    default_suite_data_root,
+)
+from biocall_studio.studio.application.coordinator import StudioCoordinator
+from biocall_studio.studio.application.navigation import WorkspaceRoute
+from biocall_studio.studio.application.storage import SuiteDataPaths
+from biocall_studio.studio.gui.shell import WorkspaceCard
+from biocall_studio.train.application.collection_scan import scan_collection
+from biocall_studio.train.application.workspace import WorkspaceController
+from biocall_studio.train.domain.dataset import BuildConfig
+from biocall_studio.train.domain.run import RunStatus
+from biocall_studio.train.gui.window import MainWindow
+from biocall_studio.train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio.train.persistence.settings import ApplicationSettings, SettingsStore
+from biocall_studio.train.workflows.dataset_build import build_dataset
 
 pytestmark = [pytest.mark.integration, pytest.mark.qt]
 
@@ -235,15 +240,18 @@ def test_scan_remains_live_on_studio_and_application_close_waits_for_it(
     assert not controller.is_scanning
 
 
-def test_entrypoints_worker_protocol_and_train_settings_binding_coexist(
+def test_canonical_worker_protocol_and_train_binding_share_one_suite_identity(
     qapp, qtbot, tmp_path, collection_factory
 ):
     """Case: IT-STU-004."""
     create_studio_application()
     studio_name = qapp.applicationName()
-    established_settings = default_settings_dir()
+    established_settings = SuiteDataPaths.from_root(default_suite_data_root()).train
     assert qapp.applicationName() == studio_name == "biocall-studio"
-    assert established_settings.name == "biocall-studio-train"
+    assert established_settings.parts[-2:] == ("train", "v1")
+    default_controller = WorkspaceController()
+    assert default_controller.settings_file.parent == established_settings
+    default_controller.shutdown()
 
     root, scan = _ready_collection(tmp_path, collection_factory, source_count=1)
     settings_dir = tmp_path / "persisted-settings"
@@ -255,9 +263,9 @@ def test_entrypoints_worker_protocol_and_train_settings_binding_coexist(
     qtbot.waitUntil(lambda: controller.scan_result is not None, timeout=10_000)
     assert controller.collection_path == root.resolve()
     assert controller.collection_id == scan.collection_id
-    program, arguments = controller._worker_command(["--worker", "dataset-build"])
+    program, arguments = controller._worker_command(["--worker", "train-dataset-build"])
     assert program == sys.executable
-    assert arguments[:3] == ["-m", "biocall_studio_train", "--worker"]
+    assert arguments[:3] == ["-m", "biocall_studio", "--worker"]
     _finish(qtbot, coordinator)
 
     direct = MainWindow(WorkspaceController(tmp_path / "direct-train-settings"))
@@ -273,15 +281,15 @@ def test_entrypoints_worker_protocol_and_train_settings_binding_coexist(
         from PySide6.QtCore import QTimer
         from PySide6.QtWidgets import QApplication
         from biocall_studio.cli import main
-        from biocall_studio.gui.shell import StudioWindow
-        from biocall_studio_train.gui.window import MainWindow
+        from biocall_studio.studio.gui.shell import StudioWindow
+        from biocall_studio.train.gui.window import MainWindow
 
         def inspect_and_quit():
             studio = next(w for w in QApplication.topLevelWidgets() if isinstance(w, StudioWindow))
             train = next(w for w in QApplication.topLevelWidgets() if isinstance(w, MainWindow))
             assert studio.isVisible()
             assert not train.isVisible()
-            assert train.controller.settings_file == Path(sys.argv[1]) / 'settings.json'
+            assert train.controller.settings_file == Path(sys.argv[1]) / 'train/v1/settings.json'
             assert QApplication.instance().applicationName() == 'biocall-studio'
             print('canonical Studio entry retained Train settings')
             studio.close()

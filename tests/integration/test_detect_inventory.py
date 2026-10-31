@@ -12,19 +12,19 @@ from alp_ui.components import DataTable, HelpHint
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFileDialog, QPushButton
 
-from biocall_studio.detect.controller import DetectWorkspaceController
-from biocall_studio.detect.discovery import (
+from biocall_studio.detect.application.controller import DetectWorkspaceController
+from biocall_studio.detect.application.discovery import (
     InventoryScanCancelled,
     InventoryScanProgress,
     discover_wavs,
 )
-from biocall_studio.detect.inventory import (
+from biocall_studio.detect.domain.inventory import (
     ChangeKind,
     InclusionDecision,
     RecordingStatus,
 )
+from biocall_studio.detect.gui.workspace import DetectWorkspacePage, InventoryTableModel
 from biocall_studio.detect.persistence import DetectWorkspaceStore
-from biocall_studio.gui.detect import DetectWorkspacePage, InventoryTableModel
 
 pytestmark = [pytest.mark.integration]
 

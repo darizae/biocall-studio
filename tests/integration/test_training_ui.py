@@ -7,15 +7,15 @@ from alp_ui.components import HelpHint, NumberInput, SelectInput, Text
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QInputDialog, QMessageBox
 
-from biocall_studio_train.application.collection_scan import scan_collection
-from biocall_studio_train.application.workspace import WorkspaceController
-from biocall_studio_train.domain.dataset import BuildConfig
-from biocall_studio_train.domain.training import fields_for_family
-from biocall_studio_train.gui.app import create_application
-from biocall_studio_train.gui.training import TrainingPage
-from biocall_studio_train.gui.window import MainWindow
-from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
-from biocall_studio_train.workflows.dataset_build import build_dataset
+from biocall_studio.studio.application.app import create_application
+from biocall_studio.train.application.collection_scan import scan_collection
+from biocall_studio.train.application.workspace import WorkspaceController
+from biocall_studio.train.domain.dataset import BuildConfig
+from biocall_studio.train.domain.training import fields_for_family
+from biocall_studio.train.gui.training import TrainingPage
+from biocall_studio.train.gui.window import MainWindow
+from biocall_studio.train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio.train.workflows.dataset_build import build_dataset
 
 pytestmark = pytest.mark.integration
 

@@ -9,14 +9,14 @@ from pathlib import Path
 import pytest
 from PySide6.QtCore import QStandardPaths
 
-from biocall_studio_train.application.workspace import WorkspaceController
-from biocall_studio_train.gui.app import create_application
+from biocall_studio.studio.application.app import create_application
+from biocall_studio.train.application.workspace import WorkspaceController
 
 
 @pytest.fixture(scope="session")
 def qapp_args():
     QStandardPaths.setTestModeEnabled(True)
-    return ["biocall-studio-train-tests"]
+    return ["biocall-studio-tests"]
 
 
 @pytest.fixture

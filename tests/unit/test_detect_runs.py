@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from biocall_studio.detect.runs import (
+from biocall_studio.detect.domain.runs import (
     DetectRunRequest,
     DetectRunStatus,
     PublicationReceipt,

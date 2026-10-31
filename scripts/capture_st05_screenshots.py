@@ -19,24 +19,24 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QWidget
 
-from biocall_studio.detect.controller import ModelIntakeState
-from biocall_studio.gui.app import create_application
-from biocall_studio.gui.coordinator import StudioCoordinator
-from biocall_studio.navigation import WorkspaceRoute
-from biocall_studio_train.application.collection_scan import scan_collection
-from biocall_studio_train.application.workspace import WorkspaceController
-from biocall_studio_train.domain.dataset import BuildConfig
-from biocall_studio_train.domain.training import (
+from biocall_studio.detect.application.controller import ModelIntakeState
+from biocall_studio.studio.application.app import create_application
+from biocall_studio.studio.application.coordinator import StudioCoordinator
+from biocall_studio.studio.application.navigation import WorkspaceRoute
+from biocall_studio.train.application.collection_scan import scan_collection
+from biocall_studio.train.application.workspace import WorkspaceController
+from biocall_studio.train.domain.dataset import BuildConfig
+from biocall_studio.train.domain.training import (
     DeviceCapabilities,
     TrainingDataset,
     TrainingDraft,
     freeze_training_config,
 )
-from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
-from biocall_studio_train.persistence.models import ModelArtifact
-from biocall_studio_train.workflows.cnn_training import CnnTrainingRequest, train_cnn_model
-from biocall_studio_train.workflows.dataset_build import build_dataset
-from biocall_studio_train.workflows.rf_training import RfTrainingRequest, train_rf_model
+from biocall_studio.train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio.train.persistence.models import ModelArtifact
+from biocall_studio.train.workflows.cnn_training import CnnTrainingRequest, train_cnn_model
+from biocall_studio.train.workflows.dataset_build import build_dataset
+from biocall_studio.train.workflows.rf_training import RfTrainingRequest, train_rf_model
 
 
 @dataclass(frozen=True)

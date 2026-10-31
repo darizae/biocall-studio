@@ -6,34 +6,34 @@ from pathlib import Path
 
 import pytest
 
-from biocall_studio.detect.detection import DetectionSettings
-from biocall_studio.detect.exports import (
+from biocall_studio.detect.domain.detection import DetectionSettings
+from biocall_studio.detect.domain.exports import (
     FORMAT_POLICY,
     ExportConflictError,
     ExportMode,
     ExportSnapshot,
     SourceWaveFormat,
     create_export_snapshot,
-    ensure_publish_target_available,
     frame_seconds,
     render_raven_tsv,
     safe_snippet_relative_path,
 )
-from biocall_studio.detect.result_views import (
+from biocall_studio.detect.domain.result_views import (
     ResultSelection,
     freeze_result_selection,
 )
-from biocall_studio.detect.results import (
+from biocall_studio.detect.domain.results import (
     CandidateInterval,
     DetectionResult,
     RecordingOutcome,
     candidate_identity,
     recording_identity,
 )
-from biocall_studio.detect.rf_refinement import (
+from biocall_studio.detect.domain.rf_refinement import (
     DerivedResult,
     RefinementDecision,
 )
+from biocall_studio.detect.workflows.exports import ensure_publish_target_available
 
 
 def _result(

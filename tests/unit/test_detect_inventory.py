@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from biocall_studio.detect.inventory import (
+from biocall_studio.detect.domain.inventory import (
     ChangeKind,
     DecisionOrigin,
     DecisionRule,

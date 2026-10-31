@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from biocall_studio_train.persistence.display_names import DisplayNameStore
+from biocall_studio.train.persistence.display_names import DisplayNameStore
 
 
 def test_display_names_are_atomic_validated_and_separate_from_artifact_manifests(tmp_path):

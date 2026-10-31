@@ -8,15 +8,15 @@ import pytest
 from PySide6.QtCore import QProcess, Qt, QTimer
 from PySide6.QtWidgets import QPushButton
 
-from biocall_studio.detect.controller import DetectWorkspaceController
-from biocall_studio.detect.diagnostics import read_diagnostic_records
-from biocall_studio.detect.publication import load_publication_identity
-from biocall_studio.detect.run_persistence import DetectRunRepository
-from biocall_studio.detect.runs import DetectRunRequest, DetectRunStatus
-from biocall_studio.gui.coordinator import StudioCoordinator
-from biocall_studio.gui.detect import DetectWorkspacePage
-from biocall_studio.navigation import WorkspaceRoute
-from biocall_studio_train.application.workspace import WorkspaceController
+from biocall_studio.detect.application.controller import DetectWorkspaceController
+from biocall_studio.detect.domain.runs import DetectRunRequest, DetectRunStatus
+from biocall_studio.detect.gui.workspace import DetectWorkspacePage
+from biocall_studio.detect.persistence.diagnostics import read_diagnostic_records
+from biocall_studio.detect.persistence.publication import load_publication_identity
+from biocall_studio.detect.persistence.runs import DetectRunRepository
+from biocall_studio.studio.application.coordinator import StudioCoordinator
+from biocall_studio.studio.application.navigation import WorkspaceRoute
+from biocall_studio.train.application.workspace import WorkspaceController
 
 pytestmark = [pytest.mark.integration, pytest.mark.qt]
 

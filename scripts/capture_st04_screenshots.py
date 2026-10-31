@@ -17,11 +17,11 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QWidget
 
-from biocall_studio.detect.controller import InventoryState
-from biocall_studio.gui.app import create_application
-from biocall_studio.gui.coordinator import StudioCoordinator
-from biocall_studio.navigation import WorkspaceRoute
-from biocall_studio_train.application.workspace import WorkspaceController
+from biocall_studio.detect.application.controller import InventoryState
+from biocall_studio.studio.application.app import create_application
+from biocall_studio.studio.application.coordinator import StudioCoordinator
+from biocall_studio.studio.application.navigation import WorkspaceRoute
+from biocall_studio.train.application.workspace import WorkspaceController
 
 
 def _wav(path: Path, *, frames: int, rate: int = 16_000, channels: int = 1) -> None:

@@ -6,7 +6,7 @@
 
 - Detect owns an independently addressable **Collection** and application-owned, versioned workspace metadata **outside any recording/source root**. Preserve Train's Collection, `.alpaca/` store, preferences, Worker and CLI exactly; never treat a Train Collection ID as a Detect ID.
 - Define a stable opaque Collection ID, creation/update metadata, schema version, display label, canonical source-root binding and latest validated inventory *reference*. Keep relative recording references for later stages, and reserve app-owned namespaces for Detect Runs, Results and Exports without creating their substantive formats now.
-- Store under an OS-appropriate per-user application-data directory; inspect `biocall_studio_train.persistence.settings`, existing app identity and platform behavior before selecting exact layout. Keep Detect application settings separate from scientific immutable artifacts. The selected recording tree is read-only, including when it contains Train metadata.
+- Store under an OS-appropriate per-user application-data directory; inspect `biocall_studio.train.persistence.settings`, existing app identity and platform behavior before selecting exact layout. Keep Detect application settings separate from scientific immutable artifacts. The selected recording tree is read-only, including when it contains Train metadata.
 - Build native Detect source selection, current Collection summary, missing/stale binding state, explicit **Relink** confirmation and return/navigation. No WAV recursive inventory (ST-04), Model intake (ST-05), Worker (ST-06), or Results.
 
 ## Contract and handoff

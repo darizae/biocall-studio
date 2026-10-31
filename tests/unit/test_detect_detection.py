@@ -4,14 +4,14 @@ from dataclasses import FrozenInstanceError, replace
 
 import pytest
 
-from biocall_studio.detect.detection import (
+from biocall_studio.detect.domain.detection import (
     DetectionSettings,
     WindowScore,
     map_resampled_interval_to_source,
     merge_candidate_windows,
     target_score,
 )
-from biocall_studio.detect.results import (
+from biocall_studio.detect.domain.results import (
     CandidateInterval,
     DetectionResult,
     FileOutcomeStatus,

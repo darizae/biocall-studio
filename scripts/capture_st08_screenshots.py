@@ -15,15 +15,15 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtTest import QTest
 
-from biocall_studio.detect.detection import DetectionSettings
-from biocall_studio.detect.inventory import InclusionDecision
-from biocall_studio.detect.result_views import ResultSourceState
-from biocall_studio.detect.run_persistence import DetectRunRepository
-from biocall_studio.detect.runs import DetectRunStatus
-from biocall_studio.gui.app import create_application
-from biocall_studio.gui.coordinator import StudioCoordinator
-from biocall_studio.navigation import WorkspaceRoute
-from biocall_studio_train.application.workspace import WorkspaceController
+from biocall_studio.detect.domain.detection import DetectionSettings
+from biocall_studio.detect.domain.inventory import InclusionDecision
+from biocall_studio.detect.domain.result_views import ResultSourceState
+from biocall_studio.detect.domain.runs import DetectRunStatus
+from biocall_studio.detect.persistence.runs import DetectRunRepository
+from biocall_studio.studio.application.app import create_application
+from biocall_studio.studio.application.coordinator import StudioCoordinator
+from biocall_studio.studio.application.navigation import WorkspaceRoute
+from biocall_studio.train.application.workspace import WorkspaceController
 
 
 def _wait_completed(controller) -> None:
