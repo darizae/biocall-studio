@@ -22,12 +22,24 @@ python -m pip install --upgrade pip
 python -m pip install -e '../bioacoustics-dl-toolbox[rf]'
 python -m pip install -e ../alp-ui
 python -m pip install -e '.[test,integration]'
+```
+
+Run the local application from the command line with:
+
+```bash
+source .venv/bin/activate
 python -m biocall_studio
 ```
 
-The equivalent installed console command is `biocall-studio`. It is the only public application
-command. Windows source and packaging commands remain unqualified until they are exercised on
-native Windows; see [development guidance](docs/DEVELOPMENT.md).
+The equivalent installed console command is:
+
+```bash
+biocall-studio
+```
+
+It is the only public application command. Windows source and packaging commands remain
+unqualified until they are exercised on native Windows; see
+[development guidance](docs/DEVELOPMENT.md).
 
 For test commands, dependency checks, and platform status, see
 [Development](docs/DEVELOPMENT.md). For a genuine local workflow using deterministic audio, see

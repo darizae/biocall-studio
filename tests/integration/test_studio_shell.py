@@ -321,7 +321,7 @@ def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(q
     assert len(shell.detect_page.findChildren(FolderPicker)) == 5
     assert {
         "More about Detection Model",
-        "More about Detect Collection",
+        "More about Recordings folder identity",
         "More about Recording inclusion",
         "More about Minimum detection score",
         "More about Window overlap",
@@ -342,7 +342,7 @@ def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(q
     )
     assert all(not widget.isVisible() for widget in shell.detect_page.findChildren(QTableView))
     detect_text = " ".join(label.text() for label in shell.detect_page.findChildren(QLabel))
-    assert "Create a Detect Collection" in detect_text
+    assert "Choose a recordings folder" in detect_text
     assert "Detection Model" in detect_text
     assert shell.detect_page.start_detection_button.text() == "Start detection"
     shell.detect_page.back_button.setFocus()

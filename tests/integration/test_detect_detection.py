@@ -17,6 +17,7 @@ from bioacoustics_dl_toolbox.audio import load_audio_file
 from bioacoustics_dl_toolbox.prediction import predict_windows
 from bioacoustics_dl_toolbox.rf import compute_rf_features
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QFileDialog, QMessageBox, QPushButton
 
 from biocall_studio.detect.application.controller import DetectWorkspaceController, ModelIntakeState
 from biocall_studio.detect.application.model_intake import inspect_model_directory
@@ -230,6 +231,195 @@ def _wait_terminal(qtbot, controller: DetectWorkspaceController, timeout=120_000
     return controller.current_run
 
 
+@pytest.mark.qt
+def test_guided_detect_routes_bulk_badges_run_and_selection_free_export(
+    qapp, qtbot, genuine_cnn, genuine_rf, tmp_path, monkeypatch
+):
+    """Case: IT-DET-023."""
+    source = tmp_path / "guided-source"
+    shutil.copytree(genuine_cnn.root / "recordings", source / "recordings")
+    app_data = tmp_path / "application-data"
+    controller = DetectWorkspaceController(app_data, model_step_delay_seconds=0.05)
+    page = DetectWorkspacePage(controller)
+    qtbot.addWidget(page)
+    page.resize(1180, 790)
+    page.show()
+
+    assert [button.text() for button in page.step_buttons] == [
+        "Setup",
+        "Recordings",
+        "Run",
+        "Results",
+        "Export",
+    ]
+    assert len(page.step_chevrons) == 4
+    assert all(button.isEnabled() for button in page.step_buttons)
+    assert page.setup_button.isChecked()
+    assert page.setup_button.accessibleName().startswith("Current step 1 of 5")
+    assert page.settings_card.parent() is page.run_view
+
+    page.export_button.setFocus()
+    qtbot.keyClick(page.export_button, Qt.Key.Key_Space)
+    assert page.current_route == "export"
+    qtbot.waitUntil(lambda: page.focusWidget() is page.export_button)
+    assert page.export_page.mode_both.isEnabled()
+    assert page.export_page.destination_picker.isEnabled()
+    assert not page.export_page.start_button.isEnabled()
+    assert controller.export_selection is None
+    assert controller.export_snapshot is None
+    assert controller.export_receipt is None
+    page.export_page.mode_snippets.setChecked(True)
+    destination = tmp_path / "presentation-choice"
+    destination.mkdir()
+    page.export_page.destination_picker.setFolderPath(str(destination))
+    page.export_page.results_button.click()
+    assert page.current_route == "results"
+    qtbot.waitUntil(lambda: page.focusWidget() is page.results_button)
+    page.result_explorer.export_button.click()
+    assert page.current_route == "export"
+    assert page.export_page.mode_snippets.isChecked()
+    assert page.export_page.destination_picker.folderPath() == str(destination)
+
+    page.setup_button.click()
+    assert page.current_route == "setup"
+    assert page.model_status_badge.intent == "neutral"
+    page.model_picker.folderChanged.emit(str(genuine_cnn.model.root))
+    assert page.model_status_badge.text() == "Checking"
+    assert page.model_status_badge.intent == "warning"
+    assert not page.model_picker.isEnabled()
+    qtbot.waitUntil(lambda: controller.model_state is ModelIntakeState.COMPATIBLE, timeout=30_000)
+    assert page.model_status_badge.intent == "success"
+    assert page.model_name.text() == genuine_cnn.model.label
+
+    page.folder_picker.folderChanged.emit(str(source))
+    qtbot.waitUntil(lambda: controller.snapshot is not None, timeout=30_000)
+    assert page.current_route == "recordings"
+    bound = controller.active_collection
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args, **kwargs: "")
+    browse = next(
+        button
+        for button in page.relink_picker.findChildren(QPushButton)
+        if button.accessibleName() == "Choose Relink recordings folder"
+    )
+    browse.click()
+    assert page.current_route == "recordings"
+    assert controller.active_collection == bound
+
+    excluded_key = next(
+        row.recording_key
+        for row in controller.snapshot.recordings
+        if row.status.value == "valid"
+    )
+    controller.set_inventory_decision(
+        excluded_key,
+        is_folder=False,
+        decision=InclusionDecision.EXCLUDED,
+    )
+    prior_snapshot = controller.snapshot
+    prior_document = prior_snapshot.to_dict()
+    collection_id = controller.active_collection.ref.collection_id
+    observed_dialogs = []
+
+    def cancel_confirmation(dialog):
+        observed_dialogs.append(dialog)
+        assert dialog.defaultButton() is dialog.button(QMessageBox.StandardButton.Cancel)
+        assert "1 explicitly excluded recording" in dialog.text()
+        return QMessageBox.StandardButton.Cancel
+
+    monkeypatch.setattr(QMessageBox, "exec", cancel_confirmation)
+    page.include_all_button.click()
+    assert observed_dialogs
+    assert controller.snapshot.to_dict() == prior_document
+    assert controller.store.load_inventory(collection_id).to_dict() == prior_document
+
+    original_publish = controller.store.publish_inventory
+
+    def fail_publish(*_args, **_kwargs):
+        raise OSError("simulated atomic write failure")
+
+    monkeypatch.setattr(controller.store, "publish_inventory", fail_publish)
+    controller.include_all_valid_recordings(
+        expected_inventory_id=prior_snapshot.inventory_id,
+        exclusions_confirmed=True,
+    )
+    assert controller.snapshot.to_dict() == prior_document
+    assert controller.store.load_inventory(collection_id).to_dict() == prior_document
+    assert "simulated atomic write failure" in controller.inventory_error
+    monkeypatch.setattr(controller.store, "publish_inventory", original_publish)
+
+    monkeypatch.setattr(
+        QMessageBox,
+        "exec",
+        lambda dialog: QMessageBox.StandardButton.Yes,
+    )
+    page.include_all_button.click()
+    assert controller.snapshot.inventory_id != prior_snapshot.inventory_id
+    assert all(
+        row.decision is InclusionDecision.INCLUDED
+        for row in controller.snapshot.recordings
+        if row.status.value == "valid"
+    )
+
+    page.recordings_continue_button.setFocus()
+    qtbot.keyClick(page.recordings_continue_button, Qt.Key.Key_Space)
+    assert page.current_route == "run"
+    qtbot.waitUntil(lambda: page.focusWidget() is page.run_button)
+    assert page.minimum_score.isVisible()
+    assert page.run_summary_model.text() == genuine_cnn.model.label
+    assert page.run_summary_recordings.text().startswith(
+        str(controller.snapshot.counts.included)
+    )
+    assert page.run_blocker.text() == "Ready to start detection."
+    page.minimum_score.setValue(1.0)
+    page.start_detection_button.click()
+    assert page.current_route == "run"
+    assert controller.current_run is not None
+    record = _wait_terminal(qtbot, controller)
+    assert record.status is DetectRunStatus.COMPLETED
+    assert page.start_detection_button.text() == "Continue to Results"
+    assert page.start_detection_button.isEnabled()
+    page.start_detection_button.setFocus()
+    qtbot.keyClick(page.start_detection_button, Qt.Key.Key_Space)
+    assert page.current_route == "results"
+    qtbot.waitUntil(lambda: page.focusWidget() is page.results_button)
+
+    explorer = page.result_explorer
+    explorer.refinement_picker.folderChanged.emit(str(genuine_cnn.model.root))
+    qtbot.waitUntil(
+        lambda: controller.refinement_model_state is ModelIntakeState.INCOMPATIBLE,
+        timeout=30_000,
+    )
+    assert explorer.refinement_status_badge.intent == "danger"
+    explorer.refinement_picker.folderChanged.emit(str(genuine_rf.root))
+    qtbot.waitUntil(
+        lambda: controller.refinement_model_state is ModelIntakeState.COMPATIBLE,
+        timeout=30_000,
+    )
+    assert explorer.refinement_status_badge.intent == "success"
+    assert explorer.export_button.isEnabled()
+    explorer.export_button.click()
+    assert page.current_route == "export"
+    assert controller.export_selection is None
+    assert controller.export_snapshot is None
+    assert not page.export_page.start_button.isEnabled()
+
+    for width in (1180, 700):
+        page.resize(width, 790)
+        qtbot.waitUntil(lambda width=width: page.is_compact == (width < 760))
+        qtbot.waitUntil(lambda: page.horizontalScrollBar().maximum() == 0)
+        assert page.horizontalScrollBar().maximum() == 0
+        assert [button.text() for button in page.step_buttons] == [
+            "Setup",
+            "Recordings",
+            "Run",
+            "Results",
+            "Export",
+        ]
+        assert all(chevron.isVisible() for chevron in page.step_chevrons)
+
+    controller.shutdown()
+
+
 def test_real_wav_cpu_cnn_matches_verified_upstream_reference(genuine_cnn):
     """Case: IT-DET-012."""
     reference = inspect_model_directory(genuine_cnn.model.root)
@@ -408,6 +598,13 @@ def test_native_result_history_recording_candidates_selection_and_keyboard_navig
     qtbot.keyClick(explorer.candidate_table, Qt.Key.Key_Space)
     assert controller.result_selection.candidate_ids == (first_candidate_id,)
     assert explorer.candidate_detail_id.text() == first_candidate_id
+    prepared = controller.prepare_export_plan()
+    assert prepared is not None
+    assert controller.export_selection == prepared
+    controller.set_candidate_selected(first_candidate_id, False)
+    assert controller.export_selection is None
+    assert controller.export_snapshot is None
+    controller.set_candidate_selected(first_candidate_id, True)
 
     explorer.recording_table.setFocus()
     assert second_recording_row == first_recording_row + 1

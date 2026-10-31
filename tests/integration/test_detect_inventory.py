@@ -237,7 +237,7 @@ def test_native_inventory_selection_decisions_paging_keyboard_cancel_and_layout(
     assert page.scan_card.isVisible()
     assert page.cancel_scan_button.isEnabled()
     controller.cancel_scan()
-    qtbot.waitUntil(lambda: not controller.is_scanning)
+    qtbot.waitUntil(lambda: controller.inventory_state.value == "cancelled")
     assert controller.inventory_state.value == "cancelled"
     assert controller.snapshot is None
 
@@ -282,7 +282,7 @@ def test_native_inventory_selection_decisions_paging_keyboard_cancel_and_layout(
     page.rescan_button.click()
     qtbot.waitUntil(lambda: controller.is_scanning)
     controller.cancel_scan()
-    qtbot.waitUntil(lambda: not controller.is_scanning)
+    qtbot.waitUntil(lambda: controller.inventory_state.value == "cancelled")
     assert controller.inventory_state.value == "cancelled"
     assert controller.snapshot.inventory_id == last_good_id
     assert page.selected_key == stable_key

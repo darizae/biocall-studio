@@ -344,7 +344,8 @@ def test_native_model_selection_reopen_states_and_readiness_without_worker(
         ScientificEvidenceState.UNPROVEN
     )
     assert page.model_status_badge.text() == "Compatible"
-    assert "prediction behavior" in page.model_detail.text().lower()
+    assert page.model_status_badge.intent == "success"
+    assert not page.model_detail.isVisible()
     assert page.selected_model_path.text() == str(cnn_root.resolve())
 
     page.folder_picker.folderChanged.emit(str(genuine_exports.collection_root))

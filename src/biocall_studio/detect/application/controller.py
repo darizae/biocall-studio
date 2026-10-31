@@ -36,11 +36,13 @@ from biocall_studio.detect.domain.exports import (
     ExportState,
 )
 from biocall_studio.detect.domain.inventory import (
+    BulkInclusionConfirmationRequired,
     DecisionRule,
     InclusionDecision,
     InventorySnapshot,
     RecordingStatus,
     clear_decision,
+    plan_include_all_valid_recordings,
     revise_decision,
 )
 from biocall_studio.detect.domain.models import (
@@ -513,6 +515,7 @@ class DetectWorkspaceController(QObject):
         selected = preferred_result_id or self.selected_result_id
         if selected not in available_ids:
             selected = self.result_history[0].result_id if self.result_history else None
+        self._invalidate_export_plan()
         self.selected_result_id = selected
         self._load_result_selection()
 
@@ -587,7 +590,8 @@ class DetectWorkspaceController(QObject):
 
     def select_result(self, result_id: str) -> None:
         if not any(item.result_id == result_id for item in self.result_history):
-            raise ValueError("The selected Result is not in this Collection history.")
+            raise ValueError("The selected Result is not in this recordings folder history.")
+        self._invalidate_export_plan()
         self.selected_result_id = result_id
         self._load_result_selection()
         self.state_changed.emit()
@@ -613,6 +617,7 @@ class DetectWorkspaceController(QObject):
             self.selection_error = str(exc)
             self.state_changed.emit()
             raise
+        self._invalidate_export_plan()
         self.selection_error = ""
         self.selection_notice = ""
         self.state_changed.emit()
@@ -624,18 +629,44 @@ class DetectWorkspaceController(QObject):
             raise ValueError("Choose an available Result before freezing its selection.")
         return freeze_result_selection(item.result, selection)
 
-    def prepare_export_plan(self) -> FrozenResultSelection:
-        item = self.selected_result_item
-        projection = self.selected_result_projection
-        if item is None or item.result is None or projection is None:
-            raise ValueError("Choose an available Result before planning an export.")
-        if projection.source_state is not ResultSourceState.AVAILABLE:
-            raise ValueError("Check or relink the source recordings before exporting.")
-        frozen = self.freeze_selected_result_selection()
-        if not frozen.candidate_ids:
-            raise ValueError("Select at least one interval before planning an export.")
+    def _invalidate_export_plan(self) -> None:
+        if self.is_export_active:
+            return
+        self.export_result = None
+        self.export_selection = None
+        self.export_snapshot = None
+        self.export_receipt = None
+        self.export_state = ExportState.READY
+        self.export_message = (
+            "Select Result intervals to prepare a frozen export, or choose format and "
+            "destination now."
+        )
+
+    def prepare_export_plan(self) -> FrozenResultSelection | None:
         if self.is_export_active:
             raise RuntimeError("An export is already running.")
+        item = self.selected_result_item
+        projection = self.selected_result_projection
+        selection = self.result_selection
+        if (
+            item is None
+            or item.result is None
+            or projection is None
+            or selection is None
+            or not selection.candidate_ids
+        ):
+            self._invalidate_export_plan()
+            self.state_changed.emit()
+            return None
+        if projection.source_state is not ResultSourceState.AVAILABLE:
+            self._invalidate_export_plan()
+            self.export_state = ExportState.STALE
+            self.export_message = (
+                "Check or relink the source recordings before freezing this selection."
+            )
+            self.state_changed.emit()
+            return None
+        frozen = self.freeze_selected_result_selection()
         self.export_result = item.result
         self.export_selection = frozen
         self.export_snapshot = None
@@ -1046,7 +1077,7 @@ class DetectWorkspaceController(QObject):
         start_scan = False
         try:
             if self.active_collection is None:
-                label = candidate.name.strip() or "Detect Collection"
+                label = candidate.name.strip() or "Recordings folder"
                 self.active_collection = self.store.create_collection(label, candidate)
                 self.root_decision = RootBindingDecision.VALID
                 self.proposal = None
@@ -1110,7 +1141,7 @@ class DetectWorkspaceController(QObject):
         candidate = self.proposal.candidate_root
         try:
             self.active_collection = self.store.create_collection(
-                candidate.name.strip() or "Detect Collection", candidate
+                candidate.name.strip() or "Recordings folder", candidate
             )
             self.root_decision = RootBindingDecision.VALID
             self.proposal = None
@@ -1178,7 +1209,7 @@ class DetectWorkspaceController(QObject):
     def _scan_complete(self, snapshot: InventorySnapshot) -> None:
         collection = self.active_collection
         if collection is None:
-            self._scan_failed("The Detect Collection was closed during the scan.")
+            self._scan_failed("The recordings folder was closed during the scan.")
             return
         try:
             self.active_collection = self.store.publish_inventory(
@@ -1255,6 +1286,63 @@ class DetectWorkspaceController(QObject):
             self.inventory_state = self._state_for_snapshot(revised)
         self.state_changed.emit()
 
+    def bulk_inclusion_replaced_exclusion_count(self) -> int:
+        snapshot = self.snapshot
+        if snapshot is None:
+            return 0
+        try:
+            plan_include_all_valid_recordings(
+                snapshot,
+                expected_inventory_id=snapshot.inventory_id,
+                exclusions_confirmed=False,
+            )
+        except BulkInclusionConfirmationRequired as exc:
+            return exc.exclusion_count
+        return 0
+
+    def include_all_valid_recordings(
+        self,
+        *,
+        expected_inventory_id: str,
+        exclusions_confirmed: bool,
+    ) -> bool:
+        snapshot = self.snapshot
+        collection = self.active_collection
+        if (
+            snapshot is None
+            or collection is None
+            or self.is_scanning
+            or self._active_run_blocks_input_change()
+        ):
+            return False
+        if not snapshot_is_quickly_current(collection.source_root, snapshot):
+            self.inventory_error = (
+                "Recordings changed. Rescan before including all valid recordings."
+            )
+            self.state_changed.emit()
+            return False
+        try:
+            plan = plan_include_all_valid_recordings(
+                snapshot,
+                expected_inventory_id=expected_inventory_id,
+                exclusions_confirmed=exclusions_confirmed,
+            )
+            published = self.store.publish_inventory(
+                collection.ref.collection_id,
+                plan.snapshot,
+                expected_inventory_id=plan.expected_inventory_id,
+            )
+        except (OSError, ValueError, WorkspaceMetadataError) as exc:
+            self.inventory_error = str(exc)
+            self.state_changed.emit()
+            return False
+        self.active_collection = published
+        self.snapshot = plan.snapshot
+        self.inventory_error = ""
+        self.inventory_state = self._state_for_snapshot(plan.snapshot)
+        self.state_changed.emit()
+        return True
+
     def clear_inventory_decision(self, path: str, *, is_folder: bool) -> None:
         if (
             self.snapshot is None
@@ -1314,7 +1402,7 @@ class DetectWorkspaceController(QObject):
         collection = self.active_collection
         snapshot = self.snapshot
         if collection is None or snapshot is None:
-            raise ValueError("A current Detect Collection inventory is required.")
+            raise ValueError("A current recordings folder inventory is required.")
         if self.is_scanning or self.is_model_loading:
             raise RunConflictError("Wait for current input preparation before starting a Run.")
         if self.is_run_active or (

@@ -335,23 +335,20 @@ class ResultExplorer(QWidget):
             self.state_stack.addWidget(alert)
         outer.addWidget(self.state_stack)
 
-        self.no_results_button = Button("View Run details", variant="primary")
-        self.no_results_button.clicked.connect(self.run_requested)
         self.no_results_state = EmptyState(
             "No Results yet",
-            text="Complete candidate detection to create an immutable metadata-only Result.",
-            action=self.no_results_button,
+            text=(
+                "Complete candidate detection to create an immutable metadata-only Result. "
+                "You can still continue to Export to choose a format and destination."
+            ),
         )
         self.no_results_state.layout().setAlignment(
             Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter
         )
-        self.result_error_button = Button("View Run details", variant="primary")
-        self.result_error_button.clicked.connect(self.run_requested)
         self.result_error_state = EmptyState(
             "Result unavailable",
             text="The published Result is missing, changed, or corrupt. It is not shown as an "
             "empty successful Result.",
-            action=self.result_error_button,
         )
         self.result_error_state.layout().setAlignment(
             Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter
@@ -365,17 +362,14 @@ class ResultExplorer(QWidget):
         outer.addWidget(self.content_stack)
 
         footer = QHBoxLayout()
-        self.run_details_button = Button("Run details", variant="outline")
+        self.run_details_button = Button("Back to Run", variant="outline")
         self.run_details_button.clicked.connect(self.run_requested)
         footer.addWidget(self.run_details_button)
-        self.review_recordings_button = Button("Review recordings", variant="outline")
-        self.review_recordings_button.clicked.connect(self.recordings_requested)
-        footer.addWidget(self.review_recordings_button)
+        footer.addStretch()
         self.export_button = Button("Plan corpus export", variant="primary")
-        self.export_button.setAccessibleName("Plan export from selected Result intervals")
+        self.export_button.setAccessibleName("Continue from Results to Export")
         self.export_button.clicked.connect(self.export_requested)
         footer.addWidget(self.export_button)
-        footer.addStretch()
         outer.addLayout(footer)
 
         self.render()
@@ -848,6 +842,15 @@ class ResultExplorer(QWidget):
             ModelIntakeState.MISSING: "Missing files",
         }[state]
         self.refinement_status_badge.setText(status)
+        self.refinement_status_badge.setIntent(
+            {
+                ModelIntakeState.EMPTY: "neutral",
+                ModelIntakeState.LOADING: "warning",
+                ModelIntakeState.COMPATIBLE: "success",
+                ModelIntakeState.INCOMPATIBLE: "danger",
+                ModelIntakeState.MISSING: "danger",
+            }[state]
+        )
         self.refinement_status_badge.setAccessibleName(f"RF Model status: {status}")
         selected = self.controller.selected_refinement_model_root
         if state is not ModelIntakeState.LOADING:
@@ -870,7 +873,14 @@ class ResultExplorer(QWidget):
             )
         elif projection is not None and projection.candidate_count == 0:
             detail = "This original Result has no candidate intervals to refine."
-        self.refinement_model_detail.setText(detail)
+        redundant_compatible_detail = (
+            state is ModelIntakeState.COMPATIBLE
+            and detail == self.controller.refinement_model_reason
+        )
+        self.refinement_model_detail.setText(
+            "" if redundant_compatible_detail else detail
+        )
+        self.refinement_model_detail.setVisible(not redundant_compatible_detail)
         self.refinement_button.setEnabled(self.controller.can_refine_selected_result)
 
     def _set_state(self, key: str) -> None:
@@ -886,7 +896,7 @@ class ResultExplorer(QWidget):
             self.state_title = self.no_results_state.title_widget
 
     def render(self) -> None:
-        self.export_button.setEnabled(False)
+        self.export_button.setEnabled(not self.controller.is_export_active)
         self._render_history()
         item = self.controller.selected_result_item
         projection = self.controller.selected_result_projection
@@ -967,11 +977,7 @@ class ResultExplorer(QWidget):
         self.selection_summary.setText(
             f"{len(selected_ids):,} selected in this Result · selection revision {revision}"
         )
-        self.export_button.setEnabled(
-            bool(selected_ids)
-            and projection.source_state is ResultSourceState.AVAILABLE
-            and not self.controller.is_export_active
-        )
+        self.export_button.setEnabled(not self.controller.is_export_active)
         self.selection_message.setText(
             self.controller.selection_error or self.controller.selection_notice
         )
@@ -1025,7 +1031,7 @@ class ResultExplorer(QWidget):
         if self.controller.result_history:
             self.history_select.control.setFocus()
         else:
-            self.no_results_button.setFocus()
+            self.export_button.setFocus()
 
 
 __all__ = ["CandidateResultModel", "RecordingResultModel", "ResultExplorer"]

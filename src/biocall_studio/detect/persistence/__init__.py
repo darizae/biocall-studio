@@ -769,9 +769,20 @@ class DetectWorkspaceStore:
         return snapshot
 
     def publish_inventory(
-        self, collection_id: str, snapshot: InventorySnapshot
+        self,
+        collection_id: str,
+        snapshot: InventorySnapshot,
+        *,
+        expected_inventory_id: str | None = None,
     ) -> PersistedDetectCollection:
         current = self.load_collection(collection_id)
+        if (
+            expected_inventory_id is not None
+            and current.ref.inventory_revision != expected_inventory_id
+        ):
+            raise ValueError(
+                "The recording inventory changed; review it before publishing decisions."
+            )
         if snapshot.collection_id != collection_id:
             raise ValueError("Inventory belongs to a different Detect Collection.")
         if snapshot.binding_revision != current.ref.binding_revision:

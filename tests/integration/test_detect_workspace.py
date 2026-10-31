@@ -55,7 +55,10 @@ def test_native_create_reopen_move_confirm_relink_cancel_and_denied_access(
 
     assert page.current_route == "setup"
     assert page.setup_button.isChecked()
-    assert not page.recordings_button.isEnabled()
+    assert all(button.isEnabled() for button in page.step_buttons)
+    page.recordings_button.click()
+    assert page.current_route == "recordings"
+    page.setup_button.click()
     page.folder_picker.folderChanged.emit(str(source))
     collection_id = controller.active_collection.ref.collection_id
     assert controller.root_decision is RootBindingDecision.VALID

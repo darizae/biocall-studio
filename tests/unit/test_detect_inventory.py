@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 import pytest
 
 from biocall_studio.detect.domain.inventory import (
+    BulkInclusionConfirmationRequired,
     ChangeKind,
     DecisionOrigin,
     DecisionRule,
@@ -13,10 +14,12 @@ from biocall_studio.detect.domain.inventory import (
     InventoryRecording,
     InventorySnapshot,
     RecordingStatus,
+    StaleInventoryRevisionError,
     WavMetadata,
     compare_snapshots,
     find_file_identity_conflicts,
     find_portable_path_conflicts,
+    plan_include_all_valid_recordings,
     resolve_decision,
     summarize_inventory,
 )
@@ -184,3 +187,129 @@ def test_snapshot_digest_roundtrip_change_interpretation_and_validation():
     tampered["recordings"][0]["size_bytes"] += 1
     with pytest.raises(ValueError, match="digest"):
         InventorySnapshot.from_dict(tampered)
+
+
+def test_bulk_inclusion_is_a_revision_checked_complete_atomic_replacement():
+    """Case: UT-DET-024."""
+    original = InventorySnapshot.create(
+        collection_id=COLLECTION_ID,
+        binding_revision=3,
+        recordings=(
+            _recording("recordings/already-included.wav"),
+            replace(
+                _recording(
+                    "incoming/explicitly-excluded.wav",
+                    decision=InclusionDecision.EXCLUDED,
+                ),
+                reason="Explicit file decision",
+                decision_origin=DecisionOrigin.EXPLICIT_FILE,
+                decision_path="incoming/explicitly-excluded.wav",
+            ),
+            replace(
+                _recording(
+                    "recordings/invalid.wav",
+                    decision=InclusionDecision.EXCLUDED,
+                    status=RecordingStatus.INVALID,
+                    fingerprint="b" * 64,
+                ),
+                reason="Unsupported WAV encoding",
+                decision_origin=DecisionOrigin.EXPLICIT_FILE,
+                decision_path="recordings/invalid.wav",
+            ),
+            replace(
+                _recording(
+                    "positives/labeled.wav",
+                    decision=InclusionDecision.EXCLUDED,
+                    fingerprint="d" * 64,
+                ),
+                reason="Recognized generated or labeled-data folder",
+                decision_origin=DecisionOrigin.POLICY,
+                decision_path="positives/",
+            ),
+            replace(
+                _recording(
+                    "recordings/missing.wav",
+                    decision=InclusionDecision.EXCLUDED,
+                    status=RecordingStatus.MISSING,
+                    fingerprint="c" * 64,
+                ),
+                reason="Recording is missing",
+                decision_origin=DecisionOrigin.DEFAULT,
+                decision_path="recordings/",
+            ),
+        ),
+        decision_rules=(
+            DecisionRule.file(
+                "incoming/explicitly-excluded.wav", InclusionDecision.EXCLUDED
+            ),
+            DecisionRule.file("recordings/invalid.wav", InclusionDecision.EXCLUDED),
+        ),
+        scanned_at=SCANNED_AT,
+    )
+    original_document = original.to_dict()
+
+    with pytest.raises(BulkInclusionConfirmationRequired) as confirmation:
+        plan_include_all_valid_recordings(
+            original,
+            expected_inventory_id=original.inventory_id,
+            exclusions_confirmed=False,
+        )
+    assert confirmation.value.exclusion_count == 1
+    assert original.to_dict() == original_document
+
+    with pytest.raises(StaleInventoryRevisionError):
+        plan_include_all_valid_recordings(
+            original,
+            expected_inventory_id="inv_" + "f" * 32,
+            exclusions_confirmed=True,
+        )
+    assert original.to_dict() == original_document
+
+    plan = plan_include_all_valid_recordings(
+        original,
+        expected_inventory_id=original.inventory_id,
+        exclusions_confirmed=True,
+    )
+
+    assert plan.expected_inventory_id == original.inventory_id
+    assert plan.replaced_exclusion_count == 1
+    assert plan.snapshot is not original
+    assert {
+        row.recording_key
+        for row in plan.snapshot.recordings
+        if row.decision is InclusionDecision.INCLUDED
+    } == {
+        "incoming/explicitly-excluded.wav",
+        "positives/labeled.wav",
+        "recordings/already-included.wav",
+    }
+    assert {
+        rule.path for rule in plan.snapshot.decision_rules
+    } == {
+        "incoming/explicitly-excluded.wav",
+        "positives/labeled.wav",
+        "recordings/already-included.wav",
+        "recordings/invalid.wav",
+    }
+    assert resolve_decision(
+        "positives/labeled.wav", plan.snapshot.decision_rules
+    ).decision is InclusionDecision.INCLUDED
+    invalid = next(
+        row
+        for row in plan.snapshot.recordings
+        if row.recording_key == "recordings/invalid.wav"
+    )
+    missing = next(
+        row
+        for row in plan.snapshot.recordings
+        if row.recording_key == "recordings/missing.wav"
+    )
+    assert (invalid.status, invalid.decision) == (
+        RecordingStatus.INVALID,
+        InclusionDecision.EXCLUDED,
+    )
+    assert (missing.status, missing.decision) == (
+        RecordingStatus.MISSING,
+        InclusionDecision.EXCLUDED,
+    )
+    assert original.to_dict() == original_document

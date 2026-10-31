@@ -63,6 +63,21 @@ class ChangeKind(StrEnum):
     REMOVED = "removed"
 
 
+class StaleInventoryRevisionError(ValueError):
+    """Raised when a decision was prepared from a superseded inventory."""
+
+
+class BulkInclusionConfirmationRequired(ValueError):
+    """Raised before replacing one or more explicit exclusions."""
+
+    def __init__(self, exclusion_count: int):
+        self.exclusion_count = exclusion_count
+        super().__init__(
+            f"Confirm replacement of {exclusion_count} explicitly excluded recording"
+            f"{'s' if exclusion_count != 1 else ''}."
+        )
+
+
 def portable_identity(path: str) -> str:
     return unicodedata.normalize("NFC", path).casefold()
 
@@ -135,15 +150,6 @@ def _policy_excluded(path: str) -> str | None:
 
 def resolve_decision(path: str, rules: Iterable[DecisionRule]) -> DecisionResolution:
     key = validate_relative_reference(path)
-    policy = _policy_excluded(key)
-    if policy is not None:
-        return DecisionResolution(
-            InclusionDecision.EXCLUDED,
-            DecisionOrigin.POLICY,
-            f"{policy}/",
-            "Recognized generated or labeled-data folder",
-        )
-
     identity = portable_identity(key)
     file_matches = [
         rule for rule in rules if not rule.is_folder and portable_identity(rule.path) == identity
@@ -155,6 +161,15 @@ def resolve_decision(path: str, rules: Iterable[DecisionRule]) -> DecisionResolu
             DecisionOrigin.EXPLICIT_FILE,
             rule.path,
             "Explicit file decision",
+        )
+
+    policy = _policy_excluded(key)
+    if policy is not None:
+        return DecisionResolution(
+            InclusionDecision.EXCLUDED,
+            DecisionOrigin.POLICY,
+            f"{policy}/",
+            "Recognized generated or labeled-data folder",
         )
 
     folder_matches = []
@@ -561,6 +576,79 @@ class InventorySnapshot:
         if raw["counts"] != created.counts.to_dict():
             raise ValueError("InventorySnapshot counts do not match its rows.")
         return created
+
+
+@dataclass(frozen=True, slots=True)
+class BulkInclusionPlan:
+    """One revision-checked replacement of the complete inventory decision set."""
+
+    expected_inventory_id: str
+    replaced_exclusion_count: int
+    snapshot: InventorySnapshot
+
+
+def plan_include_all_valid_recordings(
+    snapshot: InventorySnapshot,
+    *,
+    expected_inventory_id: str,
+    exclusions_confirmed: bool,
+) -> BulkInclusionPlan:
+    """Include every valid WAV while preserving unavailable rows and source facts."""
+
+    if expected_inventory_id != snapshot.inventory_id:
+        raise StaleInventoryRevisionError(
+            "The recording inventory changed; review it before including recordings."
+        )
+    replaced_exclusions = sum(
+        row.status is RecordingStatus.VALID
+        and row.decision is InclusionDecision.EXCLUDED
+        and row.decision_origin
+        in {DecisionOrigin.EXPLICIT_FILE, DecisionOrigin.EXPLICIT_FOLDER}
+        for row in snapshot.recordings
+    )
+    if replaced_exclusions and not exclusions_confirmed:
+        raise BulkInclusionConfirmationRequired(replaced_exclusions)
+
+    valid_identities = {
+        portable_identity(row.recording_key)
+        for row in snapshot.recordings
+        if row.status is RecordingStatus.VALID
+    }
+    rules = [
+        rule
+        for rule in snapshot.decision_rules
+        if rule.is_folder or portable_identity(rule.path) not in valid_identities
+    ]
+    rules.extend(
+        DecisionRule.file(row.recording_key, InclusionDecision.INCLUDED)
+        for row in snapshot.recordings
+        if row.status is RecordingStatus.VALID
+    )
+    rows = tuple(
+        replace(
+            row,
+            decision=InclusionDecision.INCLUDED,
+            reason="Explicit file decision",
+            decision_origin=DecisionOrigin.EXPLICIT_FILE,
+            decision_path=row.recording_key,
+        )
+        if row.status is RecordingStatus.VALID
+        else row
+        for row in snapshot.recordings
+    )
+    replacement = InventorySnapshot.create(
+        collection_id=snapshot.collection_id,
+        binding_revision=snapshot.binding_revision,
+        recordings=rows,
+        decision_rules=rules,
+        issues=snapshot.issues,
+        scanned_at=_parse_utc(snapshot.scanned_at),
+    )
+    return BulkInclusionPlan(
+        expected_inventory_id=snapshot.inventory_id,
+        replaced_exclusion_count=replaced_exclusions,
+        snapshot=replacement,
+    )
 
 
 @dataclass(frozen=True, slots=True)

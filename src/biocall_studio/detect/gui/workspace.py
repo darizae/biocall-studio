@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -193,10 +194,11 @@ class DetectWorkspacePage(QScrollArea):
         super().__init__()
         self.controller = controller
         self._compact = False
+        self._recordings_attention_active = False
         self._rendered_inventory_id: str | None = None
         self.selected_key: str | None = None
         self.setObjectName("detectWorkspacePage")
-        self.setAccessibleName("Detect Collection setup")
+        self.setAccessibleName("Detect workflow setup")
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setWidgetResizable(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -208,7 +210,8 @@ class DetectWorkspacePage(QScrollArea):
         self.outer.addLayout(self._build_heading())
         self.run_header = self._build_run_header()
         self.outer.addWidget(self.run_header)
-        self.outer.addLayout(self._build_navigation())
+        self.navigation_layout = self._build_navigation()
+        self.outer.addLayout(self.navigation_layout)
         self.selection_error = QLabel()
         self.selection_error.setWordWrap(True)
         self.selection_error.setAccessibleName("Recordings folder error")
@@ -235,8 +238,6 @@ class DetectWorkspacePage(QScrollArea):
         self.setup_layout.setColumnStretch(0, 1)
         self.setup_layout.setColumnStretch(1, 1)
         setup_view_layout.addLayout(self.setup_layout)
-        self.settings_card = self._build_settings_card()
-        setup_view_layout.addWidget(self.settings_card)
         self.readiness_card = Card()
         self.readiness_card.setAccessibleName("Detect setup readiness")
         self.readiness_title = Text("Setup needs attention", role="subheading")
@@ -248,6 +249,13 @@ class DetectWorkspacePage(QScrollArea):
         self.readiness_card.content_layout.addWidget(self.readiness_title)
         self.readiness_card.content_layout.addWidget(self.readiness_detail)
         setup_view_layout.addWidget(self.readiness_card)
+        setup_actions = QHBoxLayout()
+        setup_actions.addStretch()
+        self.setup_continue_button = Button("Continue to Recordings", variant="primary")
+        self.setup_continue_button.setAccessibleName("Continue from Setup to Recordings")
+        self.setup_continue_button.clicked.connect(lambda: self._set_route("recordings"))
+        setup_actions.addWidget(self.setup_continue_button)
+        setup_view_layout.addLayout(setup_actions)
         setup_view_layout.addStretch()
 
         self.recordings_view = QWidget()
@@ -262,8 +270,18 @@ class DetectWorkspacePage(QScrollArea):
         recordings_layout.addWidget(self.relink_card)
         self.different_card = self._build_different_card()
         recordings_layout.addWidget(self.different_card)
+        recordings_actions = QHBoxLayout()
+        self.recordings_back_button = Button("Back to Setup", variant="outline")
+        self.recordings_back_button.clicked.connect(lambda: self._set_route("setup"))
+        recordings_actions.addWidget(self.recordings_back_button)
+        recordings_actions.addStretch()
+        self.recordings_continue_button = Button("Continue to Run", variant="primary")
+        self.recordings_continue_button.clicked.connect(lambda: self._set_route("run"))
+        recordings_actions.addWidget(self.recordings_continue_button)
+        recordings_layout.addLayout(recordings_actions)
         recordings_layout.addStretch()
 
+        self.settings_card = self._build_settings_card()
         self.run_view = self._build_run_view()
         self.result_explorer = ResultExplorer(self.controller)
         self.result_explorer.run_requested.connect(lambda: self._set_route("run"))
@@ -378,10 +396,21 @@ class DetectWorkspacePage(QScrollArea):
         self.start_detection_button.setAccessibleDescription(
             "Freeze the verified setup and run CNN candidate detection."
         )
-        self.start_detection_button.clicked.connect(self._start_detection)
+        self.start_detection_button.clicked.connect(self._run_primary_action)
         actions.addWidget(self.start_detection_button)
         card.content_layout.addLayout(actions)
         return card
+
+    def _run_primary_action(self) -> None:
+        record = self.controller.current_run
+        if (
+            record is not None
+            and record.status is DetectRunStatus.COMPLETED
+            and self.controller.current_result is not None
+        ):
+            self._set_route("results")
+            return
+        self._start_detection()
 
     def _start_detection(self) -> None:
         overlaps = (0, 25, 50, 75)
@@ -425,40 +454,35 @@ class DetectWorkspacePage(QScrollArea):
         self.heading_layout = heading
         return heading
 
-    def _build_navigation(self) -> QHBoxLayout:
-        navigation = QHBoxLayout()
-        navigation.setSpacing(8)
-        self.setup_button = Button("Setup", variant="outline", size="small")
-        self.setup_button.setAccessibleName("Open Detect setup")
-        self.setup_button.setCheckable(True)
-        self.setup_button.setAutoExclusive(True)
-        self.setup_button.clicked.connect(lambda: self._set_route("setup"))
-        navigation.addWidget(self.setup_button)
-        self.recordings_button = Button("Recordings", variant="outline", size="small")
-        self.recordings_button.setAccessibleName("Open Detect recordings folder")
-        self.recordings_button.setCheckable(True)
-        self.recordings_button.setAutoExclusive(True)
-        self.recordings_button.clicked.connect(lambda: self._set_route("recordings"))
-        navigation.addWidget(self.recordings_button)
-        self.run_button = Button("Run", variant="outline", size="small")
-        self.run_button.setAccessibleName("Open Detect Run")
-        self.run_button.setCheckable(True)
-        self.run_button.setAutoExclusive(True)
-        self.run_button.clicked.connect(lambda: self._set_route("run"))
-        navigation.addWidget(self.run_button)
-        self.results_button = Button("Results", variant="outline", size="small")
-        self.results_button.setAccessibleName("Open Detect Results")
-        self.results_button.setCheckable(True)
-        self.results_button.setAutoExclusive(True)
-        self.results_button.clicked.connect(lambda: self._set_route("results"))
-        navigation.addWidget(self.results_button)
-        self.export_button = Button("Export", variant="outline", size="small")
-        self.export_button.setAccessibleName("Open frozen corpus export")
-        self.export_button.setCheckable(True)
-        self.export_button.setAutoExclusive(True)
-        self.export_button.clicked.connect(self._navigate_export)
-        navigation.addWidget(self.export_button)
-        navigation.addStretch()
+    def _build_navigation(self) -> QGridLayout:
+        navigation = QGridLayout()
+        navigation.setHorizontalSpacing(7)
+        navigation.setVerticalSpacing(7)
+        route_names = ("setup", "recordings", "run", "results", "export")
+        labels = ("Setup", "Recordings", "Run", "Results", "Export")
+        self.step_buttons: list[Button] = []
+        self.step_chevrons: list[QLabel] = []
+        for index, (route, label) in enumerate(zip(route_names, labels, strict=True)):
+            button = Button(label, variant="outline", size="small")
+            button.setCheckable(True)
+            button.setAutoExclusive(True)
+            if route == "export":
+                button.clicked.connect(self._navigate_export)
+            else:
+                button.clicked.connect(
+                    lambda _=False, selected=route: self._set_route(selected)
+                )
+            setattr(self, f"{route}_button", button)
+            self.step_buttons.append(button)
+            navigation.addWidget(button, 0, index * 2)
+            if index < len(labels) - 1:
+                chevron = QLabel("›")
+                chevron.setAccessibleName("")
+                chevron.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+                chevron.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.step_chevrons.append(chevron)
+                navigation.addWidget(chevron, 0, index * 2 + 1)
+        navigation.setColumnStretch(len(labels) * 2 - 1, 1)
         return navigation
 
     def _open_export(self) -> None:
@@ -467,15 +491,10 @@ class DetectWorkspacePage(QScrollArea):
         except (RuntimeError, ValueError) as exc:
             self.selection_error.setText(str(exc))
             self.selection_error.setVisible(True)
-            self._set_route("results")
-            return
         self._set_route("export")
 
     def _navigate_export(self) -> None:
-        if self.controller.export_selection is None:
-            self._open_export()
-            return
-        self._set_route("export")
+        self._open_export()
 
     def _build_run_header(self) -> Card:
         card = Card()
@@ -506,6 +525,29 @@ class DetectWorkspacePage(QScrollArea):
         outer = QVBoxLayout(view)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(16)
+
+        self.run_summary_card = Card()
+        self.run_summary_card.setAccessibleName("Run input summary and readiness")
+        self.run_summary_card.content_layout.addWidget(Text("Run inputs", role="heading"))
+        summary = QGridLayout()
+        summary.setHorizontalSpacing(18)
+        summary.setVerticalSpacing(6)
+        summary.addWidget(Text("Detection Model", role="caption"), 0, 0)
+        summary.addWidget(Text("Included recordings", role="caption"), 0, 1)
+        self.run_summary_model = Text("Not selected", role="subheading", word_wrap=True)
+        self.run_summary_recordings = Text("0 recordings", role="subheading")
+        summary.addWidget(self.run_summary_model, 1, 0)
+        summary.addWidget(self.run_summary_recordings, 1, 1)
+        summary.setColumnStretch(0, 2)
+        summary.setColumnStretch(1, 1)
+        self.run_summary_card.content_layout.addLayout(summary)
+        self.run_blocker = Text(
+            "Choose a compatible Detection Model.", role="body", word_wrap=True
+        )
+        self.run_blocker.setAccessibleName("Run readiness")
+        self.run_summary_card.content_layout.addWidget(self.run_blocker)
+        outer.addWidget(self.run_summary_card)
+        outer.addWidget(self.settings_card)
 
         self.run_guidance = QLabel()
         self.run_guidance.setWordWrap(True)
@@ -571,6 +613,12 @@ class DetectWorkspacePage(QScrollArea):
         self.run_layout.setColumnStretch(0, 2)
         self.run_layout.setColumnStretch(1, 1)
         outer.addLayout(self.run_layout)
+        footer = QHBoxLayout()
+        self.run_back_button = Button("Back to Recordings", variant="outline")
+        self.run_back_button.clicked.connect(lambda: self._set_route("recordings"))
+        footer.addWidget(self.run_back_button)
+        footer.addStretch()
+        outer.addLayout(footer)
         outer.addStretch()
         return view
 
@@ -632,7 +680,7 @@ class DetectWorkspacePage(QScrollArea):
 
         self.model_picker = FolderPicker(label="Train Model folder", show_hidden=True)
         self.model_picker.setAccessibleDescription(
-            "Choose one Model folder published inside a local Train Collection."
+            "Choose one Model folder published by Train."
         )
         card.content_layout.addWidget(self.model_picker)
         actions = QHBoxLayout()
@@ -645,11 +693,11 @@ class DetectWorkspacePage(QScrollArea):
 
     def _build_collection_card(self) -> Card:
         card = Card()
-        card.setAccessibleName("Detect Collection source")
+        card.setAccessibleName("Recordings folder selection")
         header = QHBoxLayout()
         labels = QVBoxLayout()
         labels.setSpacing(4)
-        self.collection_title = Text("Create a Detect Collection", role="heading")
+        self.collection_title = Text("Choose a recordings folder", role="heading")
         labels.addWidget(self.collection_title)
         self.collection_description = Text(
             "Choose a folder. Detect stores its metadata separately and leaves "
@@ -660,9 +708,9 @@ class DetectWorkspacePage(QScrollArea):
         labels.addWidget(self.collection_description)
         header.addLayout(labels, 1)
         hint = HelpHint(
-            "A Detect Collection keeps a stable identity if its recordings folder moves. "
-            "A different recordings folder creates a different Collection.",
-            subject="Detect Collection",
+            "Detect remembers this recordings folder if it moves. Choosing a different "
+            "folder starts a separate recording source.",
+            subject="Recordings folder identity",
         )
         header.addWidget(hint, 0, Qt.AlignmentFlag.AlignTop)
         self.status_badge = Badge("Not selected", intent="neutral")
@@ -672,7 +720,7 @@ class DetectWorkspacePage(QScrollArea):
 
         self.root_caption = Text("No recordings folder selected", role="overline")
         card.content_layout.addWidget(self.root_caption)
-        self.root_path = QLabel("Choose a folder to create a Detect Collection.")
+        self.root_path = QLabel("Choose a recordings folder to begin.")
         self.root_path.setWordWrap(True)
         self.root_path.setMinimumWidth(0)
         self.root_path.setSizePolicy(
@@ -685,14 +733,14 @@ class DetectWorkspacePage(QScrollArea):
 
         self.folder_picker = FolderPicker(label="Recordings folder")
         self.folder_picker.setAccessibleDescription(
-            "Choose a new recordings folder or the relocated folder for this Collection."
+            "Choose a new recordings folder or the relocated saved folder."
         )
         card.content_layout.addWidget(self.folder_picker)
         return card
 
     def _build_recordings_card(self) -> Card:
         card = Card()
-        card.setAccessibleName("Current Detect Collection recordings folder")
+        card.setAccessibleName("Current recordings folder")
         header = QHBoxLayout()
         labels = QVBoxLayout()
         labels.setSpacing(4)
@@ -719,7 +767,7 @@ class DetectWorkspacePage(QScrollArea):
         card.content_layout.addWidget(self.recordings_path)
         self.relink_picker = FolderPicker(label="Relink recordings folder")
         self.relink_picker.setAccessibleDescription(
-            "Choose the relocated folder for this Detect Collection."
+            "Choose the relocated saved recordings folder."
         )
         card.content_layout.addWidget(self.relink_picker)
         return card
@@ -737,7 +785,7 @@ class DetectWorkspacePage(QScrollArea):
         labels.addWidget(Text("Approve recording inclusion", role="heading"))
         labels.addWidget(
             Text(
-                "Review which WAV files belong to this Detect Collection.",
+                "Review which WAV files belong to this recordings folder.",
                 role="body",
                 word_wrap=True,
             )
@@ -843,6 +891,14 @@ class DetectWorkspacePage(QScrollArea):
         self.reset_selection_button = Button("Reset decision", variant="outline", size="small")
         self.reset_selection_button.clicked.connect(self._clear_selected_decision)
         decision_actions.addWidget(self.reset_selection_button)
+        self.include_all_button = Button(
+            "Include all valid recordings", variant="outline", size="small"
+        )
+        self.include_all_button.setAccessibleDescription(
+            "Apply one explicit Included decision to every valid WAV in this inventory."
+        )
+        self.include_all_button.clicked.connect(self._include_all_valid_recordings)
+        decision_actions.addWidget(self.include_all_button)
         decision_actions.addStretch()
         self.inventory_table_card.content_layout.addLayout(decision_actions)
         self.inventory_model = InventoryTableModel(self)
@@ -897,13 +953,46 @@ class DetectWorkspacePage(QScrollArea):
         layout.addLayout(self.inventory_layout)
         return content
 
+    def _include_all_valid_recordings(self) -> None:
+        snapshot = self.controller.snapshot
+        if snapshot is None:
+            return
+        expected_inventory_id = snapshot.inventory_id
+        exclusion_count = self.controller.bulk_inclusion_replaced_exclusion_count()
+        confirmed = False
+        if exclusion_count:
+            dialog = QMessageBox(self)
+            dialog.setIcon(QMessageBox.Icon.Warning)
+            dialog.setWindowTitle("Include all valid recordings?")
+            noun = "recording" if exclusion_count == 1 else "recordings"
+            dialog.setText(
+                f"This will replace {exclusion_count} explicitly excluded {noun}."
+            )
+            dialog.setInformativeText(
+                "Every currently valid WAV will be included. Invalid and unavailable "
+                "entries will remain unavailable."
+            )
+            dialog.setStandardButtons(
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel
+            )
+            dialog.setDefaultButton(QMessageBox.StandardButton.Cancel)
+            dialog.setEscapeButton(QMessageBox.StandardButton.Cancel)
+            confirmed = dialog.exec() == QMessageBox.StandardButton.Yes
+            if not confirmed:
+                return
+        self.controller.include_all_valid_recordings(
+            expected_inventory_id=expected_inventory_id,
+            exclusions_confirmed=confirmed,
+        )
+
     def _build_relink_card(self) -> Card:
         card = Card()
         card.setAccessibleName("Confirm recordings folder relink")
         card.content_layout.addWidget(Text("Relink recordings folder", role="heading"))
         card.content_layout.addWidget(
             Text(
-                "The folder identity matches this Collection. Confirm the new location before "
+                "The folder identity matches the saved recordings folder. Confirm the new "
+                "location before "
                 "the binding changes.",
                 role="body",
                 word_wrap=True,
@@ -942,19 +1031,18 @@ class DetectWorkspacePage(QScrollArea):
         card.content_layout.addWidget(Text("This is a different folder", role="heading"))
         card.content_layout.addWidget(
             Text(
-                "Its verified folder identity does not match the current Collection. "
-                "Create a new Collection to prevent an unrelated folder from taking "
-                "over its history.",
+                "Its verified identity does not match the saved recordings folder. Use it as "
+                "a new recording source instead of attaching unrelated files to saved history.",
                 role="body",
                 word_wrap=True,
             )
         )
         actions = QHBoxLayout()
         actions.addStretch()
-        self.cancel_different_button = Button("Keep current Collection", variant="outline")
+        self.cancel_different_button = Button("Keep saved folder", variant="outline")
         self.cancel_different_button.clicked.connect(self.controller.cancel_relink)
         actions.addWidget(self.cancel_different_button)
-        self.new_collection_button = Button("Create new Collection", variant="primary")
+        self.new_collection_button = Button("Use as new recordings folder", variant="primary")
         self.new_collection_button.clicked.connect(self.controller.create_new_collection)
         actions.addWidget(self.new_collection_button)
         card.content_layout.addLayout(actions)
@@ -1058,6 +1146,12 @@ class DetectWorkspacePage(QScrollArea):
                 self._render_inventory_detail(self.inventory_model.entry_at(row))
         has_snapshot = snapshot is not None and self.inventory_model.rowCount() > 0
         self.inventory_table.setEnabled(has_snapshot and not self.controller.is_scanning)
+        self.include_all_button.setEnabled(
+            snapshot is not None
+            and any(row.status is RecordingStatus.VALID for row in snapshot.recordings)
+            and not self.controller.is_scanning
+            and not self.controller.is_run_active
+        )
 
     def _render_model(self) -> None:
         state = self.controller.model_state
@@ -1071,6 +1165,15 @@ class DetectWorkspacePage(QScrollArea):
         reference = self.controller.model_reference
         selected = self.controller.selected_model_root
         self.model_status_badge.setText(status)
+        self.model_status_badge.setIntent(
+            {
+                ModelIntakeState.EMPTY: "neutral",
+                ModelIntakeState.LOADING: "warning",
+                ModelIntakeState.COMPATIBLE: "success",
+                ModelIntakeState.INCOMPATIBLE: "danger",
+                ModelIntakeState.MISSING: "danger",
+            }[state]
+        )
         self.model_status_badge.setAccessibleName(f"Detection Model status: {status}")
         if reference is not None:
             self.model_name.setText(reference.snapshot.label)
@@ -1078,7 +1181,10 @@ class DetectWorkspacePage(QScrollArea):
             self.model_name.setText(selected.name or "Selected Model")
         else:
             self.model_name.setText("No Model selected")
-        self.model_detail.setText(self.controller.model_reason)
+        self.model_detail.setText(
+            "" if state is ModelIntakeState.COMPATIBLE else self.controller.model_reason
+        )
+        self.model_detail.setVisible(state is not ModelIntakeState.COMPATIBLE)
         self.selected_model_path.setText(
             "Choose a Train Model folder." if selected is None else str(selected)
         )
@@ -1097,13 +1203,52 @@ class DetectWorkspacePage(QScrollArea):
             self.combine_nearby,
         ):
             field.setEnabled(not settings_locked)
-        self.start_detection_button.setEnabled(self.controller.inputs_ready)
+        collection = self.controller.active_collection
+        snapshot = self.controller.snapshot
+        reference = self.controller.model_reference
+        self.setup_continue_button.setEnabled(collection is not None)
+        self.run_summary_model.setText(
+            reference.snapshot.label if reference is not None else "Not selected"
+        )
+        included = 0 if snapshot is None else snapshot.counts.included
+        self.run_summary_recordings.setText(
+            f"{included:,} recording{'s' if included != 1 else ''}"
+        )
+        record = self.controller.current_run
+        completed = (
+            record is not None
+            and record.status is DetectRunStatus.COMPLETED
+            and self.controller.current_result is not None
+        )
+        if completed:
+            self.start_detection_button.setText("Continue to Results")
+            self.start_detection_button.setAccessibleDescription(
+                "Open the verified Result published by this Run."
+            )
+            self.start_detection_button.setEnabled(True)
+        elif self.controller.is_run_active:
+            self.start_detection_button.setText("Detection running")
+            self.start_detection_button.setEnabled(False)
+        else:
+            self.start_detection_button.setText("Start detection")
+            self.start_detection_button.setAccessibleDescription(
+                "Freeze the verified inputs and start candidate detection."
+            )
+            self.start_detection_button.setEnabled(self.controller.inputs_ready)
+        if self.controller.is_run_active:
+            self.readiness_title.setText("Detection is running")
+            self.readiness_detail.setText(
+                "Frozen inputs are in use. Settings become available after this Run stops."
+            )
+            self.run_blocker.setText("Detection is running with frozen inputs.")
+            return
         if self.controller.inputs_ready:
             self.readiness_title.setText("Setup inputs verified")
             self.readiness_detail.setText(
-                f"Compatible CNN Model · {self.controller.snapshot.counts.included:,} included "
+                f"Compatible CNN Model · {snapshot.counts.included:,} included "
                 "WAV recordings."
             )
+            self.run_blocker.setText("Ready to start detection.")
             return
         if self.controller.model_state is ModelIntakeState.LOADING:
             title = "Checking Detection Model"
@@ -1119,7 +1264,7 @@ class DetectWorkspacePage(QScrollArea):
             detail = "Select a Model published by Train."
         elif self.controller.active_collection is None:
             title = "Choose a recordings folder"
-            detail = "Create a Detect Collection and review its WAV inventory."
+            detail = "Choose a recordings folder and review its WAV inventory."
         elif self.controller.root_decision is not RootBindingDecision.VALID:
             title = "Recordings folder needs attention"
             detail = "Relink or restore the recordings folder before using this setup."
@@ -1131,6 +1276,7 @@ class DetectWorkspacePage(QScrollArea):
             detail = "Include at least one valid WAV recording."
         self.readiness_title.setText(title)
         self.readiness_detail.setText(detail)
+        self.run_blocker.setText(detail)
 
     def _select_inventory_row(self, row: int) -> None:
         entry = self.inventory_model.entry_at(row)
@@ -1330,20 +1476,9 @@ class DetectWorkspacePage(QScrollArea):
         self._render_run_header()
         self._render_run()
         self._render_model()
-        self.results_button.setEnabled(bool(self.controller.result_history))
+        for button in self.step_buttons:
+            button.setEnabled(True)
         self.result_explorer.render()
-        projection = self.controller.selected_result_projection
-        selection = self.controller.result_selection
-        can_plan_export = (
-            projection is not None
-            and projection.source_state.value == "available"
-            and selection is not None
-            and bool(selection.candidate_ids)
-            and not self.controller.is_export_active
-        )
-        self.export_button.setEnabled(
-            can_plan_export or self.controller.export_selection is not None
-        )
         self.export_page.render()
         collection = self.controller.active_collection
         proposal = self.controller.proposal
@@ -1360,9 +1495,7 @@ class DetectWorkspacePage(QScrollArea):
         self.selection_error.setVisible(bool(self.selection_error.text()))
 
         if collection is None:
-            self.recordings_button.setEnabled(False)
-            self._set_route("setup")
-            self.collection_title.setText("Create a Detect Collection")
+            self.collection_title.setText("Choose a recordings folder")
             self.collection_description.setText(
                 "Choose a folder. Detect stores its metadata separately and leaves "
                 "recordings unchanged."
@@ -1370,13 +1503,12 @@ class DetectWorkspacePage(QScrollArea):
             self.status_badge.setText("Not selected")
             self.status_badge.setAccessibleName("Recordings folder status: Not selected")
             self.root_caption.setText("NO RECORDINGS FOLDER SELECTED")
-            self.root_path.setText("Choose a folder to create a Detect Collection.")
+            self.root_path.setText("Choose a recordings folder to begin.")
             self.folder_picker.setFolderPath("")
             self._render_inventory()
             self._render_readiness()
             return
 
-        self.recordings_button.setEnabled(True)
         decision = self.controller.root_decision
         status, description = {
             RootBindingDecision.VALID: (
@@ -1385,7 +1517,7 @@ class DetectWorkspacePage(QScrollArea):
             ),
             RootBindingDecision.MISSING: (
                 "Folder missing",
-                "Choose the folder's new location to relink this Collection.",
+                "Choose the folder's new location to restore this recording source.",
             ),
             RootBindingDecision.INACCESSIBLE: (
                 "Access unavailable",
@@ -1395,9 +1527,9 @@ class DetectWorkspacePage(QScrollArea):
             RootBindingDecision.CHANGED: (
                 "Folder changed",
                 "The location now refers to a different folder. Choose the relocated "
-                "folder or create a new Collection.",
+                "saved folder or use this as a new recordings folder.",
             ),
-            None: ("Unavailable", "The Detect Collection binding could not be read."),
+            None: ("Unavailable", "The saved recordings folder link could not be read."),
         }[decision]
         self.collection_title.setText(collection.ref.display_label)
         self.collection_description.setText(description)
@@ -1423,28 +1555,23 @@ class DetectWorkspacePage(QScrollArea):
             self.new_path.setText(str(proposal.candidate_root))
             self.relink_confirm.setChecked(False)
             self.confirm_relink_button.setEnabled(False)
-        if (
-            (proposal is not None or decision is not RootBindingDecision.VALID)
-            and self.current_route != "results"
-        ):
-            self._set_route("recordings")
-        elif (
-            self.controller.inventory_state is InventoryState.SCANNING
-            and self.current_route != "results"
-        ):
-            self._set_route("recordings")
+        recordings_attention = (
+            proposal is not None
+            or decision is not RootBindingDecision.VALID
+            or self.controller.inventory_state is InventoryState.SCANNING
+        )
+        if recordings_attention and not self._recordings_attention_active:
+            self._recordings_attention_active = True
+            if self.current_route == "setup":
+                self._set_route("recordings")
+        elif not recordings_attention:
+            self._recordings_attention_active = False
         self._render_inventory()
         self._render_readiness()
 
     def _set_route(self, route: str) -> None:
         if route not in {"setup", "recordings", "run", "results", "export"}:
             raise ValueError(f"Unknown Detect route: {route}")
-        if route == "recordings" and not self.recordings_button.isEnabled():
-            route = "setup"
-        if route == "results" and not self.results_button.isEnabled():
-            route = "run"
-        if route == "export" and self.controller.export_selection is None:
-            route = "results"
         route_changed = getattr(self, "current_route", None) != route
         self.current_route = route
         self.setup_button.setChecked(route == "setup")
@@ -1471,7 +1598,7 @@ class DetectWorkspacePage(QScrollArea):
             self.page_overline.setText("SOURCE INVENTORY")
             self.page_title.setText("Recordings")
             self.page_description.setText(
-                "Approve the WAVs that belong to this Detect Collection."
+                "Approve the WAVs that belong to this recordings folder."
             )
         elif route == "run":
             self.page_overline.setText("RUN · CANDIDATE DETECTION")
@@ -1481,7 +1608,7 @@ class DetectWorkspacePage(QScrollArea):
                 else self.controller.current_run.title
             )
             self.page_description.setText(
-                "Follow Worker progress, cancellation, recovery, and verified publication."
+                "Review candidate settings and inputs, then follow detection progress."
             )
         elif route == "results":
             self.page_overline.setText("METADATA-ONLY RESULTS")
@@ -1492,10 +1619,20 @@ class DetectWorkspacePage(QScrollArea):
             )
         else:
             self.page_overline.setText("CORPUS EXPORT")
-            self.page_title.setText("Materialize a frozen selection")
+            self.page_title.setText("Plan corpus export")
             self.page_description.setText(
-                "Choose what to create and where to publish it. Source-time provenance "
-                "travels with every output."
+                "Choose a format and destination. Publication becomes available after "
+                "Result intervals are selected and verified."
+            )
+        routes = ("setup", "recordings", "run", "results", "export")
+        labels = ("Setup", "Recordings", "Run", "Results", "Export")
+        for index, (name, label, button) in enumerate(
+            zip(routes, labels, self.step_buttons, strict=True), start=1
+        ):
+            button.setAccessibleName(
+                f"Current step {index} of 5: {label}"
+                if name == route
+                else f"Step {index} of 5: {label}"
             )
         self.setup_button.setAccessibleDescription(
             "Current Detect page" if route == "setup" else "Open Detect setup"
@@ -1515,6 +1652,8 @@ class DetectWorkspacePage(QScrollArea):
         self._render_run_header()
         if route_changed:
             QTimer.singleShot(0, lambda: self.verticalScrollBar().setValue(0))
+            current_button = self.step_buttons[routes.index(route)]
+            QTimer.singleShot(0, current_button.setFocus)
 
     def focus_initial(self) -> None:
         if self.relink_card.isVisible():
