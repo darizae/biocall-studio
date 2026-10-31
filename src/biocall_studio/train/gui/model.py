@@ -26,12 +26,11 @@ from biocall_studio.train.persistence.datasets import load_dataset
 from biocall_studio.train.persistence.models import ModelArtifact, list_models
 
 
-def _heading(title: str, subtitle: str, *, overline: str) -> QWidget:
+def _heading(title: str, subtitle: str) -> QWidget:
     widget = QWidget()
     layout = QVBoxLayout(widget)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(3)
-    layout.addWidget(Text(overline, role="overline"))
     layout.addWidget(Text(title, role="title"))
     if subtitle:
         layout.addWidget(Text(subtitle, role="caption", word_wrap=True))
@@ -115,19 +114,13 @@ class ModelListPage(QScrollArea):
         layout = QVBoxLayout(content)
         layout.setContentsMargins(38, 30, 38, 38)
         layout.setSpacing(16)
-        layout.addWidget(
-            _heading(
-                "Models",
-                "",
-                overline="IMMUTABLE ARTIFACTS",
-            )
-        )
+        layout.addWidget(_heading("Models", ""))
         self.error_alert = Alert("", title="Models could not be read", intent="danger")
         self.error_alert.hide()
         layout.addWidget(self.error_alert)
         self.model = ModelListModel(self)
         self.table = DataTable(model=self.model)
-        self.table.setAccessibleName("Published Models")
+        self.table.setAccessibleName("Models")
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.table.clicked.connect(
@@ -138,7 +131,7 @@ class ModelListPage(QScrollArea):
         action.clicked.connect(open_datasets)
         self.empty = EmptyState(
             "No Models yet.",
-            text="Start Training from an immutable Dataset to publish a verified Model.",
+            text="Start training from a dataset to create a model.",
             icon=make_icon("info", color=ALPACA_LIGHT.colors.primary, size=28),
             action=action,
         )
@@ -213,11 +206,7 @@ class ModelDetailPage(QScrollArea):
         self.display_name = self.model_name(artifact.model_id, artifact.label)
         header = QHBoxLayout()
         header.addWidget(
-            _heading(
-                self.display_name,
-                "",
-                overline="MODEL",
-            ),
+            _heading(self.display_name, ""),
             1,
         )
         actions = QHBoxLayout()
@@ -236,21 +225,21 @@ class ModelDetailPage(QScrollArea):
         metrics = manifest["results"]["metrics"]
         for column, (label, value) in enumerate(
             (
-                ("FAMILY", family_label),
+                ("Family", family_label),
                 (
-                    "DECISION THRESHOLD" if is_rf else "SELECTED EPOCH",
+                    "Decision threshold" if is_rf else "Selected epoch",
                     (
                         f"{manifest['random_forest']['decision_policy']['threshold']:.3f}"
                         if is_rf
                         else str(manifest["results"]["selected_epoch"])
                     ),
                 ),
-                ("VAL ACCURACY", _metric(metrics["accuracy"])),
-                ("ARTIFACT", f"{manifest['artifact']['size_bytes'] / 1024:.1f} KiB"),
+                ("Validation accuracy", _metric(metrics["accuracy"])),
+                ("File size", f"{manifest['artifact']['size_bytes'] / 1024:.1f} KiB"),
             )
         ):
             card = Card(shadow=False)
-            card.content_layout.addWidget(Text(label, role="overline"))
+            card.content_layout.addWidget(Text(label, role="caption"))
             card.content_layout.addWidget(Text(value, role="heading"))
             summary.addWidget(card, 0, column)
         self.outer.addLayout(summary)
@@ -313,41 +302,6 @@ class ModelDetailPage(QScrollArea):
             metrics_card.content_layout.addLayout(row)
         left.addWidget(metrics_card)
 
-        boundary = Card(shadow=False)
-        boundary.content_layout.addWidget(Text("Prediction not included", role="subheading"))
-        boundary.content_layout.addWidget(
-            Text(
-                "This Trainer release creates and verifies the classifier. Running inference "
-                "on new recordings belongs to a later, explicitly validated workflow.",
-                role="body",
-                word_wrap=True,
-            )
-        )
-        right.addWidget(boundary)
-
-        provenance = Card(shadow=False)
-        provenance.content_layout.addWidget(Text("Provenance", role="subheading"))
-        provenance_rows = [
-            ("Trainer", manifest["provenance"]["trainer"]["version"]),
-            ("Toolbox", manifest["provenance"]["toolbox"]["version"]),
-            ("Toolbox revision", manifest["provenance"]["toolbox"]["revision"][:12]),
-        ]
-        if is_rf:
-            provenance_rows.extend(
-                (
-                    ("scikit-learn", manifest["provenance"]["scikit_learn_version"]),
-                    ("Librosa", manifest["provenance"]["librosa_version"]),
-                )
-            )
-        else:
-            provenance_rows.append(("PyTorch", manifest["provenance"]["torch_version"]))
-        for label, value in provenance_rows:
-            row = QHBoxLayout()
-            row.addWidget(Text(label, role="caption"))
-            row.addStretch()
-            row.addWidget(Text(str(value), role="body", selectable=True))
-            provenance.content_layout.addLayout(row)
-        right.addWidget(provenance)
         back = Button("← All Models", variant="outline")
         back.clicked.connect(self.open_models)
         right.addWidget(back, 0, Qt.AlignmentFlag.AlignLeft)

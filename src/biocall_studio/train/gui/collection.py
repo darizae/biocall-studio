@@ -35,6 +35,12 @@ def _duration(seconds: float) -> str:
     return f"{seconds:.1f} s"
 
 
+def _context_help(copy_id: str, help_text: str, subject: str) -> HelpHint:
+    hint = HelpHint(help_text, subject=subject)
+    hint.setObjectName(copy_id)
+    return hint
+
+
 class PagedRecordingModel(QAbstractTableModel):
     """Expose Source Recording aggregates to Qt in bounded pages."""
 
@@ -122,7 +128,6 @@ class ReadingCollectionPage(QScrollArea):
         layout = QVBoxLayout(self.narrow)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(18)
-        layout.addWidget(Text("SELECT COLLECTION", role="overline"))
         self.title = Text("Reading Collection", role="title")
         layout.addWidget(self.title)
         layout.addWidget(
@@ -221,7 +226,6 @@ class CollectionPage(QScrollArea):
         heading = QVBoxLayout(heading_widget)
         heading.setContentsMargins(0, 0, 0, 0)
         heading.setSpacing(3)
-        heading.addWidget(Text("COLLECTION", role="overline"))
         heading.addWidget(Text(result.root_name, role="title"))
         heading_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.header_layout.addWidget(heading_widget)
@@ -292,10 +296,11 @@ class CollectionPage(QScrollArea):
         table_heading.addLayout(title)
         table_heading.addStretch()
         table_heading.addWidget(
-            HelpHint(
-                "Each labeled clip filename names its full recording and includes the clip's "
-                "start and end time in milliseconds.",
-                subject="Source and positive mapping",
+            _context_help(
+                "CTX-11",
+                "Each labeled clip name identifies its full recording and the clip's start "
+                "and end times.",
+                "Source and positive mapping",
             )
         )
         recordings.content_layout.addLayout(table_heading)
@@ -358,10 +363,11 @@ class CollectionPage(QScrollArea):
         folder_header.addWidget(Text("Folder", role="subheading"))
         folder_header.addStretch()
         folder_header.addWidget(
-            HelpHint(
-                "Trainer stores its own files in .alpaca/ and doesn't copy or change your WAV "
-                "files.",
-                subject="Collection storage",
+            _context_help(
+                "CTX-12",
+                "BioCall Studio stores datasets and models in this folder. It does not copy "
+                "or change your WAV files.",
+                "Collection storage",
             )
         )
         folder.content_layout.addLayout(folder_header)

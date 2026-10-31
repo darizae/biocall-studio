@@ -306,9 +306,7 @@ def test_guided_detect_routes_bulk_badges_run_and_selection_free_export(
     assert controller.active_collection == bound
 
     excluded_key = next(
-        row.recording_key
-        for row in controller.snapshot.recordings
-        if row.status.value == "valid"
+        row.recording_key for row in controller.snapshot.recordings if row.status.value == "valid"
     )
     controller.set_inventory_decision(
         excluded_key,
@@ -366,9 +364,7 @@ def test_guided_detect_routes_bulk_badges_run_and_selection_free_export(
     qtbot.waitUntil(lambda: page.focusWidget() is page.run_button)
     assert page.minimum_score.isVisible()
     assert page.run_summary_model.text() == genuine_cnn.model.label
-    assert page.run_summary_recordings.text().startswith(
-        str(controller.snapshot.counts.included)
-    )
+    assert page.run_summary_recordings.text().startswith(str(controller.snapshot.counts.included))
     assert page.run_blocker.text() == "Ready to start detection."
     page.minimum_score.setValue(1.0)
     page.start_detection_button.click()
@@ -476,9 +472,7 @@ def test_real_run_publishes_reopenable_metadata_result_and_native_controls(
     }
     assert page.minimum_score.value() == 0.5
     assert page.start_detection_button.isEnabled()
-    assert {
-        hint.accessibleName() for hint in page.findChildren(HelpHint)
-    } >= {
+    assert {hint.accessibleName() for hint in page.findChildren(HelpHint)} >= {
         "More about Minimum detection score",
         "More about Window overlap",
         "More about Combine nearby candidates",
@@ -501,9 +495,7 @@ def test_real_run_publishes_reopenable_metadata_result_and_native_controls(
     assert record.status is DetectRunStatus.COMPLETED
     assert record.progress == 100
 
-    repository = DetectRunRepository(
-        app_data, controller.active_collection.ref.collection_id
-    )
+    repository = DetectRunRepository(app_data, controller.active_collection.ref.collection_id)
     result = repository.load_detection_result(record)
     assert result.result_id == record.published_artifact_id
     assert result.result_digest
@@ -521,7 +513,9 @@ def test_real_run_publishes_reopenable_metadata_result_and_native_controls(
         path.relative_to(genuine_cnn.root).as_posix(): path.read_bytes()
         for path in (genuine_cnn.root / "recordings").glob("*.wav")
     }
-    assert "metadata-only Result" in page.run_guidance.text()
+    assert page.run_guidance.text() == (
+        "Detection finished: 0 possible calls across 4 recordings; 1 file failed."
+    )
     reopened = DetectWorkspaceController(app_data)
     assert reopened.current_run.status is DetectRunStatus.COMPLETED
     assert reopened.current_result == result
@@ -554,9 +548,12 @@ def test_native_result_history_recording_candidates_selection_and_keyboard_navig
     assert controller.current_result is not None
     assert controller.current_result.candidate_count >= 2
     first_result = controller.current_result
-    result_path = DetectRunRepository(
-        app_data, controller.active_collection.ref.collection_id
-    ).result_path(first_result.result_id) / "result.json"
+    result_path = (
+        DetectRunRepository(app_data, controller.active_collection.ref.collection_id).result_path(
+            first_result.result_id
+        )
+        / "result.json"
+    )
     immutable_bytes = result_path.read_bytes()
 
     assert page.results_button.isEnabled()
@@ -565,9 +562,10 @@ def test_native_result_history_recording_candidates_selection_and_keyboard_navig
     explorer = page.result_explorer
     page.focus_initial()
     qtbot.waitUntil(lambda: page.focusWidget() is explorer.history_select.control)
-    assert {
-        hint.accessibleName() for hint in explorer.findChildren(HelpHint)
-    } >= {"More about Result lineage", "More about Result selection"}
+    assert {hint.accessibleName() for hint in explorer.findChildren(HelpHint)} == {
+        "More about RF refinement",
+        "More about Result selection",
+    }
     assert isinstance(explorer.recording_table, DataTable)
     assert isinstance(explorer.candidate_table, DataTable)
     assert explorer.history_select.count() == 1
@@ -580,9 +578,7 @@ def test_native_result_history_recording_candidates_selection_and_keyboard_navig
     ]
     assert len(successful_rows) >= 2
     first_recording_row, second_recording_row = successful_rows[:2]
-    explorer.recording_table.setCurrentIndex(
-        explorer.recording_model.index(first_recording_row, 0)
-    )
+    explorer.recording_table.setCurrentIndex(explorer.recording_model.index(first_recording_row, 0))
     first_recording_id = explorer.selected_recording_id
     assert explorer.candidate_model.rowCount() > 0
     opened_urls = []
@@ -615,12 +611,13 @@ def test_native_result_history_recording_candidates_selection_and_keyboard_navig
         candidate.recording_id == explorer.selected_recording_id
         for candidate in explorer.candidate_model.visible_candidates
     )
-    explorer.recording_table.setCurrentIndex(
-        explorer.recording_model.index(first_recording_row, 0)
+    explorer.recording_table.setCurrentIndex(explorer.recording_model.index(first_recording_row, 0))
+    assert (
+        explorer.candidate_model.data(
+            explorer.candidate_model.index(0, 0), Qt.ItemDataRole.CheckStateRole
+        )
+        == Qt.CheckState.Checked
     )
-    assert explorer.candidate_model.data(
-        explorer.candidate_model.index(0, 0), Qt.ItemDataRole.CheckStateRole
-    ) == Qt.CheckState.Checked
 
     controller.start_detection(DetectionSettings(1.0, 50, 0, 4))
     second_run = _wait_terminal(qtbot, controller)
@@ -695,15 +692,16 @@ def test_result_empty_partial_missing_corrupt_persistence_and_native_screenshots
     assert partial_result.failed_files == 1
     assert controller.selected_result_projection.content_state is ResultContentState.PARTIAL
     first_candidate = next(
-        candidate
-        for recording in partial_result.recordings
-        for candidate in recording.candidates
+        candidate for recording in partial_result.recordings for candidate in recording.candidates
     )
     controller.set_candidate_selected(first_candidate.candidate_id, True)
     selection_revision = controller.result_selection.selection_revision
-    partial_path = DetectRunRepository(
-        app_data, controller.active_collection.ref.collection_id
-    ).result_path(partial_run.artifact_id) / "result.json"
+    partial_path = (
+        DetectRunRepository(app_data, controller.active_collection.ref.collection_id).result_path(
+            partial_run.artifact_id
+        )
+        / "result.json"
+    )
     partial_bytes = partial_path.read_bytes()
 
     controller.set_inventory_decision(
@@ -739,9 +737,7 @@ def test_result_empty_partial_missing_corrupt_persistence_and_native_screenshots
     assert page.result_explorer.provenance_card.isVisible()
     candidate_recording_row = next(
         index
-        for index, recording in enumerate(
-            reopened.selected_result_projection.recordings
-        )
+        for index, recording in enumerate(reopened.selected_result_projection.recordings)
         if recording.candidates
     )
     page.result_explorer.recording_table.setCurrentIndex(
@@ -758,9 +754,12 @@ def test_result_empty_partial_missing_corrupt_persistence_and_native_screenshots
     assert page.grab().save(str(compact), "PNG") and compact.stat().st_size > 10_000
     assert partial_path.read_bytes() == partial_bytes
 
-    empty_path = DetectRunRepository(
-        app_data, reopened.active_collection.ref.collection_id
-    ).result_path(empty_run.artifact_id) / "result.json"
+    empty_path = (
+        DetectRunRepository(app_data, reopened.active_collection.ref.collection_id).result_path(
+            empty_run.artifact_id
+        )
+        / "result.json"
+    )
     empty_path.write_bytes(b"{corrupt")
     reopened.refresh()
     reopened.select_result(empty_result.result_id)
@@ -833,18 +832,16 @@ def test_stale_input_cancellation_crash_and_publication_collision_are_atomic(
     collision_controller.shutdown()
 
     receipt_data = tmp_path / "receipt-data"
-    receipt_controller = DetectWorkspaceController(
-        receipt_data, worker_step_delay_seconds=0.2
-    )
+    receipt_controller = DetectWorkspaceController(receipt_data, worker_step_delay_seconds=0.2)
     _select_inputs(qtbot, receipt_controller, genuine_cnn.model.root, genuine_cnn.root)
     receipt_controller.start_detection(settings)
     qtbot.waitUntil(lambda: receipt_controller.current_run is not None, timeout=10_000)
     receipt_repository = DetectRunRepository(
         receipt_data, receipt_controller.active_collection.ref.collection_id
     )
-    receipt_path = receipt_repository.run_directory(
-        receipt_controller.current_run.run_id
-    ) / "receipt.json"
+    receipt_path = (
+        receipt_repository.run_directory(receipt_controller.current_run.run_id) / "receipt.json"
+    )
     receipt_path.write_text("{}\n")
     receipt_failed = _wait_terminal(qtbot, receipt_controller)
     assert receipt_failed.status is DetectRunStatus.FAILED
@@ -859,8 +856,10 @@ def test_stale_input_cancellation_crash_and_publication_collision_are_atomic(
     _select_inputs(qtbot, crash_controller, genuine_cnn.model.root, genuine_cnn.root)
     crash_controller.start_detection(settings)
     qtbot.waitUntil(
-        lambda: crash_controller.run_process is not None
-        and crash_controller.run_process.processId() > 0,
+        lambda: (
+            crash_controller.run_process is not None
+            and crash_controller.run_process.processId() > 0
+        ),
         timeout=10_000,
     )
     crash_controller.run_process.kill()
@@ -1040,9 +1039,7 @@ def test_real_rf_reference_probability_persists_independent_native_derived_resul
     expected = _canonical_rf_reference(raw, n_mfcc=int(config["n_mfcc"]))
     assert tuple(expected) == rf_reference.snapshot.rf_feature_names
     assert observed == pytest.approx(expected, rel=0, abs=1e-10)
-    estimator = joblib.load(
-        rf_reference.root / rf_reference.snapshot.artifact_relative_path
-    )
+    estimator = joblib.load(rf_reference.root / rf_reference.snapshot.artifact_relative_path)
     vector = np.asarray([[expected[name] for name in expected]], dtype=np.float64)
     target_column = list(map(int, estimator.classes_)).index(1)
     reference_score = float(estimator.predict_proba(vector)[0, target_column])
@@ -1088,11 +1085,13 @@ def test_real_rf_reference_probability_persists_independent_native_derived_resul
     page._set_route("results")
     explorer = page.result_explorer
     assert explorer.history_select.count() == 2
-    assert {
-        hint.accessibleName() for hint in explorer.findChildren(HelpHint)
-    } >= {"More about RF refinement"}
+    assert {hint.accessibleName() for hint in explorer.findChildren(HelpHint)} >= {
+        "More about RF refinement"
+    }
     assert explorer.provenance_badge.text() == "Refined"
-    assert child.parent_result_id in explorer.provenance_values["parent"].text()
+    assert explorer.lineage_label.text() == (
+        "Calls from an original result checked with a Random Forest model."
+    )
     assert explorer.candidate_model.refinement_visible
     explorer.history_select.control.setFocus()
     qtbot.keyClick(explorer.history_select.control, Qt.Key.Key_Down)
@@ -1130,9 +1129,7 @@ def test_real_rf_reference_probability_persists_independent_native_derived_resul
             controller.select_result(result_id)
             candidate_row = next(
                 index
-                for index, recording in enumerate(
-                    controller.selected_result_projection.recordings
-                )
+                for index, recording in enumerate(controller.selected_result_projection.recordings)
                 if recording.candidates
             )
             explorer.recording_table.setCurrentIndex(
@@ -1194,9 +1191,7 @@ def test_rf_wrong_model_unscored_cancel_crash_stale_and_publication_are_atomic(
             continue
         candidate_scores.extend(
             item.target_score
-            for item in predict_recording_windows(
-                reference, path, DetectionSettings(0.0, 0, 0, 4)
-            )
+            for item in predict_recording_windows(reference, path, DetectionSettings(0.0, 0, 0, 4))
         )
     controller.start_detection(DetectionSettings(max(candidate_scores), 0, 0, 4))
     parent_run = _wait_terminal(qtbot, controller)
@@ -1253,23 +1248,19 @@ def test_rf_wrong_model_unscored_cancel_crash_stale_and_publication_are_atomic(
     unscored_recording_id = next(
         recording.recording_ref
         for recording in child.recordings
-        if any(
-            candidate.status is RefinementStatus.UNSCORED
-            for candidate in recording.candidates
-        )
+        if any(candidate.status is RefinementStatus.UNSCORED for candidate in recording.candidates)
     )
     unscored_row = explorer.recording_model.row_for_id(unscored_recording_id)
-    explorer.recording_table.setCurrentIndex(
-        explorer.recording_model.index(unscored_row, 0)
-    )
+    explorer.recording_table.setCurrentIndex(explorer.recording_model.index(unscored_row, 0))
     unscored_candidate_row = next(
         row
         for row, candidate in enumerate(explorer.candidate_model.visible_candidates)
         if candidate.refinement_status is RefinementStatus.UNSCORED
     )
-    assert explorer.candidate_model.data(
-        explorer.candidate_model.index(unscored_candidate_row, 4)
-    ) == "Could not assess"
+    assert (
+        explorer.candidate_model.data(explorer.candidate_model.index(unscored_candidate_row, 4))
+        == "Could not assess"
+    )
     explorer.candidate_table.setCurrentIndex(
         explorer.candidate_model.index(unscored_candidate_row, 0)
     )
@@ -1281,8 +1272,7 @@ def test_rf_wrong_model_unscored_cancel_crash_stale_and_publication_are_atomic(
         page.verticalScrollBar().setValue(page.verticalScrollBar().maximum() * 3 // 5)
         unscored_image = evidence / "results-refined-unscored-normal.png"
         assert (
-            page.grab().save(str(unscored_image), "PNG")
-            and unscored_image.stat().st_size > 10_000
+            page.grab().save(str(unscored_image), "PNG") and unscored_image.stat().st_size > 10_000
         )
 
     controller.select_result(parent.result_id)

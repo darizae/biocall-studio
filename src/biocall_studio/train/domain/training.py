@@ -363,6 +363,10 @@ def _validate_cnn(
     ):
         if float(values[lower]) > float(values[upper]):
             errors[upper] = f"{label} maximum must be at least the minimum."
+    if int(values["augmentation.noise_min_snr"]) >= int(values["augmentation.noise_max_snr"]):
+        errors["augmentation.noise_max_snr"] = (
+            "Noise mix maximum SNR must be greater than the minimum."
+        )
     if values["augmentation.noise_source"] != "none":
         errors["augmentation.noise_source"] = (
             "Collection-selected augmentation noise is not yet supported by the verified executor."

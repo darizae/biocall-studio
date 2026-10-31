@@ -7,9 +7,8 @@ from PySide6.QtCore import QSignalBlocker
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
 KEEP_AWAKE_HELP = (
-    "When this is on, Trainer asks your computer to stay awake while the app is open. "
-    "Your screen can still turn off. It may use more battery. Closing the lid or putting "
-    "the computer to sleep yourself can still pause training."
+    "Prevents inactivity sleep while BioCall Studio is open. The display can still turn off, "
+    "and closing the lid or choosing Sleep still works."
 )
 
 
@@ -25,6 +24,7 @@ class KeepAwakeControl(QWidget):
         self.toggle = Switch("Keep computer awake")
         self.toggle.setAccessibleDescription(KEEP_AWAKE_HELP)
         self.hint = HelpHint(KEEP_AWAKE_HELP, subject="Keep computer awake")
+        self.hint.setObjectName("CTX-22")
         self.status = Text("Off", role="body")
         self.status.setAccessibleName("Keep computer awake status")
         row.addWidget(self.toggle)

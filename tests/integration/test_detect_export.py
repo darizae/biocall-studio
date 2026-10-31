@@ -155,15 +155,11 @@ def _freeze(
     )
 
 
-def test_real_snippet_pcm_headers_checksums_and_source_frames_are_exact(
-    tmp_path, wav_factory
-):
+def test_real_snippet_pcm_headers_checksums_and_source_frames_are_exact(tmp_path, wav_factory):
     """Cases: IT-DET-019, IT-STU-009."""
     source = tmp_path / "source"
     mono = wav_factory(source / "recordings" / "mono.wav", frames=64, rate=8_000)
-    stereo = wav_factory(
-        source / "recordings" / "stereo.wav", frames=96, rate=16_000, channels=2
-    )
+    stereo = wav_factory(source / "recordings" / "stereo.wav", frames=96, rate=16_000, channels=2)
     result = _result_for_sources(
         source,
         (
@@ -205,9 +201,7 @@ def test_real_snippet_pcm_headers_checksums_and_source_frames_are_exact(
     assert verify_export_directory(final) == receipt
 
 
-def test_both_mode_concat_pcm_raven_offsets_and_receipt_reopen_are_exact(
-    tmp_path, wav_factory
-):
+def test_both_mode_concat_pcm_raven_offsets_and_receipt_reopen_are_exact(tmp_path, wav_factory):
     """Case: IT-DET-020."""
     source = tmp_path / "source"
     first = wav_factory(source / "recordings" / "alpha.wav", frames=80, rate=8_000)
@@ -231,15 +225,17 @@ def test_both_mode_concat_pcm_raven_offsets_and_receipt_reopen_are_exact(
     concat_facts, concat_pcm = _pcm(final / "corpus.wav")
     assert concat_facts == (8_000, 1, 2, "NONE")
     assert concat_pcm == expected
-    assert [
-        (row.concat_start_frame, row.concat_end_frame) for row in receipt.concat_mappings
-    ] == [(0, 7), (7, 18), (18, 31)]
-    assert [
-        (row.begin_frame, row.end_frame, row.gap_frames) for row in receipt.raven_rows
-    ] == [(0, 7, 0), (7, 18, 0), (18, 31, 0)]
-    tsv_lines = (final / "corpus.Table.1.selections.txt").read_text(
-        encoding="utf-8"
-    ).splitlines()
+    assert [(row.concat_start_frame, row.concat_end_frame) for row in receipt.concat_mappings] == [
+        (0, 7),
+        (7, 18),
+        (18, 31),
+    ]
+    assert [(row.begin_frame, row.end_frame, row.gap_frames) for row in receipt.raven_rows] == [
+        (0, 7, 0),
+        (7, 18, 0),
+        (18, 31, 0),
+    ]
+    tsv_lines = (final / "corpus.Table.1.selections.txt").read_text(encoding="utf-8").splitlines()
     assert len(tsv_lines) == 4
     assert tsv_lines[1].split("\t")[3:5] == ["0", "0.000875"]
     assert tsv_lines[-1].split("\t")[3:5] == ["0.00225", "0.003875"]
@@ -251,16 +247,12 @@ def test_both_mode_concat_pcm_raven_offsets_and_receipt_reopen_are_exact(
         "raven_tsv",
     }
     published_bytes = {
-        path.relative_to(final): path.read_bytes()
-        for path in final.rglob("*")
-        if path.is_file()
+        path.relative_to(final): path.read_bytes() for path in final.rglob("*") if path.is_file()
     }
     reopened = verify_export_directory(final)
     assert reopened == receipt
     assert {
-        path.relative_to(final): path.read_bytes()
-        for path in final.rglob("*")
-        if path.is_file()
+        path.relative_to(final): path.read_bytes() for path in final.rglob("*") if path.is_file()
     } == published_bytes
     receipt_path = final / "export-receipt.json"
     assert json.loads(receipt_path.read_text())["receipt_digest"]
@@ -385,7 +377,7 @@ def test_native_export_controls_freeze_destination_compact_status_and_show_folde
     assert isinstance(page.destination_picker, FolderPicker)
     assert isinstance(page.format_help, HelpHint)
     assert page.frozen_count.text() == "1 interval"
-    assert page.start_button.accessibleName() == "Export frozen corpus selection"
+    assert page.start_button.accessibleName() == "Export selected calls"
     assert not page.start_button.isEnabled()
     page.destination_picker.setFolderPath(str(destination))
     page.render()

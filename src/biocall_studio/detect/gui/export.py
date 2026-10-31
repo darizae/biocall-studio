@@ -83,15 +83,15 @@ class ExportPage(QWidget):
 
     def _build_selection_card(self) -> Card:
         card = Card()
-        card.setAccessibleName("Frozen Result selection")
+        card.setAccessibleName("Selected calls")
         heading = QHBoxLayout()
-        heading.addWidget(Text("Frozen Result selection", role="heading"))
+        heading.addWidget(Text("Selected calls", role="heading"))
         heading.addStretch()
         self.frozen_count = Badge("No intervals", intent="success")
-        self.frozen_count.setAccessibleName("Frozen interval count")
+        self.frozen_count.setAccessibleName("Selected call count")
         heading.addWidget(self.frozen_count)
         card.content_layout.addLayout(heading)
-        self.result_label = Text("No Result selection has been frozen.", role="subheading")
+        self.result_label = Text("No result selected.", role="subheading")
         card.content_layout.addWidget(self.result_label)
         self.selection_summary = Text("Return to Results and select intervals.", role="body")
         card.content_layout.addWidget(self.selection_summary)
@@ -103,11 +103,11 @@ class ExportPage(QWidget):
         heading = QHBoxLayout()
         heading.addWidget(Text("Export format", role="heading"))
         self.format_help = HelpHint(
-            "Snippets preserve each source WAV format. Concatenation is gap-free and is "
-            "available only when selected PCM formats match; audio is never resampled or "
-            "downmixed. Raven rows use concatenated output time and retain source frames.",
+            "Individual snippets creates one WAV per selected call. Concatenated creates one "
+            "WAV and a Raven table, and requires matching audio formats.",
             subject="Corpus export formats",
         )
+        self.format_help.setObjectName("CTX-07")
         heading.addWidget(self.format_help)
         heading.addStretch()
         card.content_layout.addLayout(heading)
@@ -116,9 +116,7 @@ class ExportPage(QWidget):
         self.mode_concat = QRadioButton("Concatenated WAV with Raven TSV")
         self.mode_both = QRadioButton("Both")
         self.mode_both.setChecked(True)
-        for identifier, button in enumerate(
-            (self.mode_snippets, self.mode_concat, self.mode_both)
-        ):
+        for identifier, button in enumerate((self.mode_snippets, self.mode_concat, self.mode_both)):
             self.mode_group.addButton(button, identifier)
             card.content_layout.addWidget(button)
         return card
@@ -136,9 +134,8 @@ class ExportPage(QWidget):
         card.content_layout.addWidget(self.destination_picker)
         card.content_layout.addWidget(
             Text(
-                "The selected audio and source-time provenance may be sensitive. A new "
-                "collision-safe export folder is published inside this destination; existing "
-                "files are never overwritten.",
+                "Exported audio may be sensitive. BioCall Studio creates a new folder inside "
+                "this destination and never overwrites existing files.",
                 role="body",
                 word_wrap=True,
             )
@@ -147,12 +144,12 @@ class ExportPage(QWidget):
 
     def _build_mapping_card(self) -> Card:
         card = Card()
-        card.setAccessibleName("Planned source and output frame mapping")
-        card.content_layout.addWidget(Text("Planned source-time mapping", role="heading"))
+        card.setAccessibleName("Planned audio output")
+        card.content_layout.addWidget(Text("Planned output", role="heading"))
         self.mapping_label = QLabel()
         self.mapping_label.setWordWrap(True)
         self.mapping_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByKeyboard)
-        self.mapping_label.setAccessibleName("Planned source and output mapping")
+        self.mapping_label.setAccessibleName("Planned source and output audio")
         card.content_layout.addWidget(self.mapping_label)
         return card
 
@@ -160,7 +157,7 @@ class ExportPage(QWidget):
         card = Card()
         card.setAccessibleName("Review corpus export")
         card.content_layout.addWidget(Text("Review export", role="heading"))
-        self.review_summary = Text("Freeze a Result selection to continue.", role="body")
+        self.review_summary = Text("Select calls in Results to continue.", role="body")
         card.content_layout.addWidget(self.review_summary)
         self.status_title = Text("Selection required", role="subheading")
         self.status_title.setAccessibleName("Export status")
@@ -170,7 +167,7 @@ class ExportPage(QWidget):
         )
         card.content_layout.addWidget(self.status_detail)
         self.start_button = Button("Export corpus", variant="primary")
-        self.start_button.setAccessibleName("Export frozen corpus selection")
+        self.start_button.setAccessibleName("Export selected calls")
         card.content_layout.addWidget(self.start_button)
         self.cancel_button = Button("Cancel export", variant="outline")
         self.cancel_button.setAccessibleName("Cancel corpus export")
@@ -223,7 +220,7 @@ class ExportPage(QWidget):
         )
         frozen = self.controller.export_selection
         self.result_label.setText(
-            "No Result selection has been frozen."
+            "No result selected."
             if frozen is None
             else (
                 f"{'Refined' if frozen.result_kind == 'derived' else 'Original'} Result · "
@@ -234,8 +231,7 @@ class ExportPage(QWidget):
             "Return to Results and select intervals."
             if not count
             else (
-                f"{count:,} intervals from {recordings:,} "
-                f"recording{'s' if recordings != 1 else ''}"
+                f"{count:,} intervals from {recordings:,} recording{'s' if recordings != 1 else ''}"
             )
         )
         mode = self._mode()
@@ -252,11 +248,7 @@ class ExportPage(QWidget):
             output = (
                 snippet
                 if mode is ExportMode.SNIPPETS
-                else (
-                    f"{snippet} + corpus.wav"
-                    if mode is ExportMode.BOTH
-                    else "corpus.wav"
-                )
+                else (f"{snippet} + corpus.wav" if mode is ExportMode.BOTH else "corpus.wav")
             )
             concat = (
                 ""
@@ -269,31 +261,26 @@ class ExportPage(QWidget):
                 f"[{candidate.start_frame:,}, {candidate.end_frame:,}) → {output}{concat}"
             )
             offset += length
-        self.mapping_label.setText("\n".join(lines) or "No frozen intervals to map.")
+        self.mapping_label.setText("\n".join(lines) or "No selected calls to map.")
         audio_outputs = (
             count
             if mode is ExportMode.SNIPPETS
             else (1 if mode is ExportMode.CONCAT else count + 1)
         )
-        companions = (
-            "Provenance receipt"
-            if mode is ExportMode.SNIPPETS
-            else "Raven TSV and provenance receipt"
-        )
+        companions = "Details file" if mode is ExportMode.SNIPPETS else "Raven TSV and details file"
         self.review_summary.setText(
-            f"{audio_outputs:,} WAV output{'s' if audio_outputs != 1 else ''} · {companions} · "
-            "source files remain read-only"
+            f"{audio_outputs:,} WAV output{'s' if audio_outputs != 1 else ''} · {companions}"
             if count
-            else "Freeze a Result selection to continue."
+            else "Select calls in Results to continue."
         )
         state = ExportState(self.controller.export_state)
         active = bool(self.controller.is_export_active)
         destination = self.destination_picker.folderPath().strip()
         titles = {
-            ExportState.READY: "Ready to export" if destination and count else (
-                "Destination required" if count else "Selection required"
-            ),
-            ExportState.RUNNING: "Exporting frozen selection",
+            ExportState.READY: "Ready to export"
+            if destination and count
+            else ("Destination required" if count else "Selection required"),
+            ExportState.RUNNING: "Exporting selected calls",
             ExportState.CONFLICT: "Destination conflict",
             ExportState.STALE: "Source changed",
             ExportState.CANCELLED: "Export cancelled",
@@ -368,11 +355,7 @@ class ExportPage(QWidget):
             return
         buttons = self.destination_picker.findChildren(QWidget)
         target = next(
-            (
-                button
-                for button in buttons
-                if button.focusPolicy() != Qt.FocusPolicy.NoFocus
-            ),
+            (button for button in buttons if button.focusPolicy() != Qt.FocusPolicy.NoFocus),
             None,
         )
         (target or self.results_button).setFocus()

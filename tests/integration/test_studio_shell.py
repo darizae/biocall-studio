@@ -1,12 +1,15 @@
+# ruff: noqa: E501 -- approved interface copy is asserted verbatim.
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
 from textwrap import dedent
 
 import pytest
-from alp_ui.components import FolderPicker, HelpHint
+from alp_ui.components import Badge, FolderPicker, HelpHint, Text
+from alp_ui.theme import ALPACA_LIGHT
 from PySide6.QtCore import QProcess, Qt
 from PySide6.QtWidgets import (
     QApplication,
@@ -15,6 +18,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QTableView,
+    QWidget,
 )
 
 from biocall_studio.studio.application.app import (
@@ -109,6 +113,41 @@ def test_studio_launchpad_uses_one_themed_application_and_accessible_native_card
     assert not shell.isVisible()
 
     coordinator.show_studio()
+    _finish(qtbot, coordinator)
+
+
+def test_approved_launch_language_and_light_theme_survive_host_dark_appearance(
+    qapp, qtbot, tmp_path
+):
+    """Case: IT-UI-006."""
+    qapp.styleHints().setColorScheme(Qt.ColorScheme.Dark)
+    coordinator = _coordinator(qtbot, WorkspaceController(tmp_path / "settings"))
+    shell = coordinator.shell_window
+
+    assert qapp.styleHints().colorScheme() is Qt.ColorScheme.Light
+    assert qapp.property("alp_ui_theme") == ALPACA_LIGHT
+    assert qapp.palette().window().color().name().upper() == (
+        ALPACA_LIGHT.colors.background.upper()
+    )
+    assert qapp.palette().windowText().color().name().upper() == (ALPACA_LIGHT.colors.text.upper())
+    labels = [label.text() for label in shell.launchpad.findChildren(QLabel)]
+    assert labels.count("From raw audio to corpora") == 1
+    assert "CHOOSE A WORKSPACE" not in labels
+    assert "From recordings to evidence" not in labels
+    assert (
+        "Train models, detect candidate calls, and review results in one workspace." not in labels
+    )
+    assert all("theme" not in text.casefold() for text in labels)
+    assert not any(
+        "theme" in button.text().casefold() for button in shell.launchpad.findChildren(QPushButton)
+    )
+
+    for width in (1180, 700):
+        shell.resize(width, 790)
+        qtbot.waitUntil(lambda width=width: shell.launchpad._compact == (width < 900))
+        assert shell.launchpad.findChildren(Text)
+        assert shell.launchpad.grab().size().width() > 0
+
     _finish(qtbot, coordinator)
 
 
@@ -321,28 +360,21 @@ def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(q
     assert len(shell.detect_page.findChildren(FolderPicker)) == 5
     assert {
         "More about Detection Model",
-        "More about Recordings folder identity",
+        "More about Recordings folder",
         "More about Recording inclusion",
         "More about Minimum detection score",
         "More about Window overlap",
         "More about Combine nearby candidates",
         "More about Corpus export formats",
-    } <= {
-        hint.accessibleName() for hint in shell.detect_page.findChildren(HelpHint)
-    }
+    } <= {hint.accessibleName() for hint in shell.detect_page.findChildren(HelpHint)}
     assert len(shell.detect_page.findChildren(QComboBox)) == 3
     assert not shell.detect_page.result_explorer.history_select.isEnabled()
-    assert (
-        shell.detect_page.result_explorer.history_select.accessibleName()
-        == "Result history"
-    )
+    assert shell.detect_page.result_explorer.history_select.accessibleName() == "Result history"
     assert not shell.detect_page.start_detection_button.isEnabled()
-    assert all(
-        not widget.isVisible() for widget in shell.detect_page.findChildren(QProgressBar)
-    )
+    assert all(not widget.isVisible() for widget in shell.detect_page.findChildren(QProgressBar))
     assert all(not widget.isVisible() for widget in shell.detect_page.findChildren(QTableView))
     detect_text = " ".join(label.text() for label in shell.detect_page.findChildren(QLabel))
-    assert "Choose a recordings folder" in detect_text
+    assert "Recordings folder" in detect_text
     assert "Detection Model" in detect_text
     assert shell.detect_page.start_detection_button.text() == "Start detection"
     shell.detect_page.back_button.setFocus()
@@ -363,6 +395,129 @@ def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(q
     qtbot.keyClick(shell.review_page.back_button, Qt.Key.Key_Space)
     assert shell.current_workspace is WorkspaceRoute.STUDIO
     assert not coordinator.controller.settings_file.exists()
+
+    _finish(qtbot, coordinator)
+
+
+def test_detect_routes_use_approved_help_plain_language_and_compact_result_states(qtbot, tmp_path):
+    """Case: IT-DET-024."""
+    coordinator = _coordinator(qtbot, WorkspaceController(tmp_path / "settings"))
+    page = coordinator.shell_window.detect_page
+    approved_help = {
+        "Minimum detection score": "Only results at or above this score are kept. Higher scores usually return fewer results.",
+        "Window overlap": "How much each scan window overlaps the next. More overlap takes longer.",
+        "Combine nearby candidates": "Joins nearby results when the gap between them is no larger than this value. Overlapping results are always joined.",
+        "Detection Model": "A model trained in BioCall Studio that searches your recordings for possible calls.",
+        "Recordings folder": "The folder of WAV files you want to search. BioCall Studio remembers it so you can relink the folder if it moves.",
+        "Recording inclusion": "Included recordings are searched. Excluded and undecided recordings are skipped.",
+        "Corpus export formats": "Individual snippets creates one WAV per selected call. Concatenated creates one WAV and a Raven table, and requires matching audio formats.",
+        "RF refinement": "Optionally use a Random Forest model to check the calls found by the detection model. The original results stay unchanged.",
+        "Result selection": "Selections are saved separately for each result.",
+    }
+    actual_help = {
+        hint.accessibleName().removeprefix("More about "): hint.toolTip()
+        for hint in page.findChildren(HelpHint)
+    }
+    assert actual_help == approved_help
+    approved_ids = {
+        "CTX-01": "Minimum detection score",
+        "CTX-02": "Window overlap",
+        "CTX-03": "Combine nearby candidates",
+        "CTX-04": "Detection Model",
+        "CTX-05": "Recordings folder",
+        "CTX-06": "Recording inclusion",
+        "CTX-07": "Corpus export formats",
+        "CTX-08": None,
+        "CTX-09": "RF refinement",
+        "CTX-10": "Result selection",
+    }
+    actual_ids = {
+        hint.objectName(): hint.accessibleName().removeprefix("More about ")
+        for hint in page.findChildren(HelpHint)
+    }
+    assert actual_ids == {
+        copy_id: subject for copy_id, subject in approved_ids.items() if subject is not None
+    }
+    assert "CTX-08" not in actual_ids
+    assert all(
+        hint.focusPolicy() != Qt.FocusPolicy.NoFocus
+        and hint.accessibleDescription() == hint.toolTip()
+        for hint in page.findChildren(HelpHint)
+    )
+
+    visible = " ".join(label.text() for label in page.findChildren(QLabel))
+    for rejected in (
+        "Choose a CNN Model published by Train.",
+        "Choose a Train Model folder.",
+        "manifest",
+        "checksum",
+        "runtime structure",
+        "Detect Collection",
+    ):
+        assert rejected.casefold() not in visible.casefold()
+    assert "recordings folder" in visible.casefold()
+
+    interface_copy: list[str] = []
+    for widget in page.findChildren(QWidget):
+        interface_copy.extend(
+            text
+            for text in (
+                widget.accessibleName(),
+                widget.accessibleDescription(),
+                widget.toolTip(),
+                widget.whatsThis(),
+            )
+            if text
+        )
+        if isinstance(widget, (QLabel, QPushButton)):
+            interface_copy.append(widget.text())
+    joined_copy = "\n".join(interface_copy)
+    for rejected in (
+        "manifest",
+        "checksum",
+        "runtime structure",
+        "schema",
+        "digest",
+        "publication",
+        "immutable",
+        "provenance",
+        "source-time",
+        "inventory",
+        "published",
+    ):
+        assert rejected.casefold() not in joined_copy.casefold()
+    assert re.search(r"\bworker\b", joined_copy, flags=re.IGNORECASE) is None
+
+    incompatible = tmp_path / "not-a-model"
+    incompatible.mkdir()
+    page.model_picker.folderChanged.emit(str(incompatible))
+    qtbot.waitUntil(lambda: page.model_status_badge.text() == "Incompatible", timeout=10_000)
+    assert page.model_detail.text() == (
+        "This folder does not contain a compatible BioCall Studio model. "
+        "Choose a different model folder."
+    )
+    incompatible_copy = " ".join(
+        label.text() for label in page.findChildren(QLabel) if label.isVisibleTo(page)
+    )
+    assert incompatible_copy.count(page.model_detail.text()) == 1
+
+    explorer = page.result_explorer
+    assert isinstance(explorer.state_badge, Badge)
+    approved_states = {
+        "available": (False, "", "", ""),
+        "partial": (True, "Some files failed", "warning", "View file errors"),
+        "empty": (True, "No calls found", "neutral", ""),
+        "stale": (True, "Recordings changed", "warning", "Review recordings"),
+        "source-unavailable": (True, "Folder unavailable", "danger", "Relink folder"),
+    }
+    for key, (visible, status, intent, action) in approved_states.items():
+        explorer._set_state(key)
+        assert explorer.state_row.isVisibleTo(explorer) is visible
+        if visible:
+            assert explorer.state_badge.text() == status
+            assert explorer.state_badge.intent == intent
+            assert explorer.state_action.text() == action
+            assert explorer.state_action.isVisibleTo(explorer) is bool(action)
 
     _finish(qtbot, coordinator)
 

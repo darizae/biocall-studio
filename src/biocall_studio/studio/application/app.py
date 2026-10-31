@@ -6,7 +6,7 @@ import logging
 import sys
 from pathlib import Path
 
-from alp_ui.theme import install_theme
+from alp_ui.theme import ALPACA_LIGHT, install_theme
 from PySide6.QtCore import QStandardPaths, Qt, QtMsgType, qInstallMessageHandler
 from PySide6.QtWidgets import QApplication
 
@@ -27,9 +27,9 @@ def create_application(argv: list[str] | None = None) -> QApplication:
     app.setApplicationDisplayName("BioCall Studio")
     app.setWindowIcon(application_icon())
     app.setQuitOnLastWindowClosed(False)
+    app.styleHints().setColorScheme(Qt.ColorScheme.Light)
     if not app.property("biocall_studio_initialized"):
-        app.styleHints().setColorScheme(Qt.ColorScheme.Light)
-        install_theme(app)
+        install_theme(app, ALPACA_LIGHT)
         app.setProperty("biocall_studio_initialized", True)
     return app
 
@@ -38,9 +38,7 @@ def default_suite_data_root() -> Path:
     app = QApplication.instance()
     if app is None:
         app = create_application()
-    location = QStandardPaths.writableLocation(
-        QStandardPaths.StandardLocation.AppLocalDataLocation
-    )
+    location = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppLocalDataLocation)
     if not location:
         raise OSError("Qt could not locate BioCall Studio application-data storage.")
     return Path(location)

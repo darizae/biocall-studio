@@ -224,7 +224,7 @@ def test_active_close_dialog_defaults_to_keep_open_then_stops_once(
     assert dialog.focusWidget() is dialog.defaultButton()
     assert "Dataset Build" in dialog.text()
     assert "work in progress will be lost" in dialog.informativeText()
-    assert "no partially trained Dataset or Model" in dialog.informativeText()
+    assert "The unfinished Dataset or Model will not be kept." in dialog.informativeText()
     window.close()
     assert window.close_dialog is dialog
     assert len([item for item in qapp.topLevelWidgets() if isinstance(item, QMessageBox)]) == 1

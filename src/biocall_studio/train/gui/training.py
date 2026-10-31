@@ -41,6 +41,7 @@ from biocall_studio.train.domain.training import (
     TrainingDataset,
     TrainingDraft,
     TrainingValidationError,
+    field_definitions,
     fields_for_family,
     freeze_training_config,
 )
@@ -59,6 +60,16 @@ _SECTION_ORDER = {
     ),
     "rf": ("Forest", "Acoustic features & preprocessing", "Execution"),
 }
+
+_CONFIGURATION_COPY_IDS = {
+    field.key: f"CFG-{index:02d}" for index, field in enumerate(field_definitions(), start=1)
+}
+
+
+def _context_help(copy_id: str, help_text: str, subject: str) -> HelpHint:
+    hint = HelpHint(help_text, subject=subject)
+    hint.setObjectName(copy_id)
+    return hint
 
 
 def _ui_section(family: str, field: FieldDefinition) -> str:
@@ -103,7 +114,6 @@ class TrainingWikiPage(QScrollArea):
         layout = QVBoxLayout(content)
         layout.setContentsMargins(38, 30, 38, 42)
         layout.setSpacing(16)
-        layout.addWidget(Text("WIKI  /  TRAINING CONFIGURATION", role="overline"))
         self.title = Text("Training configuration", role="title")
         layout.addWidget(self.title)
         self.anchor_label = Text("", role="caption", selectable=True)
@@ -283,7 +293,6 @@ class TrainingPage(QScrollArea):
         header = QHBoxLayout()
         heading = QVBoxLayout()
         heading.setSpacing(3)
-        heading.addWidget(Text("TRAINING", role="overline"))
         heading.addWidget(Text("Train a Model", role="title"))
         header.addLayout(heading)
         header.addStretch()
@@ -322,10 +331,11 @@ class TrainingPage(QScrollArea):
         header.addLayout(title)
         header.addStretch()
         header.addWidget(
-            HelpHint(
-                "Choose the Dataset to train. Both model types use its existing training and "
-                "validation groups.",
-                subject="Training Dataset",
+            _context_help(
+                "CTX-23",
+                "The dataset supplies the labeled call and background examples used to train "
+                "this model.",
+                "Training Dataset",
             )
         )
         card.content_layout.addLayout(header)
@@ -365,9 +375,11 @@ class TrainingPage(QScrollArea):
         header.addLayout(title)
         header.addStretch()
         header.addWidget(
-            HelpHint(
-                "Choose CNN for spectrogram-based learning or Random Forest for acoustic features.",
-                subject="Model families",
+            _context_help(
+                "CTX-24",
+                "CNN learns from spectrograms. Random Forest learns from calculated sound "
+                "features.",
+                "Model families",
             )
         )
         card.content_layout.addLayout(header)
@@ -412,14 +424,8 @@ class TrainingPage(QScrollArea):
         header = QHBoxLayout()
         header.addWidget(Text("3 · Start Training", role="subheading"))
         header.addStretch()
-        header.addWidget(
-            HelpHint(
-                "Checks these settings, then starts training.",
-                subject="Start Training",
-            )
-        )
         card.content_layout.addLayout(header)
-        self.launch_alert = Alert("", title="Configuration verified", intent="info")
+        self.launch_alert = Alert("", title="", intent="danger")
         self.launch_alert.hide()
         card.content_layout.addWidget(self.launch_alert)
         self.power_control = KeepAwakeControl(self.controller, self.open_power_wiki)
@@ -608,6 +614,7 @@ class TrainingPage(QScrollArea):
         label_row = QHBoxLayout()
         label = QLabel(field.label)
         hint = HelpHint(field.help, subject=field.label)
+        hint.setObjectName(_CONFIGURATION_COPY_IDS[field.key])
         label_row.addWidget(label)
         label_row.addWidget(hint)
         wiki = Button("Wiki →", variant="outline", size="small")
@@ -621,6 +628,8 @@ class TrainingPage(QScrollArea):
         native_control = getattr(control, "control", control)
         label.setBuddy(native_control)
         native_control.setAccessibleName(field.label)
+        self.field_accessibility.setdefault(field.key, field.help)
+        native_control.setAccessibleDescription(self.field_accessibility[field.key])
         layout.addWidget(control)
         actions = QHBoxLayout()
         if field.mode == "editable":
@@ -703,7 +712,7 @@ class TrainingPage(QScrollArea):
                         item.setToolTip(reason)
             if unavailable:
                 description = self._unavailable_field_description(field.key, unavailable)
-                self.field_accessibility[field.key] = description
+                self.field_accessibility[field.key] = f"{field.help} {description}"
             control.currentIndexChanged.connect(
                 lambda _index, key=field.key: self._control_changed(key)
             )
@@ -717,11 +726,11 @@ class TrainingPage(QScrollArea):
 
     def _unavailable_choice_reason(self, key: str, choice: object) -> str:
         if key == "device" and choice == "cuda" and not self.capabilities.cuda:
-            return "CUDA is unavailable because it was not detected in this runtime."
+            return "CUDA is not available on this computer."
         if key == "device" and choice == "mps" and not self.capabilities.mps:
-            return "MPS isn't available for training yet."
+            return "Apple GPU training is not available in this version."
         if key == "augmentation.noise_source" and choice == "collection-selected":
-            return "Collection noise isn't available for augmentation yet."
+            return "Using Collection audio as augmentation noise is not available in this version."
         return ""
 
     @staticmethod
@@ -730,12 +739,15 @@ class TrainingPage(QScrollArea):
         if key == "device":
             parts = []
             if "cuda" in choices:
-                parts.append("CUDA not detected")
+                parts.append("CUDA is not available on this computer")
             if "mps" in choices:
-                parts.append("MPS isn't available yet")
+                parts.append("Apple GPU training is not available in this version")
             return "Unavailable: " + "; ".join(parts) + "."
         if key == "augmentation.noise_source":
-            return "Unavailable: Collection noise isn't available for augmentation yet."
+            return (
+                "Unavailable: Using Collection audio as augmentation noise is not available "
+                "in this version."
+            )
         return "Unavailable: " + "; ".join(reason for _choice, reason in unavailable)
 
     def _control_value(self, key: str) -> object:

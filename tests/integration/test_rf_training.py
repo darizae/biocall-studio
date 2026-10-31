@@ -291,8 +291,9 @@ def test_real_rf_worker_publishes_reloadable_model_and_native_views(
     assert window.current_route == "model-detail"
     assert "Random Forest" in window.model_detail_page.accessibleName()
     model_text = "\n".join(label.text() for label in window.findChildren(QLabel))
-    assert "Librosa" in model_text
-    assert version("librosa") in model_text
+    assert "Librosa" not in model_text
+    assert version("librosa") not in model_text
+    assert "Validation metrics" in model_text
 
     undefined_draft = _fast_rf_draft()
     undefined_draft.set("min_samples_leaf", 100)

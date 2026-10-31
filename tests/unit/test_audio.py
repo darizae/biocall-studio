@@ -91,7 +91,7 @@ def test_integrity_hash_is_streamed_and_cancellation_is_application_owned(tmp_pa
     assert provenance == {
         "distribution": "bioacoustics-dl-toolbox",
         "version": "0.2.0",
-        "revision": "e478ca5156a5d1018d0a7a61486bc85fe7c1e92d",
+        "revision": "22c1b342918b33c62288f23b660aa716f3e361e6",
         "api": "bioacoustics_dl_toolbox.audio.extract_pcm_wav_segment",
     }
     assert "/Users/" not in json.dumps(provenance)

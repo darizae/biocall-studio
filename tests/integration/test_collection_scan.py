@@ -507,7 +507,6 @@ def test_collection_ui_repair_rescan_cta_focus_and_narrow_layout(
     assert isinstance(window.collection_page.recordings_table, DataTable)
     page_text = {label.text() for label in window.collection_page.findChildren(Text)}
     assert {
-        "COLLECTION",
         root.name,
         "Recordings",
         "Validation details",

@@ -87,19 +87,9 @@ class LaunchpadPage(QScrollArea):
 
         intro = QVBoxLayout()
         intro.setSpacing(7)
-        overline = Text("CHOOSE A WORKSPACE", role="overline")
-        overline.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        intro.addWidget(overline)
-        title = Text("From recordings to evidence", role="title")
+        title = Text("From raw audio to corpora", role="title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         intro.addWidget(title)
-        subtitle = Text(
-            "Train models, detect candidate calls, and review results in one workspace.",
-            role="body",
-            word_wrap=True,
-        )
-        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        intro.addWidget(subtitle)
         outer.addLayout(intro)
 
         self.cards = QGridLayout()
@@ -188,9 +178,6 @@ class LandingPage(QWidget):
         icon.setPixmap(make_icon(icon_name, color="#FFFFFF", size=38).pixmap(38, 38))
         icon.setStyleSheet(f"background: {accent}; border-radius: 16px;")
         card.content_layout.addWidget(icon, 0, Qt.AlignmentFlag.AlignHCenter)
-        overline = Text(workspace.upper(), role="overline")
-        overline.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        card.content_layout.addWidget(overline)
         heading = Text(title, role="title")
         heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
         card.content_layout.addWidget(heading)
@@ -272,7 +259,6 @@ class StudioWindow(QMainWindow):
         text = QVBoxLayout()
         text.setSpacing(0)
         text.addWidget(Text("BioCall Studio", role="subheading"))
-        text.addWidget(Text("BIOACOUSTICS WORKSPACE", role="overline"))
         layout.addLayout(text)
         layout.addStretch()
         return header

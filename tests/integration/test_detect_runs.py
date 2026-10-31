@@ -74,8 +74,10 @@ def test_real_qprocess_progress_cancel_forced_loss_and_restart(qtbot, tmp_path, 
 
     success_id = controller.start_lifecycle_fixture(_request(controller), behavior="success")
     qtbot.waitUntil(
-        lambda: controller.current_run is not None
-        and controller.current_run.status is DetectRunStatus.COMPLETED,
+        lambda: (
+            controller.current_run is not None
+            and controller.current_run.status is DetectRunStatus.COMPLETED
+        ),
         timeout=10_000,
     )
     success = controller.current_run
@@ -91,15 +93,19 @@ def test_real_qprocess_progress_cancel_forced_loss_and_restart(qtbot, tmp_path, 
     cancel_request = _request(controller, suffix="1")
     controller.start_lifecycle_fixture(cancel_request, behavior="stubborn")
     qtbot.waitUntil(
-        lambda: controller.current_run is not None
-        and controller.current_run.status is DetectRunStatus.RUNNING,
+        lambda: (
+            controller.current_run is not None
+            and controller.current_run.status is DetectRunStatus.RUNNING
+        ),
         timeout=5_000,
     )
     controller.cancel_active_run()
     assert controller.current_run.status is DetectRunStatus.CANCELLING
     qtbot.waitUntil(
-        lambda: controller.current_run is not None
-        and controller.current_run.status is DetectRunStatus.CANCELLED,
+        lambda: (
+            controller.current_run is not None
+            and controller.current_run.status is DetectRunStatus.CANCELLED
+        ),
         timeout=10_000,
     )
     assert not repository.publication_path(cancel_request.artifact_id).exists()
@@ -107,16 +113,20 @@ def test_real_qprocess_progress_cancel_forced_loss_and_restart(qtbot, tmp_path, 
     loss_request = _request(controller, suffix="2")
     controller.start_lifecycle_fixture(loss_request, behavior="slow")
     qtbot.waitUntil(
-        lambda: controller.current_run is not None
-        and controller.current_run.status is DetectRunStatus.RUNNING,
+        lambda: (
+            controller.current_run is not None
+            and controller.current_run.status is DetectRunStatus.RUNNING
+        ),
         timeout=5_000,
     )
     process = controller.run_process
     assert process is not None and process.state() is not QProcess.ProcessState.NotRunning
     process.kill()
     qtbot.waitUntil(
-        lambda: controller.current_run is not None
-        and controller.current_run.status is DetectRunStatus.INTERRUPTED,
+        lambda: (
+            controller.current_run is not None
+            and controller.current_run.status is DetectRunStatus.INTERRUPTED
+        ),
         timeout=10_000,
     )
     reopened = DetectWorkspaceController(tmp_path / "application-data")
@@ -161,8 +171,10 @@ def test_native_run_header_keyboard_cancel_responsiveness_and_private_stderr(
     QTimer.singleShot(30, lambda: ticks.append(True))
     qtbot.waitUntil(lambda: bool(ticks), timeout=5_000)
     qtbot.waitUntil(
-        lambda: controller.current_run is not None
-        and controller.current_run.status is DetectRunStatus.COMPLETED,
+        lambda: (
+            controller.current_run is not None
+            and controller.current_run.status is DetectRunStatus.COMPLETED
+        ),
         timeout=15_000,
     )
     assert page.active_run_label.text() == "Lifecycle boundary check"
@@ -191,8 +203,10 @@ def test_native_run_header_keyboard_cancel_responsiveness_and_private_stderr(
 
     controller.start_lifecycle_fixture(_request(controller, suffix="4"), behavior="slow")
     qtbot.waitUntil(
-        lambda: controller.current_run is not None
-        and controller.current_run.status is DetectRunStatus.RUNNING,
+        lambda: (
+            controller.current_run is not None
+            and controller.current_run.status is DetectRunStatus.RUNNING
+        ),
         timeout=5_000,
     )
     assert page.run_status_badge.text() == "Running"
@@ -201,18 +215,22 @@ def test_native_run_header_keyboard_cancel_responsiveness_and_private_stderr(
     assert controller.current_run.status is DetectRunStatus.CANCELLING
     assert page.run_status_badge.text() == "Cancelling"
     qtbot.waitUntil(
-        lambda: controller.current_run is not None
-        and controller.current_run.status is DetectRunStatus.CANCELLED,
+        lambda: (
+            controller.current_run is not None
+            and controller.current_run.status is DetectRunStatus.CANCELLED
+        ),
         timeout=10_000,
     )
     assert page.run_status_badge.text() == "Cancelled"
-    assert "start a new Run" in page.run_guidance.text()
+    assert "start a new run" in page.run_guidance.text()
     assert _source_unchanged(source_bytes)
 
     controller.start_lifecycle_fixture(_request(controller, suffix="a"), behavior="fail")
     qtbot.waitUntil(
-        lambda: controller.current_run is not None
-        and controller.current_run.status is DetectRunStatus.FAILED,
+        lambda: (
+            controller.current_run is not None
+            and controller.current_run.status is DetectRunStatus.FAILED
+        ),
         timeout=10_000,
     )
     assert page.run_status_badge.text() == "Failed"
@@ -220,12 +238,14 @@ def test_native_run_header_keyboard_cancel_responsiveness_and_private_stderr(
 
     controller.start_lifecycle_fixture(_request(controller, suffix="b"), behavior="crash")
     qtbot.waitUntil(
-        lambda: controller.current_run is not None
-        and controller.current_run.status is DetectRunStatus.INTERRUPTED,
+        lambda: (
+            controller.current_run is not None
+            and controller.current_run.status is DetectRunStatus.INTERRUPTED
+        ),
         timeout=10_000,
     )
     assert page.run_status_badge.text() == "Interrupted"
-    assert "start a new Run" in page.run_guidance.text()
+    assert "start a new run" in page.run_guidance.text()
 
     page.resize(700, 780)
     qtbot.waitUntil(lambda: page.is_compact)
@@ -233,9 +253,7 @@ def test_native_run_header_keyboard_cancel_responsiveness_and_private_stderr(
     controller.shutdown()
 
 
-def test_application_close_stops_detect_worker_before_windows_exit(
-    qtbot, tmp_path, wav_factory
-):
+def test_application_close_stops_detect_worker_before_windows_exit(qtbot, tmp_path, wav_factory):
     """Case: IT-DET-010."""
     train = WorkspaceController(tmp_path / "train-settings")
     coordinator = StudioCoordinator(train, detect_data_dir=tmp_path / "application-data")
@@ -254,8 +272,10 @@ def test_application_close_stops_detect_worker_before_windows_exit(
     qtbot.waitUntil(lambda: controller.snapshot is not None, timeout=10_000)
     controller.start_lifecycle_fixture(_request(controller, suffix="d"), behavior="stubborn")
     qtbot.waitUntil(
-        lambda: controller.current_run is not None
-        and controller.current_run.status is DetectRunStatus.RUNNING,
+        lambda: (
+            controller.current_run is not None
+            and controller.current_run.status is DetectRunStatus.RUNNING
+        ),
         timeout=5_000,
     )
 
@@ -263,8 +283,9 @@ def test_application_close_stops_detect_worker_before_windows_exit(
     qtbot.waitUntil(lambda: controller._shutdown_finished, timeout=10_000)
     qtbot.waitUntil(lambda: train._shutdown_finished, timeout=10_000)
     qtbot.waitUntil(
-        lambda: not coordinator.shell_window.isVisible()
-        and not coordinator.train_window.isVisible(),
+        lambda: (
+            not coordinator.shell_window.isVisible() and not coordinator.train_window.isVisible()
+        ),
         timeout=5_000,
     )
 
@@ -294,8 +315,10 @@ def test_publication_failures_source_reservation_and_restart_reconciliation(
     sentinel.write_text("do not replace")
     controller.start_lifecycle_fixture(request, behavior="success")
     qtbot.waitUntil(
-        lambda: controller.current_run is not None
-        and controller.current_run.status is DetectRunStatus.FAILED,
+        lambda: (
+            controller.current_run is not None
+            and controller.current_run.status is DetectRunStatus.FAILED
+        ),
         timeout=10_000,
     )
     assert sentinel.read_text() == "do not replace"
@@ -307,8 +330,10 @@ def test_publication_failures_source_reservation_and_restart_reconciliation(
     try:
         controller.start_lifecycle_fixture(permission_request, behavior="success")
         qtbot.waitUntil(
-            lambda: controller.current_run is not None
-            and controller.current_run.status is DetectRunStatus.FAILED,
+            lambda: (
+                controller.current_run is not None
+                and controller.current_run.status is DetectRunStatus.FAILED
+            ),
             timeout=10_000,
         )
     finally:
@@ -318,8 +343,10 @@ def test_publication_failures_source_reservation_and_restart_reconciliation(
     active_request = _request(controller, suffix="7")
     controller.start_lifecycle_fixture(active_request, behavior="slow")
     qtbot.waitUntil(
-        lambda: controller.current_run is not None
-        and controller.current_run.status is DetectRunStatus.RUNNING,
+        lambda: (
+            controller.current_run is not None
+            and controller.current_run.status is DetectRunStatus.RUNNING
+        ),
         timeout=5_000,
     )
     snapshot_id = controller.snapshot.inventory_id
@@ -334,9 +361,7 @@ def test_publication_failures_source_reservation_and_restart_reconciliation(
     stage = repository.staging_path(incomplete.launch_id)
     stage.mkdir()
     (stage / "partial.tmp").write_text("incomplete")
-    repository.save_record(
-        incomplete.with_running_process(999_999, now="2026-10-28T09:00:00.000Z")
-    )
+    repository.save_record(incomplete.with_running_process(999_999, now="2026-10-28T09:00:00.000Z"))
     repository.reconcile()
     reconciled = repository.load_record(incomplete.run_id)
     assert reconciled.status is DetectRunStatus.INTERRUPTED
@@ -345,8 +370,10 @@ def test_publication_failures_source_reservation_and_restart_reconciliation(
     committed_request = _request(controller, suffix="9")
     controller.start_lifecycle_fixture(committed_request, behavior="commit_then_crash")
     qtbot.waitUntil(
-        lambda: controller.current_run is not None
-        and controller.current_run.status is DetectRunStatus.COMPLETED,
+        lambda: (
+            controller.current_run is not None
+            and controller.current_run.status is DetectRunStatus.COMPLETED
+        ),
         timeout=10_000,
     )
     assert repository.load_receipt(controller.current_run).artifact_id == (

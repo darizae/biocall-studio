@@ -33,7 +33,6 @@ def test_native_shell_routes_between_select_and_wiki(qapp, qtbot, workspace):
     assert not window.windowIcon().isNull()
     assert window.brand_icon.accessibleName() == "BioCall Studio Train logo"
     assert window.brand_title.text() == "BioCall Studio"
-    assert window.brand_subtitle.text() == "TRAIN"
     assert window.current_route == "select"
     assert all(not button.icon().isNull() for button in window._navigation.values())
     assert window._navigation["select"].isChecked()
@@ -136,7 +135,7 @@ def test_empty_routes_help_and_qt_screenshot_are_real_native_widgets(qtbot, work
     assert hint is not None
     hint.setFocus()
     qtbot.keyClick(hint, Qt.Key.Key_Space)
-    assert "Use whole milliseconds" in hint.accessibleDescription()
+    assert "Write start and end times in whole milliseconds" in hint.accessibleDescription()
     screenshot = window.grab()
     image_path = tmp_path / "wiki.png"
     assert screenshot.save(str(image_path))

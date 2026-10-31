@@ -7,7 +7,6 @@ from datetime import datetime
 from pathlib import Path
 
 from alp_ui.components import (
-    Alert,
     Badge,
     Button,
     Card,
@@ -73,6 +72,12 @@ def _completed_label(value: str) -> str:
     except (TypeError, ValueError):
         return value
     return parsed.strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _context_help(copy_id: str, help_text: str, subject: str) -> HelpHint:
+    hint = HelpHint(help_text, subject=subject)
+    hint.setObjectName(copy_id)
+    return hint
 
 
 class RecordingResultModel(QAbstractTableModel):
@@ -299,56 +304,32 @@ class ResultExplorer(QWidget):
 
         self.history_card = self._build_history_card()
         outer.addWidget(self.history_card)
-        self.state_stack = QStackedWidget()
-        self.state_stack.setMinimumWidth(0)
-        self.alerts = {
-            "available": Alert(
-                "Candidate intervals retain their original recording positions.",
-                title="Original Result",
-                intent="info",
-            ),
-            "partial": Alert(
-                "Successful recordings remain available; file errors are reported separately.",
-                title="Completed with file errors",
-                intent="warning",
-            ),
-            "empty": Alert(
-                "This completed Result has no candidate intervals. Recording outcomes and "
-                "provenance remain available.",
-                title="Completed with no candidates",
-                intent="success",
-            ),
-            "stale": Alert(
-                "Candidate metadata is preserved, but source navigation is disabled until the "
-                "recording inventory is checked again.",
-                title="Recordings changed after this Result",
-                intent="warning",
-            ),
-            "source-unavailable": Alert(
-                "Candidate metadata is preserved, but the recordings folder must be relinked "
-                "before source navigation is available.",
-                title="Recordings folder unavailable",
-                intent="danger",
-            ),
-        }
-        for alert in self.alerts.values():
-            self.state_stack.addWidget(alert)
-        outer.addWidget(self.state_stack)
+        self.state_row = QWidget()
+        self.state_row.setAccessibleName("Result availability")
+        state_layout = QHBoxLayout(self.state_row)
+        state_layout.setContentsMargins(0, 0, 0, 0)
+        self.state_badge = Badge("", intent="neutral")
+        self.state_badge.setAccessibleName("Result availability status")
+        state_layout.addWidget(self.state_badge)
+        state_layout.addStretch()
+        self.state_action = Button("", variant="outline", size="small")
+        self.state_action.clicked.connect(self._state_action_requested)
+        self.state_action.hide()
+        state_layout.addWidget(self.state_action)
+        self.state_row.hide()
+        outer.addWidget(self.state_row)
 
         self.no_results_state = EmptyState(
             "No Results yet",
-            text=(
-                "Complete candidate detection to create an immutable metadata-only Result. "
-                "You can still continue to Export to choose a format and destination."
-            ),
+            text="Run detection to create results. Export planning remains available.",
         )
         self.no_results_state.layout().setAlignment(
             Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter
         )
         self.result_error_state = EmptyState(
             "Result unavailable",
-            text="The published Result is missing, changed, or corrupt. It is not shown as an "
-            "empty successful Result.",
+            text="This result is missing, changed, or unreadable. It is not shown as a "
+            "successful result.",
         )
         self.result_error_state.layout().setAlignment(
             Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter
@@ -380,15 +361,7 @@ class ResultExplorer(QWidget):
         card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
         layout = QGridLayout()
         copy = QVBoxLayout()
-        copy.addWidget(Text("RESULT HISTORY", role="overline"))
-        copy.addWidget(Text("Original candidate Results", role="heading"))
-        copy.addWidget(
-            Text(
-                "Each completed Run publishes a separate immutable Result.",
-                role="body",
-                word_wrap=True,
-            )
-        )
+        copy.addWidget(Text("Results", role="heading"))
         layout.addLayout(copy, 0, 0)
         self.history_select = SelectInput(label="Result")
         self.history_select.setAccessibleName("Result history")
@@ -406,16 +379,9 @@ class ResultExplorer(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
         self.provenance_card = Card()
-        self.provenance_card.setAccessibleName("Result lineage and provenance")
+        self.provenance_card.setAccessibleName("Result details")
         provenance_heading = QHBoxLayout()
-        provenance_heading.addWidget(Text("Result lineage", role="heading"))
-        provenance_heading.addWidget(
-            HelpHint(
-                "A Result is immutable. Candidate selections are saved separately and never "
-                "change its intervals, scores, or provenance.",
-                subject="Result lineage",
-            )
-        )
+        provenance_heading.addWidget(Text("Result details", role="heading"))
         provenance_heading.addStretch()
         self.provenance_badge = Badge("Original", intent="neutral")
         provenance_heading.addWidget(self.provenance_badge)
@@ -427,11 +393,8 @@ class ResultExplorer(QWidget):
         for row, (key, label) in enumerate(
             (
                 ("completed", "Completed"),
-                ("inventory", "Source inventory"),
-                ("intervals", "Intervals"),
+                ("intervals", "Calls"),
                 ("files", "Recording outcomes"),
-                ("metadata", "Metadata"),
-                ("parent", "Parent"),
             )
         ):
             name = QLabel(label)
@@ -465,26 +428,14 @@ class ResultExplorer(QWidget):
         card.setAccessibleName("Optional RF candidate refinement")
         heading = QHBoxLayout()
         copy = QVBoxLayout()
-        copy.addWidget(Text("OPTIONAL REFINEMENT", role="overline"))
-        copy.addWidget(
-            Text("Refine candidate intervals with another model", role="heading")
-        )
-        copy.addWidget(
-            Text(
-                "Creates a separate metadata-only Result. The original remains selectable "
-                "and unchanged.",
-                role="body",
-                word_wrap=True,
-            )
-        )
+        copy.addWidget(Text("Check calls with another model", role="heading"))
         heading.addLayout(copy, 1)
         heading.addWidget(
-            HelpHint(
-                "A compatible Random Forest (RF) Model evaluates only the candidate "
-                "intervals in the selected original Result. Accepted means its target score "
-                "meets the Model's saved threshold; Rejected means it does not; Could not "
-                "assess reports a specific feature or duration reason.",
-                subject="RF refinement",
+            _context_help(
+                "CTX-09",
+                "Optionally use a Random Forest model to check the calls found by the detection "
+                "model. The original results stay unchanged.",
+                "RF refinement",
             ),
             0,
             Qt.AlignmentFlag.AlignTop,
@@ -493,27 +444,23 @@ class ResultExplorer(QWidget):
         heading.addWidget(self.refinement_status_badge, 0, Qt.AlignmentFlag.AlignTop)
         card.content_layout.addLayout(heading)
 
-        self.refinement_picker = FolderPicker(
-            label="Train RF Model folder", show_hidden=True
-        )
+        self.refinement_picker = FolderPicker(label="Random Forest model folder", show_hidden=True)
         self.refinement_picker.setAccessibleDescription(
-            "Choose a trusted Random Forest Model to assess existing candidate intervals."
+            "Choose a Random Forest model to check calls in the selected original result."
         )
-        self.refinement_picker.folderChanged.connect(
-            self.controller.choose_refinement_model_root
-        )
+        self.refinement_picker.folderChanged.connect(self.controller.choose_refinement_model_root)
         card.content_layout.addWidget(self.refinement_picker)
         self.refinement_model_detail = Text("", role="body", word_wrap=True)
         card.content_layout.addWidget(self.refinement_model_detail)
 
         actions = QHBoxLayout()
-        self.clear_refinement_model_button = Button("Clear RF Model", variant="outline")
+        self.clear_refinement_model_button = Button("Clear model", variant="outline")
         self.clear_refinement_model_button.clicked.connect(
             self.controller.clear_refinement_model_selection
         )
         actions.addWidget(self.clear_refinement_model_button)
         actions.addStretch()
-        self.refinement_button = Button("Create refined Result", variant="primary")
+        self.refinement_button = Button("Check calls", variant="primary")
         self.refinement_button.clicked.connect(self._start_refinement)
         actions.addWidget(self.refinement_button)
         card.content_layout.addLayout(actions)
@@ -522,8 +469,10 @@ class ResultExplorer(QWidget):
     def _start_refinement(self) -> None:
         try:
             self.controller.start_refinement()
-        except (OSError, RuntimeError, ValueError) as exc:
-            self.refinement_model_detail.setText(str(exc))
+        except (OSError, RuntimeError, ValueError):
+            self.refinement_model_detail.setText(
+                "This check could not start. Review the model and selected result, then try again."
+            )
             return
         self.run_requested.emit()
 
@@ -533,7 +482,7 @@ class ResultExplorer(QWidget):
         card.content_layout.addWidget(Text("Recordings", role="heading"))
         card.content_layout.addWidget(
             Text(
-                "Choose a recording to inspect its source-time candidate intervals.",
+                "Choose a recording to inspect the calls found in it.",
                 role="body",
                 word_wrap=True,
             )
@@ -550,21 +499,19 @@ class ResultExplorer(QWidget):
             self.recording_table.horizontalHeader().setSectionResizeMode(
                 column, QHeaderView.ResizeMode.ResizeToContents
             )
-        self.recording_table.selectionModel().currentRowChanged.connect(
-            self._recording_changed
-        )
+        self.recording_table.selectionModel().currentRowChanged.connect(self._recording_changed)
         card.content_layout.addWidget(self.recording_table)
         return card
 
     def _build_candidate_card(self) -> Card:
         card = Card()
-        card.setAccessibleName("Candidate intervals")
+        card.setAccessibleName("Calls in the selected recording")
         heading = QHBoxLayout()
         labels = QVBoxLayout()
         self.recording_title = Text("Choose a recording", role="heading", word_wrap=True)
         labels.addWidget(self.recording_title)
         self.recording_subtitle = Text(
-            "Times in the original source recording", role="body", word_wrap=True
+            "Times in the original recording", role="body", word_wrap=True
         )
         labels.addWidget(self.recording_subtitle)
         heading.addLayout(labels, 1)
@@ -577,10 +524,10 @@ class ResultExplorer(QWidget):
         self.selection_summary = Text("0 selected in this Result", role="body")
         selection_row.addWidget(self.selection_summary)
         selection_row.addWidget(
-            HelpHint(
-                "Selections are saved only for this Result. Changing Results never copies or "
-                "overwrites another Result's selection.",
-                subject="Result selection",
+            _context_help(
+                "CTX-10",
+                "Selections are saved separately for each result.",
+                "Result selection",
             )
         )
         selection_row.addStretch()
@@ -596,16 +543,14 @@ class ResultExplorer(QWidget):
             selection_changed=self.controller.set_candidate_selected,
         )
         self.candidate_table = DataTable(model=self.candidate_model)
-        self.candidate_table.setAccessibleName("Candidate intervals in original source time")
+        self.candidate_table.setAccessibleName("Calls at their original recording times")
         self.candidate_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.candidate_table.setMinimumHeight(230)
         for column in range(len(self.candidate_model.ORIGINAL_HEADERS)):
             self.candidate_table.horizontalHeader().setSectionResizeMode(
                 column, QHeaderView.ResizeMode.ResizeToContents
             )
-        self.candidate_table.selectionModel().currentRowChanged.connect(
-            self._candidate_changed
-        )
+        self.candidate_table.selectionModel().currentRowChanged.connect(self._candidate_changed)
         self.candidate_empty = EmptyState(
             "No candidates in this recording",
             text="The recording completed successfully and no intervals met the Run settings.",
@@ -631,8 +576,8 @@ class ResultExplorer(QWidget):
         for row, (label, value) in enumerate(
             (
                 ("Candidate ID", self.candidate_detail_id),
-                ("Source time", self.candidate_detail_time),
-                ("Source frames", self.candidate_detail_frames),
+                ("Time in recording", self.candidate_detail_time),
+                ("Audio frames", self.candidate_detail_frames),
                 ("Detection score", self.candidate_detail_score),
             ),
             start=1,
@@ -685,9 +630,9 @@ class ResultExplorer(QWidget):
         if candidate is not None:
             result_id = self.controller.selected_result_id
             if result_id is not None and self.selected_recording_id is not None:
-                self._candidate_by_recording[
-                    (result_id, self.selected_recording_id)
-                ] = candidate.candidate_id
+                self._candidate_by_recording[(result_id, self.selected_recording_id)] = (
+                    candidate.candidate_id
+                )
         self._render_candidate_detail(candidate)
 
     def _render_candidate_detail(self, candidate: CandidateViewRow | None) -> None:
@@ -696,8 +641,7 @@ class ResultExplorer(QWidget):
         else:
             values = (
                 candidate.candidate_id,
-                f"{_source_time(candidate.start_time_ns)} – "
-                f"{_source_time(candidate.end_time_ns)}",
+                f"{_source_time(candidate.start_time_ns)} – {_source_time(candidate.end_time_ns)}",
                 f"[{candidate.start_frame:,}, {candidate.end_frame:,})",
                 f"{candidate.max_target_score:.6f} · "
                 f"{candidate.contributing_windows} contributing window"
@@ -830,9 +774,7 @@ class ResultExplorer(QWidget):
             self.history_select.setCurrentIndex(selected_index)
         self.history_select.setEnabled(bool(self.controller.result_history))
 
-    def _render_refinement_controls(
-        self, projection: ResultViewProjection | None
-    ) -> None:
+    def _render_refinement_controls(self, projection: ResultViewProjection | None) -> None:
         state = self.controller.refinement_model_state
         status = {
             ModelIntakeState.EMPTY: "Not selected",
@@ -854,9 +796,7 @@ class ResultExplorer(QWidget):
         self.refinement_status_badge.setAccessibleName(f"RF Model status: {status}")
         selected = self.controller.selected_refinement_model_root
         if state is not ModelIntakeState.LOADING:
-            self.refinement_picker.setFolderPath(
-                "" if selected is None else str(selected)
-            )
+            self.refinement_picker.setFolderPath("" if selected is None else str(selected))
         self.refinement_picker.setEnabled(
             state is not ModelIntakeState.LOADING and not self.controller.is_run_active
         )
@@ -865,34 +805,68 @@ class ResultExplorer(QWidget):
             and state is not ModelIntakeState.LOADING
             and not self.controller.is_run_active
         )
-        detail = self.controller.refinement_model_reason
+        detail = {
+            ModelIntakeState.EMPTY: "",
+            ModelIntakeState.LOADING: "",
+            ModelIntakeState.COMPATIBLE: "",
+            ModelIntakeState.INCOMPATIBLE: (
+                "This folder does not contain a compatible Random Forest model. "
+                "Choose a different model folder."
+            ),
+            ModelIntakeState.MISSING: (
+                "The selected Random Forest model files are unavailable. "
+                "Choose the model folder again."
+            ),
+        }[state]
         if projection is not None and projection.result_kind == "derived":
             detail = (
-                "This is a refined Result. Select its original parent to create another "
-                "independent refinement."
+                "This result has already been checked. Select its original result to check it "
+                "with another model."
             )
         elif projection is not None and projection.candidate_count == 0:
-            detail = "This original Result has no candidate intervals to refine."
-        redundant_compatible_detail = (
-            state is ModelIntakeState.COMPATIBLE
-            and detail == self.controller.refinement_model_reason
-        )
-        self.refinement_model_detail.setText(
-            "" if redundant_compatible_detail else detail
-        )
-        self.refinement_model_detail.setVisible(not redundant_compatible_detail)
+            detail = "This result has no calls to check."
+        self.refinement_model_detail.setText(detail)
+        self.refinement_model_detail.setVisible(bool(detail))
         self.refinement_button.setEnabled(self.controller.can_refine_selected_result)
+
+    def _state_action_requested(self) -> None:
+        if self.current_state_key == "partial":
+            projection = self.controller.selected_result_projection
+            if projection is None:
+                return
+            for row, recording in enumerate(projection.recordings):
+                if recording.outcome is FileOutcomeStatus.FAILED:
+                    self.recording_table.setCurrentIndex(self.recording_model.index(row, 0))
+                    self.recording_table.setFocus()
+                    return
+        elif self.current_state_key in {"stale", "source-unavailable"}:
+            self.recordings_requested.emit()
 
     def _set_state(self, key: str) -> None:
         self.current_state_key = key
-        self.state_stack.setVisible(key in self.alerts)
-        if key in self.alerts:
-            alert = self.alerts[key]
-            self.state_stack.setCurrentWidget(alert)
-            self.state_title = alert.title_widget
+        states = {
+            "partial": ("Some files failed", "warning", "View file errors"),
+            "empty": ("No calls found", "neutral", ""),
+            "stale": ("Recordings changed", "warning", "Review recordings"),
+            "source-unavailable": ("Folder unavailable", "danger", "Relink folder"),
+        }
+        if key in states:
+            status, intent, action = states[key]
+            self.state_badge.setText(status)
+            self.state_badge.setIntent(intent)
+            self.state_badge.setAccessibleName(f"Result availability status: {status}")
+            self.state_action.setText(action)
+            self.state_action.setAccessibleName(action)
+            self.state_action.setVisible(bool(action))
+            self.state_row.show()
+            self.state_title = self.state_badge
         elif key == "result-error":
+            self.state_row.hide()
+            self.state_action.hide()
             self.state_title = self.result_error_state.title_widget
         else:
+            self.state_row.hide()
+            self.state_action.hide()
             self.state_title = self.no_results_state.title_widget
 
     def render(self) -> None:
@@ -927,56 +901,28 @@ class ResultExplorer(QWidget):
         self.provenance_card.setVisible(True)
         refined = projection.result_kind == "derived"
         self.provenance_badge.setText("Refined" if refined else "Original")
-        self.alerts["available"].title_widget.setText(
-            "Refined Result" if refined else "Original Result"
-        )
-        self.alerts["available"].text_widget.setText(
-            "Each candidate retains its original recording position and explicit RF "
-            "assessment."
-            if refined
-            else "Candidate intervals retain their original recording positions."
-        )
         self.lineage_label.setText(
-            f"Parent Result · {projection.parent_result_id}  →  RF Model · "
-            f"{projection.model_id}  →  Result · {projection.result_id}"
+            "Calls from an original result checked with a Random Forest model."
             if refined
-            else f"Detection Model · {projection.model_id}  →  Result · "
-            f"{projection.result_id}"
+            else "Calls found by the detection model."
         )
-        self.provenance_values["completed"].setText(
-            _completed_label(projection.completed_at)
-        )
-        self.provenance_values["inventory"].setText(
-            f"{projection.inventory_id} · frozen for this Run"
-        )
+        self.provenance_values["completed"].setText(_completed_label(projection.completed_at))
         self.provenance_values["intervals"].setText(
-            f"{projection.candidate_count:,} candidate intervals · "
+            f"{projection.candidate_count:,} possible calls · "
             f"{projection.accepted_count:,} accepted · "
             f"{projection.rejected_count:,} rejected · "
-            f"{projection.unscored_count:,} could not assess · digest "
-            f"{projection.result_digest}"
+            f"{projection.unscored_count:,} could not assess"
             if refined
-            else f"{projection.candidate_count:,} candidate intervals · digest "
-            f"{projection.result_digest}"
+            else f"{projection.candidate_count:,} possible "
+            f"call{'s' if projection.candidate_count != 1 else ''}"
         )
         self.provenance_values["files"].setText(
-            f"{projection.successful_files:,} completed · "
-            f"{projection.failed_files:,} file errors"
-        )
-        self.provenance_values["metadata"].setText(
-            "App-owned Result; source audio unchanged"
-        )
-        self.provenance_values["parent"].setText(
-            f"{projection.parent_result_id} · digest {projection.parent_result_digest}"
-            if refined
-            else "None · original Result"
+            f"{projection.successful_files:,} completed · {projection.failed_files:,} file "
+            f"error{'s' if projection.failed_files != 1 else ''}"
         )
         selection = self.controller.result_selection
         selected_ids = () if selection is None else selection.candidate_ids
-        revision = 0 if selection is None else selection.selection_revision
-        self.selection_summary.setText(
-            f"{len(selected_ids):,} selected in this Result · selection revision {revision}"
-        )
+        self.selection_summary.setText(f"{len(selected_ids):,} selected in this result")
         self.export_button.setEnabled(not self.controller.is_export_active)
         self.selection_message.setText(
             self.controller.selection_error or self.controller.selection_notice

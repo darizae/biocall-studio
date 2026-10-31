@@ -53,13 +53,12 @@ def _duration(seconds: float) -> str:
     return f"{seconds:.1f} s"
 
 
-def _heading(title: str, subtitle: str, *, overline: str) -> QWidget:
+def _heading(title: str, subtitle: str) -> QWidget:
     widget = QWidget()
     widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
     layout = QVBoxLayout(widget)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(3)
-    layout.addWidget(Text(overline, role="overline"))
     layout.addWidget(Text(title, role="title"))
     if subtitle:
         layout.addWidget(Text(subtitle, role="caption", word_wrap=True))
@@ -72,6 +71,7 @@ def _section_header(
     *,
     help_text: str = "",
     subject: str = "",
+    copy_id: str = "",
 ) -> QHBoxLayout:
     row = QHBoxLayout()
     labels = QVBoxLayout()
@@ -82,18 +82,22 @@ def _section_header(
     row.addLayout(labels)
     row.addStretch()
     if help_text:
-        row.addWidget(HelpHint(help_text, subject=subject or title))
+        hint = HelpHint(help_text, subject=subject or title)
+        hint.setObjectName(copy_id)
+        row.addWidget(hint)
     return row
 
 
-def _field_with_help(field: QWidget, label: str, help_text: str) -> QWidget:
+def _field_with_help(field: QWidget, label: str, help_text: str, *, copy_id: str) -> QWidget:
     wrapper = QWidget()
     layout = QVBoxLayout(wrapper)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(4)
     header = QHBoxLayout()
     header.addWidget(Text(label, role="body"))
-    header.addWidget(HelpHint(help_text, subject=label))
+    hint = HelpHint(help_text, subject=label)
+    hint.setObjectName(copy_id)
+    header.addWidget(hint)
     header.addStretch()
     layout.addLayout(header)
     layout.addWidget(field)
@@ -199,11 +203,7 @@ class DatasetBuilderPage(QScrollArea):
         self.outer.setSpacing(17)
         header = QHBoxLayout()
         header.addWidget(
-            _heading(
-                "Create a training Dataset",
-                "",
-                overline="DATASET BUILD",
-            ),
+            _heading("Create a training Dataset", ""),
             1,
         )
         self.outer.addLayout(header)
@@ -219,9 +219,10 @@ class DatasetBuilderPage(QScrollArea):
             _section_header(
                 "1 · Choose positive examples",
                 help_text=(
-                    "Choose which recordings to use. Deselecting a recording also excludes its "
-                    "labeled clips and background audio."
+                    "Choose which recordings to use. Turning one off also removes its labeled "
+                    "clips and background examples."
                 ),
+                copy_id="CTX-13",
             )
         )
         selection = QHBoxLayout()
@@ -240,15 +241,7 @@ class DatasetBuilderPage(QScrollArea):
         left.addWidget(self.sources_card)
 
         self.preview_card = Card(shadow=False)
-        self.preview_card.content_layout.addLayout(
-            _section_header(
-                "3 · Dataset preview",
-                help_text=(
-                    "Preview counts update with these settings. Final counts are checked when "
-                    "the Dataset is built."
-                ),
-            )
-        )
+        self.preview_card.content_layout.addLayout(_section_header("3 · Dataset preview"))
         summary = QFrame()
         summary.setObjectName("datasetPreviewSummary")
         summary.setStyleSheet(
@@ -288,9 +281,10 @@ class DatasetBuilderPage(QScrollArea):
             _section_header(
                 "2 · Negative Mining",
                 help_text=(
-                    "Choose background clips from selected recordings without using labeled "
-                    "calls or the protected time around them."
+                    "Creates background examples from parts of the selected recordings that do "
+                    "not overlap labeled calls."
                 ),
+                copy_id="CTX-15",
             )
         )
         self.negative_mode = SelectInput(("Per positive", "Total negatives"))
@@ -298,7 +292,8 @@ class DatasetBuilderPage(QScrollArea):
             _field_with_help(
                 self.negative_mode,
                 "Negative amount",
-                "Use negatives per positive, or specify a total number of noise Snippets.",
+                "Choose a number for each labeled call or one total number for the dataset.",
+                copy_id="CTX-16",
             )
         )
         self.negative_amount = NumberInput(
@@ -311,8 +306,9 @@ class DatasetBuilderPage(QScrollArea):
             _field_with_help(
                 self.allocation,
                 "By Source Recording",
-                "Choose background clips in proportion to labeled clips, or spread them evenly "
-                "across recordings.",
+                "Choose whether recordings with more labeled calls supply more background "
+                "examples, or each recording supplies about the same number.",
+                copy_id="CTX-17",
             )
         )
         field_row = QHBoxLayout()
@@ -324,8 +320,9 @@ class DatasetBuilderPage(QScrollArea):
             _field_with_help(
                 self.split,
                 "Training Split",
-                "Keeps clips from the same recording together so they don't appear in both "
-                "training and validation.",
+                "Keeps every clip from one recording in the same group, so training and "
+                "validation do not share a recording.",
+                copy_id="CTX-18",
             ),
             1,
         )
@@ -334,7 +331,9 @@ class DatasetBuilderPage(QScrollArea):
             _field_with_help(
                 self.seed,
                 "Seed",
-                "Using the same recordings, settings, and seed produces the same Dataset.",
+                "Use the same seed with the same inputs and settings to build the same dataset "
+                "again.",
+                copy_id="CTX-19",
             ),
             1,
         )
@@ -351,7 +350,8 @@ class DatasetBuilderPage(QScrollArea):
             _field_with_help(
                 self.margin,
                 "Positive exclusion margin",
-                "Adds time before and after each labeled call that cannot be chosen as background.",
+                "Keeps background examples this far away from each labeled call.",
+                copy_id="CTX-20",
             )
         )
         self.build_button = Button("Build Dataset", size="large", loading_text="Building Dataset…")
@@ -622,11 +622,7 @@ class DatasetListPage(QScrollArea):
         layout.setSpacing(16)
         header = QHBoxLayout()
         header.addWidget(
-            _heading(
-                "Datasets",
-                "",
-                overline="DATA",
-            ),
+            _heading("Datasets", ""),
             1,
         )
         self.build_button = Button("Build Dataset")
@@ -636,7 +632,7 @@ class DatasetListPage(QScrollArea):
         layout.addLayout(header)
         self.model = DatasetListModel(self)
         self.table = DataTable(model=self.model)
-        self.table.setAccessibleName("Published Datasets")
+        self.table.setAccessibleName("Datasets")
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.table.clicked.connect(
@@ -721,11 +717,7 @@ class DatasetDetailPage(QScrollArea):
         self.display_name = display_name
         self.setAccessibleName(f"Dataset detail: {display_name}")
         header.addWidget(
-            _heading(
-                display_name,
-                manifest["created_at"].split("T", 1)[0],
-                overline="IMMUTABLE DATASET",
-            ),
+            _heading(display_name, manifest["created_at"].split("T", 1)[0]),
             1,
         )
         actions = QHBoxLayout()
@@ -736,7 +728,7 @@ class DatasetDetailPage(QScrollArea):
         self.delete_button.clicked.connect(self._confirm_delete)
         actions.addWidget(self.delete_button)
         self.train_button = Button("Train Model")
-        self.train_button.setAccessibleDescription("Configure training for this immutable Dataset.")
+        self.train_button.setAccessibleDescription("Configure training for this dataset.")
         self.train_button.clicked.connect(lambda: self.train_requested(artifact.dataset_id))
         actions.addWidget(self.train_button)
         header.addLayout(actions)
@@ -767,7 +759,8 @@ class DatasetDetailPage(QScrollArea):
         split_card.content_layout.addLayout(
             _section_header(
                 "train / val Splits",
-                help_text="Keeps all clips from a recording in either training or validation.",
+                help_text="Every clip from one recording stays in the same group.",
+                copy_id="CTX-21",
             )
         )
         for split in ("train", "val"):
@@ -794,7 +787,7 @@ class DatasetDetailPage(QScrollArea):
         right.setContentsMargins(0, 0, 0, 0)
         right.setSpacing(15)
         provenance = Card(shadow=False)
-        provenance.content_layout.addWidget(Text("Dataset provenance", role="subheading"))
+        provenance.content_layout.addWidget(Text("Dataset settings", role="subheading"))
         collection_button = Button(
             f"{manifest['collection_label']} →", variant="outline", size="small"
         )

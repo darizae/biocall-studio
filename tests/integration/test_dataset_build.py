@@ -140,7 +140,7 @@ def test_real_source_audio_is_materialized_with_protected_windows_and_grouped_sp
     assert {path: path.read_bytes() for path in positive_bytes} == positive_bytes
     assert load_dataset(root, artifact.dataset_id).manifest == artifact.manifest
     extraction = artifact.manifest["source_policy"]["audio_extraction"]
-    assert extraction["revision"] == "e478ca5156a5d1018d0a7a61486bc85fe7c1e92d"
+    assert extraction["revision"] == "22c1b342918b33c62288f23b660aa716f3e361e6"
     assert str(root) not in json.dumps(artifact.manifest)
 
 

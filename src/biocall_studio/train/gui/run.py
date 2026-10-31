@@ -35,16 +35,34 @@ from PySide6.QtWidgets import (
 from biocall_studio.train.domain.run import RunState, RunStatus
 
 
-def _heading(title: str, subtitle: str, *, overline: str) -> QWidget:
+def _heading(title: str, subtitle: str) -> QWidget:
     widget = QWidget()
     layout = QVBoxLayout(widget)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(3)
-    layout.addWidget(Text(overline, role="overline"))
     layout.addWidget(Text(title, role="title"))
     if subtitle:
         layout.addWidget(Text(subtitle, role="caption", word_wrap=True))
     return widget
+
+
+def _researcher_run_text(value: str | None) -> str:
+    text = value or ""
+    for technical, plain in (
+        ("Worker", "Process"),
+        ("worker", "process"),
+        ("publication", "saving"),
+        ("published", "saved"),
+        ("immutable", "saved"),
+        ("artifact", "output"),
+        ("manifest", "file information"),
+        ("checksum", "file check"),
+        ("schema", "format"),
+        ("runtime", "software"),
+        ("source-time", "recording time"),
+    ):
+        text = text.replace(technical, plain)
+    return text
 
 
 def _status_intent(status: RunStatus) -> str:
@@ -144,11 +162,7 @@ class RunListPage(QScrollArea):
 
         header = QHBoxLayout()
         header.addWidget(
-            _heading(
-                "Runs",
-                "",
-                overline="EXECUTION",
-            ),
+            _heading("Runs", ""),
             1,
         )
         self.active_button = Button("View Active Run")
@@ -243,11 +257,7 @@ class RunDetailPage(QScrollArea):
         self.outer.setSpacing(16)
         header = QHBoxLayout()
         header.addWidget(
-            _heading(
-                run.title,
-                run.created_at.split("T", 1)[0],
-                overline=f"RUN · {_kind_label(run).upper()}",
-            ),
+            _heading(run.title, run.created_at.split("T", 1)[0]),
             1,
         )
         actions = QHBoxLayout()
@@ -256,16 +266,14 @@ class RunDetailPage(QScrollArea):
         actions.addWidget(self.rename_button)
         self.cancel_button = Button("Cancel Run", variant="danger")
         self.cancel_button.setAccessibleDescription(
-            "Request cooperative cancellation; unpublished output will not be published."
+            "Stop the run safely. Incomplete output is not kept."
         )
         self.cancel_button.clicked.connect(self._confirm_cancel)
         self.cancel_button.setVisible(run.active)
         self.cancel_button.setEnabled(run.status is not RunStatus.CANCELLING)
         actions.addWidget(self.cancel_button)
         self.open_log_button = Button("Open log", variant="outline")
-        self.open_log_button.setAccessibleDescription(
-            "Open this Run's contained local Worker diagnostic log."
-        )
+        self.open_log_button.setAccessibleDescription("Open this run's diagnostic log.")
         self.open_log_button.clicked.connect(self._open_log)
         self.open_log_button.setVisible(self.log_available(run.run_id))
         actions.addWidget(self.open_log_button)
@@ -315,7 +323,7 @@ class RunDetailPage(QScrollArea):
         progress_header.addWidget(self.status_badge)
         self.progress_card.content_layout.addLayout(progress_header)
         progress_values = QHBoxLayout()
-        progress_values.addWidget(Text(run.current_stage, role="body"))
+        progress_values.addWidget(Text(_researcher_run_text(run.current_stage), role="body"))
         progress_values.addStretch()
         progress_values.addWidget(Text(f"{run.progress}%", role="heading"))
         self.progress_card.content_layout.addLayout(progress_values)
@@ -330,7 +338,11 @@ class RunDetailPage(QScrollArea):
             marker = Badge("✓" if done else str(index + 1), intent="success" if done else "neutral")
             marker.setFixedWidth(30)
             row.addWidget(marker)
-            label = Text(stage, role="body" if current else "caption", word_wrap=True)
+            label = Text(
+                _researcher_run_text(stage),
+                role="body" if current else "caption",
+                word_wrap=True,
+            )
             label.setAccessibleDescription(
                 "completed" if done else "current" if current else "pending"
             )
@@ -405,7 +417,7 @@ class RunDetailPage(QScrollArea):
 
         activity_card = Card(shadow=False)
         activity_card.content_layout.addWidget(Text("Run activity", role="subheading"))
-        self.activity = QLabel("\n".join(run.activity))
+        self.activity = QLabel("\n".join(_researcher_run_text(item) for item in run.activity))
         self.activity.setObjectName("runActivity")
         self.activity.setWordWrap(True)
         self.activity.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -414,8 +426,9 @@ class RunDetailPage(QScrollArea):
         fixed.setPointSize(12)
         self.activity.setFont(fixed)
         self.activity.setStyleSheet(
-            "QLabel#runActivity { background: #0f172a; color: #b8d4ca; "
-            "border-radius: 8px; padding: 12px; }"
+            f"QLabel#runActivity {{ background: {ALPACA_LIGHT.colors.background}; "
+            f"color: {ALPACA_LIGHT.colors.text}; border: 1px solid "
+            f"{ALPACA_LIGHT.colors.border}; border-radius: 8px; padding: 12px; }}"
         )
         activity_card.content_layout.addWidget(self.activity)
         right.addWidget(activity_card)
@@ -461,14 +474,14 @@ class RunDetailPage(QScrollArea):
     def _output_feedback(run: RunState) -> tuple[str, str, str]:
         if run.status in {RunStatus.CREATED, RunStatus.STARTING, RunStatus.RUNNING}:
             return (
-                "Not yet published",
+                "Not ready yet",
                 "",
                 "neutral",
             )
         if run.status is RunStatus.CANCELLING:
             return (
                 "Cancellation requested",
-                "The Worker is stopping. No partial Dataset or Model will be published.",
+                "The run is stopping. Incomplete output will not be kept.",
                 "warning",
             )
         if run.status is RunStatus.COMPLETED:
@@ -479,17 +492,21 @@ class RunDetailPage(QScrollArea):
             )
         if run.status is RunStatus.CANCELLED:
             return (
-                "No published artifact",
-                "Cancellation completed without publishing partial output.",
+                "No output",
+                "Cancellation completed without keeping incomplete output.",
                 "warning",
             )
         if run.status is RunStatus.INTERRUPTED:
             return (
-                "Worker interrupted",
-                run.error or "The Worker stopped before verified completion.",
+                "Run interrupted",
+                _researcher_run_text(run.error) or "The run stopped before completion.",
                 "danger",
             )
-        return ("Run failed", run.error or "The Worker did not publish an output.", "danger")
+        return (
+            "Run failed",
+            _researcher_run_text(run.error) or "The run did not create an output.",
+            "danger",
+        )
 
     def _confirm_cancel(self) -> None:
         if self.run is None or not self.run.active:
@@ -497,7 +514,7 @@ class RunDetailPage(QScrollArea):
         answer = QMessageBox.question(
             self,
             f"Cancel {_kind_label(self.run)}?",
-            "Unpublished files will be cleaned up. No Dataset or Model will be published.",
+            "Incomplete files will be cleaned up. No dataset or model will be kept.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -527,7 +544,7 @@ class RunDetailPage(QScrollArea):
         answer = QMessageBox.question(
             self,
             "Delete Run?",
-            f"Delete {self.run.title} from Run history? Published output will be kept.",
+            f"Delete {self.run.title} from Run history? Its finished output will be kept.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )

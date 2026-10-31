@@ -16,7 +16,7 @@ from bioacoustics_dl_toolbox.audio import (
 AUDIO_TRANSFORM_POLICY = "pcm-preserve-nearest-frame-v1"
 TOOLBOX_DISTRIBUTION = "bioacoustics-dl-toolbox"
 TOOLBOX_VERSION = version(TOOLBOX_DISTRIBUTION)
-TOOLBOX_SOURCE_REVISION = "e478ca5156a5d1018d0a7a61486bc85fe7c1e92d"
+TOOLBOX_SOURCE_REVISION = "22c1b342918b33c62288f23b660aa716f3e361e6"
 
 
 class AudioExtractionCancelled(InterruptedError):

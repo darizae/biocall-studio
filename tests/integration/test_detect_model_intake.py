@@ -273,9 +273,7 @@ def test_genuine_train_exports_inspect_in_fresh_process_with_installed_toolbox_w
         "untrusted",
     ),
 )
-def test_invalid_or_untrusted_genuine_exports_are_denied(
-    genuine_exports, tmp_path, case
-):
+def test_invalid_or_untrusted_genuine_exports_are_denied(genuine_exports, tmp_path, case):
     """Case: IT-DET-007."""
     artifact = genuine_exports.rf if case == "feature-order" else genuine_exports.cnn
     root = _copy_model_collection(genuine_exports, artifact, tmp_path / case)
@@ -346,12 +344,12 @@ def test_native_model_selection_reopen_states_and_readiness_without_worker(
     assert page.model_status_badge.text() == "Compatible"
     assert page.model_status_badge.intent == "success"
     assert not page.model_detail.isVisible()
-    assert page.selected_model_path.text() == str(cnn_root.resolve())
+    assert page.model_picker.folderPath() == str(cnn_root.resolve())
 
     page.folder_picker.folderChanged.emit(str(genuine_exports.collection_root))
     qtbot.waitUntil(lambda: controller.snapshot is not None, timeout=30_000)
     assert controller.inputs_ready
-    assert page.readiness_title.text() == "Setup inputs verified"
+    assert not hasattr(page, "readiness_card")
     assert page.start_detection_button.isEnabled()
     assert controller.current_run is None
 
@@ -365,9 +363,9 @@ def test_native_model_selection_reopen_states_and_readiness_without_worker(
         0,
         0,
     )
-    assert page.setup_layout.getItemPosition(
-        page.setup_layout.indexOf(page.collection_card)
-    )[:2] == (1, 0)
+    assert page.setup_layout.getItemPosition(page.setup_layout.indexOf(page.collection_card))[
+        :2
+    ] == (1, 0)
 
     before = controller.model_reference
     monkeypatch.setattr(QFileDialog, "exec", lambda *_args, **_kwargs: 0)
@@ -407,7 +405,10 @@ def test_native_model_selection_reopen_states_and_readiness_without_worker(
     )
     assert reopened_controller.model_reference is not None
     assert reopened_controller.model_reference.snapshot.family is ModelFamily.RANDOM_FOREST
-    assert "refine" in reopened_page.model_detail.text().lower()
+    assert reopened_page.model_detail.text() == (
+        "This folder does not contain a compatible BioCall Studio model. "
+        "Choose a different model folder."
+    )
     assert not reopened_controller.inputs_ready
 
     empty_collection = tmp_path / "empty" / ".alpaca"
@@ -422,5 +423,9 @@ def test_native_model_selection_reopen_states_and_readiness_without_worker(
         lambda: reopened_controller.model_state is ModelIntakeState.INCOMPATIBLE,
         timeout=30_000,
     )
-    assert "manifest" in reopened_page.model_detail.text().lower()
+    assert "model information" not in reopened_page.model_detail.text().lower()
+    assert reopened_page.model_detail.text() == (
+        "This folder does not contain a compatible BioCall Studio model. "
+        "Choose a different model folder."
+    )
     assert reopened_controller.wait_for_model(30_000)

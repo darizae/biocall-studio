@@ -62,6 +62,12 @@ _ROUTES = (
 )
 
 
+def _context_help(copy_id: str, help_text: str, subject: str) -> HelpHint:
+    hint = HelpHint(help_text, subject=subject)
+    hint.setObjectName(copy_id)
+    return hint
+
+
 class _EmptyArtifactModel(QAbstractTableModel):
     """A real model/view seam for later artifact lists, deliberately with no rows."""
 
@@ -93,9 +99,6 @@ class SelectCollectionPage(QScrollArea):
         hero_layout = QVBoxLayout(hero)
         hero_layout.setContentsMargins(0, 0, 0, 0)
         hero_layout.setSpacing(10)
-        eyebrow = Text("COLLECTION → DATASET → MODEL", role="overline")
-        eyebrow.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        hero_layout.addWidget(eyebrow)
         title = Text("Train from a collection", role="title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hero_layout.addWidget(title)
@@ -118,11 +121,11 @@ class SelectCollectionPage(QScrollArea):
         header.addLayout(heading)
         header.addStretch()
         header.addWidget(
-            HelpHint(
-                "Choose a folder with recordings/ and positives/. Trainer doesn't copy your "
-                "WAV files. Each labeled clip filename includes when it occurs in the full "
-                "recording.",
-                subject="Collection folders",
+            _context_help(
+                "CTX-26",
+                "Choose a folder containing `recordings/` and `positives/`. BioCall Studio "
+                "reads the WAV files in place and does not copy them.",
+                "Collection folders",
             )
         )
         card.content_layout.addLayout(header)
@@ -226,7 +229,6 @@ class WikiPage(QScrollArea):
         header = QHBoxLayout()
         heading = QVBoxLayout()
         heading.setSpacing(4)
-        heading.addWidget(Text("WIKI", role="overline"))
         heading.addWidget(Text("Selecting a Collection", role="title"))
         header.addLayout(heading)
         header.addStretch()
@@ -311,7 +313,11 @@ class WikiPage(QScrollArea):
         header = QHBoxLayout()
         header.addWidget(Text("2 · Put times in each positive WAV name", role="subheading"))
         header.addWidget(
-            HelpHint("Use whole milliseconds. 1000 ms equals 1 second.", subject="Clip times")
+            _context_help(
+                "CTX-27",
+                "Write start and end times in whole milliseconds. 1,000 ms equals 1 second.",
+                "Clip times",
+            )
         )
         header.addStretch()
         card.content_layout.addLayout(header)
@@ -321,7 +327,7 @@ class WikiPage(QScrollArea):
         fixed_font.setPointSize(12)
         example.setFont(fixed_font)
         example.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        example.setAccessibleName("Positive filename source-time example")
+        example.setAccessibleName("Positive filename recording-time example")
         card.content_layout.addWidget(example)
         for label, value in (
             ("Source Recording", "SITE_001.wav"),
@@ -386,7 +392,6 @@ class SettingsPage(QScrollArea):
         layout = QVBoxLayout(content)
         layout.setContentsMargins(38, 30, 38, 38)
         layout.setSpacing(18)
-        layout.addWidget(Text("LOCAL FOLDERS", role="overline"))
         layout.addWidget(Text("Settings", role="title"))
 
         grid = QGridLayout()
@@ -397,13 +402,6 @@ class SettingsPage(QScrollArea):
         binding_header = QHBoxLayout()
         binding_header.addWidget(Text("Collection folders", role="subheading"))
         binding_header.addStretch()
-        binding_header.addWidget(
-            HelpHint(
-                "This is the folder currently open in Trainer. Changing it doesn't move or "
-                "copy files.",
-                subject="Collection folders",
-            )
-        )
         binding.content_layout.addLayout(binding_header)
         self.binding_value = Text("", role="body", word_wrap=True)
         for label, value in (
@@ -708,14 +706,14 @@ class MainWindow(QMainWindow):
         dialog.setWindowTitle("Active Run")
         dialog.setText(f"{family} is still active: {run.title}")
         dialog.setInformativeText(
-            "If you exit, work in progress will be lost. Trainer will stop the Worker before "
-            "closing; no partially trained Dataset or Model and no resumable checkpoint will "
-            "be kept. Earlier published artifacts remain unchanged."
+            "If you exit, work in progress will be lost. BioCall Studio will stop the run "
+            "before closing. The unfinished Dataset or Model will not be kept. "
+            "Earlier finished datasets and models remain unchanged."
         )
         keep = dialog.addButton("Keep app open", QMessageBox.ButtonRole.RejectRole)
         stop = dialog.addButton("Stop Run and Exit", QMessageBox.ButtonRole.DestructiveRole)
         keep.setAccessibleDescription("Dismiss this warning and leave the Active Run untouched.")
-        stop.setAccessibleDescription("Cancel the Active Run, wait for its Worker, then exit.")
+        stop.setAccessibleDescription("Cancel the active run, wait for it to stop, then exit.")
         dialog.setDefaultButton(keep)
         dialog.setEscapeButton(keep)
         self.close_dialog = dialog
@@ -779,15 +777,11 @@ class MainWindow(QMainWindow):
         brand_text = QVBoxLayout()
         brand_text.setSpacing(0)
         self.brand_title = Text("BioCall Studio", role="subheading")
-        self.brand_subtitle = Text("TRAIN", role="overline")
         brand_text.addWidget(self.brand_title)
-        brand_text.addWidget(self.brand_subtitle)
         brand_layout.addLayout(brand_text)
         brand_layout.addStretch()
         self.sidebar_layout.addWidget(self.brand)
         self.sidebar_layout.addSpacing(25)
-        self.nav_label = Text("WORKSPACE", role="overline")
-        self.sidebar_layout.addWidget(self.nav_label)
 
         self.nav_scroll = QScrollArea()
         self.nav_scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -850,7 +844,6 @@ class MainWindow(QMainWindow):
         layout.addWidget(self.open_draft_button)
         active = QVBoxLayout()
         active.setSpacing(0)
-        active.addWidget(Text("ACTIVE RUN", role="overline"))
         self.active_run_label = Text("No Active Run", role="body")
         active.addWidget(self.active_run_label)
         layout.addLayout(active)
@@ -881,7 +874,6 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(page)
         layout.setContentsMargins(38, 30, 38, 30)
         layout.setSpacing(10)
-        layout.addWidget(Text(label.upper(), role="overline"))
         layout.addWidget(Text(label, role="title"))
         layout.addSpacing(14)
         action = Button("Select Collection")
@@ -914,7 +906,6 @@ class MainWindow(QMainWindow):
             self.sidebar_layout.setSpacing(4)
             self.navigation_layout.setDirection(QBoxLayout.Direction.LeftToRight)
             self.nav_scroll.setFixedHeight(49)
-            self.nav_label.hide()
             self.sidebar_footer.hide()
             for button in self._navigation.values():
                 button.setMinimumWidth(150)
@@ -930,7 +921,6 @@ class MainWindow(QMainWindow):
             self.navigation_layout.setDirection(QBoxLayout.Direction.TopToBottom)
             self.nav_scroll.setMinimumHeight(0)
             self.nav_scroll.setMaximumHeight(16_777_215)
-            self.nav_label.show()
             self.sidebar_footer.show()
             for button in self._navigation.values():
                 button.setMinimumWidth(0)

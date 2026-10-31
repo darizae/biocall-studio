@@ -64,6 +64,36 @@ def _duration(row: InventoryRecording) -> str:
     return f"{seconds:.1f} s"
 
 
+def _researcher_run_text(value: str) -> str:
+    text = value
+    for technical, plain in (
+        ("Inventory", "Recording review"),
+        ("inventory", "recording review"),
+        ("Frozen inputs", "Inputs"),
+        ("frozen inputs", "inputs"),
+        ("publication receipt", "saved result"),
+        ("publication", "saving"),
+        ("immutable", "saved"),
+        ("Worker", "Detection"),
+        ("worker", "detection"),
+        ("artifact", "result"),
+        ("digest", "identifier"),
+        ("manifest", "model information"),
+        ("checksum", "file check"),
+        ("runtime", "software"),
+        ("schema", "format"),
+        ("source-time", "recording time"),
+    ):
+        text = text.replace(technical, plain)
+    return text
+
+
+def _context_help(copy_id: str, help_text: str, subject: str) -> HelpHint:
+    hint = HelpHint(help_text, subject=subject)
+    hint.setObjectName(copy_id)
+    return hint
+
+
 @dataclass(frozen=True, slots=True)
 class _InventoryEntry:
     key: str
@@ -111,9 +141,7 @@ class InventoryTableModel(QAbstractTableModel):
     def _folder_rows(self, key: str) -> tuple[InventoryRecording, ...]:
         if self._snapshot is None:
             return ()
-        return tuple(
-            row for row in self._snapshot.recordings if row.recording_key.startswith(key)
-        )
+        return tuple(row for row in self._snapshot.recordings if row.recording_key.startswith(key))
 
     def _decision_text(self, rows: tuple[InventoryRecording, ...]) -> str:
         values = {row.decision.value for row in rows}
@@ -238,17 +266,6 @@ class DetectWorkspacePage(QScrollArea):
         self.setup_layout.setColumnStretch(0, 1)
         self.setup_layout.setColumnStretch(1, 1)
         setup_view_layout.addLayout(self.setup_layout)
-        self.readiness_card = Card()
-        self.readiness_card.setAccessibleName("Detect setup readiness")
-        self.readiness_title = Text("Setup needs attention", role="subheading")
-        self.readiness_detail = Text(
-            "Choose a compatible CNN Model and recordings folder.",
-            role="body",
-            word_wrap=True,
-        )
-        self.readiness_card.content_layout.addWidget(self.readiness_title)
-        self.readiness_card.content_layout.addWidget(self.readiness_detail)
-        setup_view_layout.addWidget(self.readiness_card)
         setup_actions = QHBoxLayout()
         setup_actions.addStretch()
         self.setup_continue_button = Button("Continue to Recordings", variant="primary")
@@ -285,9 +302,7 @@ class DetectWorkspacePage(QScrollArea):
         self.run_view = self._build_run_view()
         self.result_explorer = ResultExplorer(self.controller)
         self.result_explorer.run_requested.connect(lambda: self._set_route("run"))
-        self.result_explorer.recordings_requested.connect(
-            lambda: self._set_route("recordings")
-        )
+        self.result_explorer.recordings_requested.connect(lambda: self._set_route("recordings"))
         self.result_explorer.export_requested.connect(self._open_export)
         self.export_page = ExportPage(self.controller)
         self.export_page.results_requested.connect(lambda: self._set_route("results"))
@@ -310,7 +325,7 @@ class DetectWorkspacePage(QScrollArea):
         self._set_route("setup")
         self._render()
 
-    def _setting_row(self, field: QWidget, help_text: str, subject: str) -> QWidget:
+    def _setting_row(self, field: QWidget, help_text: str, subject: str, copy_id: str) -> QWidget:
         row = QWidget()
         field.setMinimumWidth(0)
         field.setSizePolicy(
@@ -327,7 +342,7 @@ class DetectWorkspacePage(QScrollArea):
         layout.setHorizontalSpacing(8)
         layout.addWidget(field, 0, 0)
         layout.addWidget(
-            HelpHint(help_text, subject=subject),
+            _context_help(copy_id, help_text, subject),
             0,
             1,
             Qt.AlignmentFlag.AlignTop,
@@ -357,9 +372,10 @@ class DetectWorkspacePage(QScrollArea):
         )
         self.minimum_score_row = self._setting_row(
             self.minimum_score,
-            "Includes windows whose binary target score meets this value. A score is not a "
-            "certainty percentage; higher values usually return fewer candidates.",
+            "Only results at or above this score are kept. Higher scores usually return fewer "
+            "results.",
             "Minimum detection score",
+            "CTX-01",
         )
         self.window_overlap = SelectInput(
             ("0%", "25%", "50%", "75%"),
@@ -367,9 +383,9 @@ class DetectWorkspacePage(QScrollArea):
         )
         self.window_overlap_row = self._setting_row(
             self.window_overlap,
-            "Controls how often neighboring portions of a recording are examined. More overlap "
-            "adds analysis windows and can increase processing time.",
+            "How much each scan window overlaps the next. More overlap takes longer.",
             "Window overlap",
+            "CTX-02",
         )
         self.combine_nearby = SelectInput(
             ("Do not combine across gaps", "0.20 s", "0.50 s"),
@@ -377,9 +393,10 @@ class DetectWorkspacePage(QScrollArea):
         )
         self.combine_nearby_row = self._setting_row(
             self.combine_nearby,
-            "Joins candidate intervals when the source-time gap between them is no greater "
-            "than the selected value. Overlapping candidates are always joined.",
+            "Joins nearby results when the gap between them is no larger than this value. "
+            "Overlapping results are always joined.",
             "Combine nearby candidates",
+            "CTX-03",
         )
         self.settings_layout = QGridLayout()
         self.settings_layout.setHorizontalSpacing(16)
@@ -435,8 +452,6 @@ class DetectWorkspacePage(QScrollArea):
         heading.setVerticalSpacing(10)
         self.heading_copy = QVBoxLayout()
         self.heading_copy.setSpacing(5)
-        self.page_overline = Text("DETECT SETUP", role="overline")
-        self.heading_copy.addWidget(self.page_overline)
         self.page_title = Text("Prepare candidate detection", role="title")
         self.heading_copy.addWidget(self.page_title)
         self.page_description = Text(
@@ -469,9 +484,7 @@ class DetectWorkspacePage(QScrollArea):
             if route == "export":
                 button.clicked.connect(self._navigate_export)
             else:
-                button.clicked.connect(
-                    lambda _=False, selected=route: self._set_route(selected)
-                )
+                button.clicked.connect(lambda _=False, selected=route: self._set_route(selected))
             setattr(self, f"{route}_button", button)
             self.step_buttons.append(button)
             navigation.addWidget(button, 0, index * 2)
@@ -504,7 +517,6 @@ class DetectWorkspacePage(QScrollArea):
         layout.setVerticalSpacing(8)
         self.run_header_labels = QVBoxLayout()
         self.run_header_labels.setSpacing(3)
-        self.run_header_labels.addWidget(Text("DETECT RUN", role="overline"))
         self.active_run_label = Text("No active Run", role="subheading", word_wrap=True)
         self.run_header_labels.addWidget(self.active_run_label)
         layout.addLayout(self.run_header_labels, 0, 0)
@@ -541,9 +553,7 @@ class DetectWorkspacePage(QScrollArea):
         summary.setColumnStretch(0, 2)
         summary.setColumnStretch(1, 1)
         self.run_summary_card.content_layout.addLayout(summary)
-        self.run_blocker = Text(
-            "Choose a compatible Detection Model.", role="body", word_wrap=True
-        )
+        self.run_blocker = Text("Choose a compatible Detection Model.", role="body", word_wrap=True)
         self.run_blocker.setAccessibleName("Run readiness")
         self.run_summary_card.content_layout.addWidget(self.run_blocker)
         outer.addWidget(self.run_summary_card)
@@ -584,15 +594,13 @@ class DetectWorkspacePage(QScrollArea):
         self.run_progress_card.content_layout.addWidget(self.run_stage_list)
         actions = QHBoxLayout()
         self.cancel_run_button = Button("Cancel Run", variant="danger")
-        self.cancel_run_button.setAccessibleDescription(
-            "Request cancellation, then stop the Worker within the bounded grace period."
-        )
+        self.cancel_run_button.setAccessibleDescription("Stop detection safely.")
         self.cancel_run_button.clicked.connect(self.controller.cancel_active_run)
         actions.addWidget(self.cancel_run_button)
         actions.addStretch()
         self.open_run_log_button = Button("Open Run log", variant="outline")
         self.open_run_log_button.setAccessibleDescription(
-            "Open the existing privacy-safe diagnostic log for this Detect Run."
+            "Open the diagnostic log for this detection run."
         )
         self.open_run_log_button.clicked.connect(self._open_run_log)
         actions.addWidget(self.open_run_log_button)
@@ -603,9 +611,7 @@ class DetectWorkspacePage(QScrollArea):
         self.run_activity_card.content_layout.addWidget(Text("Activity", role="heading"))
         self.run_activity = QLabel("No activity yet.")
         self.run_activity.setWordWrap(True)
-        self.run_activity.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByKeyboard
-        )
+        self.run_activity.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByKeyboard)
         self.run_activity.setAccessibleName("Detect Run activity entries")
         self.run_activity_card.content_layout.addWidget(self.run_activity)
         self.run_layout.addWidget(self.run_progress_card, 0, 0)
@@ -637,19 +643,13 @@ class DetectWorkspacePage(QScrollArea):
         labels = QVBoxLayout()
         labels.setSpacing(4)
         labels.addWidget(Text("Detection Model", role="heading"))
-        labels.addWidget(
-            Text(
-                "Choose the trained CNN Model that will search your recordings.",
-                role="body",
-                word_wrap=True,
-            )
-        )
         header.addLayout(labels, 1)
         header.addWidget(
-            HelpHint(
-                "Detect verifies the Train manifest, checksums, binary class mapping, and "
-                "runtime structure. Numerical prediction behavior is rechecked before a Run.",
-                subject="Detection Model",
+            _context_help(
+                "CTX-04",
+                "A model trained in BioCall Studio that searches your recordings for possible "
+                "calls.",
+                "Detection Model",
             ),
             0,
             Qt.AlignmentFlag.AlignTop,
@@ -659,29 +659,17 @@ class DetectWorkspacePage(QScrollArea):
         header.addWidget(self.model_status_badge, 0, Qt.AlignmentFlag.AlignTop)
         card.content_layout.addLayout(header)
 
-        self.model_name = Text("No Model selected", role="subheading", word_wrap=True)
+        self.model_name = Text("", role="subheading", word_wrap=True)
+        self.model_name.hide()
         card.content_layout.addWidget(self.model_name)
-        self.model_detail = QLabel("Choose a CNN Model published by Train.")
+        self.model_detail = QLabel("")
         self.model_detail.setWordWrap(True)
         self.model_detail.setAccessibleName("Detection Model compatibility detail")
+        self.model_detail.hide()
         card.content_layout.addWidget(self.model_detail)
-        self.selected_model_path = QLabel("Choose a Train Model folder.")
-        self.selected_model_path.setWordWrap(True)
-        self.selected_model_path.setMinimumWidth(0)
-        self.selected_model_path.setSizePolicy(
-            QSizePolicy.Policy.Ignored,
-            QSizePolicy.Policy.Preferred,
-        )
-        self.selected_model_path.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByKeyboard
-        )
-        self.selected_model_path.setAccessibleName("Selected Model folder")
-        card.content_layout.addWidget(self.selected_model_path)
 
         self.model_picker = FolderPicker(label="Train Model folder", show_hidden=True)
-        self.model_picker.setAccessibleDescription(
-            "Choose one Model folder published by Train."
-        )
+        self.model_picker.setAccessibleDescription("Choose one model folder created in Train.")
         card.content_layout.addWidget(self.model_picker)
         actions = QHBoxLayout()
         actions.addStretch()
@@ -697,39 +685,23 @@ class DetectWorkspacePage(QScrollArea):
         header = QHBoxLayout()
         labels = QVBoxLayout()
         labels.setSpacing(4)
-        self.collection_title = Text("Choose a recordings folder", role="heading")
+        self.collection_title = Text("Recordings folder", role="heading")
         labels.addWidget(self.collection_title)
-        self.collection_description = Text(
-            "Choose a folder. Detect stores its metadata separately and leaves "
-            "recordings unchanged.",
-            role="body",
-            word_wrap=True,
-        )
+        self.collection_description = Text("", role="body", word_wrap=True)
+        self.collection_description.hide()
         labels.addWidget(self.collection_description)
         header.addLayout(labels, 1)
-        hint = HelpHint(
-            "Detect remembers this recordings folder if it moves. Choosing a different "
-            "folder starts a separate recording source.",
-            subject="Recordings folder identity",
+        hint = _context_help(
+            "CTX-05",
+            "The folder of WAV files you want to search. BioCall Studio remembers it so you "
+            "can relink the folder if it moves.",
+            "Recordings folder",
         )
         header.addWidget(hint, 0, Qt.AlignmentFlag.AlignTop)
         self.status_badge = Badge("Not selected", intent="neutral")
         self.status_badge.setAccessibleName("Recordings folder status: Not selected")
         header.addWidget(self.status_badge, 0, Qt.AlignmentFlag.AlignTop)
         card.content_layout.addLayout(header)
-
-        self.root_caption = Text("No recordings folder selected", role="overline")
-        card.content_layout.addWidget(self.root_caption)
-        self.root_path = QLabel("Choose a recordings folder to begin.")
-        self.root_path.setWordWrap(True)
-        self.root_path.setMinimumWidth(0)
-        self.root_path.setSizePolicy(
-            QSizePolicy.Policy.Ignored,
-            QSizePolicy.Policy.Preferred,
-        )
-        self.root_path.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByKeyboard)
-        self.root_path.setAccessibleName("Current recordings folder")
-        card.content_layout.addWidget(self.root_path)
 
         self.folder_picker = FolderPicker(label="Recordings folder")
         self.folder_picker.setAccessibleDescription(
@@ -752,7 +724,6 @@ class DetectWorkspacePage(QScrollArea):
         self.recordings_status_badge = Badge("Unavailable", intent="neutral")
         header.addWidget(self.recordings_status_badge, 0, Qt.AlignmentFlag.AlignTop)
         card.content_layout.addLayout(header)
-        card.content_layout.addWidget(Text("LINKED LOCATION", role="overline"))
         self.recordings_path = QLabel()
         self.recordings_path.setWordWrap(True)
         self.recordings_path.setMinimumWidth(0)
@@ -766,9 +737,7 @@ class DetectWorkspacePage(QScrollArea):
         self.recordings_path.setAccessibleName("Linked recordings folder")
         card.content_layout.addWidget(self.recordings_path)
         self.relink_picker = FolderPicker(label="Relink recordings folder")
-        self.relink_picker.setAccessibleDescription(
-            "Choose the relocated saved recordings folder."
-        )
+        self.relink_picker.setAccessibleDescription("Choose the relocated saved recordings folder.")
         card.content_layout.addWidget(self.relink_picker)
         return card
 
@@ -781,7 +750,6 @@ class DetectWorkspacePage(QScrollArea):
         heading = QHBoxLayout()
         labels = QVBoxLayout()
         labels.setSpacing(4)
-        labels.addWidget(Text("SOURCE INVENTORY", role="overline"))
         labels.addWidget(Text("Approve recording inclusion", role="heading"))
         labels.addWidget(
             Text(
@@ -793,7 +761,7 @@ class DetectWorkspacePage(QScrollArea):
         heading.addLayout(labels, 1)
         self.rescan_button = Button("Rescan", variant="primary")
         self.rescan_button.setAccessibleDescription(
-            "Read the source folder again and publish only a complete inventory."
+            "Read the recordings folder again and save only a complete review."
         )
         self.rescan_button.clicked.connect(self.controller.rescan)
         heading.addWidget(self.rescan_button, 0, Qt.AlignmentFlag.AlignTop)
@@ -801,7 +769,7 @@ class DetectWorkspacePage(QScrollArea):
 
         self.inventory_alert = QLabel()
         self.inventory_alert.setWordWrap(True)
-        self.inventory_alert.setAccessibleName("Recording inventory status")
+        self.inventory_alert.setAccessibleName("Recording review status")
         self.inventory_alert.setStyleSheet(
             "padding: 12px; border: 1px solid #CBD5E1; border-left: 4px solid #D97706; "
             "border-radius: 7px;"
@@ -866,24 +834,20 @@ class DetectWorkspacePage(QScrollArea):
         table_heading.addLayout(table_labels, 1)
         table_heading.addStretch()
         table_heading.addWidget(
-            HelpHint(
-                "Included recordings are available to analysis. Excluded and undecided "
-                "recordings are skipped. Inclusion never modifies source files.",
-                subject="Recording inclusion",
+            _context_help(
+                "CTX-06",
+                "Included recordings are searched. Excluded and undecided recordings are skipped.",
+                "Recording inclusion",
             )
         )
         self.inventory_table_card.content_layout.addLayout(table_heading)
         decision_actions = QHBoxLayout()
-        self.include_selection_button = Button(
-            "Include selection", variant="outline", size="small"
-        )
+        self.include_selection_button = Button("Include selection", variant="outline", size="small")
         self.include_selection_button.clicked.connect(
             lambda: self._set_selected_decision(InclusionDecision.INCLUDED)
         )
         decision_actions.addWidget(self.include_selection_button)
-        self.exclude_selection_button = Button(
-            "Exclude selection", variant="outline", size="small"
-        )
+        self.exclude_selection_button = Button("Exclude selection", variant="outline", size="small")
         self.exclude_selection_button.clicked.connect(
             lambda: self._set_selected_decision(InclusionDecision.EXCLUDED)
         )
@@ -895,7 +859,7 @@ class DetectWorkspacePage(QScrollArea):
             "Include all valid recordings", variant="outline", size="small"
         )
         self.include_all_button.setAccessibleDescription(
-            "Apply one explicit Included decision to every valid WAV in this inventory."
+            "Include every valid WAV in this recordings folder."
         )
         self.include_all_button.clicked.connect(self._include_all_valid_recordings)
         decision_actions.addWidget(self.include_all_button)
@@ -918,7 +882,7 @@ class DetectWorkspacePage(QScrollArea):
         self.inventory_table_card.content_layout.addWidget(self.inventory_table)
 
         self.inventory_detail_card = Card()
-        self.detail_kind = Text("SELECTED ITEM", role="overline")
+        self.detail_kind = Text("Selected item", role="caption")
         self.inventory_detail_card.content_layout.addWidget(self.detail_kind)
         self.detail_title = Text("No recording selected", role="heading")
         self.inventory_detail_card.content_layout.addWidget(self.detail_title)
@@ -965,9 +929,7 @@ class DetectWorkspacePage(QScrollArea):
             dialog.setIcon(QMessageBox.Icon.Warning)
             dialog.setWindowTitle("Include all valid recordings?")
             noun = "recording" if exclusion_count == 1 else "recordings"
-            dialog.setText(
-                f"This will replace {exclusion_count} explicitly excluded {noun}."
-            )
+            dialog.setText(f"This will replace {exclusion_count} explicitly excluded {noun}.")
             dialog.setInformativeText(
                 "Every currently valid WAV will be included. Invalid and unavailable "
                 "entries will remain unavailable."
@@ -999,8 +961,8 @@ class DetectWorkspacePage(QScrollArea):
             )
         )
         paths = QGridLayout()
-        paths.addWidget(Text("PREVIOUS LOCATION", role="overline"), 0, 0)
-        paths.addWidget(Text("NEW LOCATION", role="overline"), 0, 1)
+        paths.addWidget(Text("Previous location", role="caption"), 0, 0)
+        paths.addWidget(Text("New location", role="caption"), 0, 1)
         self.previous_path = QLabel()
         self.previous_path.setWordWrap(True)
         self.new_path = QLabel()
@@ -1070,23 +1032,23 @@ class DetectWorkspacePage(QScrollArea):
         self._render_scan()
 
         cancelled_message = (
-            "Scan cancelled. No inventory was published. Rescan before detection."
+            "Scan cancelled. No recording review was saved. Rescan before detection."
             if snapshot is None
-            else "Scan cancelled. The last complete inventory was kept and no partial result "
-            "was published. Rescan before using it for detection."
+            else "Scan cancelled. The last complete recording review was kept and no partial "
+            "result was saved. Rescan before using it for detection."
         )
         message = {
             InventoryState.EMPTY: (
-                "No complete inventory yet. Scan this folder to discover WAV recordings."
+                "Recordings have not been reviewed yet. Scan this folder to discover WAV files."
             ),
             InventoryState.SCANNING: (
-                "Scanning the source folder. The previous complete inventory remains unchanged."
+                "Scanning the recordings folder. The previous complete review remains unchanged."
             ),
-            InventoryState.READY: "Inventory ready. Review undecided and excluded recordings.",
+            InventoryState.READY: "Review undecided and excluded recordings.",
             InventoryState.CANCELLED: cancelled_message,
             InventoryState.INVALID: (
-                "The inventory needs attention. Repair invalid included recordings or change "
-                "their inclusion, then rescan."
+                "The recording review needs attention. Repair invalid included recordings or "
+                "change their inclusion, then rescan."
             ),
             InventoryState.STALE: (
                 "Recordings changed after the last complete scan. Rescan before detection."
@@ -1095,11 +1057,8 @@ class DetectWorkspacePage(QScrollArea):
                 "The recordings folder is unavailable. Relink it before rescanning."
             ),
         }[state]
-        if (
-            self.controller.inventory_error
-            and state is not InventoryState.CANCELLED
-        ):
-            message = f"{message} {self.controller.inventory_error}"
+        if self.controller.inventory_error and state is not InventoryState.CANCELLED:
+            message = f"{message} {_researcher_run_text(self.controller.inventory_error)}"
         self.inventory_alert.setText(message)
 
         counts = snapshot.counts if snapshot is not None else None
@@ -1177,17 +1136,24 @@ class DetectWorkspacePage(QScrollArea):
         self.model_status_badge.setAccessibleName(f"Detection Model status: {status}")
         if reference is not None:
             self.model_name.setText(reference.snapshot.label)
-        elif selected is not None:
-            self.model_name.setText(selected.name or "Selected Model")
+            self.model_name.show()
         else:
-            self.model_name.setText("No Model selected")
-        self.model_detail.setText(
-            "" if state is ModelIntakeState.COMPATIBLE else self.controller.model_reason
-        )
-        self.model_detail.setVisible(state is not ModelIntakeState.COMPATIBLE)
-        self.selected_model_path.setText(
-            "Choose a Train Model folder." if selected is None else str(selected)
-        )
+            self.model_name.setText("")
+            self.model_name.hide()
+        correction = {
+            ModelIntakeState.EMPTY: "",
+            ModelIntakeState.LOADING: "",
+            ModelIntakeState.COMPATIBLE: "",
+            ModelIntakeState.INCOMPATIBLE: (
+                "This folder does not contain a compatible BioCall Studio model. "
+                "Choose a different model folder."
+            ),
+            ModelIntakeState.MISSING: (
+                "The selected model files are unavailable. Choose the model folder again."
+            ),
+        }[state]
+        self.model_detail.setText(correction)
+        self.model_detail.setVisible(bool(correction))
         self.model_picker.setEnabled(state is not ModelIntakeState.LOADING)
         self.clear_model_button.setEnabled(
             selected is not None and state is not ModelIntakeState.LOADING
@@ -1211,9 +1177,7 @@ class DetectWorkspacePage(QScrollArea):
             reference.snapshot.label if reference is not None else "Not selected"
         )
         included = 0 if snapshot is None else snapshot.counts.included
-        self.run_summary_recordings.setText(
-            f"{included:,} recording{'s' if included != 1 else ''}"
-        )
+        self.run_summary_recordings.setText(f"{included:,} recording{'s' if included != 1 else ''}")
         record = self.controller.current_run
         completed = (
             record is not None
@@ -1223,7 +1187,7 @@ class DetectWorkspacePage(QScrollArea):
         if completed:
             self.start_detection_button.setText("Continue to Results")
             self.start_detection_button.setAccessibleDescription(
-                "Open the verified Result published by this Run."
+                "Open the result saved by this run."
             )
             self.start_detection_button.setEnabled(True)
         elif self.controller.is_run_active:
@@ -1232,50 +1196,32 @@ class DetectWorkspacePage(QScrollArea):
         else:
             self.start_detection_button.setText("Start detection")
             self.start_detection_button.setAccessibleDescription(
-                "Freeze the verified inputs and start candidate detection."
+                "Check the selected model and recordings, then start detection."
             )
             self.start_detection_button.setEnabled(self.controller.inputs_ready)
         if self.controller.is_run_active:
-            self.readiness_title.setText("Detection is running")
-            self.readiness_detail.setText(
-                "Frozen inputs are in use. Settings become available after this Run stops."
-            )
-            self.run_blocker.setText("Detection is running with frozen inputs.")
+            self.run_blocker.setText("Detection is running with the selected inputs.")
             return
         if self.controller.inputs_ready:
-            self.readiness_title.setText("Setup inputs verified")
-            self.readiness_detail.setText(
-                f"Compatible CNN Model · {snapshot.counts.included:,} included "
-                "WAV recordings."
-            )
             self.run_blocker.setText("Ready to start detection.")
             return
         if self.controller.model_state is ModelIntakeState.LOADING:
-            title = "Checking Detection Model"
-            detail = self.controller.model_reason
+            detail = "Wait while the detection model is checked."
         elif self.controller.model_state in {
             ModelIntakeState.INCOMPATIBLE,
             ModelIntakeState.MISSING,
         }:
-            title = "Detection Model needs attention"
-            detail = self.controller.model_reason
+            detail = self.model_detail.text()
         elif self.controller.model_state is ModelIntakeState.EMPTY:
-            title = "Choose a compatible CNN Model"
-            detail = "Select a Model published by Train."
+            detail = "Select a model created in Train."
         elif self.controller.active_collection is None:
-            title = "Choose a recordings folder"
-            detail = "Choose a recordings folder and review its WAV inventory."
+            detail = "Choose a recordings folder and review its WAV files."
         elif self.controller.root_decision is not RootBindingDecision.VALID:
-            title = "Recordings folder needs attention"
             detail = "Relink or restore the recordings folder before using this setup."
         elif self.controller.inventory_state is not InventoryState.READY:
-            title = "Recording review is not ready"
-            detail = "Complete a current inventory with at least one included WAV recording."
+            detail = "Finish reviewing the recordings and include at least one valid WAV file."
         else:
-            title = "No recordings included"
             detail = "Include at least one valid WAV recording."
-        self.readiness_title.setText(title)
-        self.readiness_detail.setText(detail)
         self.run_blocker.setText(detail)
 
     def _select_inventory_row(self, row: int) -> None:
@@ -1289,15 +1235,13 @@ class DetectWorkspacePage(QScrollArea):
             return ()
         if entry.is_folder:
             return tuple(
-                row
-                for row in snapshot.recordings
-                if row.recording_key.startswith(entry.key)
+                row for row in snapshot.recordings if row.recording_key.startswith(entry.key)
             )
         return () if entry.recording is None else (entry.recording,)
 
     def _render_inventory_detail(self, entry: _InventoryEntry | None) -> None:
         if entry is None:
-            self.detail_kind.setText("SELECTED ITEM")
+            self.detail_kind.setText("Selected item")
             self.detail_title.setText("No recording selected")
             for value in (
                 self.detail_decision,
@@ -1309,25 +1253,16 @@ class DetectWorkspacePage(QScrollArea):
             enabled = False
         else:
             rows = self._rows_for_entry(entry)
-            self.detail_kind.setText("SELECTED FOLDER" if entry.is_folder else "SELECTED FILE")
+            self.detail_kind.setText("Selected folder" if entry.is_folder else "Selected file")
             self.detail_title.setText(entry.key)
             decisions = {row.decision.value.capitalize() for row in rows}
             statuses = {row.status.value.capitalize() for row in rows}
-            sources = {
-                row.decision_path or "No default rule"
-                for row in rows
-            }
-            self.detail_decision.setText(
-                next(iter(decisions)) if len(decisions) == 1 else "Mixed"
-            )
-            self.detail_status.setText(
-                next(iter(statuses)) if len(statuses) == 1 else "Mixed"
-            )
+            sources = {row.decision_path or "No default rule" for row in rows}
+            self.detail_decision.setText(next(iter(decisions)) if len(decisions) == 1 else "Mixed")
+            self.detail_status.setText(next(iter(statuses)) if len(statuses) == 1 else "Mixed")
             self.detail_source.setText(next(iter(sources)) if len(sources) == 1 else "Mixed")
             seconds = sum(
-                row.wav.frame_count / row.wav.sample_rate_hz
-                for row in rows
-                if row.wav is not None
+                row.wav.frame_count / row.wav.sample_rate_hz for row in rows if row.wav is not None
             )
             self.detail_audio.setText(
                 f"{seconds / 3_600:.1f} h"
@@ -1341,8 +1276,7 @@ class DetectWorkspacePage(QScrollArea):
                 in {InventoryState.READY, InventoryState.INVALID}
             )
         locked = bool(entry and rows) and all(
-            row.decision_origin in {DecisionOrigin.POLICY, DecisionOrigin.CONFLICT}
-            for row in rows
+            row.decision_origin in {DecisionOrigin.POLICY, DecisionOrigin.CONFLICT} for row in rows
         )
         self.include_selection_button.setEnabled(enabled and not locked)
         self.exclude_selection_button.setEnabled(enabled and not locked)
@@ -1356,9 +1290,7 @@ class DetectWorkspacePage(QScrollArea):
     def _set_selected_decision(self, decision: InclusionDecision) -> None:
         if self.selected_key is None:
             return
-        entry = self.inventory_model.entry_at(
-            self.inventory_table.currentIndex().row()
-        )
+        entry = self.inventory_model.entry_at(self.inventory_table.currentIndex().row())
         if entry is None:
             return
         self.controller.set_inventory_decision(
@@ -1370,14 +1302,10 @@ class DetectWorkspacePage(QScrollArea):
     def _clear_selected_decision(self) -> None:
         if self.selected_key is None:
             return
-        entry = self.inventory_model.entry_at(
-            self.inventory_table.currentIndex().row()
-        )
+        entry = self.inventory_model.entry_at(self.inventory_table.currentIndex().row())
         if entry is None:
             return
-        self.controller.clear_inventory_decision(
-            entry.key.rstrip("/"), is_folder=entry.is_folder
-        )
+        self.controller.clear_inventory_decision(entry.key.rstrip("/"), is_folder=entry.is_folder)
 
     def _render_run_header(self) -> None:
         record = self.controller.current_run
@@ -1402,12 +1330,10 @@ class DetectWorkspacePage(QScrollArea):
             self.run_status_badge.setAccessibleName("Run detail status: Idle")
             self.run_percent.setText("0%")
             self.run_progress_bar.setValue(0)
-            self.run_stage_list.setText(
-                "○ Validate frozen inputs\n○ Run the supervised Worker\n○ Verify publication"
-            )
+            self.run_stage_list.setText("○ Check inputs\n○ Search recordings\n○ Save results")
             self.run_activity.setText("No activity yet.")
             self.run_guidance.setText(
-                "No Run has started. Prepare a compatible Model and current recording inventory."
+                "No Run has started. Prepare a compatible Model and review the recordings."
             )
             self.cancel_run_button.setEnabled(False)
             self.open_run_log_button.setEnabled(False)
@@ -1416,38 +1342,38 @@ class DetectWorkspacePage(QScrollArea):
         status = record.status.value.capitalize()
         result = self.controller.current_result
         guidance = {
-            DetectRunStatus.PREPARING: "Preparing frozen inputs and starting the Worker.",
-            DetectRunStatus.RUNNING: "The supervised Worker is running.",
+            DetectRunStatus.PREPARING: "Preparing the recordings.",
+            DetectRunStatus.RUNNING: "Searching recordings for possible calls.",
             DetectRunStatus.CANCELLING: (
-                "Cancellation requested. Detect is waiting for the Worker to stop safely."
+                "Cancellation requested. Waiting for detection to stop safely."
             ),
             DetectRunStatus.CANCELLED: (
-                "This Run was cancelled without publication. Review setup and start a new Run."
+                "This run was cancelled. Review setup and start a new run."
             ),
             DetectRunStatus.INTERRUPTED: (
-                "The Worker stopped unexpectedly. Review setup and start a new Run."
+                "Detection stopped unexpectedly. Review setup and start a new run."
             ),
             DetectRunStatus.FAILED: (
-                record.error_message
-                or "The Run failed without publication. Review setup and start a new Run."
+                _researcher_run_text(record.error_message)
+                or "The run failed. Review setup and start a new run."
             ),
             DetectRunStatus.COMPLETED: (
                 (
-                    f"The metadata-only Result was verified and published: "
-                    f"{result.candidate_count:,} candidate intervals across "
+                    f"Detection finished: {result.candidate_count:,} possible calls across "
                     f"{result.successful_files:,} recordings"
                     + (
-                        f"; {result.failed_files:,} recording files failed separately."
+                        f"; {result.failed_files:,} "
+                        f"{'file' if result.failed_files == 1 else 'files'} failed."
                         if result.failed_files
                         else "."
                     )
                 )
                 if result is not None
-                else "The immutable artifact and its publication receipt were verified."
+                else "Detection finished, but the result could not be opened."
             ),
         }[record.status]
         self.run_title.setText(record.title)
-        self.run_stage.setText(record.current_stage)
+        self.run_stage.setText(_researcher_run_text(record.current_stage))
         self.run_status_badge.setText(status)
         self.run_status_badge.setAccessibleName(f"Run detail status: {status}")
         self.run_percent.setText(f"{record.progress}%")
@@ -1455,15 +1381,16 @@ class DetectWorkspacePage(QScrollArea):
         stage_rows = []
         for index, stage in enumerate(record.stages):
             marker = (
-                "✓"
-                if index < record.stage_index
-                else ("●" if index == record.stage_index else "○")
+                "✓" if index < record.stage_index else ("●" if index == record.stage_index else "○")
             )
             if record.status is DetectRunStatus.COMPLETED:
                 marker = "✓"
-            stage_rows.append(f"{marker} {stage}")
+            stage_rows.append(f"{marker} {_researcher_run_text(stage)}")
         self.run_stage_list.setText("\n".join(stage_rows))
-        self.run_activity.setText("\n".join(record.activity[-8:]) or "No activity yet.")
+        self.run_activity.setText(
+            "\n".join(_researcher_run_text(item) for item in record.activity[-8:])
+            or "No activity yet."
+        )
         self.run_guidance.setText(guidance)
         self.cancel_run_button.setEnabled(
             record.status in {DetectRunStatus.PREPARING, DetectRunStatus.RUNNING}
@@ -1483,8 +1410,7 @@ class DetectWorkspacePage(QScrollArea):
         collection = self.controller.active_collection
         proposal = self.controller.proposal
         self.relink_card.setVisible(
-            proposal is not None
-            and proposal.decision is RootBindingDecision.AWAITING_CONFIRMATION
+            proposal is not None and proposal.decision is RootBindingDecision.AWAITING_CONFIRMATION
         )
         self.different_card.setVisible(
             proposal is not None and proposal.decision is RootBindingDecision.CHANGED
@@ -1495,15 +1421,11 @@ class DetectWorkspacePage(QScrollArea):
         self.selection_error.setVisible(bool(self.selection_error.text()))
 
         if collection is None:
-            self.collection_title.setText("Choose a recordings folder")
-            self.collection_description.setText(
-                "Choose a folder. Detect stores its metadata separately and leaves "
-                "recordings unchanged."
-            )
+            self.collection_title.setText("Recordings folder")
+            self.collection_description.setText("")
+            self.collection_description.hide()
             self.status_badge.setText("Not selected")
             self.status_badge.setAccessibleName("Recordings folder status: Not selected")
-            self.root_caption.setText("NO RECORDINGS FOLDER SELECTED")
-            self.root_path.setText("Choose a recordings folder to begin.")
             self.folder_picker.setFolderPath("")
             self._render_inventory()
             self._render_readiness()
@@ -1513,36 +1435,32 @@ class DetectWorkspacePage(QScrollArea):
         status, description = {
             RootBindingDecision.VALID: (
                 "Available",
-                "The recordings folder is available. Detect keeps the source tree read-only.",
+                "",
             ),
             RootBindingDecision.MISSING: (
                 "Folder missing",
-                "Choose the folder's new location to restore this recording source.",
+                "Relink the recordings folder to continue.",
             ),
             RootBindingDecision.INACCESSIBLE: (
                 "Access unavailable",
-                "The linked folder exists but cannot be read. Its contents are not "
-                "treated as empty.",
+                "BioCall Studio cannot read this folder. Check access or relink it.",
             ),
             RootBindingDecision.CHANGED: (
                 "Folder changed",
-                "The location now refers to a different folder. Choose the relocated "
-                "saved folder or use this as a new recordings folder.",
+                "This location contains different recordings. Relink the original folder or "
+                "use this as a new recordings folder.",
             ),
             None: ("Unavailable", "The saved recordings folder link could not be read."),
         }[decision]
         self.collection_title.setText(collection.ref.display_label)
         self.collection_description.setText(description)
+        self.collection_description.setVisible(bool(description))
         self.status_badge.setText(status)
         self.status_badge.setAccessibleName(f"Recordings folder status: {status}")
-        self.root_caption.setText("CURRENT RECORDINGS FOLDER")
-        self.root_path.setText(str(collection.source_root))
         self.recordings_title.setText(collection.ref.display_label)
         self.recordings_description.setText(description)
         self.recordings_status_badge.setText(status)
-        self.recordings_status_badge.setAccessibleName(
-            f"Recordings folder status: {status}"
-        )
+        self.recordings_status_badge.setAccessibleName(f"Recordings folder status: {status}")
         self.recordings_card.setVisible(
             decision is not RootBindingDecision.VALID or proposal is not None
         )
@@ -1589,19 +1507,14 @@ class DetectWorkspacePage(QScrollArea):
             }[route]
         )
         if route == "setup":
-            self.page_overline.setText("DETECT SETUP")
             self.page_title.setText("Prepare candidate detection")
             self.page_description.setText(
                 "Choose a detection Model and recordings folder in either order."
             )
         elif route == "recordings":
-            self.page_overline.setText("SOURCE INVENTORY")
             self.page_title.setText("Recordings")
-            self.page_description.setText(
-                "Approve the WAVs that belong to this recordings folder."
-            )
+            self.page_description.setText("Approve the WAVs that belong to this recordings folder.")
         elif route == "run":
-            self.page_overline.setText("RUN · CANDIDATE DETECTION")
             self.page_title.setText(
                 "Detect Run"
                 if self.controller.current_run is None
@@ -1611,18 +1524,15 @@ class DetectWorkspacePage(QScrollArea):
                 "Review candidate settings and inputs, then follow detection progress."
             )
         elif route == "results":
-            self.page_overline.setText("METADATA-ONLY RESULTS")
-            self.page_title.setText("Candidate intervals")
+            self.page_title.setText("Results")
             self.page_description.setText(
-                "Explore immutable intervals in original recording time. No audio is copied "
-                "into a Result."
+                "Review possible calls at their original times in each recording."
             )
         else:
-            self.page_overline.setText("CORPUS EXPORT")
             self.page_title.setText("Plan corpus export")
             self.page_description.setText(
-                "Choose a format and destination. Publication becomes available after "
-                "Result intervals are selected and verified."
+                "Choose a format and destination. Export becomes available after calls are "
+                "selected."
             )
         routes = ("setup", "recordings", "run", "results", "export")
         labels = ("Setup", "Recordings", "Run", "Results", "Export")
@@ -1661,9 +1571,7 @@ class DetectWorkspacePage(QScrollArea):
             return
         if self.current_route == "run":
             target = (
-                self.cancel_run_button
-                if self.cancel_run_button.isEnabled()
-                else self.run_button
+                self.cancel_run_button if self.cancel_run_button.isEnabled() else self.run_button
             )
             target.setFocus()
             return
@@ -1694,17 +1602,13 @@ class DetectWorkspacePage(QScrollArea):
             self.run_header_layout.removeWidget(self.view_run_button)
             if compact:
                 self.heading_layout.addLayout(self.heading_copy, 0, 0)
-                self.heading_layout.addWidget(
-                    self.back_button, 1, 0, Qt.AlignmentFlag.AlignLeft
-                )
+                self.heading_layout.addWidget(self.back_button, 1, 0, Qt.AlignmentFlag.AlignLeft)
                 self.run_header_layout.addLayout(self.run_header_labels, 0, 0, 1, 2)
                 self.run_header_layout.addWidget(self.active_run_badge, 1, 0)
                 self.run_header_layout.addWidget(self.view_run_button, 1, 1)
             else:
                 self.heading_layout.addLayout(self.heading_copy, 0, 0)
-                self.heading_layout.addWidget(
-                    self.back_button, 0, 1, Qt.AlignmentFlag.AlignTop
-                )
+                self.heading_layout.addWidget(self.back_button, 0, 1, Qt.AlignmentFlag.AlignTop)
                 self.run_header_layout.addLayout(self.run_header_labels, 0, 0)
                 self.run_header_layout.addWidget(self.active_run_badge, 0, 1)
                 self.run_header_layout.addWidget(self.view_run_button, 0, 2)
