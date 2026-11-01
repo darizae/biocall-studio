@@ -1,53 +1,34 @@
-# Prediction — future application plan (**not part of BioCall Studio Train MVP**)
+# Detect — data and scientific contract
 
-**Status: design only; no implementation or release acceptance in Trainer Specs 01–07.** This page preserves the intended interoperability requirements for a **separate future Prediction application**. It must not be used to justify adding prediction routes, buttons, inference workers, segment scoring APIs or inference tests to the Trainer. The current native UX remains exactly the [training-first prototype](design/prototypes/training-first/index.html). When a Prediction project is initiated, author its own UX prototype, numbered specs, package/release gates, threat model and test index.
+## Ownership and artifact lineage
 
-## Product objective and boundaries
+- A **Detect Collection** represents an approved, independently identified set of Source Recordings under a selected root. Its manifest, inventory and Runs are distinct from Train's `collection.json`/`.alpaca/`. Store Detect metadata in an app-owned workspace outside the source root. Support explicit relinking; compare stable inventory facts before accepting moved/changed sources.
+- **Detection Run** freezes Model identity/integrity, selected source inventory, resolved preprocessing/window/threshold settings, software versions and outcomes. Persist state/diagnostics separately from published, immutable result metadata. Run success requires verified publication, not only process exit.
+- **Detection Result** describes source-recording paths/identities and intervals in **original source time**, with score meaning, class mapping, provenance and non-successful-file status. Do not copy WAV data into a Result.
+- **Derived Result** references one input Result and its frozen RF Model/settings, stores accepted/rejected/unscored decisions, never overwrites its parent and remains metadata-only even though RF processing reads WAV samples.
+- **Corpus Export** freezes a chosen Result plus selection/settings, publishes materialized audio at an explicit user-visible destination, records checksums and maps exported snippets/concatenation offsets back to original source and timestamps. Present **Show in folder** after success. A result can have multiple exports.
 
-The Prediction app will initially accept only **binary single-label `target`/`noise` Models** from BioCall Studio Train ([current contract](science/BINARY_CLASSIFICATION_CONTRACT.md)); multi-class/multi-label expansion would require an explicitly approved future schema/UX/test plan. It will accept compatible, **immutable Models** exported by BioCall Studio Train, select source audio independently of the Trainer's Dataset, and produce reproducible predictions with source-time provenance. It may later support a CNN candidate detector plus optional RF refinement. Predictions and review artifacts belong to the **future app**, not to Trainer `.alpaca/` training runs by assumption.
+## Source discovery
 
-**Training-time prerequisite (implemented by Spec 05):** both CNN and RF save complete, versioned, integrity-checked model packages. See [MODEL_EXPORT_CONTRACT](science/MODEL_EXPORT_CONTRACT.md) for required architecture/weights, preprocessing, class order, RF ordered feature schema and provenance. **Prediction-only verification is deferred**; simply reopening a checkpoint does not validate scores on real unseen WAV.
+Recurse deterministically, with bounded work and no symlink following by default. Exclude app-owned/Train-generated directories and recognized `positives/` snippets; `recordings/` is the default inclusion candidate in a recognizable Train Collection. Unknown WAVs are candidates for explicit folder/file approval, not automatically accepted. Separate **excluded**, **invalid** and **undecided**. Validate header/format, path containment, duplicates/collisions and staleness; do not turn an unreadable input into a zero-detection recording. Exact app-data schema/layout and discovery snapshot schema are scoped to [ST-03](specs/ST-03-detect-workspace.md)/[ST-04](specs/ST-04-wav-discovery.md); finalize their values against tests and verified platform behavior, not by copying Train metadata.
 
-## Upstream code to study when Prediction work begins
+## Scientific order
 
-Reference [`../alpaca-pipelines`](agent/SOURCE_MAP.md) at a **fresh local commit** (previously inspected `973866102726556f844877d1fe38978fe06eda4b`; not an API lock):
+1. **CNN** first-pass sliding-window inference over approved WAVs. Verify Train package loading, sample rate/resampling, normalization, spectrogram/config parity, class order, window/hop, threshold meaning, merge/clamp behavior and real-WAV numerical outputs before claiming availability. A score is not automatically a calibrated probability.
+2. **Optional RF** second-layer assessment of candidate intervals, never automatically a stand-alone full-recording detector. Verify the exact ordered feature schema, preprocessing, estimator class order and score/threshold semantics. Preserve accepted/rejected/unscored and the original CNN Result. Do not load arbitrary untrusted Torch/joblib files without an explicit trust boundary.
 
-| Future capability | Existing upstream reference | Compatibility question |
-|---|---|---|
-| CNN load & frame/segment classification | `src/alpaca_pipelines/prediction/executor.py`, `src/bioacoustics_dl_toolbox/training/checkpoints.py` as shipped in inspected pipeline | Replace embedded toolbox with the **separately installed** `../bioacoustics-dl-toolbox` library; verify checkpoint configuration fields, model architecture, class map and numerical transform parity. |
-| CNN recording-wide event detection | `src/alpaca_pipelines/prediction/{audio_sources.py,executor.py}` | Sliding-window length/hop, sample-rate conversion, target threshold, overlapping detection merges, bounded reads and source-relative timestamps. |
-| RF feature extraction and RF model loading | `src/alpaca_pipelines/rf/{config.py,audio_preprocess.py,audio_features/,executor.py}` | Resample/padding, band limits, robust/MFCC names/order, numeric equivalence, estimator class-order and threshold policy. Do not silently substitute toolbox RF feature defaults. |
-| RF postprocessing of CNN candidates | `src/alpaca_pipelines/rf_inference/{config.py,executor.py}` | Existing RF inference expects **CNN prediction intervals**; it is not independently a full-recording RF event detector. Preserve accepted/rejected/unscored semantics. |
+Ground interoperability in [Train Model export](science/MODEL_EXPORT_CONTRACT.md), [binary classification](science/BINARY_CLASSIFICATION_CONTRACT.md) and inspected `../bioacoustics-dl-toolbox` / `../alpaca-pipelines` source, not assumed APIs.
 
-The dedicated `../bioacoustics-dl-toolbox` checkout is the intended **direct scientific dependency** for the CNN implementation; its current API/version must be inspected locally before using it. Both packages may export the same Python namespace if pipeline bundles an older copy—record and resolve this explicitly. Distributed Prediction installers must not depend on developer checkout paths.
+## Export behavior to specify and verify in [ST-10](specs/ST-10-corpus-export.md)
 
-## Future interoperability and scientific contracts
+- **Individual snippets:** origin-linked collision-safe names recording source identity and start/end in source time.
+- **Concatenated WAV + Raven TSV:** selection rows refer to offsets in the **concatenated** waveform; a separate provenance map records original source/interval.
+- **Both:** same frozen selection, independent verified materializations.
 
-1. **Model intake:** accept only documented `model.json` schema/format versions and compatible signed or checksum-verifiable artifact contents; refuse modified files, unknown class maps, missing preprocess schema, incompatible toolbox or feature extractor versions. Loading Torch/joblib artifacts may execute code: enforce a trust policy (prefer Trainer-generated, provenance-verified artifacts), consider safer formats/migration tooling before third-party model import. Do not infer compatibility from `.pt`/`.joblib` extension alone.
-2. **Preprocessing equivalence:** CNN must reconstruct model architecture and state, use `eval()`/no-gradient, exact sample rate, channel policy, spectrogram and normalization used during validation (training augmentation excluded). RF must reapply exact resample/padding/band and **ordered** acoustic features; align estimator probability columns using the saved class mapping, never assume index 1 equals `target`.
-3. **Input and semantics:** define bounded waveform reading, explicit source path/identity, source-time half-open `[start_ms, end_ms)` intervals, per-window probability, raw score vs decision threshold, calibrated-vs-uncalibrated interpretation and invalid/unscorable outcomes. No fabricated zeros for errors or undefined outputs. Decide separately whether users supply short candidate intervals or whole recordings.
-4. **Optional two-stage detector:** CNN proposes intervals; RF may rerank those *specific* excerpts; accepted/rejected/unscored outputs keep original CNN scores and provenance. An RF Model trained directly from Trainer Snippets can classify **provided** excerpts; it does not automatically generate recording-wide candidate event times. Independent RF scanning would be a separately specified windowing/detection feature.
-5. **Prediction artifacts:** future owner chooses an immutable Prediction Run/Manifest schema, source fingerprinting, time/score fields, model IDs/hashes, method/thresholds and per-file failure details. Avoid coupling trained Model artifacts to fixed Dataset filename layouts or machine-absolute paths.
-6. **Operations/UI:** define its own UX, resource usage, progress, cancellation, model selection, batch input, output navigation and platform release controls. No automatic HPC dependency; use small generated real WAVs with authorized Git LFS samples only when essential.
+Define sample-rate/channel mismatches, interval/frame rounding, ordering, gaps, TSV coordinate conventions, filename encoding, destination collisions, cancelled/stale-source publication and multi-file atomicity before implementing. Never silently resample or merge channels without an approved policy.
 
-## Proposed future TDD index — **reserved, NOT Trainer acceptance**
+## Cross-cutting operations
 
-When the Prediction app is scoped, migrate/refine these IDs to *its* test documents; do not include them in Trainer `docs/UNIT_TESTING.md`, `docs/INTEGRATION_TEST_BEHAVIORS.md`, Specs 05–07 or their release gates.
+Use explicit unavailable/incompatible Model states; plain-language errors; background scanning and workers; cancellable Runs; per-file failure reporting; privacy-safe, bounded application/Worker JSONL logs consistent with Train diagnostics, without creating shared Run identity. No claim of implemented detection until real inference tests pass.
 
-| Future ID | Evidence to require in Prediction app |
-|---|---|
-| `UT-INFER-001` | Source-time bounds, score schema and explicit class/probability order |
-| `UT-INFER-002` | Threshold logic separated from raw probability, invalid/unscorable states |
-| `UT-INFER-003` | CNN transform/class-map versioning and RF exact ordered feature/schema parity |
-| `UT-INFER-004` | Contained/model version/checksum/trust and incompatibility refusal |
-| `IT-INFER-001` | Fresh-process CNN load and CPU score **real WAV** using exact exported transforms |
-| `IT-INFER-002` | Fresh-process RF load and CPU score **real WAV** with exact feature schema |
-| `IT-INFER-003` | Compare saved validation/reference probabilities with independent reloaded scores within specified tolerance; include WAV outside training Dataset |
-| `IT-INFER-004` | Corrupted/incompatible Model, altered class map, bad/short/unsupported WAV fail explicitly |
-| `IT-INFER-005` | Multiple bounded intervals preserve order, provenance and resource limits; no checkout dependency |
-
-**Future acceptance prerequisite:** train and export **both** model families in Trainer using real WAV-backed Snippets; import them into an isolated Prediction environment (no Trainer checkout), load and score both against an independent WAV, prove transform/class-map parity with a justified tolerance, and test rejected/unsupported formats. This is **not** a gating test for today's Trainer or installer.
-
-## Trigger for implementation
-
-Only after the owner explicitly authorizes the Prediction application's scope and UX: establish a separately versioned interoperability contract (including migration), assign implementation ownership and new specs, then move the reserved cases into its active test registry. Trainer Spec 05 remains solely responsible for **export integrity and structural reload**, not the consumer's algorithm.
+**Implementation authority:** the [ST-03–ST-11 sequence](IMPLEMENTATION_SEQUENCE.md) and one active stage spec own detailed acceptance and test IDs. This page records stable scientific/domain invariants only; do not add competing stage specs or whole-Studio tests here.

@@ -12,6 +12,79 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-UI-004` | Prototype Select/Wiki/empty-state structure is exercised with real `alp-ui` Widgets, an accessible inline Wiki action, keyboard Tab/Space and HelpHint, and no demo scientific completions. **Separately required native macOS evidence:** persist real Trainer screenshots (not only pytest tmp files), compare side by side with both bundled prototype and sibling Showcase, log deviations and update README with truthful native shots before claiming UI acceptance. | TD-UI |
 | `IT-UI-005` | The UI-pass revision uses readable `alp-ui` typography, concise non-redundant copy with no user-facing internal IDs, a top-right Run state, and top-to-bottom numbered preparation. A Training draft stays visibly reopenable until discarded or launched. Dataset/Model/Run names are editable; Collection unbind and Dataset/Model/terminal-Run delete actions are confirmed, contained, and non-cascading. Active Run activity sits beside progress and Output remains below. | TD-UI, TD-PATH, TD-RUN |
 
+
+## 1a. Studio shell (ST-02)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-STU-001` | New Studio entry creates one themed `QApplication`, shows branded launchpad; accessible cards, keyboard/focus and visible Studio identity use native Qt/`alp-ui`. | TD-UI |
+| `IT-STU-002` | Studio → real Train → Studio → Train reuses controller/window, preserves current Train route and live training draft, and leaves Collection bindings and input WAV unchanged. Return control works at compact widths. | TD-UI, TD-COL |
+| `IT-STU-003` | Real Train QProcess Run and scan remain active while visiting Studio; application Quit from either visible/hidden workspace preserves Train's single safe close/cancel/keep-open policy and releases Worker/lease/resources only after confirmed stop. | TD-RUN, TD-FAIL, TD-UI |
+| `IT-STU-004` | Canonical Studio entry retains a validated Train binding under isolated suite data while supervised Train work launches through the canonical private Worker protocol. | TD-UI, TD-CACHE |
+| `IT-STU-005` | Detect Collection setup and Review placeholder have reachable, keyboard-operable returns; Detect adds no invented Model, inventory, prediction, result, simulated value or enabled detection action. | TD-UI |
+| `IT-STU-006` | Real native Studio/Train/Detect/Review screenshots at normal and compact widths show checked-in branding, focus and contrast; no Train layout regression or inaccessible switch; report unavailable native platforms separately. | TD-UI, TD-OS |
+
+**Reported status:** ST-02 implements `IT-STU-001`–`006` in
+`tests/integration/test_studio_shell.py`. Genuine macOS Cocoa evidence and its environment/deviation
+record are under `design/evidence/st-02-native/`; installed and Windows qualification remain open.
+
+## 1b. Stage-owned Detect integration cases (ST-03–ST-10)
+
+ST-03 implements `IT-DET-001`–`002`; ST-04 implements `IT-DET-003`–`005`; ST-05 implements
+`IT-DET-006`–`008`; and ST-06 implements `IT-DET-009`–`011` pending owner review. ST-07–ST-10
+rows remain planned, unexecuted acceptance contracts. Each stage implements **only its own rows**,
+using genuine
+Qt/Worker/WAV/scientific boundaries where named. The whole-Studio E2E appears exclusively in ST-11.
+No planned case counts as covered.
+
+| Case ID | Public seam / expected result | Data | Spec |
+|---|---|---|---|
+| `IT-DET-001` | real temporary directory create→reopen→move→explicit relink via native Qt; cancel/denied access keep prior Collection intact | TD-UI, TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
+| `IT-DET-002` | actual app-owned files and permissions, corrupt/unsupported manifest, interrupted write, symlink escape and untouched recording bytes | TD-PATH, TD-FAIL | [ST-03](specs/ST-03-detect-workspace.md) |
+| `IT-DET-003` | real nested mono/stereo WAVs; nested generated snippets, symlink loop/escape and path collision; correct deterministic included inventory and no source writes | TD-WAV, TD-PATH, TD-COL | [ST-04](specs/ST-04-wav-discovery.md) |
+| `IT-DET-004` | truncated/unsupported headers, permissions, edited/missing files, many-row bounded scan, cancel/restart/rescan without false completion | TD-WAV, TD-CACHE, TD-SCALE, TD-FAIL | [ST-04](specs/ST-04-wav-discovery.md) |
+| `IT-DET-005` | genuine Qt selection, folder decisions, count updates, paging, keyboard, canceled picker, native screenshots and state transitions | TD-UI, TD-SCALE | [ST-04](specs/ST-04-wav-discovery.md) |
+| `IT-DET-006` | trusted genuinely Train-exported CNN and RF Models load/inspect in fresh process via verified installed toolbox, without source-tree runtime dependency | TD-EXPORT, TD-TRAIN | [ST-05](specs/ST-05-model-intake.md) |
+| `IT-DET-007` | missing/corrupt/checksum-swapped binary, extra class, feature-order mismatch, unsupported runtime, unsafe path, explicit untrusted user artifact denied | TD-EXPORT, TD-FAIL, TD-PATH | [ST-05](specs/ST-05-model-intake.md) |
+| `IT-DET-008` | real Qt Model selection/reopen states and readiness gating without Worker launch | TD-UI, TD-EXPORT | [ST-05](specs/ST-05-model-intake.md) |
+| `IT-DET-009` | real short QProcess worker, progress, bounded cancellation, forced loss and restart; no success without verified receipt | TD-RUN, TD-FAIL | [ST-06](specs/ST-06-detect-workers.md) |
+| `IT-DET-010` | genuine Qt event-loop responsiveness, Run header, keyboard cancel and large stderr/log privacy checks | TD-UI, TD-RUN, TD-PATH | [ST-06](specs/ST-06-detect-workers.md) |
+| `IT-DET-011` | actual staging/publication failure, permissions/collision, source reservation and reconciliation of valid versus incomplete output | TD-FAIL, TD-RUN | [ST-06](specs/ST-06-detect-workers.md) |
+| `IT-DET-012` | real-WAV CPU CNN inference compared numerically to verified upstream reference output, class order and frame intervals | TD-WAV, TD-EXPORT, TD-TRAIN | [ST-07](specs/ST-07-cnn-detection.md) |
+| `IT-DET-013` | real Run→checksum-valid metadata Result reopen; source non-mutation, zero candidates vs failed-file contrast, worker/GUI progress | TD-WAV, TD-RUN, TD-UI | [ST-07](specs/ST-07-cnn-detection.md) |
+| `IT-DET-014` | stale/replaced WAV/Model, unsupported shape, cancelled Worker, crash, invalid receipt, atomic failure | TD-FAIL, TD-CACHE, TD-RUN | [ST-07](specs/ST-07-cnn-detection.md) |
+| `IT-DET-015` | real Qt Result selection, recording switch, interval IDs, history and keyboard navigation on genuine ST-07 Result | TD-UI, TD-RUN, TD-SCALE | [ST-08](specs/ST-08-results-ux.md) |
+| `IT-DET-016` | corrupted/unavailable source, empty/error/partial Result, persisted selection and actual normal/compact native screenshots without artifact mutation | TD-UI, TD-CACHE, TD-FAIL | [ST-08](specs/ST-08-results-ux.md) |
+| `IT-DET-017` | genuine WAV segments and trusted RF Model, reference feature-vector/probability parity; original/derived persisted independently and native selection works | TD-TRAIN, TD-EXPORT, TD-WAV, TD-UI | [ST-09](specs/ST-09-rf-refinement.md) |
+| `IT-DET-018` | wrong feature order/Model, missing/short/stale recording, cancelled/crashed Worker and atomic failure; original Result bytes unchanged | TD-FAIL, TD-RUN, TD-WAV | [ST-09](specs/ST-09-rf-refinement.md) |
+| `IT-DET-019` | compare real snippet PCM samples, headers, checksums and original timestamps byte-by-byte/frame-by-frame | TD-WAV, TD-PATH | [ST-10](specs/ST-10-corpus-export.md) |
+| `IT-DET-020` | real concatenated WAV plus Raven TSV offsets and both-mode receipt on distinct sources; reopen all outputs | TD-WAV, TD-FAIL | [ST-10](specs/ST-10-corpus-export.md) |
+| `IT-DET-021` | real stale/permission/collision/disk error/cancel and destination Show in folder in native Qt; no partial visible success or source mutation | TD-UI, TD-PATH, TD-FAIL, TD-RUN | [ST-10](specs/ST-10-corpus-export.md) |
+
+## 1c. Planned post-ST-10 revision integration (REV-01–REV-03)
+
+These cases execute only after the owning revision's predecessor is reviewed. They remain scoped
+package, workflow or widget-boundary checks; they do not introduce the whole-Studio scientific E2E
+reserved for ST-11.
+
+| Case ID | Public seam / expected result | Data | Spec |
+|---|---|---|---|
+| `IT-STU-009` | Build and clean-install the unified wheel; only `biocall_studio` and the canonical command are exposed, the removed package/command fail, the native shell starts, and real Train/Detect supervised Workers launch through canonical private modes with unchanged input WAV bytes and equivalent fresh artifacts. | TD-UI, TD-RUN, TD-WAV, TD-TRAIN, TD-EXPORT | [REV-01](specs/manual_revision_specs/REV-01-project-consolidation.md) |
+| `IT-DET-023` | Real Qt sidebar plus Back/Continue focus exercise Models→Recordings→New detection settings, Start without returning to Models, active/completed Run transition, bulk inclusion confirmation, CNN/RF semantic states, and selection-free Export planning with no artifact publication at normal/compact widths. | TD-UI, TD-WAV, TD-RUN, TD-FAIL | [REV-02](specs/manual_revision_specs/REV-02-detect-guided-workflow.md), [REV-04](specs/manual_revision_specs/REV-04-Detect-Navigation-and-History.md) |
+| `IT-UI-006` | Native Studio launch uses only approved launch copy and one readable light theme under host dark appearance, exposes no theme control and preserves keyboard/focus behavior at normal/compact widths and 100%/150% scaling. | TD-UI, TD-OS | [REV-03](specs/manual_revision_specs/REV-03-interface-language-and-theme.md) |
+| `IT-TRAIN-015` | Every Train page and all 67 configuration fields expose the owner-approved contextual/configuration/disabled-choice tooltip decisions through real keyboard-accessible Qt HelpHints and descriptions; removed hints and rejected visible copy are absent. | TD-CONFIG, TD-UI | [REV-03](specs/manual_revision_specs/REV-03-interface-language-and-theme.md) |
+| `IT-DET-024` | Every final Detect route/state uses approved HelpHints and recordings-folder terminology, removes duplicate prompts/alerts and renders concise actionable Model/Result states while preserving missing/empty/stale/partial distinctions. | TD-UI, TD-FAIL, TD-CACHE | [REV-03](specs/manual_revision_specs/REV-03-interface-language-and-theme.md) |
+| `IT-DET-025` | Real Qt persistent Detect sidebar navigation, Models→Recordings→New detection flow, newest-first Runs list/detail, active-Run indicator, keyboard focus, and normal/compact layouts without page-level horizontal scrolling. | TD-UI, TD-WAV, TD-RUN | [REV-04](specs/manual_revision_specs/REV-04-Detect-Navigation-and-History.md) |
+| `IT-DET-026` | Multiple exports from one Result, restart persistence, background verification of available/missing/inaccessible/changed destinations, corrupt/symlink history isolation, cancellation, and post-publication history-write failure without source mutation. | TD-UI, TD-WAV, TD-EXPORT, TD-PATH, TD-FAIL | [REV-04](specs/manual_revision_specs/REV-04-Detect-Navigation-and-History.md) |
+
+## 1d. Planned whole-Studio integration (ST-11 ONLY)
+
+| Case ID | Public seam / expected result | Data | Spec |
+|---|---|---|---|
+| `IT-DET-022` | end-to-end **scientific round trip** cross-checking source CNN→RF→export frame times, class/feature parity, checksums and TSV rows against reference numeric outputs | TD-WAV, TD-EXPORT, TD-TRAIN | [ST-11](specs/ST-11-unified-qualification.md) |
+| `IT-STU-007` | **one genuine whole-Studio scenario**: retained Train and trusted Model, Detect Collection/scan/CNN/Results/RF/export, restart/relink/provenance, unchanged originals, native navigation and user-visible success | TD-UI, TD-RUN, TD-WAV, TD-TRAIN, TD-EXPORT | [ST-11](specs/ST-11-unified-qualification.md) |
+| `IT-STU-008` | real Qt/QProcess cross-workspace active operation/exit contention, keep-open/confirm, crash recovery and no orphaned workers without altering Train's existing behavior | TD-RUN, TD-FAIL, TD-UI | [ST-11](specs/ST-11-unified-qualification.md) |
+
 ## 2. Collection Scan and metadata (spec 02)
 
 | Case ID | Public seam / expected result | Data |
@@ -124,7 +197,7 @@ exact persisted values are compared at the public Plot binding seam, the 10,001-
 a responsive live window, and CLI/startup tests carry their indexed IDs. See the
 [Spec 05f ledger](design/evidence/README.md#spec-05f--ui-chart-scale-and-cli-coverage-closeout).
 
-Future Prediction inference cases are **reserved exclusively** in [PREDICTION](PREDICTION.md), outside this Trainer test index or any Trainer release gate.
+Detect inference cases are pre-registered **planned** in section 1b above and owned only by their ST-07/ST-09 stage; they are **not** Train acceptance cases. See [PREDICTION](PREDICTION.md) for the science contract.
 
 ## 5d. Local logging and diagnostics (pre-release)
 
@@ -144,21 +217,21 @@ for Specs 06/07.
 
 | Case ID | Public seam / expected result | Data |
 |---|---|---|
-| `IT-E2E-001` | **Installed** native macOS package launches bundled UI/Worker, selects folder, builds Dataset, trains CNN/RF, restarts, opens published artifacts and **structurally reloads both Model formats using trusted local binary files** while leaving inputs intact. | TD-TRAIN, TD-UI |
-| `IT-MAC-001` | Versioned signed `.app` and installer `.dmg` verify the **BioCall Studio Train** bundle/display name, checked-in Train ICNS in Finder/Dock/menu/window, correct bundle ID/embedded Qt and `alp-ui` resources, Developer ID signature/hardened runtime, notarization + stapling, Gatekeeper/quarantine first launch on supported Mac architecture. | TD-OS, TD-UI |
-| `IT-MAC-002` | Clean Mac installed-app launches its **bundled** Worker (not system Python), survives cancellation/restart and writes user state outside sealed app; folder chooser/help/plots/theme/resources work. | TD-OS, TD-RUN, TD-UI |
-| `IT-MAC-003` | Controlled release from exact tagged/approved commit emits installer with checksums/recorded dependency/SHA provenance and tested native E2E scientific outputs; missing signing/approval blocks promotion rather than advertising a public installer. | TD-OS, TD-TRAIN |
-| `IT-MAC-004` | Installed `.app` retains prototype route/state layout and pinned `alp-ui` styling, icons, themes, picker/help/plot at normal and narrow sizes; actual installed screenshots and six-dimension review pass before DMG promotion. | TD-OS, TD-UI |
+| `IT-E2E-001` | **Installed** native package launches Studio with bundled Train/Detect Workers; creates and structurally reloads real CNN/RF Models, runs Detect CNN→RF, exports/reopens WAV+TSV, restarts/relinks and leaves inputs byte-identical. | TD-TRAIN, TD-WAV, TD-EXPORT, TD-UI |
+| `IT-MAC-001` | Versioned signed `.app` and `.dmg` verify **BioCall Studio** suite identity/ICNS, embedded Qt/`alp-ui` resources, Developer ID signature/hardened runtime, notarization/stapling and Gatekeeper/quarantine launch on every supported Mac architecture. | TD-OS, TD-UI |
+| `IT-MAC-002` | Clean installed app launches bundled Train and Detect Workers without system Python, enforces global admission, survives cancellation/crash/restart, performs shared safe quit and writes versioned per-user state outside the sealed app and source folders. | TD-OS, TD-RUN, TD-UI |
+| `IT-MAC-003` | Controlled release from the exact tag and pinned wheels emits a checksummed installer/manifest with dependency and scientific SHA provenance plus tested Train→Detect outputs; missing signing, legal or owner approval blocks promotion. | TD-OS, TD-TRAIN, TD-EXPORT |
+| `IT-MAC-004` | Installed `.app` retains accepted Studio/Detect and native Train routes at normal/compact sizes with focus, keyboard HelpHints, copy, tables, plots and all states; actual installed screenshots pass before DMG promotion. | TD-OS, TD-UI |
 
 ## 7. Windows installer/qualification gates (spec 07)
 
 | Case ID | Public seam / expected result | Data |
 |---|---|---|
-| `IT-WIN-001` | Real Windows input paths, case/Unicode collision, reparse containment, file locks and atomic updates honor same Collection contract. | TD-OS, TD-PATH |
-| `IT-WIN-002` | Windows native Qt/`alp-ui` file picker/scan and packaged QProcess/Worker launch, cancel, recovery and theme/assets function. | TD-OS, TD-RUN |
-| `IT-WIN-003` | **Installed** Windows native package builds and reopens one real Dataset and both CNN/RF Models, **structurally reloads both Model formats**; verified portable relative provenance. | TD-OS, TD-TRAIN |
-| `IT-WIN-004` | Clean Windows installation/uninstallation of versioned `.exe` retains user Collection; installer/Add-Remove/shortcut/taskbar/window show **BioCall Studio Train** with the checked-in multi-size Train ICO; packaged resources, release digest/security/signing and native Windows keyboard/DPI help/plot parity are verified. | TD-OS, TD-UI |
-| `IT-WIN-005` | Installed Windows app retains prototype layout/interaction and native `alp-ui` styling at 100%/150% DPI plus keyboard/focus, with screenshots and explicit owner-reviewed native exceptions before installer promotion. | TD-OS, TD-UI |
+| `IT-WIN-001` | Real Windows drive/UNC paths, case/Unicode collisions, reparse containment, locks and atomic updates honor independent Train/Detect ownership and keep Detect metadata outside sources. | TD-OS, TD-PATH |
+| `IT-WIN-002` | Native Qt/`alp-ui` pickers and bundled Train/Detect QProcesses enforce global admission, cancel/crash recovery and shared safe quit without system Python; suite theme/assets function. | TD-OS, TD-RUN, TD-UI |
+| `IT-WIN-003` | **Installed** package builds/reopens real Dataset and CNN/RF Models, structurally reloads both, completes Detect CNN→RF→WAV+TSV, restarts/relinks and verifies portable immutable provenance. | TD-OS, TD-TRAIN, TD-EXPORT |
+| `IT-WIN-004` | Clean install/upgrade/uninstall preserves user Collections, recordings, exports and per-user state; installer/Add-Remove/shortcut/taskbar/window show **BioCall Studio** with the suite ICO and verified digest/security/signing. | TD-OS, TD-UI |
+| `IT-WIN-005` | Installed Studio/Train/Detect retains accepted layout and interactions at 100%/150% DPI and compact width with keyboard/focus, HelpHints, plots, screenshots and owner-reviewed native exceptions before promotion. | TD-OS, TD-UI |
 
 ## Audit rules
 

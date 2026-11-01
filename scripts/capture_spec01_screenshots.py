@@ -10,9 +10,9 @@ from pathlib import Path
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtTest import QTest
 
-from biocall_studio_train.application.workspace import WorkspaceController
-from biocall_studio_train.gui.app import create_application
-from biocall_studio_train.gui.window import MainWindow
+from biocall_studio.studio.application.app import create_application
+from biocall_studio.train.application.workspace import WorkspaceController
+from biocall_studio.train.gui.window import MainWindow
 
 
 def _capture(window: MainWindow, path: Path, *, settle_ms: int) -> None:
@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("Spec 01 evidence must be captured by the native macOS Cocoa platform.")
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.TemporaryDirectory(prefix="biocall-studio-train-spec01-settings-") as settings:
+    with tempfile.TemporaryDirectory(prefix="biocall-studio-spec01-settings-") as settings:
         window = MainWindow(WorkspaceController(Path(settings)))
         window.resize(1180, 790)
         window.show()

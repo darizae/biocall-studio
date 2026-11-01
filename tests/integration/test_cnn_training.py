@@ -9,23 +9,23 @@ import pytest
 from alp_ui.components import Plot
 from PySide6.QtWidgets import QInputDialog, QLabel
 
-from biocall_studio_train.application.collection_scan import scan_collection
-from biocall_studio_train.application.workspace import WorkspaceController
-from biocall_studio_train.domain.dataset import BuildConfig
-from biocall_studio_train.domain.run import RunState, RunStatus
-from biocall_studio_train.domain.training import (
+from biocall_studio.studio.application.app import create_application
+from biocall_studio.train.application.collection_scan import scan_collection
+from biocall_studio.train.application.workspace import WorkspaceController
+from biocall_studio.train.domain.dataset import BuildConfig
+from biocall_studio.train.domain.run import RunState, RunStatus
+from biocall_studio.train.domain.training import (
     DeviceCapabilities,
     TrainingDataset,
     TrainingDraft,
     freeze_training_config,
 )
-from biocall_studio_train.gui.app import create_application
-from biocall_studio_train.gui.window import MainWindow
-from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
-from biocall_studio_train.persistence.diagnostics import read_diagnostic_records, worker_log_path
-from biocall_studio_train.persistence.models import list_models, structurally_reload_cnn_model
-from biocall_studio_train.persistence.training_presets import PresetStore
-from biocall_studio_train.workflows.dataset_build import build_dataset
+from biocall_studio.train.gui.window import MainWindow
+from biocall_studio.train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio.train.persistence.diagnostics import read_diagnostic_records, worker_log_path
+from biocall_studio.train.persistence.models import list_models, structurally_reload_cnn_model
+from biocall_studio.train.persistence.training_presets import PresetStore
+from biocall_studio.train.workflows.dataset_build import build_dataset
 
 pytestmark = pytest.mark.integration
 
@@ -92,7 +92,7 @@ def test_real_cnn_worker_publishes_reloadable_model_and_native_views(
     qapp, qtbot, tmp_path, wav_factory, monkeypatch
 ):
     """Cases: IT-TRAIN-001, IT-TRAIN-005, IT-TRAIN-007, IT-TRAIN-008, IT-TRAIN-012,
-    IT-TRAIN-014, IT-LOG-002.
+    IT-TRAIN-014, IT-LOG-002, IT-STU-009.
     """
     create_application()
     root = tmp_path / "collection"
@@ -190,7 +190,7 @@ def test_real_cnn_worker_publishes_reloadable_model_and_native_views(
             (
                 "import json,sys; "
                 "from pathlib import Path; "
-                "from biocall_studio_train.persistence.models import "
+                "from biocall_studio.train.persistence.models import "
                 "structurally_reload_cnn_model; "
                 "print(json.dumps(structurally_reload_cnn_model(Path(sys.argv[1]), "
                 "sys.argv[2]).to_dict(), sort_keys=True))"

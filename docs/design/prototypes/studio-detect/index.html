@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interactive BioCall Studio launchpad and Detect workspace prototype">
+  <title>BioCall Studio · Detect prototype</title>
+  <link rel="icon" href="../../../../assets/branding/icons/icon-32.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <div class="prototype-banner" role="note">
+    <strong>Interactive prototype</strong>
+    <span>This interface uses example data and performs no real processing.</span>
+  </div>
+
+  <div id="prototype">
+    <section class="suite-screen" id="studio-screen" data-screen="studio">
+      <header class="suite-header">
+        <a class="brand" href="#studio" data-route="studio" aria-label="BioCall Studio home">
+          <img src="../../../../assets/branding/icons/icon-64.png" alt="">
+          <span><strong>BioCall Studio</strong><small>BIOACOUSTICS WORKSPACE</small></span>
+        </a>
+      </header>
+      <main class="launchpad" id="main-content" tabindex="-1">
+        <div class="launch-intro">
+          <p class="overline">CHOOSE A WORKSPACE</p>
+          <h1>From recordings to evidence</h1>
+          <p>Train models, detect candidate calls, and review results in one workspace.</p>
+        </div>
+        <div class="workspace-grid" aria-label="BioCall Studio workspaces">
+          <article class="workspace-card train-card">
+            <div class="workspace-icon train-icon" aria-hidden="true"><span></span><span></span><span></span></div>
+            <h2>Train</h2>
+            <p>Create models using labeled examples from your recordings.</p>
+            <button class="button primary" type="button" data-route="train-reference">Open Train <span aria-hidden="true">→</span></button>
+          </article>
+          <article class="workspace-card detect-card featured">
+            <div class="workspace-icon detect-icon" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+            <h2>Detect</h2>
+            <p>Find candidate calls, refine results with another model, and export audio.</p>
+            <button class="button primary" type="button" data-route="detect/setup">Open Detect <span aria-hidden="true">→</span></button>
+          </article>
+          <article class="workspace-card review-card">
+            <div class="workspace-icon review-icon" aria-hidden="true">✓</div>
+            <h2>Review</h2>
+            <p>Inspect and confirm detected calls.</p>
+            <button class="button outline" type="button" data-route="review">Coming later</button>
+          </article>
+        </div>
+      </main>
+    </section>
+
+    <section class="suite-screen reference-screen" id="train-reference-screen" data-screen="train-reference" hidden>
+      <header class="suite-header">
+        <button class="brand brand-button" type="button" data-route="studio" aria-label="Return to BioCall Studio">
+          <img src="../../../../assets/branding/icons/icon-64.png" alt="">
+          <span><strong>BioCall Studio</strong><small>TRAIN</small></span>
+        </button>
+        <button class="button outline small" type="button" data-route="studio">← Studio</button>
+      </header>
+      <main class="reference-content" id="train-main" tabindex="-1">
+        <div class="page-heading">
+          <div><h1>Train</h1><p>Reference screens from the current Train workspace.</p></div>
+        </div>
+        <div class="screenshot-grid">
+          <figure class="screenshot-card">
+            <img src="../../evidence/spec-01-native/select.png" alt="Train Select Collection screen">
+            <figcaption><strong>Select Collection</strong><span>Current Train workspace</span></figcaption>
+          </figure>
+          <figure class="screenshot-card">
+            <img src="../../evidence/spec-05-native/train-cnn.png" alt="Train model configuration screen">
+            <figcaption><strong>Train a Model</strong><span>Current Train workspace</span></figcaption>
+          </figure>
+        </div>
+        <div class="actions"><button class="button primary" type="button" data-route="studio">Return to Studio</button></div>
+      </main>
+    </section>
+
+    <section class="suite-screen reference-screen" id="review-screen" data-screen="review" hidden>
+      <header class="suite-header">
+        <button class="brand brand-button" type="button" data-route="studio" aria-label="Return to BioCall Studio">
+          <img src="../../../../assets/branding/icons/icon-64.png" alt="">
+          <span><strong>BioCall Studio</strong><small>REVIEW</small></span>
+        </button>
+        <button class="button outline small" type="button" data-route="studio">← Studio</button>
+      </header>
+      <main class="placeholder-content" id="review-main" tabindex="-1">
+        <div class="workspace-icon review-icon large" aria-hidden="true">✓</div>
+        <h1>Review is coming later</h1>
+        <p>Inspect and confirm detected calls in a future workspace.</p>
+        <button class="button primary" type="button" data-route="studio">Return to Studio</button>
+      </main>
+    </section>
+
+    <section class="detect-app" id="detect-screen" data-screen="detect" hidden>
+      <aside class="detect-sidebar" aria-label="Detect navigation">
+        <button class="brand brand-button" type="button" data-route="studio" aria-label="Return to BioCall Studio">
+          <img src="../../../../assets/branding/icons/icon-64.png" alt="">
+          <span><strong>BioCall Studio</strong><small>DETECT</small></span>
+        </button>
+        <p class="nav-label">WORKSPACE</p>
+        <nav class="detect-nav">
+          <button type="button" data-route="detect/setup" data-nav="setup"><span aria-hidden="true">⌁</span> Setup</button>
+          <button type="button" data-route="detect/recordings" data-nav="recordings"><span aria-hidden="true">▤</span> Recordings <b id="nav-issue-count">2</b></button>
+          <button type="button" data-route="detect/run" data-nav="run"><span aria-hidden="true">▶</span> Run <i id="nav-run-dot"></i></button>
+          <button type="button" data-route="detect/results" data-nav="results"><span aria-hidden="true">≡</span> Results</button>
+          <button type="button" data-route="detect/export" data-nav="export"><span aria-hidden="true">⇩</span> Corpus Export</button>
+        </nav>
+        <div class="sidebar-foot">
+          <button class="text-button" id="help-wiki-button" type="button">? Detect guide</button>
+          <button class="text-button" type="button" data-route="studio">← Studio launchpad</button>
+        </div>
+      </aside>
+
+      <div class="detect-body">
+        <header class="detect-header">
+          <div><p class="overline">ACTIVE RUN</p><strong id="global-run-label">No active Run</strong></div>
+          <span class="badge neutral" id="global-run-badge">Idle</span>
+          <button class="button outline small" id="view-active-run" type="button" data-route="detect/run" hidden>View Run →</button>
+        </header>
+
+        <details class="prototype-controls">
+          <summary>Prototype controls <span>Change simulated states for review</span></summary>
+          <div class="prototype-control-grid">
+            <label>Model scenario<select id="model-state"><option value="valid">Compatible model</option><option value="loading">Loading</option><option value="empty">Empty package</option><option value="incompatible">Incompatible model</option><option value="missing">Missing files</option></select></label>
+            <label>Folder scenario<select id="root-state"><option value="valid">Available and scanned</option><option value="loading">Scanning</option><option value="empty">No WAV candidates</option><option value="invalid">Path errors</option><option value="changed">Files changed after scan</option><option value="missing">Folder unavailable</option></select></label>
+            <label>Inventory scenario<select id="inventory-state"><option value="ready">Ready with skipped items</option><option value="scanning">Scan in progress</option><option value="cancelled">Scan cancelled</option><option value="invalid">Invalid included recording</option><option value="stale">Files changed</option><option value="missing">Folder unavailable</option></select></label>
+            <label>Run scenario<select id="run-state"><option value="idle">Not started</option><option value="preparing">Preparing</option><option value="running">Running</option><option value="cancelling">Cancelling</option><option value="cancelled">Cancelled</option><option value="interrupted">Interrupted</option><option value="failed">Failed</option><option value="completed">Completed</option><option value="file-errors">Completed with file errors</option></select></label>
+            <label>Results scenario<select id="result-state"><option value="populated">Candidates available</option><option value="empty">No candidates</option><option value="error">Unavailable source</option></select></label>
+            <label>Export scenario<select id="export-state"><option value="ready">Ready</option><option value="conflict">Destination conflicts</option><option value="stale">Stale source</option><option value="cancelled">Cancelled</option><option value="error">Write error</option><option value="success">Completed</option></select></label>
+          </div>
+        </details>
+
+        <main class="detect-main" id="detect-main" tabindex="-1">
+          <section class="detect-page" data-page="setup">
+            <div class="page-heading">
+              <div><p class="overline">DETECT SETUP</p><h1>Prepare candidate detection</h1><p>Choose a detection model and recordings folder in either order.</p></div>
+            </div>
+
+            <div class="setup-grid">
+              <article class="card source-card" id="model-card">
+                <div class="card-heading"><div><span class="step-number">1</span><h2>Detection model</h2></div><button class="help-hint" type="button" data-help="Choose a trained model to search recordings for candidate calls. Only compatible models can be used." aria-label="More about the detection model" aria-expanded="false">?</button></div>
+                <p class="muted">Choose the trained model that will search your recordings.</p>
+                <div class="selection-box" id="model-selection"><span class="selection-icon" aria-hidden="true">◇</span><div><strong>No model selected</strong><span>Choose a trained detection model</span></div></div>
+                <div class="row-actions"><button class="button primary" id="choose-model" type="button">Choose model</button><button class="button outline" id="clear-model" type="button" disabled>Clear</button></div>
+              </article>
+
+              <article class="card source-card" id="root-card">
+                <div class="card-heading"><div><span class="step-number">2</span><h2>Recordings folder</h2></div><button class="help-hint" type="button" data-help="Choose the folder containing your recordings. Review which WAV files are included before starting." aria-label="More about the recordings folder" aria-expanded="false">?</button></div>
+                <p class="muted">Choose a folder, then review the recordings to include.</p>
+                <div class="selection-box" id="root-selection"><span class="selection-icon" aria-hidden="true">□</span><div><strong>No folder selected</strong><span>Choose the folder containing your WAV recordings</span></div></div>
+                <div class="row-actions"><button class="button primary" id="choose-root" type="button">Choose folder</button><button class="button outline" id="clear-root" type="button" disabled>Clear</button></div>
+              </article>
+            </div>
+
+            <div class="alert neutral" id="readiness-alert" role="status" aria-live="polite"><strong>Not ready</strong><span>Choose a compatible detection model and recordings folder.</span></div>
+
+            <article class="card settings-card">
+              <div class="card-heading"><div><span class="step-number">3</span><h2>Candidate settings</h2></div><span class="badge neutral">Illustrative values</span></div>
+              <p class="muted">These values illustrate the form and are not approved scientific defaults.</p>
+              <div class="form-grid">
+                <label>Minimum detection score <button class="help-hint inline" type="button" data-help="Only segments meeting this score are included as candidates. Higher thresholds usually produce fewer candidates. A score is not a certainty percentage." aria-label="More about minimum detection score" aria-expanded="false">?</button><input id="threshold-input" type="number" min="0" max="1" step="0.01" value="0.72"></label>
+                <label>Window overlap <button class="help-hint inline" type="button" data-help="Controls how much neighboring analysis windows overlap. More overlap examines the recording more frequently and can increase processing time." aria-label="More about window overlap" aria-expanded="false">?</button><select id="overlap-input"><option>50%</option><option>25%</option><option>75%</option></select></label>
+                <label>Combine nearby candidates <button class="help-hint inline" type="button" data-help="Joins candidate intervals separated by no more than the selected gap." aria-label="More about combining nearby candidates" aria-expanded="false">?</button><select id="merge-input"><option>0.20 s</option><option>Do not combine</option><option>0.50 s</option></select></label>
+              </div>
+              <details class="advanced-settings"><summary>Advanced settings <span>3 controls</span></summary><div class="form-grid"><label>Batch size<input type="number" value="16" min="1" max="128"></label><label>Device<select><option>CPU</option><option disabled>GPU unavailable</option></select></label><label>File errors<select><option>Continue and report</option><option>Stop Run</option></select></label></div></details>
+            </article>
+
+            <div class="page-footer-actions">
+              <button class="button outline" type="button" data-route="detect/recordings">Review recordings</button>
+              <button class="button primary large-button" id="start-detect" type="button" disabled>Start detection</button>
+            </div>
+          </section>
+
+          <section class="detect-page" data-page="recordings" hidden>
+            <div class="page-heading">
+              <div><p class="overline">SOURCE INVENTORY</p><h1>Recordings</h1><p>Approve the WAVs that belong to this Detect Collection.</p></div>
+              <div class="heading-actions"><button class="button primary" id="rescan-button" type="button">Rescan</button></div>
+            </div>
+
+            <div class="alert warning" id="inventory-alert" role="status" aria-live="polite"><strong>2 recordings skipped</strong><span>One duplicate and one invalid WAV are not included.</span></div>
+            <article class="card scan-progress" id="scan-progress" hidden>
+              <div class="card-heading"><div><h2 id="scan-title">Scanning Rainforest_2026</h2><p class="muted" id="scan-stage">Reading WAV headers</p></div><span id="scan-percent">46%</span></div>
+              <div class="progress"><span id="scan-progress-bar" style="width:46%"></span></div>
+              <div class="split-line"><span id="scan-count">31 / 68 files</span><button class="button outline small" id="cancel-scan" type="button">Cancel scan</button></div>
+            </article>
+
+            <div class="metric-grid">
+              <div class="metric"><span>Included</span><strong id="included-count">42</strong><small>source WAVs</small></div>
+              <div class="metric"><span>Undecided</span><strong id="undecided-count">1</strong><small>skipped WAV</small></div>
+              <div class="metric"><span>Excluded</span><strong id="excluded-count">24</strong><small>skipped WAVs</small></div>
+              <div class="metric"><span>Invalid</span><strong id="invalid-count">1</strong><small>not included</small></div>
+            </div>
+
+            <div class="inventory-grid">
+              <article class="card tree-card">
+                <div class="card-heading"><div><h2>Rainforest_2026/</h2><p class="muted">/Volumes/Field/Rainforest_2026</p></div><button class="help-hint" type="button" data-help="Included recordings are analyzed. Excluded and undecided recordings are skipped unless explicitly included. Invalid included recordings require resolution." aria-label="More about recording inclusion" aria-expanded="false">?</button></div>
+                <div class="tree-toolbar"><button class="button outline small" id="include-folder" type="button">Include folder</button><button class="button outline small" id="exclude-folder" type="button">Exclude folder</button></div>
+                <ul class="file-tree" aria-label="Recording folder hierarchy">
+                  <li><button class="tree-row folder-row selected" type="button" data-folder="recordings"><span>▾</span><strong>recordings/</strong><span class="badge success">42 included</span></button>
+                    <ul>
+                      <li><button class="tree-row" type="button" data-file="Dawn_A01.wav"><span>♪</span>Dawn_A01.wav <span class="row-note">included · 01:38:14</span></button></li>
+                      <li><button class="tree-row" type="button" data-file="Dawn_A02.wav"><span>♪</span>Dawn_A02.wav <span class="row-note">included · 00:54:09</span></button></li>
+                      <li><button class="tree-row issue-row" type="button" data-file="Dawn_A02-copy.wav"><span>!</span>Dawn_A02-copy.wav <span class="badge warning">duplicate</span></button></li>
+                    </ul>
+                  </li>
+                  <li><button class="tree-row folder-row" type="button" data-folder="incoming"><span>▸</span><strong>incoming/</strong><span class="badge warning">1 undecided</span></button></li>
+                  <li><button class="tree-row folder-row" type="button" data-folder="positives"><span>▸</span><strong>positives/</strong><span class="badge neutral">12 excluded</span></button></li>
+                  <li><button class="tree-row folder-row" type="button" data-folder="alpaca"><span>▸</span><strong>.alpaca/</strong><span class="badge neutral">11 excluded</span></button></li>
+                  <li><button class="tree-row issue-row" type="button" data-file="broken.wav"><span>!</span>broken.wav <span class="badge danger">invalid · skipped</span></button></li>
+                </ul>
+              </article>
+
+              <aside class="card detail-card" id="inventory-detail">
+                <p class="overline">SELECTED FOLDER</p><h2>recordings/</h2>
+                <dl><div><dt>Decision</dt><dd><span class="badge success">Included</span></dd></div><div><dt>Source files</dt><dd>42 WAV</dd></div><div><dt>Recorded audio</dt><dd>31 h 08 min</dd></div><div><dt>Default rule</dt><dd>Recognized recordings/ folder</dd></div></dl>
+                <p class="muted small-copy">Inclusion applies to analysis; source files are not modified.</p>
+              </aside>
+            </div>
+
+            <article class="card relink-card" id="relink-card" hidden>
+              <div class="card-heading"><div><h2>Relink recordings folder</h2><p class="muted">Review changed and missing recordings before accepting a new location.</p></div><span class="badge warning">Needs review</span></div>
+              <div class="path-compare"><div><span>Missing folder</span><code>/Volumes/Field/Rainforest_2026</code></div><div><span>New folder</span><code>/Volumes/Archive/Rainforest_2026</code></div></div>
+              <label class="check-row"><input type="checkbox" id="relink-confirm"> Inventory comparison reviewed: 42 match, 1 changed, 1 missing</label>
+              <div class="row-actions"><button class="button outline" id="cancel-relink" type="button">Cancel</button><button class="button primary" id="accept-relink" type="button" disabled>Rebind and rescan</button></div>
+            </article>
+
+            <div class="page-footer-actions"><button class="button outline" type="button" data-route="detect/setup">Back to setup</button><button class="button primary" type="button" data-route="detect/setup">Review settings</button></div>
+          </section>
+
+          <section class="detect-page" data-page="run" hidden>
+            <div class="page-heading">
+              <div><p class="overline">RUN · CANDIDATE DETECTION</p><h1>Rainforest dawn</h1><p id="run-subtitle">No Run has started.</p></div>
+            </div>
+            <div class="alert info" id="run-alert" role="status" aria-live="polite"><strong>Ready to start</strong><span>Review setup, then start detection.</span></div>
+            <div class="run-grid">
+              <article class="card run-progress-card">
+                <div class="card-heading"><div><h2 id="run-title">Run not started</h2><p class="muted" id="run-stage">Waiting</p></div><strong class="run-percent" id="run-percent">0%</strong></div>
+                <div class="progress large"><span id="run-progress-bar" style="width:0%"></span></div>
+                <ul class="stage-list" id="stage-list">
+                  <li data-stage="prepare"><span>○</span> Validate frozen inventory and Model metadata</li>
+                  <li data-stage="detect"><span>○</span> Analyze recording windows</li>
+                  <li data-stage="publish"><span>○</span> Publish metadata-only Result</li>
+                </ul>
+                <div class="row-actions"><button class="button danger" id="cancel-run" type="button" disabled>Cancel Run</button><button class="button outline" id="retry-run" type="button" hidden>Retry</button></div>
+              </article>
+              <aside class="card activity-card">
+                <h2>Activity</h2>
+                <pre id="run-log">No activity yet.</pre>
+              </aside>
+            </div>
+            <article class="card file-failures" id="file-failures" hidden>
+              <div class="card-heading"><div><h2>Nonfatal file failure</h2><p class="muted">The completed Result keeps this source status; it does not turn failure into zero detections.</p></div><span class="badge warning">1 file</span></div>
+              <table><thead><tr><th>Recording</th><th>Outcome</th><th>Correction</th></tr></thead><tbody><tr><td>Dawn_Broken.wav</td><td>Unreadable after scan</td><td>Repair source, rescan, then start a new Run</td></tr></tbody></table>
+            </article>
+            <div class="page-footer-actions"><button class="button outline" type="button" data-route="detect/setup">Setup</button><button class="button primary" id="open-results" type="button" data-route="detect/results" disabled>Open Results</button></div>
+          </section>
+
+          <section class="detect-page" data-page="results" hidden>
+            <div class="page-heading">
+              <div><p class="overline">METADATA-ONLY RESULTS</p><h1>Candidate intervals</h1><p>Intervals refer to original recording time; no audio is copied into a Result.</p></div>
+              <div class="heading-actions"><label>Result<select id="result-select"><option value="cnn">Original candidate Result</option><option value="rf" disabled>Refined Result · not created</option></select></label></div>
+            </div>
+            <div class="alert info" id="result-alert"><strong>Original Result</strong><span>18 candidate intervals retain their source recording times.</span></div>
+
+            <article class="card provenance-card">
+              <div><p class="overline">RESULT LINEAGE</p><h2 id="result-name">Original candidate Result</h2></div>
+              <div class="lineage" aria-label="Result lineage"><span id="lineage-model">Detection Model · CallNet v4 (CNN)</span><b>→</b><span id="lineage-result">Result · result-original-001</span></div>
+              <dl><div><dt>Source inventory</dt><dd>42 included · frozen for this Run</dd></div><div><dt>Intervals</dt><dd id="provenance-count">18 candidates</dd></div><div><dt>Metadata</dt><dd>App-owned workspace · outside source folder</dd></div><div><dt>Parent</dt><dd id="parent-value">None · original Result</dd></div></dl>
+            </article>
+
+            <div class="results-grid" id="populated-results">
+              <article class="card recording-list" id="recording-list"><h2>Recordings</h2></article>
+              <article class="card interval-card">
+                <div class="card-heading"><div><h2>Dawn_A01.wav</h2><p class="muted">Times in original source recording</p></div><button class="button outline small" id="show-source" type="button">Show source</button></div>
+                <div class="table-wrap"><table><thead><tr><th scope="col">Select</th><th scope="col">Start</th><th scope="col">End</th><th scope="col">Detection score</th><th scope="col" id="rf-status-heading" hidden>Refinement status</th></tr></thead><tbody id="interval-body"></tbody></table></div>
+              </article>
+            </div>
+
+            <div class="empty-state" id="empty-results" hidden><div aria-hidden="true">∅</div><h2>No candidates</h2><p>The completed Result contains no intervals. Recording outcomes and provenance remain available.</p></div>
+            <div class="empty-state error-state" id="error-results" hidden><div aria-hidden="true">!</div><h2>Recordings folder unavailable</h2><p>Candidate metadata is preserved, but source navigation is unavailable until the folder is relinked and checked.</p><button class="button primary" type="button" id="result-relink">Review relinking</button></div>
+
+            <article class="card rf-card" id="rf-card">
+              <div class="card-heading"><div><p class="overline">OPTIONAL REFINEMENT</p><h2>Refine candidate intervals with another model</h2><p class="muted">Creates a separate metadata-only Result. The original Result remains selectable and unchanged.</p></div><span class="badge neutral">Optional</span></div>
+              <div class="rf-controls"><label>Refinement model<select id="rf-model"><option value="">Choose a model</option><option value="valid">Forest Calls v2 · compatible</option><option value="invalid">Forest Calls legacy · incompatible features</option></select></label><button class="button primary" id="run-rf" type="button" disabled>Create refined Result</button></div>
+              <p class="field-help">Model information: Random Forest (RF) · evaluates only intervals in the selected candidate Result.</p>
+              <p class="field-error" id="rf-error" hidden>Feature schema mismatch. Choose a compatible refinement model.</p>
+            </article>
+            <div class="page-footer-actions"><button class="button outline" type="button" data-route="detect/run">Run details</button><button class="button primary" type="button" data-route="detect/export">Plan corpus export</button></div>
+          </section>
+
+          <section class="detect-page" data-page="export" hidden>
+            <div class="page-heading">
+              <div><p class="overline">CORPUS EXPORT</p><h1>Materialize a frozen selection</h1><p>Choose what to create and where to write it. Source-time provenance travels with every output.</p></div>
+            </div>
+            <div class="export-grid">
+              <div class="export-main">
+                <article class="card">
+                  <div class="card-heading"><div><span class="step-number">1</span><h2>Frozen Result selection</h2></div><span class="badge success" id="export-selection-count">3 intervals</span></div>
+                  <dl class="summary-list"><div><dt>Result</dt><dd id="export-result-name">Original candidate Result</dd></div><div><dt>Selection</dt><dd id="export-selection-summary">3 intervals from 1 recording</dd></div><div><dt>Source time</dt><dd>Preserved in names and mapping</dd></div></dl>
+                </article>
+                <article class="card">
+                  <div class="card-heading"><div><span class="step-number">2</span><h2>Export format</h2></div><button class="help-hint" type="button" data-help="Export individual WAV clips, one combined WAV with a Raven selection table, or both. Outputs go to the chosen destination and retain source-recording references." aria-label="More about export formats" aria-expanded="false">?</button></div>
+                  <fieldset class="format-options"><legend class="sr-only">Corpus export format</legend><label><input type="radio" name="export-format" value="snippets"><span><strong>Individual WAV snippets</strong><small>One origin-linked file per interval</small></span></label><label><input type="radio" name="export-format" value="concat"><span><strong>Concatenated WAV + Raven TSV</strong><small>One waveform, selection table, and provenance map</small></span></label><label><input type="radio" name="export-format" value="both" checked><span><strong>Both</strong><small>Same frozen selection, two independent materializations</small></span></label></fieldset>
+                </article>
+                <article class="card">
+                  <div class="card-heading"><div><span class="step-number">3</span><h2>Destination</h2></div><span class="badge warning">Required</span></div>
+                  <label>Export folder<div class="input-action"><input id="destination-input" type="text" value="" placeholder="Choose a destination outside the recordings folder" spellcheck="false"><button class="button primary" id="choose-destination" type="button">Choose folder</button></div></label>
+                  <p class="field-help">App metadata: <code>~/Library/Application Support/BioCall Studio/Detect/…</code><br>Corpus destination: <strong id="destination-summary">Not selected</strong></p>
+                </article>
+                <article class="card mapping-card">
+                  <div class="card-heading"><div><span class="step-number">4</span><h2>Planned source-time mapping</h2></div></div>
+                  <div class="table-wrap"><table><thead><tr><th>Original source interval</th><th>Planned output</th><th>Export offset</th></tr></thead><tbody id="mapping-body"></tbody></table></div>
+                </article>
+              </div>
+              <aside class="export-side">
+                <article class="card export-review">
+                  <h2>Review export</h2><dl><div><dt>Format</dt><dd id="format-summary">Both</dd></div><div><dt>Audio outputs</dt><dd id="output-count">4 WAV</dd></div><div><dt>Companions</dt><dd id="companion-count">Raven TSV + provenance map</dd></div><div><dt>Source files</dt><dd>Read-only</dd></div></dl>
+                  <div class="alert neutral compact-alert" id="export-alert"><strong>Destination required</strong><span>Choose a folder to continue.</span></div>
+                  <button class="button primary full" id="start-export" type="button" disabled>Export corpus</button>
+                  <button class="button outline full" id="show-output" type="button" hidden>Show in folder</button>
+                </article>
+              </aside>
+            </div>
+          </section>
+        </main>
+      </div>
+    </section>
+  </div>
+
+  <dialog id="guide-dialog" aria-labelledby="guide-title">
+    <div class="dialog-heading"><h2 id="guide-title">Detect guide</h2><button class="icon-button" type="button" data-close-dialog aria-label="Close guide">×</button></div>
+    <h3>Choose inputs</h3>
+    <p>Select a trained detection model and the folder containing your recordings. Only compatible models can be used. Review the discovered WAV files before starting: included recordings are analyzed, while excluded and undecided recordings are skipped. Resolve any invalid recording that is included.</p>
+    <h3>Set candidate sensitivity</h3>
+    <p>The minimum detection score controls which segments become candidates; a higher value usually returns fewer candidates, and the score is not a certainty percentage. Window overlap controls how often neighboring portions of audio are examined. Combining nearby candidates joins intervals separated by no more than the chosen gap.</p>
+    <h3>Review and refine results</h3>
+    <p>Candidate intervals retain their positions in the original recordings. An optional Random Forest (RF) refinement evaluates those existing intervals and creates a separate Result with accepted, rejected, and unscored states. It does not search full recordings, and the original Result remains unchanged.</p>
+    <h3>Export a corpus</h3>
+    <p>Freeze selected intervals, then export individual WAV clips, one combined WAV with a Raven selection table, or both. Choose the destination explicitly; every output retains references to its source recording and source time.</p>
+    <button class="button primary" type="button" data-close-dialog>Close</button>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script src="prototype.js"></script>
+</body>
+</html>

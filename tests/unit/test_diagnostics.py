@@ -9,7 +9,7 @@ from zipfile import ZipFile
 
 import pytest
 
-from biocall_studio_train.persistence.diagnostics import (
+from biocall_studio.train.persistence.diagnostics import (
     BoundedJsonlSink,
     BoundedStderrCapture,
     DiagnosticJsonlHandler,
@@ -27,7 +27,7 @@ def _record(**overrides) -> dict[str, object]:
         "schema_version": 1,
         "timestamp_utc": "2026-10-26T08:09:10.123Z",
         "level": "INFO",
-        "component": "biocall_studio_train.test",
+        "component": "biocall_studio.train.test",
         "event": "test_event",
         "message": "Safe diagnostic summary",
         "session_id": "session-a1b2",
@@ -48,7 +48,7 @@ def _run_root(tmp_path: Path, run_id: str = "run-safe") -> Path:
 def test_versioned_record_schema_levels_correlation_and_context_allowlist(tmp_path):
     """Case: UT-LOG-001."""
     encoded = encode_diagnostic_record(
-        component="biocall_studio_train.worker.cnn",
+        component="biocall_studio.train.worker.cnn",
         event="training_started",
         message="CNN training started",
         level="INFO",
@@ -70,7 +70,7 @@ def test_versioned_record_schema_levels_correlation_and_context_allowlist(tmp_pa
         "schema_version": 1,
         "timestamp_utc": "2026-10-26T08:09:10.123Z",
         "level": "INFO",
-        "component": "biocall_studio_train.worker.cnn",
+        "component": "biocall_studio.train.worker.cnn",
         "event": "training_started",
         "message": "CNN training started",
         "session_id": "session-a1b2",
@@ -87,7 +87,7 @@ def test_versioned_record_schema_levels_correlation_and_context_allowlist(tmp_pa
         session_id="session-a1b2",
         level=logging.INFO,
     )
-    logger = logging.Logger("biocall_studio_train.test", logging.DEBUG)
+    logger = logging.Logger("biocall_studio.train.test", logging.DEBUG)
     logger.addHandler(handler)
     logger.debug(
         "debug is filtered",
@@ -128,7 +128,7 @@ def test_sensitive_text_variants_are_removed(secret, message):
     assert len(sanitized) <= 2_000
 
     encoded = encode_diagnostic_record(
-        component="biocall_studio_train.test",
+        component="biocall_studio.train.test",
         event="failure",
         message=message,
         level="ERROR",

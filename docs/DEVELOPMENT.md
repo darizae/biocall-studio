@@ -1,56 +1,67 @@
 # Development and local execution
 
-## Toolchain
+## Toolchain and dependency provenance
 
-- Python **3.11–3.13** with a project-local `.venv`, PySide6 and `pytest`, `pytest-qt`, `ruff` as defined by `pyproject.toml`.
-- macOS is the day-to-day native implementation and integration-test platform. Windows is a target **only after a separate native qualification gate**.
-- Install `../alp-ui` from its **native PySide6 sibling checkout or locally built wheel**. Do not substitute a PyPI package or the similarly named web UI project. Verify installed public Components/API from the checkout.
-- Install the separate `../bioacoustics-dl-toolbox` checkout from the tagged `0.2.0`
-  release at committed revision `e478ca5156a5d1018d0a7a61486bc85fe7c1e92d`.
-  Editable installation is development-only.
-- When implementing CNN/RF, inspect the intended sibling `../alpaca-pipelines` after confirming its exact directory and commit; if unavailable, report it and resolve an owner-approved local checkout rather than silently assuming remote code. Install only the real training dependencies needed for that integration, pinned/tested as part of the Training spec. Do not assume the reference repository's CLI or output manifests are application contracts.
+Use Python **3.11–3.13**. BioCall Studio is one `biocall-studio` distribution and one
+`biocall_studio` package. The adjacent dependency revisions are recorded under
+`tool.biocall-studio.science` in `pyproject.toml`:
 
-A scaffold-level local setup from repository root:
+- `../bioacoustics-dl-toolbox` supplies bounded audio, CNN, and RF feature primitives;
+- `../alp-ui` supplies the public native PySide6 widgets and theme.
+
+Do not substitute similarly named packages or a copied toolbox inside another repository. Confirm
+the installed imports before scientific or native UI work:
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e ../bioacoustics-dl-toolbox
-python -m pip install -e '.[gui,test,integration]'
-# When available, install/build the sibling PySide6 Widgets library:
-python -m pip install -e ../alp-ui
-python -c "import bioacoustics_dl_toolbox as m; print(m.__file__)"
-python -m biocall_studio_train
+python -c "import alp_ui, bioacoustics_dl_toolbox; print(alp_ui.__file__); print(bioacoustics_dl_toolbox.__file__)"
 ```
 
-**Status:** the checked-in executable is a development scaffold, not the specified full Trainer. Follow the numbered specs before interpreting existing UI behavior as product acceptance. Do not add an undocumented dependency or fake fallback if a required sibling checkout is unavailable.
+Create a clean source environment from the repository root:
+
+```bash
+python3.12 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -e '../bioacoustics-dl-toolbox[rf]'
+.venv/bin/python -m pip install -e ../alp-ui
+.venv/bin/python -m pip install -e '.[test,integration]'
+.venv/bin/python -m biocall_studio
+```
+
+`.venv/bin/biocall-studio` is the equivalent and only public console command. Worker arguments
+are private. Train and Detect supervisors invoke the same `.venv/bin/python` interpreter with a
+private `--worker <mode> ...` argument in development.
 
 ## Tests and audit
 
 ```bash
 python -m pytest tests/unit -q
-python scripts/audit_test_ids.py
-# On native macOS with Qt libraries and appropriate local fixtures:
 python -m pytest tests/integration -q
 python -m ruff check src tests scripts
-# Explicit periodic durability run; ordinary pytest excludes this marker by default:
-BIOCALL_STUDIO_TRAIN_SOAK_REPORT=/tmp/biocall-studio-train-soak-observations.json \
+python scripts/audit_test_ids.py
+python scripts/verify_handoff.py
+python scripts/check_fixtures.py
+git diff --check
+```
+
+Ordinary pytest excludes the durability marker. Initiate the soak separately:
+
+```bash
+BIOCALL_STUDIO_SOAK_REPORT=/tmp/biocall-studio-soak-observations.json \
   python -m pytest -m soak tests/integration/test_long_running_runs.py -q -s
 ```
 
-The only initial CI-eligible suite is Qt-independent `tests/unit/` plus inexpensive static checks, without HPC access; CI pulls only the small versioned Git LFS synthetic fixture bytes when executing the integrity audit. Real Qt/application/filesystem and QProcess/in-process workflow integration executes locally on native macOS with test-specific temporary Collection roots and isolated Application Settings. Capture run commands/results by indexed ID. `pytest-qt` tests need a real compatible platform plugin; headless/offscreen Qt smoke is not a native-dialog or packaged-app qualification.
+Real Qt/application/filesystem and QProcess integration runs locally on native macOS with isolated
+temporary Collections and application data. Offscreen rendering does not replace native visual or
+dialog review. Windows commands, filesystem locking, QProcess behavior, packaging, and installers
+remain unqualified until exercised on native Windows under the release gate.
 
-Test data: use short deterministic WAV generators and a generated many-row metadata index. If an actual field codec/checkpoint cannot be represented synthetically, consult the protected [`INTEGRATION_TEST_DATA.md`](INTEGRATION_TEST_DATA.md) policy; the untracked `docs/priv/hpc-source-access` skill is read-only and never required by CI. For binary fixtures maintained through Git LFS validate SHA-256 and object presence, not a pointer file.
+## Data and release boundaries
 
-## Implementation / platform gates
+Tests use deterministic short WAV generators and the policy in
+[`INTEGRATION_TEST_DATA.md`](INTEGRATION_TEST_DATA.md). Never point a write-capable manual session
+at tracked fixtures. Validate Git LFS objects where required and keep private HPC material
+untracked.
 
-Check [`IMPLEMENTATION_SEQUENCE.md`](IMPLEMENTATION_SEQUENCE.md) and [`specs/README.md`](specs/README.md) for exact scope, local tests and publication rules. No Dataset or Model may be called produced until a real successfully validated Artifact exists. For Windows, document actual environment and native results; macOS path-unit success is not Windows qualification.
-
-## Current `alp-ui` and visual workflow
-
-Use the **public** updated UI library checkout at `../alp-ui`; install it locally in a test environment (`python -m pip install -e ../alp-ui`) where the sibling checkout exists. It exposes `FolderPicker`, `HelpHint`, and `Plot`, as detailed in [consumer contract](design/ALP_UI_CONSUMER_CONTRACT.md). Run sibling `python -m gallery.showcase` as native composition reference, then open checked-in `docs/design/prototypes/training-first/index.html` in a browser for interaction reference. Report absent sibling environments instead of downloading a new library silently. Use target UI screenshots and `pytest-qt`; offscreen does not replace native manual review.
-
-## Test fixture/release preflight
-
-Install `git-lfs` **before initializing/staging** this ZIP's `tests/data/example_collection/*.wav`. `python scripts/verify_handoff.py` checks tracked document references/private ignore/prototype in CI, while `--require-private` additionally checks ZIP-only HPC materials; `python scripts/check_fixtures.py` checks example WAV content/hashes; `python scripts/audit_test_ids.py` checks docstring indexes (not coverage). `tests/data/README.md` records real local synthetic WAVs; do not call them HPC downloads. Private HPC skill is shipped in ZIP but ignored in Git. Release plan and native `.dmg` / `.exe` gates: [RELEASE_PROCESS](RELEASE_PROCESS.md), [spec 06](specs/06-macos-release-and-installer.md), [spec 07](specs/07-windows-release-and-installer.md).
+Follow [`IMPLEMENTATION_SEQUENCE.md`](IMPLEMENTATION_SEQUENCE.md) and the active stage only.
+Installer, signing, publication, and cross-workflow end-to-end claims remain owned by ST-11 and the
+[`RELEASE_PROCESS.md`](RELEASE_PROCESS.md).

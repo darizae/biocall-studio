@@ -1,25 +1,62 @@
-# Controlled native releases — planned gates, not current outputs
+# Controlled BioCall Studio native releases
 
-**Owner:** specs [06 macOS](specs/06-macos-release-and-installer.md) and [07 Windows](specs/07-windows-release-and-installer.md). These are acceptance **plans**; the current ZIP is source/scaffold, **not** an installed app, `.dmg`, notarized Mac download, `.exe`, or completed release. Never mark a gate passed from a documentation checklist.
+**Status after ST-11:** this is the release gate, not a release record. No installer was built,
+installed, signed, notarized, uploaded or promoted. All `IT-MAC-*`, `IT-WIN-*` and installed
+`IT-E2E-*` checks remain deferred until a separately approved packaging stage executes
+[macOS spec 06](specs/06-macos-release-and-installer.md) or
+[Windows spec 07](specs/07-windows-release-and-installer.md).
 
-## Release candidate chain
+## Candidate chain
 
-1. **Identify** exact Git tag (`vX.Y.Z`), release commit, Python version, `alp-ui` sibling SHA + built wheel digest, alpaca-pipelines reference SHA/adapter behavior, **independent bioacoustics-dl-toolbox direct dependency SHA/version/wheel digest**, science dependency lock/wheel hashes, fixture revisions and minimum supported OS/CPU arch. Reject dirty tree, missing pin or unsupported architecture. If a scientific defect required an upstream toolbox fix, require its independently tested/committed revision and matching wheel in the release provenance; [upstream workflow](agent/UPSTREAM_TOOLBOX_WORKFLOW.md) governs the separate library branch/commit/reinstall and downstream regression gates. **Editable `../bioacoustics-dl-toolbox` installations are development-only.** No developer absolute paths in release manifest.
-2. **Build once from clean checkout** and reproducible pinned dependencies in an isolated native job. Use a frozen bundler selected/verified in spec 06; prefer a one-folder `.app` with Worker executable entry in the same bundle, no `/usr/bin/python` or user's venv. Capture build tool and dependency metadata, bundle licenses/resources.
-3. **Exercise installed output**, not only editable checkout: native folder chooser, app resource/theme/help/plot, embedded Worker launch/cancel/recovery, synthetic real Collection → Dataset → actual CNN and RF → reopen, untouched input hashes, local logs/config permissions. Standard smoke fixture is `tests/data/example_collection/` if its content supports the case; generate larger fit-for-training data in a temporary directory as needed.
-4. **Mac**: create versioned drag-and-drop `.dmg` containing signed `.app` and Applications link; validate the **BioCall Studio Train** bundle/display name and checked-in `assets/branding/icons/icon.icns` in Finder/Dock/menu/window, bundle identifier, Apple Silicon and declared Intel policy, codesign verification, hardened runtime, notarization and stapling for externally distributable release. Apple signing credentials/notary secrets stay in secure release runner keychain/vault, not repo, ZIP or printed logs. Where credentials unavailable emit an explicitly **development-only** unsigned artifact and keep public-release gate blocked.
-5. **Windows** (separate native qualification): package actual Windows app/Worker/resources; produce versioned `.exe` installer and uninstaller named **BioCall Studio Train**, using `assets/branding/icons/icon.ico` for installer/Add-Remove/shortcut/taskbar/window identity; run native path/permission tests, clean Windows VM install/smoke/uninstall and security/signing evidence. No claim of Windows readiness on Mac.
-6. **Promote explicitly**: require green tagged source/static/unit/native `IT-*`, full installer smoke, reviewed UI parity/screenshots, confirmed brand-art/name redistribution and trademark clearance, SPDX/license and dependency security review, SHA-256 checksums, release notes and operator approval. Upload only tested digests from candidate job (immutable artifact). No self-updater or auto-release in MVP.
-7. **Rollback**: retain previous verified installer/digest; never rewrite a release tag or silently replace binaries. Migration/manifest version refusal and compatibility behavior must be tested before distribution. Document known limitations without claiming compatibility.
+1. **Identify.** Require a clean reviewed BioCall Studio release commit and immutable tag. Record
+   Python/Qt, `alp-ui` and direct `bioacoustics-dl-toolbox` versions, committed upstream SHAs,
+   independently built wheel/lock hashes, fixture revision, current suite-brand asset digests and
+   supported OS/architecture. Editable siblings and developer paths are development-only.
+2. **Build once natively.** Reproduce from a clean checkout and pinned wheels. Bundle one BioCall
+   Studio GUI plus all `--worker` entries used by Train Dataset/CNN/RF and Detect CNN/RF. Bundle
+   Qt plugins, fonts, public `alp-ui` resources, scientific runtimes, icons and licenses. Workers
+   must not use system Python, shell lookup, user venvs or inherited CWD.
+3. **Verify data ownership.** Mutable suite state uses Qt's per-user BioCall Studio data root with
+   versioned `train/v1` and `detect/v1` ownership. Detect metadata never enters a source folder.
+   Train and Detect inputs remain byte-identical. Immutable Dataset, Model, Result and export
+   receipts/digests must reopen; exports are written only to an explicit destination.
+4. **Exercise the installed app.** From a clean target: launch Studio; run genuine Train
+   Dataset→CNN/RF; structurally reload both Models; retain Train state across workspace switching;
+   run Detect scan→CNN→Results→RF→WAV+Raven export; restart/reopen/relink; exercise source
+   replacement, missing Model, crash, cancel, global Run admission and one confirmed safe quit.
+   Review remains a placeholder.
+5. **Verify native UX.** Check the accepted Studio/Detect hierarchy and current Train UI at normal
+   and compact sizes, focus/keyboard order, accessible HelpHints, tooltips/copy, plots/tables and
+   empty/error/busy/success states. Capture the actual installed application; offscreen grabs are
+   supplemental only.
+6. **Package and sign.** macOS uses the checked-in suite ICNS, Developer ID, hardened runtime,
+   notarization, stapling and Gatekeeper/quarantine checks. Windows uses the suite ICO, maintained
+   installer/uninstaller, native path/DPI/accessibility coverage and required executable/installer
+   signatures. Every shell surface says **BioCall Studio**.
+7. **Clean install and uninstall.** Validate fresh install, upgrade and removal. Uninstall removes
+   app binaries and shortcuts but preserves recordings, Train Collections, Detect exports and
+   per-user data unless a separate explicit removal option names and confirms those targets.
+8. **Promote explicitly.** Require green native test IDs, installer and dependency SHA-256 values,
+   license/security review, brand/name redistribution clearance, SBOM where practical, known
+   limitations and owner signoff. Upload only the tested immutable digest. Never auto-promote.
+9. **Rollback.** Retain the previous verified installer and manifest. Never rewrite a release tag
+   or silently replace binaries; test migration refusal/compatibility before distribution.
 
 ## Release record schema
 
-A release report must show: tag/commit; dependency lock & sibling SHAs; OS+arch; generated `.app`/`.dmg` or `.exe` with SHA-256; code signing and notarization/stapling outcome; `IT-E2E`, `IT-MAC` or `IT-WIN` exact cases with commands/log locations and actual pass/fail; UI parity review; private data/payload scan; owner signoff. CI artifact success does **not** equal installed science success.
+Each candidate report must record:
 
-## First-session boundary
+- tag and commit, clean-tree proof, build command and native runner identity;
+- Python/Qt/scientific dependency lock, upstream SHAs and wheel SHA-256 values;
+- suite ICNS/ICO digest, OS build/architecture/DPI/privileges;
+- `.app`/`.dmg` or installed files/`.exe` SHA-256 and reproducibility comparison;
+- signing, notarization/stapling or Windows signature verification results;
+- exact `IT-E2E-*`, `IT-MAC-*` or `IT-WIN-*` commands and pass/fail/blocked results;
+- installed Train→Detect scientific IDs, timestamps, source/result/export digests and unchanged
+  source checksums;
+- per-user path and clean uninstall evidence, native UX screenshots and reviewed deviations;
+- privacy scan, licenses/security/SBOM, known limitations and explicit owner signoff.
 
-Spec 01 should provide packaging-aware entry points, resource path rules and test seams; **do not** implement the release pipeline in session one. Spec 06 implements Mac release controls only after **both Models pass genuine training, complete manifest export and trusted new-process structural reload checks** in Spec 05. Installed packages repeat export/reload checks without any `../alpaca-pipelines` or `../bioacoustics-dl-toolbox` sibling checkout. Segment scoring/inference is reserved for [PREDICTION](PREDICTION.md). Spec 07 is intentionally later and does not block development of Mac-only releases, but prevents advertising Windows installers until native qualification.
-
-## Training settings and saved presets in installed applications
-
-Mac/Windows installed smoke checks must show field-level HelpHint/Wiki coverage for representative basic + advanced CNN and RF controls, verify saved preset creation and persistence in the OS user application-data directory after restart, and confirm model export's exact resolved settings. Neither installer may need a developer checkout of `../TRAINING_REFERENCE`; scientific dependencies are pinned separately. Missing source paths from the reference are not feature gaps; the user should never configure those directories in this Trainer. No prediction is required.
+A CI artifact, documentation checklist or source-tree test is never installed-app evidence.
+Missing credentials, native runners, legal clearance or any required test is recorded as blocked;
+it is not converted into a passing or public-release claim.

@@ -1,6 +1,6 @@
 import pytest
 
-from biocall_studio_train.domain.dataset import (
+from biocall_studio.train.domain.dataset import (
     BuildConfig,
     Interval,
     MiningSource,

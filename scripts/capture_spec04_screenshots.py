@@ -12,11 +12,11 @@ from PySide6.QtCore import QElapsedTimer, Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtTest import QTest
 
-from biocall_studio_train.application.workspace import WorkspaceController
-from biocall_studio_train.domain.run import RunStatus
-from biocall_studio_train.gui.app import create_application
-from biocall_studio_train.gui.window import MainWindow
-from biocall_studio_train.workflows.dataset_build import build_dataset
+from biocall_studio.studio.application.app import create_application
+from biocall_studio.train.application.workspace import WorkspaceController
+from biocall_studio.train.domain.run import RunStatus
+from biocall_studio.train.gui.window import MainWindow
+from biocall_studio.train.workflows.dataset_build import build_dataset
 
 
 def _wait_until(predicate, *, timeout_ms: int = 20_000) -> None:
@@ -80,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("Spec 04 evidence must be captured by native macOS Cocoa.")
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.TemporaryDirectory(prefix="biocall-studio-train-spec04-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="biocall-studio-spec04-") as temporary:
         temporary_root = Path(temporary)
         root = temporary_root / "Spec04Example"
         _make_collection(root)

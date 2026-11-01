@@ -1,6 +1,6 @@
 # Trainer as an `alp-ui` consumer — verified library contract
 
-**Source inspected:** uploaded `alp-ui` 0.1.0a0 checkout, public `src/alp_ui/components/__init__.py`, `docs/components.md`, `gallery/showcase.py`, and `docs/images/showcase.png`. A local **visual evidence snapshot** from that checkout is [showcase PNG](references/alp-ui-showcase.png), with [form controls](references/alp-ui-gallery-fields.png) and [data controls](references/alp-ui-gallery-data.png). In development the **actual source** is sibling `../alp-ui` (when available), not this snapshot. Recheck API/installed wheel before implementation and record the inspected commit SHA. Library owns themed presentation, **Trainer** owns all domain decisions, navigation, data, worker progress and persistence.
+**Source inspected:** uploaded `alp-ui` 0.1.0a0 checkout, public `src/alp_ui/components/__init__.py`, `docs/components.md`, `gallery/showcase.py`, and `docs/images/showcase.png`. In development the **actual source** is sibling `../alp-ui` (when available), not this snapshot. Recheck API/installed wheel before implementation and record the inspected commit SHA. Library owns themed presentation, **Trainer** owns all domain decisions, navigation, data, worker progress and persistence.
 
 ## API crosswalk / ownership
 
@@ -20,7 +20,7 @@
 
 ## Visual and accessibility gate
 
-The **HTML prototype defines navigation, state transitions, content hierarchy and interaction intent**; sibling `gallery/showcase.py` / `docs/images/showcase.png` defines credible native `alp-ui` styling/composition. The agent should open/inspect both; reproduce comparable native screen states, not fake a pixel-perfect CSS port. At minimum compare initial Select, Reading, Collection overview/validation errors, Builder/config, Run, Model detail, Wiki and empty lists at normal/compact windows. Use real Qt screenshots and recorded review against prototype `*-preview.png`; exercise keyboard Tab order, native folder cancel, disabled state, scroll, labels, help access, plot numeric alternatives and 100%/150% DPI where native environment exists. Any deliberate discrepancy requires short explanation and an acceptance check.
+The existing **native Train UI and screenshots** define Train's visual and interaction baseline. For Studio/Detect, the accepted ST-01 prototype defines new routes and states; sibling `gallery/showcase.py` / `docs/images/showcase.png` defines native `alp-ui` styling/composition. The agent should open/inspect both; reproduce comparable native screen states, not fake a pixel-perfect CSS port. At minimum compare initial Select, Reading, Collection overview/validation errors, Builder/config, Run, Model detail, Wiki and empty lists at normal/compact windows. Use real Qt screenshots and recorded review against prototype `*-preview.png`; exercise keyboard Tab order, native folder cancel, disabled state, scroll, labels, help access, plot numeric alternatives and 100%/150% DPI where native environment exists. Any deliberate discrepancy requires short explanation and an acceptance check.
 
 ### Native API example, **illustrative only**
 

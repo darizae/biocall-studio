@@ -1,84 +1,39 @@
-# UX parity contract — browser prototype → native Trainer
+# BioCall Studio — UX parity matrix
 
-**Normative reference:** `docs/design/prototypes/training-first/index.html` (HTML/CSS/JS + checked-in `*-preview.png` screenshots). **Native presentation reference:** sibling `../alp-ui/gallery/showcase.py`, `../alp-ui/docs/images/showcase.png` (also [bundled snapshot](references/alp-ui-showcase.png)) and `../alp-ui/docs/components.md`. The prototype is **included in this repository**, not a remote service. The HTML preview simulates computation; never carry `DEMO DATA`, fake progress, fake metrics or browser file-handle semantics into released scientific views.
+**Native visual anchor:** current Train Python UI + genuine screenshots under `docs/design/evidence/spec-*-native/`; `../alp-ui/gallery/showcase.py` and installed public components. **New interaction reference:** the owner-approved ST-01 `docs/design/prototypes/studio-detect/`. Train must retain its present navigation, controls and behavior. Browser data/progress are illustrative, never scientific proof.
 
-The bar for completion is **screen-by-screen faithful UX and working Python/Qt**, not HTML pixel identity. Follow the **blocking [Prototype fidelity gate](PROTOTYPE_ACCEPTANCE.md)** for all screens/states and native evidence. An agent may not waive a layout/navigation mismatch unilaterally. Compare screen hierarchy, words, controls, navigational transitions, responsive sizes, errors, empty/loading/completed/disabled states and keyboard accessibility. Use real `alp-ui` public components for controls (see [component mapping](ALP_UI_CONSUMER_CONTRACT.md)), plus ordinary Qt layouts when absent; do not vend an HTML `QWebEngineView` as the app.
+| Surface | Implemented ST-01 route and reachable prototype states | Verification when implemented natively |
+|---|---|---|
+| Studio launchpad | `#studio`; three concise keyboard-operable cards with Open Train, Open Detect and Coming later actions; suite branding; one global prototype banner | ST-02 uses native `alp-ui` cards/buttons and suite branding; Cocoa normal/compact evidence and `IT-STU-001`/`006` pass. The production UI correctly omits the prototype-only banner. |
+| Train entry/return | `#train-reference`; genuine `spec-01-native/select.png` and `spec-05-native/train-cnn.png` presented as concise reference evidence; return to `#studio` | ST-02 retains the actual Train window/controller and adds one optional header-level Back to Studio action that remains visible in its compact layout; `IT-STU-002`/`003` pass. |
+| Review placeholder | `#review`; Coming later only; return to `#studio` | ST-02 implements the native Coming later landing and return; no Review controls or state. |
+| Detect setup | `#detect/setup`; independent `#model-state` values `valid`, `loading`, `empty`, `incompatible`, `missing`; `#root-state` values `valid`, `loading`, `empty`, `invalid`, `changed`, `missing`; readiness combines Model, folder, inventory validation and score validity | ST-03/05/08 native integration |
+| Source inventory | `#detect/recordings`; `#inventory-state` values `ready`, `scanning`, `cancelled`, `invalid`, `stale`, `missing`; hierarchy, selected folder/file detail, folder decisions with live counts, included/undecided/excluded/invalid rows, duplicate, progress, cancel and rescan | ST-04 real-WAV integration |
+| Detection configuration | `#detect/setup`; Minimum detection score, Window overlap and Combine nearby candidates with researcher-facing keyboard/click HelpHints; collapsed advanced section; values explicitly illustrative; RF absent as a recording-wide option | ST-05/07 scientific and Qt tests |
+| Detection Run | `#detect/run`; `#run-state` values `idle`, `preparing`, `running`, `cancelling`, `cancelled`, `interrupted`, `failed`, `completed`, `file-errors`; Run header persists across routes | ST-06/07 real Worker tests |
+| Results | `#detect/results`; `#result-state` values `populated`, `empty`, `error`; each recording changes its source-time interval rows; interval selections persist per Result; provenance and source navigation remain visible | ST-08 Qt/model tests and native screenshots |
+| Second-layer RF | `#detect/results`; compatible/incompatible refinement Models; separate `result-refined-001` with accepted/rejected/unscored states and selectable unchanged `result-original-001` parent | ST-09 real science and persistence tests |
+| Corpus export | `#detect/export`; a frozen snapshot of the selected Result intervals drives counts and source-time/output rows for `snippets`, `concat` or `both`; explicit persistent destination; `ready`, `conflict`, `stale`, `cancelled`, `error`, `success`; Show in folder after success | ST-10 audio/parity/Qt integration |
+| Path relinking | `#detect/recordings`; `stale`/`missing` inventory states, missing/proposed roots, inventory comparison confirmation, cancel, explicit rebind + rescan | ST-03 freshness and permission tests |
 
-| Prototype screen/state | Native requirement | `alp-ui` controls | Owner spec / tests |
-|---|---|---|---|
-| Landing / Select Collection (`landing-preview.png`) | Folder field & primary intent, short structure instruction, Wiki navigation, no simulated records | `FolderPicker`, `Button`, `Text`, `HelpHint` if appropriate | 01: IT-UI-001, 003, 004 |
-| Reading/Scan (`scanning-preview.png`) | Nonblocking enumerating/header counts, cancel, accessible progress and visible specific issue | `ProgressBar`, `Text`, `Alert` | 02: IT-COL-001, 005, 008 |
-| Collection + validation (`collection-preview.png`, `validation-preview.png`) | count/duration/positive mapping; exact per-path issues and fix suggestions; Build disabled on invalid/stale | `Card`, `Badge`, `DataTable`, `Alert`, `Button` | 02: IT-COL-001, 002, 007, 008 |
-| Dataset Builder (`builder-preview.png`) | source selection, negative windows/margin/seed, grouped split ratio, intelligible help, feasible/underfill preview | `DataTable`, `NumberInput`, `SelectInput`, `HelpHint`, `Button` | 03: IT-DB-001, IT-DB-005 |
-| Dataset Run, active navigation | real stage/progress/cancel; single active Run; safe interruption | `ProgressBar`, `Badge`, `Alert`, `Button` | 04: IT-RUN-001, 003, 005 |
-| Dataset detail / lists | immutable counts/split provenance; explicit delete, no silent dependent Model removal | `Card`, `DataTable`, `Badge`, `EmptyState` | 03/04: IT-DB-005, IT-RUN-005 |
-| CNN / RF configuration (`rf-config-preview.png`) | **Existing** prototype hierarchy and basic CNN/RF controls are mandatory. Extend **only in native app**, with only a handful of primary controls plus a compact, collapsed **More settings** extension showing current/default/suggested starting values on demand, and user presets per [Spec 05 extension](SPEC05_CONFIGURATION_EXTENSION.md); field-level `HelpHint` + Wiki anchors, validation and no reference-code paths. The browser prototype is **unchanged** and does not depict the added controls. | `SelectInput`, `NumberInput`, `HelpHint`, `Button` | 05: IT-TRAIN-001, 002, 007, 010–014 |
-| Training Run | CNN measured train/val loss in native line Plot; RF fit/validation stages + actual importance bar Plot; no fictional epoch curve for RF | `Plot`, `ProgressBar`, `DataTable`, `Text` | 05: IT-TRAIN-005, 006, 007 |
-| Run/Settings diagnostics | Preserve Run activity and all baseline Settings content; add secondary **Open log**, **Open diagnostics folder** and confirmed **Export diagnostics…** actions with missing-log/degraded feedback, no new primary route and no automatic upload | `Button`, `Card`, `Alert`, `Text`; native dialogs | 05d: IT-LOG-004 |
-| Safe exit / keep awake | Active close has one safe-default native confirmation and responsive stopping state. Settings and the Training Start card share one explicit **Keep computer awake** toggle with On/Off/Not active status, compact help/Wiki link and no change to the primary Start Training CTA. The fixed light native theme must not inherit an unreadable host Dark appearance. | `Switch`, `HelpHint`, `Button`, `Alert`, `Card`; native dialog | 05g: IT-RUN-006, IT-POWER-001 |
-| Model (`model-preview.png`) | stable ID, readable name, family and Dataset links, metric values/undefined reason, recorded schema | `Card`, `Badge`, `DataTable`, `Plot` only for meaningful values | 05: IT-TRAIN-003, 006, 007 |
-| Wiki (`wiki-preview.png`) / Settings | collection naming examples and corrective advice; machine-only remembered folder/relink | `Text`, `Card`, `FolderPicker`, `Button` | 01/02 |
-| Empty Collections/Datasets/Models/Runs | unambiguous next action; no rows or phantom success | `EmptyState`, `Button` | 01: IT-UI-001, 004 |
+**Prototype controls and copy rule:** the only scenario selectors (`#model-state`, `#root-state`, `#inventory-state`, `#run-state`, `#result-state`, `#export-state`) live in one collapsed **Prototype controls** panel, separate from product settings. Product surfaces use production-ready researcher language. One global banner states that the interface uses example data and performs no real processing; repeated Demo/local/native disclaimers and implementation-stage commentary are intentionally absent.
 
-**Spec 01 evidence:** the Select, Wiki, Settings, four initial empty routes and narrow Select view
-passed the six-dimension native review at the current sibling `alp-ui` SHA. See the tracked
-[Cocoa screenshots and interaction ledger](evidence/README.md); `IT-UI-004` remains the behavioral
-assertion seam rather than a pixel-similarity claim.
+**Deliberate ST-01 boundaries:** browser buttons provide example picker and navigation outcomes because the prototype does not verify Model packages, inspect source recordings or materialize exports. Train remains a screenshot-backed reference rather than a browser clone. Result audio playback/waveforms are omitted because Results are metadata-first. Scientific configuration values are illustrative, not approved defaults.
 
-**Spec 02 evidence:** Reading, invalid Collection, corrected/rescanned valid Collection and narrow
-Collection views passed the six-dimension native review at the current sibling `alp-ui` SHA. See
-the tracked [Cocoa screenshots and interaction ledger](evidence/README.md); `IT-COL-008` asserts
-the real-WAV route, CTA, focus, repair/rescan and compact-layout behavior.
+**Evidence:** the prototype uses the genuine Train screenshots above. Browser review must exercise every route, the documented prototype states, selection-dependent recording and export data, original/refined Result independence, keyboard navigation, HelpHint/guide dismissal, cancellation, Show in folder, and normal/narrow desktop widths. Store representative screenshots under the prototype's `evidence/` folder when that review is completed. For the 2026-10-27 UX revision, local HTTP assets were served successfully and the Brave tab was visible, but the Browser Use origin gate denied page observation; browser flows and screenshots remain explicitly blocked rather than claimed. Use [prototype acceptance](PROTOTYPE_ACCEPTANCE.md) and the route/state IDs in this table as the durable acceptance record. Browser interaction does not establish scientific or native correctness.
 
-**Spec 03 evidence:** Builder ready, underfill, disabled/busy, Dataset list/detail and narrow
-Builder views passed the six-dimension native review at the current sibling `alp-ui` SHA. See the
-tracked [Cocoa screenshots and interaction ledger](evidence/README.md); `IT-DB-005` asserts real
-config changes, native controls/help, the QProcess Build handoff and Dataset navigation. Persisted
-Run history/cancel/recovery remains owned by Spec 04 and no `IT-RUN-*` coverage is claimed.
+**Acceptance boundary:** owner approved the ST-01 design direction on 2026-10-28; automated browser interaction remained blocked. Treat each prototype state as a design requirement, not executed evidence. ST-02 verifies the native Studio/Train switch; later stages verify their own Detect interactions.
 
-**Spec 04 evidence:** Active, cancelling, failed and completed Run detail, persisted Runs history
-and narrow Run detail passed the six-dimension native review at the current sibling `alp-ui` SHA.
-See the tracked [Cocoa screenshots and interaction ledger](evidence/README.md); `IT-RUN-005`
-asserts the real Worker-event hierarchy, Active Run navigation, cancellation, terminal feedback,
-history, keyboard focus and responsive layout.
+**ST-02 native observation:** `docs/design/evidence/st-02-native/` records genuine macOS Cocoa
+Studio, retained Train, Detect landing and Review landing views at 1180 px and 700 px widths. Native
+line icons replace the prototype's CSS-drawn workspace symbols; the card hierarchy, copy and action
+priority remain aligned. Detect deliberately stops at an unavailable landing without the prototype's
+future setup/sidebar controls. Windows and installed-application qualification remain unavailable.
 
-**Spec 04.5 regression evidence:** PCM extraction moved to the separate toolbox without creating or
-changing a screen. At the user's request, the Spec 04 Run group and current native `alp-ui`
-Showcase were recaptured after migration; the [evidence ledger](evidence/README.md) records the
-source-first prototype review, real Worker states and six-dimension no-regression result.
+## Native implementation rules for ST-03–ST-11
 
-**Spec 05a evidence:** collapsed CNN/RF configuration, scrolled detailed groups, saved/unsaved
-presets, delete confirmation and narrow keyboard focus passed the six-dimension native review at
-the current sibling `alp-ui` SHA. [`IT-TRAIN-010/011/013`](evidence/README.md) assert the real
-Dataset route, complete field/help inventory, strict validation, family isolation and persistent
-preset lifecycle. At 05a, `IT-TRAIN-012/014` were deferred to real executors; no Run or Model
-success was inferred from configuration readiness.
+**ST-02 is owner-approved.** ST-01 prototype states remain visual/behavioral requirements without an automated browser-pass claim; native Qt tests at each owning stage establish working desktop behavior. Preserve the Train UI; use only verified public `alp-ui` components and appropriate layout composition, not a literal CSS screenshot clone.
 
-**Spec 05b evidence:** native Model naming, the completed CNN Run with genuine measured loss,
-published Model list/detail and narrow Model detail passed the six-dimension review at the current
-sibling `alp-ui` SHA. The [evidence ledger](evidence/README.md) records the safety-mandated naming
-timing and no-Prediction boundary; `IT-TRAIN-001` is fully covered and CNN assertions for the shared
-`IT-TRAIN-004/005/007/008/009/012/014` behaviors pass for CNN. At 05b, shared cases awaited RF
-coverage in 05c; CNN screenshots alone did not satisfy them.
+A screen must have a clear heading, purposeful controls and one unambiguous next action (when applicable). Do **not** introduce floating fine-print captions, repeated status disclaimers, unexplained acronyms, disconnected badges, fabricated progress/metrics or inert "future" actions. Explain technical choices with a short researcher-readable label and an adjacent keyboard-accessible `HelpHint`/tooltip **only when useful**; longer procedures go in Wiki/help. Labels, errors and statuses must say what the user can do, never mention stage numbers, libraries, backend details or implementation plans.
 
-**Spec 05c evidence:** the genuine RF Run/importance Plot, both-family Model list and RF Model
-detail passed the six-dimension review at the current sibling `alp-ui` SHA. The
-[evidence ledger](evidence/README.md#spec-05c--real-rf-training-and-phase-05-acceptance) records the
-source-first prototype comparison, current Showcase capture, actual undefined-metric presentation
-and no-Prediction boundary. The ledger reports `IT-TRAIN-001`–`014` passing across both families.
-
-**Spec 05d evidence:** completed Run log access, Settings diagnostics actions/privacy confirmation
-and stacked narrow Settings preserve the prototype hierarchy while adding only the specified
-native support workflow. The [evidence ledger](evidence/README.md#spec-05d--local-logging-and-diagnostics)
-records the current Showcase, keyboard behavior, responsive review and `IT-LOG-004` evidence.
-
-**Spec 05g evidence:** the safe-default Active Run exit confirmation plus synchronized Settings/
-Training keep-awake controls, failure state, Wiki entry and narrow layouts preserve the existing
-prototype hierarchy. The native application is explicitly Light even when macOS uses Dark
-appearance, preventing native scroll viewports from breaking contrast. The
-[evidence ledger](evidence/README.md#spec-05g--long-running-runs-safe-exit-and-optional-keep-awake)
-records the Cocoa captures and interaction evidence.
-
-## Acceptance procedure
-
-[Prototype acceptance](PROTOTYPE_ACCEPTANCE.md) owns native screenshot capture, the six-dimension review, exception handling and installed-app gate. [Evidence ledger](evidence/README.md) owns historical reviewed evidence. This matrix owns only **which prototype states/components belong to each spec**; update its rows as scoped behavior changes.
+Verify each owned route/state in real Qt, actual keyboard/focus, normal and compact layouts, readable/accessible typography and meaningful disabled/loading/error/cancel/retry states using real artifacts. Capture genuine native screenshots and document intentional prototype divergences briefly. Do not reopen already-approved ST-01 browser-automation as a prerequisite. **Whole-Studio Train→Detect→RF→Export interaction is reserved for ST-11**; earlier stages verify only their owned native surfaces.

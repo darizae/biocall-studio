@@ -6,8 +6,9 @@ import json
 import pytest
 from bioacoustics_dl_toolbox.audio import PcmExtractionCancelled, PcmSegmentFacts
 
-from biocall_studio_train.persistence.integrity import sha256_file
-from biocall_studio_train.workflows import audio as audio_adapter
+from biocall_studio.shared.integrity import sha256_file
+from biocall_studio.train.workflows import audio as audio_adapter
+from biocall_studio.train.workflows import dataset_build
 
 
 def test_audio_transform_maps_nearest_frames_and_stable_manifest_metadata():
@@ -64,8 +65,13 @@ def test_integrity_hash_is_streamed_and_cancellation_is_application_owned(tmp_pa
         checks += 1
         return checks > 1
 
-    with pytest.raises(InterruptedError, match="Dataset Build cancelled"):
+    with pytest.raises(InterruptedError, match="Integrity hashing cancelled"):
         sha256_file(artifact, cancelled=cancelled)
+    assert checks == 2
+
+    checks = 0
+    with pytest.raises(InterruptedError, match="Dataset Build cancelled"):
+        dataset_build.sha256_file(artifact, cancelled=cancelled)
     assert checks == 2
 
     def library_cancel(*_args, **_kwargs):
@@ -85,7 +91,7 @@ def test_integrity_hash_is_streamed_and_cancellation_is_application_owned(tmp_pa
     assert provenance == {
         "distribution": "bioacoustics-dl-toolbox",
         "version": "0.2.0",
-        "revision": "e478ca5156a5d1018d0a7a61486bc85fe7c1e92d",
+        "revision": "22c1b342918b33c62288f23b660aa716f3e361e6",
         "api": "bioacoustics_dl_toolbox.audio.extract_pcm_wav_segment",
     }
     assert "/Users/" not in json.dumps(provenance)

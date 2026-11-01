@@ -16,8 +16,9 @@ def test_training_wheels_use_committed_toolbox_artifact_without_sibling_imports(
     """Case: IT-TRAIN-009."""
     trainer = Path(__file__).resolve().parents[2]
     toolbox = trainer.parent / "bioacoustics-dl-toolbox"
+    alp_ui = trainer.parent / "alp-ui"
     trainer_config = tomllib.loads((trainer / "pyproject.toml").read_text())
-    recorded_revision = trainer_config["tool"]["biocall-studio-train"]["science"][
+    recorded_revision = trainer_config["tool"]["biocall-studio"]["science"][
         "bioacoustics-dl-toolbox-revision"
     ]
     actual_revision = subprocess.run(
@@ -37,6 +38,17 @@ def test_training_wheels_use_committed_toolbox_artifact_without_sibling_imports(
     ).stdout
     assert toolbox_status == ""
     assert "bioacoustics-dl-toolbox[rf]==0.2.0" in trainer_config["project"]["dependencies"]
+    assert "alp-ui==0.1.0a0" in trainer_config["project"]["dependencies"]
+    assert (
+        subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=alp_ui,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        == trainer_config["tool"]["biocall-studio"]["science"]["alp-ui-revision"]
+    )
 
     wheels = tmp_path / "wheels"
     wheels.mkdir()
@@ -58,7 +70,7 @@ def test_training_wheels_use_committed_toolbox_artifact_without_sibling_imports(
         )
     built = sorted(wheels.glob("*.whl"))
     assert {path.name.split("-", 1)[0] for path in built} == {
-        "biocall_studio_train",
+        "biocall_studio",
         "bioacoustics_dl_toolbox",
     }
 
@@ -86,10 +98,10 @@ def test_training_wheels_use_committed_toolbox_artifact_without_sibling_imports(
             "-c",
             (
                 "import json; "
-                "import biocall_studio_train, bioacoustics_dl_toolbox; "
-                "from biocall_studio_train.workflows import rf_training; "
+                "import biocall_studio, bioacoustics_dl_toolbox; "
+                "from biocall_studio.train.workflows import rf_training; "
                 "from bioacoustics_dl_toolbox.rf import compute_rf_features; "
-                "print(json.dumps({'trainer': biocall_studio_train.__file__, "
+                "print(json.dumps({'trainer': biocall_studio.__file__, "
                 "'toolbox': bioacoustics_dl_toolbox.__file__, "
                 "'extractor': compute_rf_features.__module__, "
                 "'workflow': rf_training.__file__}))"

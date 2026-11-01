@@ -7,11 +7,11 @@ from alp_ui.components import DataTable, FolderPicker, HelpHint
 from PySide6.QtCore import QAbstractItemModel, Qt
 from PySide6.QtWidgets import QApplication, QLabel
 
-from biocall_studio_train.application.collection_scan import scan_collection
-from biocall_studio_train.application.workspace import WorkspaceController
-from biocall_studio_train.gui.app import create_application
-from biocall_studio_train.gui.window import MainWindow
-from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio.studio.application.app import create_application
+from biocall_studio.train.application.collection_scan import scan_collection
+from biocall_studio.train.application.workspace import WorkspaceController
+from biocall_studio.train.gui.window import MainWindow
+from biocall_studio.train.persistence.collection_metadata import publish_collection_metadata
 
 pytestmark = [pytest.mark.integration, pytest.mark.qt]
 
@@ -22,8 +22,8 @@ def test_native_shell_routes_between_select_and_wiki(qapp, qtbot, workspace):
     assert create_application() is app is qapp is QApplication.instance()
     assert app.styleHints().colorScheme() is Qt.ColorScheme.Light
     assert app.organizationName() == "BioCall Studio"
-    assert app.applicationName() == "biocall-studio-train"
-    assert app.applicationDisplayName() == "BioCall Studio Train"
+    assert app.applicationName() == "biocall-studio"
+    assert app.applicationDisplayName() == "BioCall Studio"
     assert not app.windowIcon().isNull()
     window = MainWindow(workspace)
     qtbot.addWidget(window)
@@ -33,7 +33,6 @@ def test_native_shell_routes_between_select_and_wiki(qapp, qtbot, workspace):
     assert not window.windowIcon().isNull()
     assert window.brand_icon.accessibleName() == "BioCall Studio Train logo"
     assert window.brand_title.text() == "BioCall Studio"
-    assert window.brand_subtitle.text() == "TRAIN"
     assert window.current_route == "select"
     assert all(not button.icon().isNull() for button in window._navigation.values())
     assert window._navigation["select"].isChecked()
@@ -136,7 +135,7 @@ def test_empty_routes_help_and_qt_screenshot_are_real_native_widgets(qtbot, work
     assert hint is not None
     hint.setFocus()
     qtbot.keyClick(hint, Qt.Key.Key_Space)
-    assert "Use whole milliseconds" in hint.accessibleDescription()
+    assert "Write start and end times in whole milliseconds" in hint.accessibleDescription()
     screenshot = window.grab()
     image_path = tmp_path / "wiki.png"
     assert screenshot.save(str(image_path))
@@ -168,23 +167,27 @@ def test_corrupt_application_settings_are_actionable_in_settings(qtbot, tmp_path
     assert "Application Settings" in window.settings_page.error_alert.accessibleName()
 
 
-def test_console_startup_passes_isolated_settings_to_the_real_gui(tmp_path):
+def test_console_startup_passes_isolated_suite_data_to_the_real_gui(tmp_path):
     """Case: IT-UI-001."""
     code = dedent("""
         import sys
         from pathlib import Path
         from PySide6.QtCore import QTimer
         from PySide6.QtWidgets import QApplication
-        from biocall_studio_train.gui.app import create_application
-        from biocall_studio_train.gui.window import MainWindow
-        from biocall_studio_train.cli import main
+        from biocall_studio.studio.application.app import create_application
+        from biocall_studio.studio.gui.shell import StudioWindow
+        from biocall_studio.train.gui.window import MainWindow
+        from biocall_studio.cli import main
 
         app = create_application()
         def inspect_and_quit():
             try:
                 window = next(w for w in app.topLevelWidgets() if isinstance(w, MainWindow))
-                assert window.isVisible()
-                assert window.controller.settings_file == Path(sys.argv[1]) / 'settings.json'
+                studio = next(w for w in app.topLevelWidgets() if isinstance(w, StudioWindow))
+                assert studio.isVisible()
+                assert not window.isVisible()
+                expected_settings = Path(sys.argv[1]) / 'train/v1/settings.json'
+                assert window.controller.settings_file == expected_settings
                 assert QApplication.instance() is app
                 print('GUI startup uses isolated Application Settings')
             finally:
@@ -202,6 +205,6 @@ def test_console_startup_passes_isolated_settings_to_the_real_gui(tmp_path):
     assert result.returncode == 0, result.stderr
     assert "GUI startup uses isolated Application Settings" in result.stdout
     assert not (settings_dir / "settings.json").exists()
-    isolated_logs = list((settings_dir / "logs").glob("session-*.jsonl"))
+    isolated_logs = list((settings_dir / "train/v1/logs").glob("session-*.jsonl"))
     assert len(isolated_logs) == 1
     assert str(settings_dir) not in isolated_logs[0].read_text()

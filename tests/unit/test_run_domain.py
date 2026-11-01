@@ -2,7 +2,7 @@ from dataclasses import replace
 
 import pytest
 
-from biocall_studio_train.domain.run import (
+from biocall_studio.train.domain.run import (
     RunConflictError,
     RunKind,
     RunReservation,

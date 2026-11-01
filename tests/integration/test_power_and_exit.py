@@ -7,24 +7,24 @@ from alp_ui.components import Switch
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QMessageBox
 
-from biocall_studio_train.application.collection_scan import scan_collection
-from biocall_studio_train.application.power import PowerInhibitionUnavailable
-from biocall_studio_train.application.workspace import WorkspaceController
-from biocall_studio_train.domain.dataset import BuildConfig
-from biocall_studio_train.domain.run import RunStatus
-from biocall_studio_train.domain.training import (
+from biocall_studio.studio.application.app import create_application
+from biocall_studio.train.application.collection_scan import scan_collection
+from biocall_studio.train.application.power import PowerInhibitionUnavailable
+from biocall_studio.train.application.workspace import WorkspaceController
+from biocall_studio.train.domain.dataset import BuildConfig
+from biocall_studio.train.domain.run import RunStatus
+from biocall_studio.train.domain.training import (
     DeviceCapabilities,
     TrainingDataset,
     TrainingDraft,
     freeze_training_config,
 )
-from biocall_studio_train.gui.app import create_application
-from biocall_studio_train.gui.window import KEEP_AWAKE_HELP, MainWindow
-from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
-from biocall_studio_train.persistence.datasets import load_dataset
-from biocall_studio_train.persistence.models import list_models
-from biocall_studio_train.persistence.runs import load_run
-from biocall_studio_train.workflows.dataset_build import build_dataset
+from biocall_studio.train.gui.window import KEEP_AWAKE_HELP, MainWindow
+from biocall_studio.train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio.train.persistence.datasets import load_dataset
+from biocall_studio.train.persistence.models import list_models
+from biocall_studio.train.persistence.runs import load_run
+from biocall_studio.train.workflows.dataset_build import build_dataset
 
 pytestmark = [pytest.mark.integration, pytest.mark.qt]
 
@@ -224,7 +224,7 @@ def test_active_close_dialog_defaults_to_keep_open_then_stops_once(
     assert dialog.focusWidget() is dialog.defaultButton()
     assert "Dataset Build" in dialog.text()
     assert "work in progress will be lost" in dialog.informativeText()
-    assert "no partially trained Dataset or Model" in dialog.informativeText()
+    assert "The unfinished Dataset or Model will not be kept." in dialog.informativeText()
     window.close()
     assert window.close_dialog is dialog
     assert len([item for item in qapp.topLevelWidgets() if isinstance(item, QMessageBox)]) == 1

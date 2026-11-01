@@ -16,10 +16,10 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QMessageBox, QWidget
 
-from biocall_studio_train.application.workspace import WorkspaceController
-from biocall_studio_train.domain.dataset import BuildConfig
-from biocall_studio_train.gui.app import create_application
-from biocall_studio_train.gui.window import MainWindow
+from biocall_studio.studio.application.app import create_application
+from biocall_studio.train.application.workspace import WorkspaceController
+from biocall_studio.train.domain.dataset import BuildConfig
+from biocall_studio.train.gui.window import MainWindow
 
 
 def _wait_until(predicate, *, timeout_ms: int = 30_000) -> None:
@@ -126,7 +126,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     with tempfile.TemporaryDirectory(
-        prefix="biocall-studio-train-spec05d-", dir="/tmp"
+        prefix="biocall-studio-spec05d-", dir="/tmp"
     ) as temporary:
         temporary_root = Path(temporary)
         root = temporary_root / "Spec05dExample"

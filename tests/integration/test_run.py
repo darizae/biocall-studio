@@ -7,23 +7,23 @@ from alp_ui.components import Alert, Badge, Button, DataTable, ProgressBar, Text
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QInputDialog, QMessageBox
 
-from biocall_studio_train.application.collection_scan import scan_collection
-from biocall_studio_train.application.workspace import WorkspaceController
-from biocall_studio_train.domain.dataset import BuildConfig
-from biocall_studio_train.domain.run import (
+from biocall_studio.studio.application.app import create_application
+from biocall_studio.train.application.collection_scan import scan_collection
+from biocall_studio.train.application.workspace import WorkspaceController
+from biocall_studio.train.domain.dataset import BuildConfig
+from biocall_studio.train.domain.run import (
     RunConflictError,
     RunKind,
     RunStatus,
     new_run,
     transition_run,
 )
-from biocall_studio_train.gui.app import create_application
-from biocall_studio_train.gui.run import RunDetailPage, RunListPage
-from biocall_studio_train.gui.window import MainWindow
-from biocall_studio_train.persistence.collection_metadata import publish_collection_metadata
-from biocall_studio_train.persistence.datasets import list_datasets
-from biocall_studio_train.persistence.runs import create_run, load_run, reconcile_runs
-from biocall_studio_train.workflows.dataset_build import build_dataset
+from biocall_studio.train.gui.run import RunDetailPage, RunListPage
+from biocall_studio.train.gui.window import MainWindow
+from biocall_studio.train.persistence.collection_metadata import publish_collection_metadata
+from biocall_studio.train.persistence.datasets import list_datasets
+from biocall_studio.train.persistence.runs import create_run, load_run, reconcile_runs
+from biocall_studio.train.workflows.dataset_build import build_dataset
 
 pytestmark = pytest.mark.integration
 
@@ -98,7 +98,7 @@ def test_real_qprocess_persists_progress_and_verified_dataset(qtbot, tmp_path, c
     assert extraction == {
         "distribution": "bioacoustics-dl-toolbox",
         "version": "0.2.0",
-        "revision": "e478ca5156a5d1018d0a7a61486bc85fe7c1e92d",
+        "revision": "22c1b342918b33c62288f23b660aa716f3e361e6",
         "api": "bioacoustics_dl_toolbox.audio.extract_pcm_wav_segment",
     }
     assert str(root) not in artifact.root.joinpath("dataset.json").read_text()
@@ -318,7 +318,7 @@ def test_native_run_detail_cancellation_failure_completion_and_history(
     assert window.active_run_label.text().startswith("Build ·")
     assert window.active_run_progress.isVisible()
     assert window.view_run_button.isVisible()
-    assert "Not yet published" in detail.output_alert.title_widget.text()
+    assert detail.output_alert.title_widget.text() == "Not ready yet"
     window.open_builder()
     assert window.current_route == "builder"
     assert not window.builder_page.build_button.isEnabled()
@@ -339,7 +339,7 @@ def test_native_run_detail_cancellation_failure_completion_and_history(
     qtbot.waitUntil(lambda: controller.active_run is None, timeout=10_000)
     assert detail.status_badge.text() == "cancelled"
     assert detail.status_badge.intent == "warning"
-    assert "No published artifact" in detail.output_alert.title_widget.text()
+    assert detail.output_alert.title_widget.text() == "No output"
 
     collision = build_dataset(root, result, _config(result), dataset_id="dataset-ui-collision")
     before = (

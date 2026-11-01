@@ -1,0 +1,1 @@
+"""Packaged BioCall Studio resources."""

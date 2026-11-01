@@ -8,7 +8,7 @@
     "default": "",
     "choices": [],
     "mode": "editable",
-    "help": "Optional descriptive label for this training Run; the Model receives its own name after training.",
+    "help": "A name to help you recognize this training run. You can rename the finished model later.",
     "ui_tier": "primary",
     "recommended_starting_value": "",
     "recommendation_basis": "backend_default_baseline"
@@ -25,7 +25,7 @@
       "debug"
     ],
     "mode": "editable",
-    "help": "Choose standard or detailed Worker logs; debug does not change scientific results.",
+    "help": "Controls how much information is saved in the run log. It does not change training results.",
     "ui_tier": "details",
     "recommended_starting_value": "info",
     "recommendation_basis": "backend_default_baseline"
@@ -39,7 +39,7 @@
     "default": false,
     "choices": [],
     "mode": "editable",
-    "help": "Reuse generated training spectrograms when compatible. Cache location is managed by the Trainer; it never takes a freeform path.",
+    "help": "Reuses spectrograms from an earlier compatible run to shorten setup time.",
     "ui_tier": "details",
     "recommended_starting_value": false,
     "recommendation_basis": "backend_default_baseline"
@@ -53,7 +53,7 @@
     "default": 400,
     "choices": [],
     "mode": "editable",
-    "help": "Fixed audio window duration used for training; choose enough temporal context for the target vocalization.",
+    "help": "Length of each audio example used for training, in milliseconds. Use a length that can contain the call.",
     "ui_tier": "primary",
     "recommended_starting_value": 400,
     "recommendation_basis": "backend_default_baseline"
@@ -67,7 +67,7 @@
     "default": 500,
     "choices": [],
     "mode": "editable",
-    "help": "Maximum passes through the training Split; early stopping may finish earlier.",
+    "help": "Maximum number of times the model sees the training data. Training may stop earlier when it stops improving.",
     "ui_tier": "primary",
     "recommended_starting_value": 500,
     "recommendation_basis": "backend_default_baseline"
@@ -81,7 +81,7 @@
     "default": 16,
     "choices": [],
     "mode": "editable",
-    "help": "Training Snippets per gradient update. Larger values use more memory.",
+    "help": "Number of audio examples processed together. Larger batches use more memory.",
     "ui_tier": "primary",
     "recommended_starting_value": 16,
     "recommendation_basis": "backend_default_baseline"
@@ -95,7 +95,7 @@
     "default": 1e-05,
     "choices": [],
     "mode": "editable",
-    "help": "Step size of the optimizer. Changes the stability and speed of learning.",
+    "help": "Controls how quickly the model changes while learning. Values that are too high can make training unstable.",
     "ui_tier": "primary",
     "recommended_starting_value": 1e-05,
     "recommendation_basis": "backend_default_baseline"
@@ -114,7 +114,7 @@
       "mps"
     ],
     "mode": "editable",
-    "help": "Run on CPU or a tested accelerator; unavailable CUDA/MPS selections must be disabled.",
+    "help": "Chooses the processor used for training. Unavailable options are disabled.",
     "ui_tier": "primary",
     "recommended_starting_value": "auto",
     "recommendation_basis": "backend_default_baseline"
@@ -128,7 +128,7 @@
     "default": 44100,
     "choices": [],
     "mode": "editable",
-    "help": "Sample rate to which audio is converted before spectrogram construction.",
+    "help": "Sample rate used to create spectrograms. Audio is converted to this rate for training.",
     "ui_tier": "details",
     "recommended_starting_value": 44100,
     "recommendation_basis": "backend_default_baseline"
@@ -142,7 +142,7 @@
     "default": 0.98,
     "choices": [],
     "mode": "editable",
-    "help": "High-frequency emphasis before spectral analysis; preserve in the exported Model.",
+    "help": "Boosts higher frequencies before creating the spectrogram. The same value is saved with the model.",
     "ui_tier": "details",
     "recommended_starting_value": 0.98,
     "recommendation_basis": "backend_default_baseline"
@@ -156,7 +156,7 @@
     "default": 4096,
     "choices": [],
     "mode": "editable",
-    "help": "Transform window length. Larger windows improve frequency resolution but reduce temporal resolution.",
+    "help": "Number of audio samples in each spectral window. Larger windows show frequency more precisely but time less precisely.",
     "ui_tier": "details",
     "recommended_starting_value": 4096,
     "recommendation_basis": "backend_default_baseline"
@@ -170,7 +170,7 @@
     "default": 441,
     "choices": [],
     "mode": "editable",
-    "help": "Audio samples between adjacent spectrogram frames; controls time resolution.",
+    "help": "Number of audio samples between spectrogram frames. Smaller values show changes over time more closely.",
     "ui_tier": "details",
     "recommended_starting_value": 441,
     "recommendation_basis": "backend_default_baseline"
@@ -184,7 +184,7 @@
     "default": 256,
     "choices": [],
     "mode": "editable",
-    "help": "Number of frequency bins after frequency compression.",
+    "help": "Number of frequency bands kept in the spectrogram.",
     "ui_tier": "details",
     "recommended_starting_value": 256,
     "recommendation_basis": "backend_default_baseline"
@@ -198,7 +198,7 @@
     "default": 500,
     "choices": [],
     "mode": "editable",
-    "help": "Lowest spectrogram frequency retained for the classifier.",
+    "help": "Lowest frequency included in the spectrogram.",
     "ui_tier": "details",
     "recommended_starting_value": 500,
     "recommendation_basis": "backend_default_baseline"
@@ -212,7 +212,7 @@
     "default": 10000,
     "choices": [],
     "mode": "editable",
-    "help": "Highest spectrogram frequency retained; cannot exceed Nyquist frequency.",
+    "help": "Highest frequency included in the spectrogram. It cannot be above half the sampling rate.",
     "ui_tier": "details",
     "recommended_starting_value": 10000,
     "recommendation_basis": "backend_default_baseline"
@@ -230,7 +230,7 @@
       "mfcc"
     ],
     "mode": "editable",
-    "help": "Frequency-axis representation: linear, mel, or MFCC; validate compatibility with chosen encoder.",
+    "help": "Chooses how frequencies are represented: linear, mel, or MFCC.",
     "ui_tier": "details",
     "recommended_starting_value": "linear",
     "recommendation_basis": "backend_default_baseline"
@@ -244,7 +244,7 @@
     "default": -100,
     "choices": [],
     "mode": "editable",
-    "help": "Lowest decibel level used to scale or clip the spectrogram representation.",
+    "help": "Quietest level retained when scaling the spectrogram. Lower values keep a wider volume range.",
     "ui_tier": "details",
     "recommended_starting_value": -100,
     "recommendation_basis": "backend_default_baseline"
@@ -258,7 +258,7 @@
     "default": 20,
     "choices": [],
     "mode": "editable",
-    "help": "Reference level for decibel scaling, separate from the normalization mode.",
+    "help": "Reference level used when converting the spectrogram to decibels.",
     "ui_tier": "details",
     "recommended_starting_value": 20,
     "recommendation_basis": "backend_default_baseline"
@@ -275,7 +275,7 @@
       "min_max"
     ],
     "mode": "editable",
-    "help": "Choose dB-based or min–max normalization; a future consumer must use the exact saved mode.",
+    "help": "Chooses how spectrogram values are scaled before training. The choice is saved with the model.",
     "ui_tier": "details",
     "recommended_starting_value": "db",
     "recommendation_basis": "backend_default_baseline"
@@ -289,7 +289,7 @@
     "default": -100,
     "choices": [],
     "mode": "editable",
-    "help": "Minimum dB applied when normalizing the spectrogram.",
+    "help": "Quietest decibel value used during spectrogram normalization.",
     "ui_tier": "details",
     "recommended_starting_value": -100,
     "recommendation_basis": "backend_default_baseline"
@@ -303,7 +303,7 @@
     "default": 20,
     "choices": [],
     "mode": "editable",
-    "help": "Reference dB applied by the selected normalization procedure.",
+    "help": "Reference decibel value used during spectrogram normalization.",
     "ui_tier": "details",
     "recommended_starting_value": 20,
     "recommendation_basis": "backend_default_baseline"
@@ -317,7 +317,7 @@
     "default": false,
     "choices": [],
     "mode": "editable",
-    "help": "Apply randomized training-only transformations; never apply them to validation.",
+    "help": "Randomly changes training examples to add variety. Validation examples are not changed.",
     "ui_tier": "details",
     "recommended_starting_value": false,
     "recommendation_basis": "backend_default_baseline"
@@ -331,7 +331,7 @@
     "default": 3,
     "choices": [],
     "mode": "editable",
-    "help": "Largest randomized loudness increase for training examples.",
+    "help": "Largest increase in volume applied during augmentation.",
     "ui_tier": "details",
     "recommended_starting_value": 3,
     "recommendation_basis": "backend_default_baseline"
@@ -345,7 +345,7 @@
     "default": -6,
     "choices": [],
     "mode": "editable",
-    "help": "Largest randomized loudness decrease, expressed as a negative dB value.",
+    "help": "Largest decrease in volume applied during augmentation.",
     "ui_tier": "details",
     "recommended_starting_value": -6,
     "recommendation_basis": "backend_default_baseline"
@@ -359,7 +359,7 @@
     "default": 0.5,
     "choices": [],
     "mode": "editable",
-    "help": "Lower bound for training-time playback-speed/time stretching.",
+    "help": "Slowest playback-speed change used during augmentation.",
     "ui_tier": "details",
     "recommended_starting_value": 0.5,
     "recommendation_basis": "backend_default_baseline"
@@ -373,7 +373,7 @@
     "default": 2.0,
     "choices": [],
     "mode": "editable",
-    "help": "Upper bound for training-time playback-speed/time stretching.",
+    "help": "Fastest playback-speed change used during augmentation.",
     "ui_tier": "details",
     "recommended_starting_value": 2.0,
     "recommendation_basis": "backend_default_baseline"
@@ -387,7 +387,7 @@
     "default": 0.5,
     "choices": [],
     "mode": "editable",
-    "help": "Lower bound for training-only pitch transformation; verify toolbox units.",
+    "help": "Lowest pitch change used during augmentation.",
     "ui_tier": "details",
     "recommended_starting_value": 0.5,
     "recommendation_basis": "backend_default_baseline"
@@ -401,7 +401,7 @@
     "default": 1.5,
     "choices": [],
     "mode": "editable",
-    "help": "Upper bound for training-only pitch transformation; verify toolbox units.",
+    "help": "Highest pitch change used during augmentation.",
     "ui_tier": "details",
     "recommended_starting_value": 1.5,
     "recommendation_basis": "backend_default_baseline"
@@ -410,28 +410,28 @@
     "family": "CNN",
     "section": "Augmentation",
     "key": "augmentation.noise_min_snr",
-    "label": "Noise augmentation SNR A (dB)",
+    "label": "Noise mix minimum SNR (dB)",
     "kind": "int",
-    "default": 12,
+    "default": -3,
     "choices": [],
     "mode": "editable",
-    "help": "One bound of noise-mixing signal-to-noise range. Confirm library direction and ordering before labeling min/max.",
+    "help": "Lowest signal-to-noise ratio used when mixing background noise. Lower values make the added noise stronger.",
     "ui_tier": "details",
-    "recommended_starting_value": 12,
+    "recommended_starting_value": -3,
     "recommendation_basis": "backend_default_baseline"
   },
   {
     "family": "CNN",
     "section": "Augmentation",
     "key": "augmentation.noise_max_snr",
-    "label": "Noise augmentation SNR B (dB)",
+    "label": "Noise mix maximum SNR (dB)",
     "kind": "int",
-    "default": -3,
+    "default": 12,
     "choices": [],
     "mode": "editable",
-    "help": "Other bound of the noise-mixing range. Do not silently reorder the upstream defaults.",
+    "help": "Highest signal-to-noise ratio used when mixing background noise. Higher values make the added noise quieter.",
     "ui_tier": "details",
-    "recommended_starting_value": -3,
+    "recommended_starting_value": 12,
     "recommendation_basis": "backend_default_baseline"
   },
   {
@@ -446,7 +446,7 @@
       "collection-selected"
     ],
     "mode": "editable",
-    "help": "Choose a vetted, readable Collection-local noise source. The user does not type a directory path.",
+    "help": "Chooses the background sound mixed into training examples. Only available sources are listed.",
     "ui_tier": "details",
     "recommended_starting_value": "none",
     "recommendation_basis": "backend_default_baseline"
@@ -466,7 +466,7 @@
       152
     ],
     "mode": "editable",
-    "help": "Residual network depth; larger models usually need more memory and training time.",
+    "help": "Size of the ResNet model. Deeper models usually take more memory and time to train.",
     "ui_tier": "details",
     "recommended_starting_value": 18,
     "recommendation_basis": "backend_default_baseline"
@@ -485,7 +485,7 @@
       9
     ],
     "mode": "editable",
-    "help": "Size of the initial CNN convolution window.",
+    "help": "Size of the first pattern-detection window in the CNN.",
     "ui_tier": "details",
     "recommended_starting_value": 7,
     "recommendation_basis": "backend_default_baseline"
@@ -503,7 +503,7 @@
       2
     ],
     "mode": "editable",
-    "help": "0: no pooling with stride; 1: pooling; 2: no pooling and no added stride. Confirm exact encoder behavior.",
+    "help": "Controls early downsampling in the CNN. Keep the preset value unless you are changing the model architecture.",
     "ui_tier": "details",
     "recommended_starting_value": 1,
     "recommendation_basis": "backend_default_baseline"
@@ -517,7 +517,7 @@
     "default": 1,
     "choices": [],
     "mode": "derived",
-    "help": "Derived from the approved mono spectrogram channel policy; not an independent freeform setting.",
+    "help": "Number of spectrogram channels supplied to the model. Set automatically for mono audio.",
     "ui_tier": "details",
     "recommended_starting_value": null,
     "recommendation_basis": "derived_not_user_selectable"
@@ -534,7 +534,7 @@
       "max"
     ],
     "mode": "editable",
-    "help": "Aggregate encoder features with average or maximum pooling.",
+    "help": "Chooses whether the classifier summarizes learned features by their average or maximum value.",
     "ui_tier": "details",
     "recommended_starting_value": "avg",
     "recommendation_basis": "backend_default_baseline"
@@ -548,7 +548,7 @@
     "default": 2,
     "choices": [],
     "mode": "derived",
-    "help": "Derived from the immutable binary target/noise Dataset; cannot disagree with its class mapping.",
+    "help": "Number of classes the model predicts. Set automatically from the dataset.",
     "ui_tier": "details",
     "recommended_starting_value": null,
     "recommendation_basis": "derived_not_user_selectable"
@@ -562,7 +562,7 @@
     "default": "derived",
     "choices": [],
     "mode": "derived",
-    "help": "Computed from the selected encoder output; cannot be independently edited.",
+    "help": "Number of learned features sent to the classifier. Set automatically from the selected CNN.",
     "ui_tier": "details",
     "recommended_starting_value": null,
     "recommendation_basis": "derived_not_user_selectable"
@@ -576,7 +576,7 @@
     "default": 4,
     "choices": [],
     "mode": "editable",
-    "help": "Parallel audio loading workers. Zero uses the main process; native packaging may impose a lower limit.",
+    "help": "Number of background processes that load training audio. Zero loads audio in the main process.",
     "ui_tier": "details",
     "recommended_starting_value": 4,
     "recommendation_basis": "backend_default_baseline"
@@ -590,7 +590,7 @@
     "default": 0.5,
     "choices": [],
     "mode": "editable",
-    "help": "Exponential decay for Adam optimizer’s first-moment estimate.",
+    "help": "Controls how strongly Adam smooths recent gradient changes. Keep the default unless tuning the optimizer.",
     "ui_tier": "details",
     "recommended_starting_value": 0.5,
     "recommendation_basis": "backend_default_baseline"
@@ -604,7 +604,7 @@
     "default": 8,
     "choices": [],
     "mode": "editable",
-    "help": "Validation patience before reducing learning rate; confirm effective evaluation cadence.",
+    "help": "Number of validation checks without improvement before the learning rate is reduced.",
     "ui_tier": "details",
     "recommended_starting_value": 8,
     "recommendation_basis": "backend_default_baseline"
@@ -618,7 +618,7 @@
     "default": 0.5,
     "choices": [],
     "mode": "editable",
-    "help": "Multiplicative learning-rate reduction when the plateau scheduler triggers.",
+    "help": "Amount the learning rate is multiplied by when validation stops improving.",
     "ui_tier": "details",
     "recommended_starting_value": 0.5,
     "recommendation_basis": "backend_default_baseline"
@@ -632,7 +632,7 @@
     "default": 20,
     "choices": [],
     "mode": "editable",
-    "help": "Stop if the monitored validation metric fails to improve for this many effective epochs.",
+    "help": "Number of validation checks without improvement before training stops.",
     "ui_tier": "details",
     "recommended_starting_value": 20,
     "recommendation_basis": "backend_default_baseline"
@@ -646,7 +646,7 @@
     "default": 2,
     "choices": [],
     "mode": "editable",
-    "help": "Frequency of validation passes during CNN training.",
+    "help": "Number of training epochs between validation checks.",
     "ui_tier": "details",
     "recommended_starting_value": 2,
     "recommendation_basis": "backend_default_baseline"
@@ -664,7 +664,7 @@
       "loss"
     ],
     "mode": "editable",
-    "help": "Metric used to select the best checkpoint and control patience.",
+    "help": "Measurement used to choose the best saved model and decide whether training is improving.",
     "ui_tier": "details",
     "recommended_starting_value": "accuracy",
     "recommendation_basis": "backend_default_baseline"
@@ -681,7 +681,7 @@
       "min"
     ],
     "mode": "editable",
-    "help": "Whether higher or lower validation scores are better; must match chosen metric.",
+    "help": "Tells training whether a higher or lower value is better for the selected validation metric.",
     "ui_tier": "details",
     "recommended_starting_value": "max",
     "recommendation_basis": "backend_default_baseline"
@@ -695,7 +695,7 @@
     "default": true,
     "choices": [],
     "mode": "editable",
-    "help": "Optional pinned host memory for faster supported accelerator data transfer.",
+    "help": "Can speed up transfers to a supported GPU, while using additional system memory.",
     "ui_tier": "details",
     "recommended_starting_value": true,
     "recommendation_basis": "backend_default_baseline"
@@ -709,7 +709,7 @@
     "default": 800,
     "choices": [],
     "mode": "editable",
-    "help": "Number of trees in the ensemble. More trees require more CPU/memory.",
+    "help": "Number of decision trees in the forest. More trees take more time and memory.",
     "ui_tier": "primary",
     "recommended_starting_value": 800,
     "recommendation_basis": "backend_default_baseline"
@@ -723,7 +723,7 @@
     "default": 2,
     "choices": [],
     "mode": "editable",
-    "help": "Minimum samples allowed in a terminal leaf; larger values regularize the forest.",
+    "help": "Smallest number of examples allowed in a final tree group. Larger values make the model less specific.",
     "ui_tier": "primary",
     "recommended_starting_value": 2,
     "recommendation_basis": "backend_default_baseline"
@@ -737,7 +737,7 @@
     "default": null,
     "choices": [],
     "mode": "editable",
-    "help": "Maximum tree depth or unlimited. The UI may show unlimited as 0, but serialize as null.",
+    "help": "Maximum number of levels in each tree. Choose Unlimited to let trees grow without this limit.",
     "ui_tier": "primary",
     "recommended_starting_value": null,
     "recommendation_basis": "backend_default_baseline"
@@ -751,7 +751,7 @@
     "default": 0.6,
     "choices": [],
     "mode": "editable",
-    "help": "Threshold for target-class probability in held-out validation; saved as policy, not inference.",
+    "help": "Minimum validation score counted as a target call. The value is saved with the model.",
     "ui_tier": "details",
     "recommended_starting_value": 0.6,
     "recommendation_basis": "backend_default_baseline"
@@ -765,7 +765,7 @@
     "default": 1337,
     "choices": [],
     "mode": "editable",
-    "help": "Controls reproducible tree bootstrapping and feature subsampling.",
+    "help": "Use the same seed with the same data and settings to train the same forest again.",
     "ui_tier": "details",
     "recommended_starting_value": 1337,
     "recommendation_basis": "backend_default_baseline"
@@ -779,7 +779,7 @@
     "default": 2,
     "choices": [],
     "mode": "editable",
-    "help": "Minimum examples required before an internal tree node can split.",
+    "help": "Smallest number of examples a tree group needs before it can divide.",
     "ui_tier": "details",
     "recommended_starting_value": 2,
     "recommendation_basis": "backend_default_baseline"
@@ -799,7 +799,7 @@
       1
     ],
     "mode": "editable",
-    "help": "Number or proportion of candidate acoustic features considered at each split. Advanced numeric modes require matching validation.",
+    "help": "Number of sound features each tree considers when making a split.",
     "ui_tier": "details",
     "recommended_starting_value": "sqrt",
     "recommendation_basis": "backend_default_baseline"
@@ -817,7 +817,7 @@
       "none"
     ],
     "mode": "editable",
-    "help": "Compensates for target/noise imbalance during tree fitting.",
+    "help": "Adjusts how strongly the forest learns from target calls and background examples when their counts differ.",
     "ui_tier": "details",
     "recommended_starting_value": "balanced",
     "recommendation_basis": "backend_default_baseline"
@@ -831,7 +831,7 @@
     "default": -1,
     "choices": [],
     "mode": "editable",
-    "help": "Number of CPU processes/threads used by the forest; −1 requests all available CPUs, subject to safe cap.",
+    "help": "Number of CPU workers used to train the forest. −1 requests all safely available CPUs.",
     "ui_tier": "details",
     "recommended_starting_value": -1,
     "recommendation_basis": "backend_default_baseline"
@@ -845,7 +845,7 @@
     "default": "robust-mfcc",
     "choices": [],
     "mode": "derived",
-    "help": "Fixed robust acoustic statistics plus MFCC summaries. Names and ordering are part of Model contract.",
+    "help": "Set of calculated sound measurements used by the Random Forest.",
     "ui_tier": "details",
     "recommended_starting_value": null,
     "recommendation_basis": "derived_not_user_selectable"
@@ -859,7 +859,7 @@
     "default": 48000,
     "choices": [],
     "mode": "editable",
-    "help": "Resample each RF segment to this sample rate before extraction.",
+    "help": "Sample rate used when calculating Random Forest sound features.",
     "ui_tier": "details",
     "recommended_starting_value": 48000,
     "recommendation_basis": "backend_default_baseline"
@@ -873,7 +873,7 @@
     "default": 0.5,
     "choices": [],
     "mode": "editable",
-    "help": "Short segments must be padded or explicitly rejected.",
+    "help": "Shortest audio segment accepted for feature calculation. Shorter segments follow the padding setting.",
     "ui_tier": "details",
     "recommended_starting_value": 0.5,
     "recommendation_basis": "backend_default_baseline"
@@ -887,7 +887,7 @@
     "default": true,
     "choices": [],
     "mode": "editable",
-    "help": "Zero-pad shorter segments to the required minimum duration.",
+    "help": "Adds silence to segments that are shorter than the minimum feature length.",
     "ui_tier": "details",
     "recommended_starting_value": true,
     "recommendation_basis": "backend_default_baseline"
@@ -901,7 +901,7 @@
     "default": "constant",
     "choices": [],
     "mode": "derived",
-    "help": "Current feature extractor uses constant padding; preserve the algorithm choice in export.",
+    "help": "Chooses how extra audio is filled when a segment is too short.",
     "ui_tier": "details",
     "recommended_starting_value": null,
     "recommendation_basis": "derived_not_user_selectable"
@@ -915,7 +915,7 @@
     "default": 4096,
     "choices": [],
     "mode": "editable",
-    "help": "FFT window size for robust and MFCC statistics.",
+    "help": "Number of audio samples in each spectral window used to calculate Random Forest features.",
     "ui_tier": "details",
     "recommended_starting_value": 4096,
     "recommendation_basis": "backend_default_baseline"
@@ -929,7 +929,7 @@
     "default": 2048,
     "choices": [],
     "mode": "editable",
-    "help": "Hop between RF feature frames.",
+    "help": "Number of audio samples between feature-analysis frames.",
     "ui_tier": "details",
     "recommended_starting_value": 2048,
     "recommendation_basis": "backend_default_baseline"
@@ -943,7 +943,7 @@
     "default": 13,
     "choices": [],
     "mode": "editable",
-    "help": "Number of mel-frequency cepstral coefficients summarized.",
+    "help": "Number of MFCC sound-shape measurements calculated for each segment.",
     "ui_tier": "details",
     "recommended_starting_value": 13,
     "recommendation_basis": "backend_default_baseline"
@@ -957,7 +957,7 @@
     "default": true,
     "choices": [],
     "mode": "editable",
-    "help": "Include first/second temporal MFCC differences in the feature vector.",
+    "help": "Adds measurements of how MFCC values change over time.",
     "ui_tier": "details",
     "recommended_starting_value": true,
     "recommendation_basis": "backend_default_baseline"
@@ -971,7 +971,7 @@
     "default": 50.0,
     "choices": [],
     "mode": "editable",
-    "help": "Lower analysis band bound for robust acoustic descriptors.",
+    "help": "Lowest frequency used when calculating Random Forest sound features.",
     "ui_tier": "details",
     "recommended_starting_value": 50.0,
     "recommendation_basis": "backend_default_baseline"
@@ -985,7 +985,7 @@
     "default": 4500.0,
     "choices": [],
     "mode": "editable",
-    "help": "Upper band bound for robust descriptors; ensure compatible with Nyquist.",
+    "help": "Highest frequency used when calculating Random Forest sound features. It cannot be above half the feature sample rate.",
     "ui_tier": "details",
     "recommended_starting_value": 4500.0,
     "recommendation_basis": "backend_default_baseline"

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from biocall_studio_train.workflows.audio import (
+from biocall_studio.train.workflows.audio import (
     AudioExtractionCancelled,
     extract_dataset_audio,
 )
@@ -173,14 +173,14 @@ def test_fresh_installed_process_resolves_committed_separate_toolbox(tmp_path):
 import importlib.util
 import json
 import bioacoustics_dl_toolbox
-from biocall_studio_train.workflows import audio
+from biocall_studio.train.workflows import audio
 print(json.dumps({
     "package_file": bioacoustics_dl_toolbox.__file__,
     "api_module": audio.extract_pcm_wav_segment.__module__,
     "distribution": audio.TOOLBOX_DISTRIBUTION,
     "version": audio.TOOLBOX_VERSION,
     "revision": audio.TOOLBOX_SOURCE_REVISION,
-    "legacy_computation": importlib.util.find_spec("biocall_studio_train.computation") is not None,
+    "legacy_computation": importlib.util.find_spec("biocall_studio.train.computation") is not None,
 }))
 """
     environment = os.environ.copy()
@@ -209,5 +209,5 @@ print(json.dumps({
     assert resolved["api_module"] == "bioacoustics_dl_toolbox.audio.io"
     assert resolved["distribution"] == "bioacoustics-dl-toolbox"
     assert resolved["version"] == "0.2.0"
-    assert resolved["revision"] == "e478ca5156a5d1018d0a7a61486bc85fe7c1e92d"
+    assert resolved["revision"] == "22c1b342918b33c62288f23b660aa716f3e361e6"
     assert resolved["legacy_computation"] is False
