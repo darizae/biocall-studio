@@ -37,6 +37,7 @@ class ExportPage(QWidget):
     """Render and operate one frozen Result selection without mutating it."""
 
     results_requested = Signal()
+    exports_requested = Signal()
 
     def __init__(self, controller: DetectWorkspaceController):
         super().__init__()
@@ -175,6 +176,20 @@ class ExportPage(QWidget):
         self.show_button = Button("Show in folder", variant="outline")
         self.show_button.setAccessibleName("Show completed corpus export in folder")
         card.content_layout.addWidget(self.show_button)
+        self.view_exports_button = Button("View in Exports", variant="outline")
+        self.view_exports_button.setAccessibleName("View completed export in export history")
+        self.view_exports_button.clicked.connect(self.exports_requested)
+        card.content_layout.addWidget(self.view_exports_button)
+        self.history_warning = QLabel()
+        self.history_warning.setWordWrap(True)
+        self.history_warning.setStyleSheet("color: #B91C1C; font-weight: 600;")
+        self.history_warning.setAccessibleName("Export history warning")
+        card.content_layout.addWidget(self.history_warning)
+        self.retry_history_button = Button("Retry saving to history", variant="outline")
+        self.retry_history_button.clicked.connect(
+            getattr(self.controller, "retry_save_export_history", lambda: None)
+        )
+        card.content_layout.addWidget(self.retry_history_button)
         card.content_layout.addStretch()
         return card
 
@@ -294,8 +309,13 @@ class ExportPage(QWidget):
         elif state is ExportState.READY and not count:
             detail = "Return to Results and choose at least one interval."
         self.status_detail.setText(detail)
+        history_warning = getattr(self.controller, "export_history_warning", "")
         self.start_button.setEnabled(
-            count > 0 and bool(destination) and state is ExportState.READY and not active
+            count > 0
+            and bool(destination)
+            and state is ExportState.READY
+            and not active
+            and not history_warning
         )
         self.cancel_button.setVisible(active)
         self.cancel_button.setEnabled(active)
@@ -304,6 +324,19 @@ class ExportPage(QWidget):
             and self.controller.export_receipt is not None
             and Path(self.controller.export_receipt.final_destination).is_dir()
         )
+        self.history_warning.setText(history_warning)
+        self.history_warning.setVisible(bool(history_warning))
+        self.retry_history_button.setVisible(bool(history_warning))
+        self.retry_history_button.setEnabled(bool(history_warning) and not active)
+        saved_export = (
+            state is ExportState.SUCCESS
+            and self.controller.export_receipt is not None
+            and getattr(self.controller, "selected_export_id", None)
+            == self.controller.export_receipt.export_id
+            and not history_warning
+        )
+        self.view_exports_button.setVisible(saved_export)
+        self.view_exports_button.setEnabled(saved_export)
         for button in (self.mode_snippets, self.mode_concat, self.mode_both):
             button.setEnabled(not active)
         self.destination_picker.setEnabled(not active)

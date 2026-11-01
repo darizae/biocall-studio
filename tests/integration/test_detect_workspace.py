@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QFileDialog, QPushButton
 
 from biocall_studio.detect.application.controller import DetectWorkspaceController
+from biocall_studio.detect.application.navigation import DetectRoute
 from biocall_studio.detect.domain import RootBindingDecision
 from biocall_studio.detect.gui.workspace import DetectWorkspacePage
 from biocall_studio.detect.persistence import (
@@ -53,18 +54,18 @@ def test_native_create_reopen_move_confirm_relink_cancel_and_denied_access(
     page.resize(1180, 790)
     page.show()
 
-    assert page.current_route == "setup"
-    assert page.setup_button.isChecked()
-    assert all(button.isEnabled() for button in page.step_buttons)
-    page.recordings_button.click()
-    assert page.current_route == "recordings"
-    page.setup_button.click()
+    assert page.current_route is DetectRoute.MODELS
+    assert page._navigation[DetectRoute.MODELS].isChecked()
+    assert all(button.isEnabled() for button in page._navigation.values())
+    page._navigation[DetectRoute.RECORDINGS].click()
+    assert page.current_route is DetectRoute.RECORDINGS
+    page._navigation[DetectRoute.MODELS].click()
     page.folder_picker.folderChanged.emit(str(source))
     collection_id = controller.active_collection.ref.collection_id
     assert controller.root_decision is RootBindingDecision.VALID
     assert page.collection_title.text() == "Rainforest_2026"
     assert page.status_badge.text() == "Available"
-    assert page.recordings_button.isEnabled()
+    assert page._navigation[DetectRoute.RECORDINGS].isEnabled()
 
     reopened = DetectWorkspaceController(application_data)
     assert reopened.active_collection.ref.collection_id == collection_id
@@ -79,8 +80,9 @@ def test_native_create_reopen_move_confirm_relink_cancel_and_denied_access(
     moved_page = DetectWorkspacePage(reopened)
     qtbot.addWidget(moved_page)
     moved_page.show()
-    assert moved_page.current_route == "recordings"
-    assert moved_page.recordings_button.isChecked()
+    moved_page._navigation[DetectRoute.RECORDINGS].click()
+    assert moved_page.current_route is DetectRoute.RECORDINGS
+    assert moved_page._navigation[DetectRoute.RECORDINGS].isChecked()
     moved_page.relink_picker.folderChanged.emit(str(moved))
     assert reopened.proposal.decision is RootBindingDecision.AWAITING_CONFIRMATION
     assert moved_page.relink_card.isVisible()

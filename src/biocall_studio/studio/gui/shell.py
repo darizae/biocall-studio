@@ -212,7 +212,8 @@ class StudioWindow(QMainWindow):
         layout = QVBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        layout.addWidget(self._build_header())
+        self.global_header = self._build_header()
+        layout.addWidget(self.global_header)
         self.pages = QStackedWidget()
         self.launchpad = LaunchpadPage()
         self.detect_page = DetectWorkspacePage(detect_controller)
@@ -268,6 +269,7 @@ class StudioWindow(QMainWindow):
             raise ValueError("Train is a retained independent window.")
         self.current_workspace = route
         self.pages.setCurrentWidget(self._pages[route])
+        self.global_header.setVisible(route is not WorkspaceRoute.DETECT)
         self.setWindowTitle(
             "BioCall Studio"
             if route is WorkspaceRoute.STUDIO

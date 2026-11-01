@@ -20,16 +20,16 @@ Create a clean source environment from the repository root:
 
 ```bash
 python3.12 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e '../bioacoustics-dl-toolbox[rf]'
-python -m pip install -e ../alp-ui
-python -m pip install -e '.[test,integration]'
-python -m biocall_studio
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -e '../bioacoustics-dl-toolbox[rf]'
+.venv/bin/python -m pip install -e ../alp-ui
+.venv/bin/python -m pip install -e '.[test,integration]'
+.venv/bin/python -m biocall_studio
 ```
 
-`biocall-studio` is the equivalent and only public console command. Worker arguments are private;
-Train and Detect supervisors invoke `python -m biocall_studio --worker <mode> ...` in development.
+`.venv/bin/biocall-studio` is the equivalent and only public console command. Worker arguments
+are private. Train and Detect supervisors invoke the same `.venv/bin/python` interpreter with a
+private `--worker <mode> ...` argument in development.
 
 ## Tests and audit
 

@@ -17,10 +17,11 @@ from bioacoustics_dl_toolbox.audio import load_audio_file
 from bioacoustics_dl_toolbox.prediction import predict_windows
 from bioacoustics_dl_toolbox.rf import compute_rf_features
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFileDialog, QMessageBox, QPushButton
+from PySide6.QtWidgets import QBoxLayout, QFileDialog, QMessageBox, QPushButton
 
 from biocall_studio.detect.application.controller import DetectWorkspaceController, ModelIntakeState
 from biocall_studio.detect.application.model_intake import inspect_model_directory
+from biocall_studio.detect.application.navigation import DetectRoute
 from biocall_studio.detect.domain.detection import (
     DetectionSettings,
     merge_candidate_windows,
@@ -235,7 +236,7 @@ def _wait_terminal(qtbot, controller: DetectWorkspaceController, timeout=120_000
 def test_guided_detect_routes_bulk_badges_run_and_selection_free_export(
     qapp, qtbot, genuine_cnn, genuine_rf, tmp_path, monkeypatch
 ):
-    """Case: IT-DET-023."""
+    """Cases: IT-DET-023, IT-DET-025."""
     source = tmp_path / "guided-source"
     shutil.copytree(genuine_cnn.root / "recordings", source / "recordings")
     app_data = tmp_path / "application-data"
@@ -245,23 +246,26 @@ def test_guided_detect_routes_bulk_badges_run_and_selection_free_export(
     page.resize(1180, 790)
     page.show()
 
-    assert [button.text() for button in page.step_buttons] == [
-        "Setup",
+    assert [button.text() for button in page._navigation.values()] == [
+        "New detection",
         "Recordings",
-        "Run",
+        "Models",
+        "Runs",
         "Results",
-        "Export",
+        "Exports",
     ]
-    assert len(page.step_chevrons) == 4
-    assert all(button.isEnabled() for button in page.step_buttons)
-    assert page.setup_button.isChecked()
-    assert page.setup_button.accessibleName().startswith("Current step 1 of 5")
-    assert page.settings_card.parent() is page.run_view
+    assert not hasattr(page, "step_chevrons")
+    assert all(not button.toolTip() for button in page._navigation.values())
+    assert page.current_route is DetectRoute.MODELS
+    assert page._navigation[DetectRoute.MODELS].isChecked()
+    assert page.settings_card.parent() is page.new_detection_view
 
-    page.export_button.setFocus()
-    qtbot.keyClick(page.export_button, Qt.Key.Key_Space)
-    assert page.current_route == "export"
-    qtbot.waitUntil(lambda: page.focusWidget() is page.export_button)
+    exports_button = page._navigation[DetectRoute.EXPORTS]
+    exports_button.setFocus()
+    qtbot.keyClick(exports_button, Qt.Key.Key_Space)
+    assert page.current_route is DetectRoute.EXPORTS
+    page.export_history_page.new_button.click()
+    assert page.current_route is DetectRoute.EXPORT_NEW
     assert page.export_page.mode_both.isEnabled()
     assert page.export_page.destination_picker.isEnabled()
     assert not page.export_page.start_button.isEnabled()
@@ -273,15 +277,14 @@ def test_guided_detect_routes_bulk_badges_run_and_selection_free_export(
     destination.mkdir()
     page.export_page.destination_picker.setFolderPath(str(destination))
     page.export_page.results_button.click()
-    assert page.current_route == "results"
-    qtbot.waitUntil(lambda: page.focusWidget() is page.results_button)
+    assert page.current_route is DetectRoute.RESULTS
     page.result_explorer.export_button.click()
-    assert page.current_route == "export"
+    assert page.current_route is DetectRoute.EXPORT_NEW
     assert page.export_page.mode_snippets.isChecked()
     assert page.export_page.destination_picker.folderPath() == str(destination)
 
-    page.setup_button.click()
-    assert page.current_route == "setup"
+    page._navigation[DetectRoute.MODELS].click()
+    assert page.current_route is DetectRoute.MODELS
     assert page.model_status_badge.intent == "neutral"
     page.model_picker.folderChanged.emit(str(genuine_cnn.model.root))
     assert page.model_status_badge.text() == "Checking"
@@ -291,9 +294,14 @@ def test_guided_detect_routes_bulk_badges_run_and_selection_free_export(
     assert page.model_status_badge.intent == "success"
     assert page.model_name.text() == genuine_cnn.model.label
 
+    page._navigation[DetectRoute.NEW_DETECTION].click()
+    assert page.current_route is DetectRoute.RECORDINGS
+    page._navigation[DetectRoute.MODELS].click()
+    page.models_continue_button.click()
+    assert page.current_route is DetectRoute.RECORDINGS
     page.folder_picker.folderChanged.emit(str(source))
     qtbot.waitUntil(lambda: controller.snapshot is not None, timeout=30_000)
-    assert page.current_route == "recordings"
+    assert page.current_route is DetectRoute.RECORDINGS
     bound = controller.active_collection
     monkeypatch.setattr(QFileDialog, "getExistingDirectory", lambda *args, **kwargs: "")
     browse = next(
@@ -302,7 +310,7 @@ def test_guided_detect_routes_bulk_badges_run_and_selection_free_export(
         if button.accessibleName() == "Choose Relink recordings folder"
     )
     browse.click()
-    assert page.current_route == "recordings"
+    assert page.current_route is DetectRoute.RECORDINGS
     assert controller.active_collection == bound
 
     excluded_key = next(
@@ -360,58 +368,112 @@ def test_guided_detect_routes_bulk_badges_run_and_selection_free_export(
 
     page.recordings_continue_button.setFocus()
     qtbot.keyClick(page.recordings_continue_button, Qt.Key.Key_Space)
-    assert page.current_route == "run"
-    qtbot.waitUntil(lambda: page.focusWidget() is page.run_button)
+    assert page.current_route is DetectRoute.NEW_DETECTION
+    qtbot.waitUntil(lambda: page.focusWidget() is page.start_detection_button)
     assert page.minimum_score.isVisible()
     assert page.run_summary_model.text() == genuine_cnn.model.label
     assert page.run_summary_recordings.text().startswith(str(controller.snapshot.counts.included))
     assert page.run_blocker.text() == "Ready to start detection."
     page.minimum_score.setValue(1.0)
     page.start_detection_button.click()
-    assert page.current_route == "run"
+    assert page.current_route is DetectRoute.RUN_DETAIL
     assert controller.current_run is not None
+    assert page.active_run_label.text() == controller.current_run.title
+    assert page.active_run_badge.text() in {"Preparing", "Running"}
     record = _wait_terminal(qtbot, controller)
     assert record.status is DetectRunStatus.COMPLETED
-    assert page.start_detection_button.text() == "Continue to Results"
-    assert page.start_detection_button.isEnabled()
-    page.start_detection_button.setFocus()
-    qtbot.keyClick(page.start_detection_button, Qt.Key.Key_Space)
-    assert page.current_route == "results"
-    qtbot.waitUntil(lambda: page.focusWidget() is page.results_button)
+    page._navigation[DetectRoute.RUNS].click()
+    assert page.run_history_page.model.rowCount() == 1
+    assert page.run_history_page.model.record_at(0).run_id == record.run_id
+    page.run_history_page.open_button.click()
+    assert page.current_route is DetectRoute.RUN_DETAIL
+    assert page.open_run_result_button.isEnabled()
+    page.open_run_result_button.click()
+    assert page.current_route is DetectRoute.RESULTS
 
     explorer = page.result_explorer
-    explorer.refinement_picker.folderChanged.emit(str(genuine_cnn.model.root))
+    page._navigation[DetectRoute.MODELS].click()
+    page.refinement_model_picker.folderChanged.emit(str(genuine_cnn.model.root))
     qtbot.waitUntil(
         lambda: controller.refinement_model_state is ModelIntakeState.INCOMPATIBLE,
         timeout=30_000,
     )
-    assert explorer.refinement_status_badge.intent == "danger"
-    explorer.refinement_picker.folderChanged.emit(str(genuine_rf.root))
+    assert page.refinement_model_status_badge.intent == "danger"
+    page.refinement_model_picker.folderChanged.emit(str(genuine_rf.root))
     qtbot.waitUntil(
         lambda: controller.refinement_model_state is ModelIntakeState.COMPATIBLE,
         timeout=30_000,
     )
+    assert page.refinement_model_status_badge.intent == "success"
+    page._navigation[DetectRoute.RESULTS].click()
     assert explorer.refinement_status_badge.intent == "success"
     assert explorer.export_button.isEnabled()
     explorer.export_button.click()
-    assert page.current_route == "export"
+    assert page.current_route is DetectRoute.EXPORT_NEW
     assert controller.export_selection is None
     assert controller.export_snapshot is None
     assert not page.export_page.start_button.isEnabled()
 
     for width in (1180, 700):
         page.resize(width, 790)
-        qtbot.waitUntil(lambda width=width: page.is_compact == (width < 760))
-        qtbot.waitUntil(lambda: page.horizontalScrollBar().maximum() == 0)
-        assert page.horizontalScrollBar().maximum() == 0
-        assert [button.text() for button in page.step_buttons] == [
-            "Setup",
-            "Recordings",
-            "Run",
-            "Results",
-            "Export",
-        ]
-        assert all(chevron.isVisible() for chevron in page.step_chevrons)
+        qtbot.waitUntil(lambda width=width: page.is_compact == (width < 820))
+        assert page.content_scroll.horizontalScrollBar().maximum() == 0
+        assert page.navigation_layout.direction() is (
+            QBoxLayout.Direction.LeftToRight
+            if width < 820
+            else QBoxLayout.Direction.TopToBottom
+        )
+
+    evidence_value = os.environ.get("BIOCALL_REV04_EVIDENCE_DIR")
+    if evidence_value:
+        evidence = Path(evidence_value)
+        evidence.mkdir(parents=True, exist_ok=True)
+        controller.select_run(record.run_id)
+        for width, size_label in ((1180, "normal"), (700, "compact")):
+            page.resize(width, 790)
+            qtbot.waitUntil(lambda width=width: page.is_compact == (width < 820))
+            qtbot.wait(50)
+            for route, label in (
+                (DetectRoute.NEW_DETECTION, "new-detection"),
+                (DetectRoute.MODELS, "models"),
+                (DetectRoute.RUNS, "runs-list"),
+                (DetectRoute.RUN_DETAIL, "run-detail"),
+            ):
+                page._set_route(route)
+                qtbot.wait(100)
+                assert page.slim_header.isVisibleTo(page)
+                assert page.slim_header.height() >= page.slim_header.minimumSizeHint().height(), (
+                    page.slim_header.geometry(),
+                    page.slim_header.minimumSizeHint(),
+                    page.body.geometry(),
+                )
+                assert page.slim_header.y() >= 0, (
+                    page.slim_header.geometry(),
+                    page.body.geometry(),
+                )
+                assert page.slim_header.geometry().bottom() < page.body.height(), (
+                    page.slim_header.geometry(),
+                    page.body.geometry(),
+                )
+                assert page.content_scroll.y() > page.slim_header.geometry().bottom(), (
+                    page.slim_header.geometry(),
+                    page.content_scroll.geometry(),
+                    page.body.geometry(),
+                )
+                assert page.sidebar_brand.isVisibleTo(page) is (width >= 820)
+                if width >= 820:
+                    assert page.sidebar_brand.y() >= 0, (
+                        page.sidebar_brand.geometry(),
+                        page.sidebar.geometry(),
+                    )
+                    assert page.nav_scroll.y() > page.sidebar_brand.geometry().bottom(), (
+                        page.sidebar_brand.geometry(),
+                        page.nav_scroll.geometry(),
+                        page.sidebar.geometry(),
+                    )
+                path = evidence / f"{label}-{size_label}.png"
+                assert page.grab().save(str(path), "PNG")
+                assert path.stat().st_size > 10_000
 
     controller.shutdown()
 
@@ -477,11 +539,13 @@ def test_real_run_publishes_reopenable_metadata_result_and_native_controls(
         "More about Window overlap",
         "More about Combine nearby candidates",
     }
-    page.verticalScrollBar().setValue(page.verticalScrollBar().maximum())
+    page.content_scroll.verticalScrollBar().setValue(
+        page.content_scroll.verticalScrollBar().maximum()
+    )
     page.resize(700, 780)
     qtbot.waitUntil(lambda: page.is_compact)
-    qtbot.waitUntil(lambda: page.horizontalScrollBar().maximum() == 0)
-    assert page.horizontalScrollBar().maximum() == 0
+    qtbot.waitUntil(lambda: page.content_scroll.horizontalScrollBar().maximum() == 0)
+    assert page.content_scroll.horizontalScrollBar().maximum() == 0
     assert page.content.minimumSizeHint().width() <= page.width()
     assert page.settings_layout.getItemPosition(
         page.settings_layout.indexOf(page.minimum_score_row)
@@ -490,7 +554,7 @@ def test_real_run_publishes_reopenable_metadata_result_and_native_controls(
     qtbot.waitUntil(lambda: not page.is_compact)
     page.minimum_score.setValue(1.0)
     page.start_detection_button.click()
-    assert page.current_route == "run"
+    assert page.current_route is DetectRoute.RUN_DETAIL
     record = _wait_terminal(qtbot, controller)
     assert record.status is DetectRunStatus.COMPLETED
     assert record.progress == 100
@@ -556,14 +620,13 @@ def test_native_result_history_recording_candidates_selection_and_keyboard_navig
     )
     immutable_bytes = result_path.read_bytes()
 
-    assert page.results_button.isEnabled()
-    page.results_button.click()
-    assert page.current_route == "results"
+    assert page._navigation[DetectRoute.RESULTS].isEnabled()
+    page._navigation[DetectRoute.RESULTS].click()
+    assert page.current_route is DetectRoute.RESULTS
     explorer = page.result_explorer
     page.focus_initial()
     qtbot.waitUntil(lambda: page.focusWidget() is explorer.history_select.control)
     assert {hint.accessibleName() for hint in explorer.findChildren(HelpHint)} == {
-        "More about RF refinement",
         "More about Result selection",
     }
     assert isinstance(explorer.recording_table, DataTable)
@@ -749,7 +812,7 @@ def test_result_empty_partial_missing_corrupt_persistence_and_native_screenshots
     assert page.grab().save(str(normal), "PNG") and normal.stat().st_size > 10_000
     page.resize(700, 780)
     qtbot.waitUntil(lambda: page.is_compact)
-    qtbot.waitUntil(lambda: page.horizontalScrollBar().maximum() == 0)
+    qtbot.waitUntil(lambda: page.content_scroll.horizontalScrollBar().maximum() == 0)
     compact = tmp_path / "results-unavailable-compact.png"
     assert page.grab().save(str(compact), "PNG") and compact.stat().st_size > 10_000
     assert partial_path.read_bytes() == partial_bytes
@@ -1085,7 +1148,7 @@ def test_real_rf_reference_probability_persists_independent_native_derived_resul
     page._set_route("results")
     explorer = page.result_explorer
     assert explorer.history_select.count() == 2
-    assert {hint.accessibleName() for hint in explorer.findChildren(HelpHint)} >= {
+    assert {hint.accessibleName() for hint in page.findChildren(HelpHint)} >= {
         "More about RF refinement"
     }
     assert explorer.provenance_badge.text() == "Refined"
@@ -1137,16 +1200,20 @@ def test_real_rf_reference_probability_persists_independent_native_derived_resul
             )
             page.resize(1180, 790)
             qtbot.waitUntil(lambda: not page.is_compact)
-            page.verticalScrollBar().setValue(0)
+            page.content_scroll.verticalScrollBar().setValue(0)
             normal = evidence / f"{label}-normal.png"
             assert page.grab().save(str(normal), "PNG") and normal.stat().st_size > 10_000
-            page.verticalScrollBar().setValue(page.verticalScrollBar().maximum())
+            page.content_scroll.verticalScrollBar().setValue(
+                page.content_scroll.verticalScrollBar().maximum()
+            )
             normal_detail = evidence / f"{label}-detail-normal.png"
             assert (
                 page.grab().save(str(normal_detail), "PNG")
                 and normal_detail.stat().st_size > 10_000
             )
-            page.verticalScrollBar().setValue(page.verticalScrollBar().maximum() * 3 // 5)
+            page.content_scroll.verticalScrollBar().setValue(
+                page.content_scroll.verticalScrollBar().maximum() * 3 // 5
+            )
             normal_intervals = evidence / f"{label}-intervals-normal.png"
             assert (
                 page.grab().save(str(normal_intervals), "PNG")
@@ -1154,17 +1221,23 @@ def test_real_rf_reference_probability_persists_independent_native_derived_resul
             )
             page.resize(700, 780)
             qtbot.waitUntil(lambda: page.is_compact)
-            qtbot.waitUntil(lambda: page.horizontalScrollBar().maximum() == 0)
-            page.verticalScrollBar().setValue(0)
+            qtbot.waitUntil(
+                lambda: page.content_scroll.horizontalScrollBar().maximum() == 0
+            )
+            page.content_scroll.verticalScrollBar().setValue(0)
             compact = evidence / f"{label}-compact.png"
             assert page.grab().save(str(compact), "PNG") and compact.stat().st_size > 10_000
-            page.verticalScrollBar().setValue(page.verticalScrollBar().maximum())
+            page.content_scroll.verticalScrollBar().setValue(
+                page.content_scroll.verticalScrollBar().maximum()
+            )
             compact_detail = evidence / f"{label}-detail-compact.png"
             assert (
                 page.grab().save(str(compact_detail), "PNG")
                 and compact_detail.stat().st_size > 10_000
             )
-            page.verticalScrollBar().setValue(page.verticalScrollBar().maximum() * 3 // 5)
+            page.content_scroll.verticalScrollBar().setValue(
+                page.content_scroll.verticalScrollBar().maximum() * 3 // 5
+            )
             compact_intervals = evidence / f"{label}-intervals-compact.png"
             assert (
                 page.grab().save(str(compact_intervals), "PNG")
@@ -1269,7 +1342,9 @@ def test_rf_wrong_model_unscored_cancel_crash_stale_and_publication_are_atomic(
     if evidence_value:
         evidence = Path(evidence_value)
         evidence.mkdir(parents=True, exist_ok=True)
-        page.verticalScrollBar().setValue(page.verticalScrollBar().maximum() * 3 // 5)
+        page.content_scroll.verticalScrollBar().setValue(
+            page.content_scroll.verticalScrollBar().maximum() * 3 // 5
+        )
         unscored_image = evidence / "results-refined-unscored-normal.png"
         assert (
             page.grab().save(str(unscored_image), "PNG") and unscored_image.stat().st_size > 10_000

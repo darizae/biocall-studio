@@ -17,27 +17,27 @@ From a BioCall Studio checkout with those siblings in place, create a clean envi
 
 ```bash
 python3.12 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e '../bioacoustics-dl-toolbox[rf]'
-python -m pip install -e ../alp-ui
-python -m pip install -e '.[test,integration]'
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -e '../bioacoustics-dl-toolbox[rf]'
+.venv/bin/python -m pip install -e ../alp-ui
+.venv/bin/python -m pip install -e '.[test,integration]'
 ```
 
 Run the local application from the command line with:
 
 ```bash
-source .venv/bin/activate
-python -m biocall_studio
+.venv/bin/python -m biocall_studio
 ```
 
 The equivalent installed console command is:
 
 ```bash
-biocall-studio
+.venv/bin/biocall-studio
 ```
 
-It is the only public application command. Windows source and packaging commands remain
+These commands intentionally address the virtual environment directly, so they also work when
+an existing `.venv` has stale shell-activation metadata. It is the only public application
+command. Windows source and packaging commands remain
 unqualified until they are exercised on native Windows; see
 [development guidance](docs/DEVELOPMENT.md).
 

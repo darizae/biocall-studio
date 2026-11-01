@@ -12,7 +12,6 @@ from alp_ui.components import (
     Card,
     DataTable,
     EmptyState,
-    FolderPicker,
     HelpHint,
     SelectInput,
     Text,
@@ -286,6 +285,7 @@ class CandidateResultModel(QAbstractTableModel):
 class ResultExplorer(QWidget):
     run_requested = Signal()
     recordings_requested = Signal()
+    models_requested = Signal()
     export_requested = Signal()
 
     def __init__(self, controller: DetectWorkspaceController):
@@ -430,35 +430,19 @@ class ResultExplorer(QWidget):
         copy = QVBoxLayout()
         copy.addWidget(Text("Check calls with another model", role="heading"))
         heading.addLayout(copy, 1)
-        heading.addWidget(
-            _context_help(
-                "CTX-09",
-                "Optionally use a Random Forest model to check the calls found by the detection "
-                "model. The original results stay unchanged.",
-                "RF refinement",
-            ),
-            0,
-            Qt.AlignmentFlag.AlignTop,
-        )
         self.refinement_status_badge = Badge("Not selected", intent="neutral")
         heading.addWidget(self.refinement_status_badge, 0, Qt.AlignmentFlag.AlignTop)
         card.content_layout.addLayout(heading)
 
-        self.refinement_picker = FolderPicker(label="Random Forest model folder", show_hidden=True)
-        self.refinement_picker.setAccessibleDescription(
-            "Choose a Random Forest model to check calls in the selected original result."
-        )
-        self.refinement_picker.folderChanged.connect(self.controller.choose_refinement_model_root)
-        card.content_layout.addWidget(self.refinement_picker)
+        self.refinement_model_name = Text("Not selected", role="subheading", word_wrap=True)
+        card.content_layout.addWidget(self.refinement_model_name)
         self.refinement_model_detail = Text("", role="body", word_wrap=True)
         card.content_layout.addWidget(self.refinement_model_detail)
 
         actions = QHBoxLayout()
-        self.clear_refinement_model_button = Button("Clear model", variant="outline")
-        self.clear_refinement_model_button.clicked.connect(
-            self.controller.clear_refinement_model_selection
-        )
-        actions.addWidget(self.clear_refinement_model_button)
+        self.change_refinement_model_button = Button("Change model", variant="outline")
+        self.change_refinement_model_button.clicked.connect(self.models_requested)
+        actions.addWidget(self.change_refinement_model_button)
         actions.addStretch()
         self.refinement_button = Button("Check calls", variant="primary")
         self.refinement_button.clicked.connect(self._start_refinement)
@@ -794,17 +778,11 @@ class ResultExplorer(QWidget):
             }[state]
         )
         self.refinement_status_badge.setAccessibleName(f"RF Model status: {status}")
-        selected = self.controller.selected_refinement_model_root
-        if state is not ModelIntakeState.LOADING:
-            self.refinement_picker.setFolderPath("" if selected is None else str(selected))
-        self.refinement_picker.setEnabled(
-            state is not ModelIntakeState.LOADING and not self.controller.is_run_active
+        reference = self.controller.refinement_model_reference
+        self.refinement_model_name.setText(
+            reference.snapshot.label if reference is not None else "Not selected"
         )
-        self.clear_refinement_model_button.setEnabled(
-            selected is not None
-            and state is not ModelIntakeState.LOADING
-            and not self.controller.is_run_active
-        )
+        self.change_refinement_model_button.setEnabled(not self.controller.is_run_active)
         detail = {
             ModelIntakeState.EMPTY: "",
             ModelIntakeState.LOADING: "",

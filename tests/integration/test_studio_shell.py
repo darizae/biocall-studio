@@ -355,6 +355,7 @@ def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(q
     shell.launchpad.detect_card.action_button.setFocus()
     qtbot.keyClick(shell.launchpad.detect_card.action_button, Qt.Key.Key_Space)
     assert shell.current_workspace is WorkspaceRoute.DETECT
+    assert not shell.global_header.isVisible()
     assert isinstance(shell.detect_page.focusWidget(), QPushButton)
     assert shell.detect_page.focusWidget().accessibleName() == "Choose Train Model folder"
     assert len(shell.detect_page.findChildren(FolderPicker)) == 5
@@ -380,6 +381,7 @@ def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(q
     shell.detect_page.back_button.setFocus()
     qtbot.keyClick(shell.detect_page.back_button, Qt.Key.Key_Space)
     assert shell.current_workspace is WorkspaceRoute.STUDIO
+    assert shell.global_header.isVisible()
 
     shell.launchpad.review_card.action_button.setFocus()
     qtbot.keyClick(shell.launchpad.review_card.action_button, Qt.Key.Key_Space)
@@ -418,6 +420,7 @@ def test_detect_routes_use_approved_help_plain_language_and_compact_result_state
         hint.accessibleName().removeprefix("More about "): hint.toolTip()
         for hint in page.findChildren(HelpHint)
     }
+    assert len(page.findChildren(HelpHint)) == 9
     assert actual_help == approved_help
     approved_ids = {
         "CTX-01": "Minimum detection score",

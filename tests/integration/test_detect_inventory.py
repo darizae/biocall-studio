@@ -18,6 +18,7 @@ from biocall_studio.detect.application.discovery import (
     InventoryScanProgress,
     discover_wavs,
 )
+from biocall_studio.detect.application.navigation import DetectRoute
 from biocall_studio.detect.domain.inventory import (
     ChangeKind,
     InclusionDecision,
@@ -226,21 +227,24 @@ def test_native_inventory_selection_decisions_paging_keyboard_cancel_and_layout(
         path.write_bytes(template)
 
     controller = DetectWorkspaceController(
-        tmp_path / "application-data", scan_step_delay_seconds=0.0005
+        tmp_path / "application-data", scan_step_delay_seconds=0.005
     )
     page = DetectWorkspacePage(controller)
     qtbot.addWidget(page)
     page.resize(1180, 790)
     page.show()
+    page._navigation[DetectRoute.RECORDINGS].click()
     page.folder_picker.folderChanged.emit(str(source))
     qtbot.waitUntil(lambda: controller.is_scanning)
     assert page.scan_card.isVisible()
     assert page.cancel_scan_button.isEnabled()
     controller.cancel_scan()
     qtbot.waitUntil(lambda: controller.inventory_state.value == "cancelled")
+    qtbot.waitUntil(lambda: not controller.is_scanning)
     assert controller.inventory_state.value == "cancelled"
     assert controller.snapshot is None
 
+    qtbot.waitUntil(lambda: page.rescan_button.isEnabled())
     page.rescan_button.click()
     qtbot.waitUntil(lambda: controller.snapshot is not None, timeout=15_000)
     assert controller.inventory_state.value == "ready"
@@ -276,6 +280,7 @@ def test_native_inventory_selection_decisions_paging_keyboard_cancel_and_layout(
     assert page.detail_decision.text() == "Excluded"
     page.rescan_button.click()
     qtbot.waitUntil(lambda: not controller.is_scanning, timeout=15_000)
+    qtbot.waitUntil(lambda: page.rescan_button.isEnabled())
     assert page.selected_key == stable_key
 
     last_good_id = controller.snapshot.inventory_id

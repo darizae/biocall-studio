@@ -9,6 +9,7 @@ from PySide6.QtCore import QProcess, Qt, QTimer
 from PySide6.QtWidgets import QPushButton
 
 from biocall_studio.detect.application.controller import DetectWorkspaceController
+from biocall_studio.detect.application.navigation import DetectRoute
 from biocall_studio.detect.domain.runs import DetectRunRequest, DetectRunStatus
 from biocall_studio.detect.gui.workspace import DetectWorkspacePage
 from biocall_studio.detect.persistence.diagnostics import read_diagnostic_records
@@ -177,11 +178,11 @@ def test_native_run_header_keyboard_cancel_responsiveness_and_private_stderr(
         ),
         timeout=15_000,
     )
-    assert page.active_run_label.text() == "Lifecycle boundary check"
-    assert page.active_run_badge.text() == "Completed"
-    assert page.run_button.isEnabled()
-    page.view_run_button.click()
-    assert page.current_route == "run"
+    assert page.active_run_label.text() == "No active Run"
+    assert page.active_run_badge.text() == "Idle"
+    page._navigation[DetectRoute.RUNS].click()
+    page.run_history_page.open_button.click()
+    assert page.current_route is DetectRoute.RUN_DETAIL
     assert page.run_status_badge.text() == "Completed"
     assert page.open_run_log_button.isEnabled()
 
@@ -209,6 +210,17 @@ def test_native_run_header_keyboard_cancel_responsiveness_and_private_stderr(
         ),
         timeout=5_000,
     )
+    active_run = controller.current_run
+    historical_run = next(
+        record for record in controller.runs if record.run_id != active_run.run_id
+    )
+    controller.select_run(historical_run.run_id)
+    assert controller.active_run == active_run
+    assert controller.selected_run != active_run
+    page._set_route(DetectRoute.RUN_DETAIL)
+    assert not page.cancel_run_button.isEnabled()
+    controller.select_run(active_run.run_id)
+    assert page.cancel_run_button.isEnabled()
     assert page.run_status_badge.text() == "Running"
     page.cancel_run_button.setFocus()
     qtbot.keyClick(page.cancel_run_button, Qt.Key.Key_Space)
@@ -222,7 +234,7 @@ def test_native_run_header_keyboard_cancel_responsiveness_and_private_stderr(
         timeout=10_000,
     )
     assert page.run_status_badge.text() == "Cancelled"
-    assert "start a new run" in page.run_guidance.text()
+    assert "start a new detection" in page.run_guidance.text()
     assert _source_unchanged(source_bytes)
 
     controller.start_lifecycle_fixture(_request(controller, suffix="a"), behavior="fail")
@@ -245,7 +257,13 @@ def test_native_run_header_keyboard_cancel_responsiveness_and_private_stderr(
         timeout=10_000,
     )
     assert page.run_status_badge.text() == "Interrupted"
-    assert "start a new run" in page.run_guidance.text()
+    assert "start a new detection" in page.run_guidance.text()
+
+    historical_id = controller.runs[-1].run_id
+    controller.select_run(historical_id)
+    controller.refresh()
+    assert controller.selected_run_id == historical_id
+    assert controller.selected_run is not None
 
     page.resize(700, 780)
     qtbot.waitUntil(lambda: page.is_compact)

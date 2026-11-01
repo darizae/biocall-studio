@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import uuid
 from collections.abc import Mapping
@@ -26,9 +27,14 @@ from biocall_studio.detect.application.model_intake import (
 from biocall_studio.detect.application.owner_lifetime import DetectOwnerLease
 from biocall_studio.detect.domain import RootBindingDecision
 from biocall_studio.detect.domain.detection import DetectionSettings
+from biocall_studio.detect.domain.export_history import (
+    ExportAvailability,
+    ExportHistoryRecord,
+)
 from biocall_studio.detect.domain.exports import (
     ExportCancelledError,
     ExportConflictError,
+    ExportError,
     ExportMode,
     ExportReceipt,
     ExportSnapshot,
@@ -84,6 +90,7 @@ from biocall_studio.detect.persistence.diagnostics import (
     encode_diagnostic_record,
     resolve_run_log_path,
 )
+from biocall_studio.detect.persistence.export_history import ExportHistoryStore
 from biocall_studio.detect.persistence.runs import DetectRunRepository
 from biocall_studio.detect.persistence.selection import ResultSelectionStore
 from biocall_studio.detect.workflows.exports import (
@@ -226,6 +233,76 @@ class _ExportThread(QThread):
             self.succeeded.emit(snapshot, receipt)
 
 
+class _ExportVerificationThread(QThread):
+    verified = Signal(object, str, object)
+
+    def __init__(self, record: ExportHistoryRecord):
+        super().__init__()
+        self.record = record
+
+    def run(self) -> None:
+        path = self.record.destination_path
+        try:
+            exists = path.exists()
+        except OSError:
+            self.verified.emit(
+                ExportAvailability.INACCESSIBLE,
+                "This export location cannot be accessed. Check folder permissions.",
+                None,
+            )
+            return
+        if not exists:
+            self.verified.emit(
+                ExportAvailability.MISSING,
+                "This export folder is missing. The saved history record remains unchanged.",
+                None,
+            )
+            return
+        if not os.access(path, os.R_OK | os.X_OK):
+            self.verified.emit(
+                ExportAvailability.INACCESSIBLE,
+                "This export location cannot be accessed. Check folder permissions.",
+                None,
+            )
+            return
+        try:
+            receipt = verify_export_directory(path)
+        except FileNotFoundError:
+            state = ExportAvailability.MISSING
+            message = "This export folder is missing. The saved history record remains unchanged."
+        except PermissionError:
+            state = ExportAvailability.INACCESSIBLE
+            message = "This export location cannot be accessed. Check folder permissions."
+        except OSError:
+            state = ExportAvailability.INACCESSIBLE
+            message = "This export location cannot be accessed. Check folder permissions."
+        except (ExportError, ValueError):
+            state = ExportAvailability.CHANGED
+            message = "This export no longer matches its verified receipt."
+        else:
+            matches = (
+                receipt.export_id == self.record.export_id
+                and receipt.receipt_digest == self.record.receipt_digest
+                and receipt.snapshot_digest == self.record.snapshot_digest
+                and receipt.result_id == self.record.result_id
+                and receipt.result_digest == self.record.result_digest
+                and receipt.mode is self.record.mode
+                and receipt.completed_at == self.record.completed_at
+                and len(receipt.files) == self.record.published_file_count
+                and len(receipt.snippets or receipt.concat_mappings)
+                == self.record.selected_call_count
+            )
+            state = ExportAvailability.AVAILABLE if matches else ExportAvailability.CHANGED
+            message = (
+                "The saved files match their verified receipt."
+                if matches
+                else "This export no longer matches its saved history record."
+            )
+            self.verified.emit(state, message, receipt if matches else None)
+            return
+        self.verified.emit(state, message, None)
+
+
 class DetectWorkspaceController(QObject):
     state_changed = Signal()
     scan_progress_changed = Signal(object)
@@ -271,6 +348,7 @@ class DetectWorkspaceController(QObject):
         self._kill_grace_ms = kill_grace_ms
         self.runs: tuple[DetectRunRecord, ...] = ()
         self.current_run: DetectRunRecord | None = None
+        self.selected_run_id: str | None = None
         self.current_result: ResultArtifact | None = None
         self.result_history: tuple[ResultHistoryItem, ...] = ()
         self.selected_result_id: str | None = None
@@ -279,6 +357,7 @@ class DetectWorkspaceController(QObject):
         self.selection_error = ""
         self._selection_store: ResultSelectionStore | None = None
         self._run_repository: DetectRunRepository | None = None
+        self._export_history_store: ExportHistoryStore | None = None
         self._run_process: QProcess | None = None
         self._run_stdout_buffer = b""
         self._run_stderr = BoundedStderrCapture()
@@ -291,6 +370,15 @@ class DetectWorkspaceController(QObject):
         self.export_state = ExportState.READY
         self.export_message = "Freeze selected Result intervals and choose a destination."
         self._export_thread: _ExportThread | None = None
+        self.export_history: tuple[ExportHistoryRecord, ...] = ()
+        self.export_history_rejected: tuple[Path, ...] = ()
+        self.selected_export_id: str | None = None
+        self.export_verification_state = ExportAvailability.UNSELECTED
+        self.export_verification_message = ""
+        self.verified_export_receipt: ExportReceipt | None = None
+        self.export_history_warning = ""
+        self._pending_export_history_record: ExportHistoryRecord | None = None
+        self._export_verification_thread: _ExportVerificationThread | None = None
         self._shutdown_requested = False
         self._shutdown_finished = False
         self.refresh(emit=False)
@@ -319,7 +407,22 @@ class DetectWorkspaceController(QObject):
 
     @property
     def is_run_active(self) -> bool:
-        return self.current_run is not None and self.current_run.active
+        return self.active_run is not None
+
+    @property
+    def active_run(self) -> DetectRunRecord | None:
+        return next((run for run in self.runs if run.active), None)
+
+    @property
+    def selected_run(self) -> DetectRunRecord | None:
+        return next((run for run in self.runs if run.run_id == self.selected_run_id), None)
+
+    @property
+    def selected_export(self) -> ExportHistoryRecord | None:
+        return next(
+            (item for item in self.export_history if item.export_id == self.selected_export_id),
+            None,
+        )
 
     @property
     def run_process(self) -> QProcess | None:
@@ -337,6 +440,16 @@ class DetectWorkspaceController(QObject):
             and not self.is_scanning
             and not self.is_model_loading
             and not self.is_run_active
+        )
+
+    @property
+    def recordings_reviewed(self) -> bool:
+        return (
+            self.root_decision is RootBindingDecision.VALID
+            and self.inventory_state is InventoryState.READY
+            and self.snapshot is not None
+            and self.snapshot.counts.included > 0
+            and not self.is_scanning
         )
 
     def _state_for_snapshot(self, snapshot: InventorySnapshot) -> InventoryState:
@@ -397,6 +510,7 @@ class DetectWorkspaceController(QObject):
         self._load_model_selection()
         self._load_refinement_model_selection()
         self._load_runs()
+        self._load_export_history()
         if emit:
             self.state_changed.emit()
 
@@ -406,6 +520,7 @@ class DetectWorkspaceController(QObject):
             self._run_repository = None
             self.runs = ()
             self.current_run = None
+            self.selected_run_id = None
             self.current_result = None
             self.result_history = ()
             self.selected_result_id = None
@@ -419,19 +534,24 @@ class DetectWorkspaceController(QObject):
             runs = repository.reconcile()
         except (OSError, ValueError) as exc:
             self._run_repository = None
+            self._export_history_store = None
             self.runs = ()
             self.current_run = None
+            self.selected_run_id = None
             self.current_result = None
             self.result_history = ()
             self.selected_result_id = None
             self.result_selection = None
             self._selection_store = None
+            self._export_history_store = None
             self.metadata_error = f"Detect Run history could not be opened: {exc}"
             return
         self._run_repository = repository
         self._selection_store = ResultSelectionStore(repository.collection_root)
         self.runs = runs
         self.current_run = next((run for run in runs if run.active), runs[0] if runs else None)
+        if not any(run.run_id == self.selected_run_id for run in runs):
+            self.selected_run_id = self.current_run.run_id if self.current_run is not None else None
         self.current_result = None
         if self.current_run is not None and self.current_run.status is DetectRunStatus.COMPLETED:
             try:
@@ -440,6 +560,99 @@ class DetectWorkspaceController(QObject):
                 # ST-06 lifecycle fixtures intentionally are not scientific Results.
                 pass
         self._reload_result_history()
+
+    def _load_export_history(self) -> None:
+        repository = self._run_repository
+        collection = self.active_collection
+        if collection is None:
+            self._export_history_store = None
+            self.export_history = ()
+            self.export_history_rejected = ()
+            self.selected_export_id = None
+            self.export_verification_state = ExportAvailability.UNSELECTED
+            self.export_verification_message = ""
+            self.verified_export_receipt = None
+            return
+        try:
+            collection_root = (
+                repository.collection_root
+                if repository is not None
+                else self.store.paths_for(collection.ref.collection_id).collection_directory
+            )
+            store = ExportHistoryStore(collection_root, collection.ref.collection_id)
+            loaded = store.load()
+        except (OSError, ValueError) as exc:
+            self._export_history_store = None
+            self.export_history = ()
+            self.export_history_rejected = ()
+            self.selected_export_id = None
+            self.export_verification_state = ExportAvailability.UNSELECTED
+            self.export_verification_message = ""
+            self.verified_export_receipt = None
+            self.metadata_error = f"Export history could not be opened: {exc}"
+            return
+        self._export_history_store = store
+        self.export_history = loaded.records
+        self.export_history_rejected = loaded.rejected
+        if not any(item.export_id == self.selected_export_id for item in loaded.records):
+            self.selected_export_id = None
+            self.export_verification_state = ExportAvailability.UNSELECTED
+            self.export_verification_message = ""
+            self.verified_export_receipt = None
+
+    def select_run(self, run_id: str) -> None:
+        if not any(run.run_id == run_id for run in self.runs):
+            raise ValueError("The selected Run is not in this recordings folder history.")
+        self.selected_run_id = run_id
+        self.state_changed.emit()
+
+    def result_item_for_run(self, run_id: str) -> ResultHistoryItem | None:
+        return next((item for item in self.result_history if item.run_id == run_id), None)
+
+    def select_result_for_run(self, run_id: str) -> None:
+        item = self.result_item_for_run(run_id)
+        if item is None:
+            raise ValueError("This Run has no Result in the current recordings folder.")
+        self.select_result(item.result_id)
+
+    def select_export(self, export_id: str) -> None:
+        record = next((item for item in self.export_history if item.export_id == export_id), None)
+        if record is None:
+            raise ValueError("The selected export is not in this recordings folder history.")
+        if self._export_verification_thread is not None:
+            raise RuntimeError("Wait for the current export verification to finish.")
+        self.selected_export_id = export_id
+        self.export_verification_state = ExportAvailability.VERIFYING
+        self.export_verification_message = "Checking the saved files against their receipt."
+        self.verified_export_receipt = None
+        thread = _ExportVerificationThread(record)
+        self._export_verification_thread = thread
+        thread.verified.connect(self._export_verified)
+        thread.finished.connect(lambda: self._export_verification_finished(thread))
+        thread.start()
+        self.state_changed.emit()
+
+    def _export_verified(
+        self,
+        state: ExportAvailability,
+        message: str,
+        receipt: ExportReceipt | None,
+    ) -> None:
+        self.export_verification_state = ExportAvailability(state)
+        self.export_verification_message = message
+        self.verified_export_receipt = receipt
+        self.state_changed.emit()
+
+    def _export_verification_finished(self, thread: _ExportVerificationThread) -> None:
+        if self._export_verification_thread is thread:
+            self._export_verification_thread = None
+        thread.deleteLater()
+        self.state_changed.emit()
+        self._maybe_finish_shutdown()
+
+    def wait_for_export_verification(self, milliseconds: int = 10_000) -> bool:
+        thread = self._export_verification_thread
+        return True if thread is None else thread.wait(milliseconds)
 
     def _is_result_run(self, repository: DetectRunRepository, record: DetectRunRecord) -> bool:
         try:
@@ -622,7 +835,7 @@ class DetectWorkspaceController(QObject):
         return freeze_result_selection(item.result, selection)
 
     def _invalidate_export_plan(self) -> None:
-        if self.is_export_active:
+        if self.is_export_active or self._pending_export_history_record is not None:
             return
         self.export_result = None
         self.export_selection = None
@@ -637,6 +850,9 @@ class DetectWorkspaceController(QObject):
     def prepare_export_plan(self) -> FrozenResultSelection | None:
         if self.is_export_active:
             raise RuntimeError("An export is already running.")
+        if self._pending_export_history_record is not None:
+            self.state_changed.emit()
+            return None
         item = self.selected_result_item
         projection = self.selected_result_projection
         selection = self.result_selection
@@ -673,6 +889,8 @@ class DetectWorkspaceController(QObject):
     def start_export(self, mode: ExportMode, destination_parent: Path) -> None:
         if self.is_export_active:
             raise RuntimeError("An export is already running.")
+        if self._pending_export_history_record is not None:
+            raise RuntimeError("Retry saving the completed export to history first.")
         if self.export_result is None or self.export_selection is None:
             raise ValueError("Freeze a Result selection before exporting.")
         collection = self.active_collection
@@ -709,6 +927,51 @@ class DetectWorkspaceController(QObject):
         self.export_receipt = receipt
         self.export_state = ExportState.SUCCESS
         self.export_message = receipt.final_destination
+        collection = self.active_collection
+        selected_count = (
+            0 if self.export_selection is None else len(self.export_selection.candidate_ids)
+        )
+        if collection is not None:
+            if self._export_history_store is None:
+                self._load_export_history()
+            record = ExportHistoryRecord.from_receipt(
+                collection.ref.collection_id,
+                receipt,
+                selected_call_count=selected_count,
+            )
+            try:
+                self._save_export_history(record)
+            except (OSError, ValueError):
+                self._pending_export_history_record = record
+                self.export_history_warning = (
+                    "The corpus was created, but its local history could not be saved. "
+                    "Retry saving to history."
+                )
+        self.state_changed.emit()
+
+    def _save_export_history(self, record: ExportHistoryRecord) -> None:
+        store = self._export_history_store
+        if store is None:
+            raise ValueError("Export history storage is unavailable.")
+        store.save(record)
+        self._pending_export_history_record = None
+        self.export_history_warning = ""
+        self.selected_export_id = record.export_id
+        loaded = store.load()
+        self.export_history = loaded.records
+        self.export_history_rejected = loaded.rejected
+
+    def retry_save_export_history(self) -> None:
+        record = self._pending_export_history_record
+        if record is None:
+            return
+        try:
+            self._save_export_history(record)
+        except (OSError, ValueError):
+            self.export_history_warning = (
+                "The corpus remains available, but its local history still could not be saved. "
+                "Retry saving to history."
+            )
         self.state_changed.emit()
 
     def _export_failed(self, error: Exception) -> None:
@@ -1750,6 +2013,8 @@ class DetectWorkspaceController(QObject):
         if len(active) > 1:
             raise RunConflictError("Persisted Detect Run history has multiple Active Runs.")
         self.current_run = active[0] if active else record
+        if record.active:
+            self.selected_run_id = record.run_id
         self.run_changed.emit(record)
         self.state_changed.emit()
 
@@ -2073,6 +2338,7 @@ class DetectWorkspaceController(QObject):
             not process_running
             and not self.is_run_active
             and not self.is_scanning
+            and self._export_verification_thread is None
             and not self.is_model_loading
             and not self.is_refinement_model_loading
             and not self.is_export_active

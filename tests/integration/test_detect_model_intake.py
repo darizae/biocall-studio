@@ -18,6 +18,7 @@ from PySide6.QtWidgets import QFileDialog, QPushButton
 
 from biocall_studio.detect.application.controller import DetectWorkspaceController, ModelIntakeState
 from biocall_studio.detect.application.model_intake import inspect_model_directory
+from biocall_studio.detect.application.navigation import DetectRoute
 from biocall_studio.detect.domain.models import (
     ModelFamily,
     ScientificEvidenceState,
@@ -359,13 +360,16 @@ def test_native_model_selection_reopen_states_and_readiness_without_worker(
     )
     page.resize(700, 780)
     qtbot.waitUntil(lambda: page.is_compact)
-    assert page.setup_layout.getItemPosition(page.setup_layout.indexOf(page.model_card))[:2] == (
+    assert page.models_layout.getItemPosition(page.models_layout.indexOf(page.model_card))[:2] == (
         0,
         0,
     )
-    assert page.setup_layout.getItemPosition(page.setup_layout.indexOf(page.collection_card))[
-        :2
-    ] == (1, 0)
+    assert page.models_layout.getItemPosition(
+        page.models_layout.indexOf(page.refinement_model_card)
+    )[:2] == (1, 0)
+    page._navigation[DetectRoute.RECORDINGS].click()
+    assert page.current_route is DetectRoute.RECORDINGS
+    assert page.collection_card.isVisible()
 
     before = controller.model_reference
     monkeypatch.setattr(QFileDialog, "exec", lambda *_args, **_kwargs: 0)

@@ -17,9 +17,11 @@ from alp_ui.components import (
     SelectInput,
     Text,
 )
+from alp_ui.theme import ALPACA_LIGHT, interactions, make_icon
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer, QUrl, Signal
-from PySide6.QtGui import QDesktopServices, QResizeEvent
+from PySide6.QtGui import QColor, QDesktopServices, QPalette, QResizeEvent
 from PySide6.QtWidgets import (
+    QBoxLayout,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -39,6 +41,13 @@ from biocall_studio.detect.application.controller import (
     InventoryState,
     ModelIntakeState,
 )
+from biocall_studio.detect.application.navigation import (
+    SIDEBAR_ROUTES,
+    DetectRoute,
+    active_sidebar_route,
+    adaptive_new_detection_route,
+    parse_detect_route,
+)
 from biocall_studio.detect.domain import RootBindingDecision
 from biocall_studio.detect.domain.detection import DetectionSettings
 from biocall_studio.detect.domain.inventory import (
@@ -50,6 +59,11 @@ from biocall_studio.detect.domain.inventory import (
 )
 from biocall_studio.detect.domain.runs import DetectRunStatus
 from biocall_studio.detect.gui.export import ExportPage
+from biocall_studio.detect.gui.history import (
+    ExportDetailPage,
+    ExportHistoryPage,
+    RunHistoryPage,
+)
 from biocall_studio.detect.gui.results import ResultExplorer
 
 
@@ -213,8 +227,8 @@ class InventoryTableModel(QAbstractTableModel):
         return None
 
 
-class DetectWorkspacePage(QScrollArea):
-    """Researcher-facing Collection setup and read-only source inventory."""
+class DetectWorkspacePage(QWidget):
+    """Persistent Detect navigation with workflow-owned nested history routes."""
 
     return_requested = Signal()
 
@@ -226,23 +240,46 @@ class DetectWorkspacePage(QScrollArea):
         self._rendered_inventory_id: str | None = None
         self.selected_key: str | None = None
         self.setObjectName("detectWorkspacePage")
-        self.setAccessibleName("Detect workflow setup")
-        self.setFrameShape(QFrame.Shape.NoFrame)
-        self.setWidgetResizable(True)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setAccessibleName("Detect workspace")
+
+        self._root_layout = QBoxLayout(QBoxLayout.Direction.LeftToRight, self)
+        self._root_layout.setContentsMargins(0, 0, 0, 0)
+        self._root_layout.setSpacing(0)
+        self.sidebar = self._build_sidebar()
+        self._root_layout.addWidget(self.sidebar)
+
+        self.body = QWidget()
+        light_palette = self.body.palette()
+        light_palette.setColor(
+            QPalette.ColorRole.Window, QColor(ALPACA_LIGHT.colors.background)
+        )
+        self.body.setAutoFillBackground(True)
+        self.body.setPalette(light_palette)
+        self.body_layout = QVBoxLayout(self.body)
+        self.body_layout.setContentsMargins(0, 0, 0, 0)
+        self.body_layout.setSpacing(0)
+        self.slim_header = self._build_slim_header()
+        self.body_layout.addWidget(self.slim_header)
+
+        self.content_scroll = QScrollArea()
+        self.content_scroll.setObjectName("detectContentScroll")
+        self.content_scroll.setAccessibleName("Detect page content")
+        self.content_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.content_scroll.setWidgetResizable(True)
+        self.content_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
 
         self.content = QWidget()
+        self.content.setAutoFillBackground(True)
+        self.content.setPalette(light_palette)
         self.outer = QVBoxLayout(self.content)
-        self.outer.setContentsMargins(48, 34, 48, 48)
+        self.outer.setContentsMargins(38, 30, 38, 42)
         self.outer.setSpacing(22)
         self.outer.addLayout(self._build_heading())
-        self.run_header = self._build_run_header()
-        self.outer.addWidget(self.run_header)
-        self.navigation_layout = self._build_navigation()
-        self.outer.addLayout(self.navigation_layout)
         self.selection_error = QLabel()
         self.selection_error.setWordWrap(True)
-        self.selection_error.setAccessibleName("Recordings folder error")
+        self.selection_error.setAccessibleName("Detect page error")
         self.selection_error.setStyleSheet("color: #B91C1C; font-weight: 600;")
         self.outer.addWidget(self.selection_error)
 
@@ -252,33 +289,40 @@ class DetectWorkspacePage(QScrollArea):
             QSizePolicy.Policy.Ignored,
             QSizePolicy.Policy.Preferred,
         )
-        self.setup_view = QWidget()
-        setup_view_layout = QVBoxLayout(self.setup_view)
-        setup_view_layout.setContentsMargins(0, 0, 0, 0)
-        setup_view_layout.setSpacing(16)
-        self.setup_layout = QGridLayout()
-        self.setup_layout.setHorizontalSpacing(16)
-        self.setup_layout.setVerticalSpacing(16)
+
+        self.settings_card = self._build_settings_card()
+        self.new_detection_view = self._build_new_detection_view()
+
+        self.models_view = QWidget()
+        models_view_layout = QVBoxLayout(self.models_view)
+        models_view_layout.setContentsMargins(0, 0, 0, 0)
+        models_view_layout.setSpacing(16)
+        self.models_layout = QGridLayout()
+        self.models_layout.setHorizontalSpacing(16)
+        self.models_layout.setVerticalSpacing(16)
         self.model_card = self._build_model_card()
-        self.collection_card = self._build_collection_card()
-        self.setup_layout.addWidget(self.model_card, 0, 0)
-        self.setup_layout.addWidget(self.collection_card, 0, 1)
-        self.setup_layout.setColumnStretch(0, 1)
-        self.setup_layout.setColumnStretch(1, 1)
-        setup_view_layout.addLayout(self.setup_layout)
-        setup_actions = QHBoxLayout()
-        setup_actions.addStretch()
-        self.setup_continue_button = Button("Continue to Recordings", variant="primary")
-        self.setup_continue_button.setAccessibleName("Continue from Setup to Recordings")
-        self.setup_continue_button.clicked.connect(lambda: self._set_route("recordings"))
-        setup_actions.addWidget(self.setup_continue_button)
-        setup_view_layout.addLayout(setup_actions)
-        setup_view_layout.addStretch()
+        self.refinement_model_card = self._build_refinement_model_card()
+        self.models_layout.addWidget(self.model_card, 0, 0)
+        self.models_layout.addWidget(self.refinement_model_card, 0, 1)
+        self.models_layout.setColumnStretch(0, 1)
+        self.models_layout.setColumnStretch(1, 1)
+        models_view_layout.addLayout(self.models_layout)
+        models_actions = QHBoxLayout()
+        models_actions.addStretch()
+        self.models_continue_button = Button("Continue to Recordings", variant="primary")
+        self.models_continue_button.clicked.connect(
+            lambda: self._set_route(DetectRoute.RECORDINGS)
+        )
+        models_actions.addWidget(self.models_continue_button)
+        models_view_layout.addLayout(models_actions)
+        models_view_layout.addStretch()
 
         self.recordings_view = QWidget()
         recordings_layout = QVBoxLayout(self.recordings_view)
         recordings_layout.setContentsMargins(0, 0, 0, 0)
         recordings_layout.setSpacing(18)
+        self.collection_card = self._build_collection_card()
+        recordings_layout.addWidget(self.collection_card)
         self.recordings_card = self._build_recordings_card()
         recordings_layout.addWidget(self.recordings_card)
         self.inventory_content = self._build_inventory_content()
@@ -288,41 +332,78 @@ class DetectWorkspacePage(QScrollArea):
         self.different_card = self._build_different_card()
         recordings_layout.addWidget(self.different_card)
         recordings_actions = QHBoxLayout()
-        self.recordings_back_button = Button("Back to Setup", variant="outline")
-        self.recordings_back_button.clicked.connect(lambda: self._set_route("setup"))
+        self.recordings_back_button = Button("Back to Models", variant="outline")
+        self.recordings_back_button.clicked.connect(
+            lambda: self._set_route(DetectRoute.MODELS)
+        )
         recordings_actions.addWidget(self.recordings_back_button)
         recordings_actions.addStretch()
-        self.recordings_continue_button = Button("Continue to Run", variant="primary")
-        self.recordings_continue_button.clicked.connect(lambda: self._set_route("run"))
+        self.recordings_continue_button = Button(
+            "Continue to New detection", variant="primary"
+        )
+        self.recordings_continue_button.clicked.connect(
+            lambda: self._set_route(DetectRoute.NEW_DETECTION)
+        )
         recordings_actions.addWidget(self.recordings_continue_button)
         recordings_layout.addLayout(recordings_actions)
         recordings_layout.addStretch()
 
-        self.settings_card = self._build_settings_card()
         self.run_view = self._build_run_view()
+        self.run_history_page = RunHistoryPage(self.controller)
+        self.run_history_page.run_requested.connect(self._open_run)
         self.result_explorer = ResultExplorer(self.controller)
-        self.result_explorer.run_requested.connect(lambda: self._set_route("run"))
-        self.result_explorer.recordings_requested.connect(lambda: self._set_route("recordings"))
+        self.result_explorer.run_requested.connect(self._open_result_or_active_run)
+        self.result_explorer.recordings_requested.connect(
+            lambda: self._set_route(DetectRoute.RECORDINGS)
+        )
+        self.result_explorer.models_requested.connect(
+            lambda: self._set_route(DetectRoute.MODELS)
+        )
         self.result_explorer.export_requested.connect(self._open_export)
+        self.export_history_page = ExportHistoryPage(self.controller)
+        self.export_history_page.export_requested.connect(self._open_export_detail)
+        self.export_history_page.new_export_requested.connect(self._open_export)
+        self.export_detail_page = ExportDetailPage(self.controller, self._show_in_folder)
+        self.export_detail_page.back_requested.connect(
+            lambda: self._set_route(DetectRoute.EXPORTS)
+        )
         self.export_page = ExportPage(self.controller)
-        self.export_page.results_requested.connect(lambda: self._set_route("results"))
+        self.export_page.results_requested.connect(
+            lambda: self._set_route(DetectRoute.RESULTS)
+        )
+        self.export_page.exports_requested.connect(self._view_completed_export)
 
-        self.route_stack.addWidget(self.setup_view)
-        self.route_stack.addWidget(self.recordings_view)
-        self.route_stack.addWidget(self.run_view)
-        self.route_stack.addWidget(self.result_explorer)
-        self.route_stack.addWidget(self.export_page)
+        self._route_pages = {
+            DetectRoute.NEW_DETECTION: self.new_detection_view,
+            DetectRoute.RECORDINGS: self.recordings_view,
+            DetectRoute.MODELS: self.models_view,
+            DetectRoute.RUNS: self.run_history_page,
+            DetectRoute.RUN_DETAIL: self.run_view,
+            DetectRoute.RESULTS: self.result_explorer,
+            DetectRoute.EXPORTS: self.export_history_page,
+            DetectRoute.EXPORT_DETAIL: self.export_detail_page,
+            DetectRoute.EXPORT_NEW: self.export_page,
+        }
+        for page in self._route_pages.values():
+            self.route_stack.addWidget(page)
         self.outer.addWidget(self.route_stack)
         self.outer.addStretch()
-        self.setWidget(self.content)
+        self.content_scroll.setWidget(self.content)
+        self.content_scroll.viewport().setAutoFillBackground(True)
+        self.content_scroll.viewport().setPalette(light_palette)
+        self.body_layout.addWidget(self.content_scroll, 1)
+        self._root_layout.addWidget(self.body, 1)
 
         self.controller.state_changed.connect(self._render)
         self.controller.scan_progress_changed.connect(lambda _progress: self._render_scan())
         self.model_picker.folderChanged.connect(self.controller.choose_model_root)
+        self.refinement_model_picker.folderChanged.connect(
+            self.controller.choose_refinement_model_root
+        )
         self.folder_picker.folderChanged.connect(self.controller.choose_source_root)
         self.relink_picker.folderChanged.connect(self.controller.choose_source_root)
-        self.current_route = "setup"
-        self._set_route("setup")
+        self.current_route = DetectRoute.MODELS
+        self._navigate_new_detection()
         self._render()
 
     def _setting_row(self, field: QWidget, help_text: str, subject: str, copy_id: str) -> QWidget:
@@ -419,14 +500,6 @@ class DetectWorkspacePage(QScrollArea):
         return card
 
     def _run_primary_action(self) -> None:
-        record = self.controller.current_run
-        if (
-            record is not None
-            and record.status is DetectRunStatus.COMPLETED
-            and self.controller.current_result is not None
-        ):
-            self._set_route("results")
-            return
         self._start_detection()
 
     def _start_detection(self) -> None:
@@ -444,7 +517,106 @@ class DetectWorkspacePage(QScrollArea):
             self.selection_error.setText(str(exc))
             self.selection_error.setVisible(True)
             return
-        self._set_route("run")
+        self._set_route(DetectRoute.RUN_DETAIL)
+
+    def _build_sidebar(self) -> QFrame:
+        sidebar = QFrame()
+        sidebar.setObjectName("detectSidebar")
+        sidebar.setAccessibleName("Detect navigation")
+        sidebar.setFixedWidth(220)
+        sidebar.setStyleSheet(
+            f"QFrame#detectSidebar {{ background: {ALPACA_LIGHT.colors.surface}; "
+            f"border-right: 1px solid {ALPACA_LIGHT.colors.border}; }}"
+        )
+        self.sidebar_layout = QVBoxLayout(sidebar)
+        self.sidebar_layout.setContentsMargins(18, 27, 18, 18)
+        self.sidebar_layout.setSpacing(7)
+
+        self.sidebar_brand = Text("Detect", role="subheading")
+        self.sidebar_layout.addWidget(self.sidebar_brand)
+        self.sidebar_layout.addSpacing(18)
+
+        self.nav_scroll = QScrollArea()
+        self.nav_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.nav_scroll.setWidgetResizable(True)
+        self.nav_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.nav_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.nav_scroll.setStyleSheet("QScrollArea { background: transparent; border: 0; }")
+        nav_content = QWidget()
+        nav_palette = nav_content.palette()
+        nav_palette.setColor(
+            QPalette.ColorRole.Window, QColor(ALPACA_LIGHT.colors.surface)
+        )
+        nav_content.setAutoFillBackground(True)
+        nav_content.setPalette(nav_palette)
+        self.nav_scroll.viewport().setAutoFillBackground(True)
+        self.nav_scroll.viewport().setPalette(nav_palette)
+        self.navigation_layout = QBoxLayout(
+            QBoxLayout.Direction.TopToBottom, nav_content
+        )
+        self.navigation_layout.setContentsMargins(0, 0, 0, 0)
+        self.navigation_layout.setSpacing(7)
+        labels = {
+            DetectRoute.NEW_DETECTION: ("New detection", "plus"),
+            DetectRoute.RECORDINGS: ("Recordings", "folder"),
+            DetectRoute.MODELS: ("Models", "info"),
+            DetectRoute.RUNS: ("Runs", "list"),
+            DetectRoute.RESULTS: ("Results", "grid"),
+            DetectRoute.EXPORTS: ("Exports", "folder"),
+        }
+        self._navigation: dict[DetectRoute, QPushButton] = {}
+        for route in SIDEBAR_ROUTES:
+            label, icon = labels[route]
+            button = QPushButton(label)
+            button.setAccessibleName(f"{label} navigation")
+            button.setCheckable(True)
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.setMinimumHeight(38)
+            button.setIcon(make_icon(icon, color=ALPACA_LIGHT.colors.text_muted, size=18))
+            button.setProperty("icon_name", icon)
+            if route is DetectRoute.NEW_DETECTION:
+                button.clicked.connect(self._navigate_new_detection)
+            else:
+                button.clicked.connect(
+                    lambda _checked=False, selected=route: self._set_route(selected)
+                )
+            self._navigation[route] = button
+            self.navigation_layout.addWidget(button)
+        self.navigation_layout.addStretch()
+        self.nav_scroll.setWidget(nav_content)
+        self.sidebar_layout.addWidget(self.nav_scroll, 1)
+        return sidebar
+
+    def _build_slim_header(self) -> QFrame:
+        header = QFrame()
+        header.setObjectName("detectHeader")
+        header.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Minimum,
+        )
+        header.setStyleSheet(
+            f"QFrame#detectHeader {{ background: {ALPACA_LIGHT.colors.surface}; "
+            f"border-bottom: 1px solid {ALPACA_LIGHT.colors.border}; }}"
+        )
+        self.header_layout = QGridLayout(header)
+        self.header_layout.setContentsMargins(28, 12, 28, 12)
+        self.header_layout.setHorizontalSpacing(12)
+        self.header_layout.setVerticalSpacing(8)
+        self.back_button = Button("Back to Studio", variant="outline", size="small")
+        self.back_button.setAccessibleName("Back to Studio launchpad")
+        self.back_button.clicked.connect(self.return_requested)
+        self.header_layout.addWidget(self.back_button, 0, 0)
+        self.header_layout.setColumnStretch(1, 1)
+        self.active_run_label = Text("No active Run", role="body", word_wrap=True)
+        self.header_layout.addWidget(self.active_run_label, 0, 2)
+        self.active_run_badge = Badge("Idle", intent="neutral")
+        self.active_run_badge.setAccessibleName("Detect Run status: Idle")
+        self.header_layout.addWidget(self.active_run_badge, 0, 3)
+        self.view_run_button = Button("View Run", variant="outline", size="small")
+        self.view_run_button.setAccessibleName("View active Detect Run")
+        self.view_run_button.clicked.connect(self._open_active_run)
+        self.header_layout.addWidget(self.view_run_button, 0, 4)
+        return header
 
     def _build_heading(self) -> QGridLayout:
         heading = QGridLayout()
@@ -455,48 +627,110 @@ class DetectWorkspacePage(QScrollArea):
         self.page_title = Text("Prepare candidate detection", role="title")
         self.heading_copy.addWidget(self.page_title)
         self.page_description = Text(
-            "Choose a detection Model and recordings folder in either order.",
+            "Choose a detection model and recordings folder.",
             role="body",
             word_wrap=True,
         )
         self.heading_copy.addWidget(self.page_description)
         heading.addLayout(self.heading_copy, 0, 0)
         heading.setColumnStretch(0, 1)
-        self.back_button = Button("Back to Studio", variant="outline")
-        self.back_button.setAccessibleName("Back to Studio launchpad")
-        self.back_button.clicked.connect(self.return_requested)
-        heading.addWidget(self.back_button, 0, 1, Qt.AlignmentFlag.AlignTop)
         self.heading_layout = heading
         return heading
 
-    def _build_navigation(self) -> QGridLayout:
-        navigation = QGridLayout()
-        navigation.setHorizontalSpacing(7)
-        navigation.setVerticalSpacing(7)
-        route_names = ("setup", "recordings", "run", "results", "export")
-        labels = ("Setup", "Recordings", "Run", "Results", "Export")
-        self.step_buttons: list[Button] = []
-        self.step_chevrons: list[QLabel] = []
-        for index, (route, label) in enumerate(zip(route_names, labels, strict=True)):
-            button = Button(label, variant="outline", size="small")
-            button.setCheckable(True)
-            button.setAutoExclusive(True)
-            if route == "export":
-                button.clicked.connect(self._navigate_export)
-            else:
-                button.clicked.connect(lambda _=False, selected=route: self._set_route(selected))
-            setattr(self, f"{route}_button", button)
-            self.step_buttons.append(button)
-            navigation.addWidget(button, 0, index * 2)
-            if index < len(labels) - 1:
-                chevron = QLabel("›")
-                chevron.setAccessibleName("")
-                chevron.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-                chevron.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.step_chevrons.append(chevron)
-                navigation.addWidget(chevron, 0, index * 2 + 1)
-        navigation.setColumnStretch(len(labels) * 2 - 1, 1)
-        return navigation
+    def _build_new_detection_view(self) -> QWidget:
+        view = QWidget()
+        outer = QVBoxLayout(view)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(16)
+        self.run_summary_card = Card()
+        self.run_summary_card.setAccessibleName("Detection input summary and readiness")
+        self.run_summary_card.content_layout.addWidget(Text("Inputs", role="heading"))
+        summary = QGridLayout()
+        summary.setHorizontalSpacing(18)
+        summary.setVerticalSpacing(8)
+        summary.addWidget(QLabel("Detection model"), 0, 0)
+        summary.addWidget(QLabel("Included recordings"), 0, 1)
+        self.run_summary_model = Text("Not selected", role="subheading", word_wrap=True)
+        self.run_summary_recordings = Text("0 recordings", role="subheading")
+        summary.addWidget(self.run_summary_model, 1, 0)
+        summary.addWidget(self.run_summary_recordings, 1, 1)
+        self.change_model_button = Button("Change model", variant="outline", size="small")
+        self.change_model_button.clicked.connect(
+            lambda: self._set_route(DetectRoute.MODELS)
+        )
+        summary.addWidget(self.change_model_button, 2, 0, Qt.AlignmentFlag.AlignLeft)
+        self.change_recordings_button = Button(
+            "Review recordings", variant="outline", size="small"
+        )
+        self.change_recordings_button.clicked.connect(
+            lambda: self._set_route(DetectRoute.RECORDINGS)
+        )
+        summary.addWidget(self.change_recordings_button, 2, 1, Qt.AlignmentFlag.AlignLeft)
+        summary.setColumnStretch(0, 1)
+        summary.setColumnStretch(1, 1)
+        self.run_summary_card.content_layout.addLayout(summary)
+        self.run_blocker = Text(
+            "Choose a compatible detection model.", role="body", word_wrap=True
+        )
+        self.run_blocker.setAccessibleName("Detection readiness")
+        self.run_summary_card.content_layout.addWidget(self.run_blocker)
+        outer.addWidget(self.run_summary_card)
+        outer.addWidget(self.settings_card)
+        footer = QHBoxLayout()
+        self.settings_back_button = Button("Back to Recordings", variant="outline")
+        self.settings_back_button.clicked.connect(
+            lambda: self._set_route(DetectRoute.RECORDINGS)
+        )
+        footer.addWidget(self.settings_back_button)
+        footer.addStretch()
+        outer.addLayout(footer)
+        outer.addStretch()
+        return view
+
+    def _build_refinement_model_card(self) -> Card:
+        card = Card()
+        card.setAccessibleName("Random Forest model selection")
+        header = QHBoxLayout()
+        header.addWidget(Text("Random Forest model", role="heading"))
+        header.addWidget(
+            _context_help(
+                "CTX-09",
+                "Optionally use a Random Forest model to check the calls found by the detection "
+                "model. The original results stay unchanged.",
+                "RF refinement",
+            ),
+            0,
+            Qt.AlignmentFlag.AlignTop,
+        )
+        header.addStretch()
+        self.refinement_model_status_badge = Badge("Not selected", intent="neutral")
+        header.addWidget(self.refinement_model_status_badge, 0, Qt.AlignmentFlag.AlignTop)
+        card.content_layout.addLayout(header)
+        self.refinement_model_name = Text("", role="subheading", word_wrap=True)
+        self.refinement_model_name.hide()
+        card.content_layout.addWidget(self.refinement_model_name)
+        self.refinement_model_detail = QLabel("")
+        self.refinement_model_detail.setWordWrap(True)
+        self.refinement_model_detail.hide()
+        card.content_layout.addWidget(self.refinement_model_detail)
+        self.refinement_model_picker = FolderPicker(
+            label="Random Forest model folder", show_hidden=True
+        )
+        self.refinement_model_picker.setAccessibleDescription(
+            "Choose one Random Forest model folder created in Train."
+        )
+        card.content_layout.addWidget(self.refinement_model_picker)
+        actions = QHBoxLayout()
+        actions.addStretch()
+        self.clear_refinement_model_button = Button(
+            "Clear model", variant="outline", size="small"
+        )
+        self.clear_refinement_model_button.clicked.connect(
+            self.controller.clear_refinement_model_selection
+        )
+        actions.addWidget(self.clear_refinement_model_button)
+        card.content_layout.addLayout(actions)
+        return card
 
     def _open_export(self) -> None:
         try:
@@ -504,33 +738,67 @@ class DetectWorkspacePage(QScrollArea):
         except (RuntimeError, ValueError) as exc:
             self.selection_error.setText(str(exc))
             self.selection_error.setVisible(True)
-        self._set_route("export")
+        self._set_route(DetectRoute.EXPORT_NEW)
 
-    def _navigate_export(self) -> None:
-        self._open_export()
+    def _open_run(self, run_id: str) -> None:
+        self.controller.select_run(run_id)
+        self._set_route(DetectRoute.RUN_DETAIL)
 
-    def _build_run_header(self) -> Card:
-        card = Card()
-        card.setAccessibleName("Current Detect Run")
-        layout = QGridLayout()
-        layout.setHorizontalSpacing(12)
-        layout.setVerticalSpacing(8)
-        self.run_header_labels = QVBoxLayout()
-        self.run_header_labels.setSpacing(3)
-        self.active_run_label = Text("No active Run", role="subheading", word_wrap=True)
-        self.run_header_labels.addWidget(self.active_run_label)
-        layout.addLayout(self.run_header_labels, 0, 0)
-        layout.setColumnStretch(0, 1)
-        self.active_run_badge = Badge("Idle", intent="neutral")
-        self.active_run_badge.setAccessibleName("Detect Run status: Idle")
-        layout.addWidget(self.active_run_badge, 0, 1)
-        self.view_run_button = Button("View Run", variant="outline", size="small")
-        self.view_run_button.setAccessibleName("View current Detect Run")
-        self.view_run_button.clicked.connect(lambda: self._set_route("run"))
-        layout.addWidget(self.view_run_button, 0, 2)
-        self.run_header_layout = layout
-        card.content_layout.addLayout(layout)
-        return card
+    def _open_active_run(self) -> None:
+        record = self.controller.active_run
+        if record is not None:
+            self._open_run(record.run_id)
+
+    def _open_result_or_active_run(self) -> None:
+        active = self.controller.active_run
+        if active is not None:
+            self._open_run(active.run_id)
+            return
+        item = self.controller.selected_result_item
+        if item is not None:
+            self._open_run(item.run_id)
+
+    def _open_selected_run_result(self) -> None:
+        record = self.controller.selected_run
+        if record is None:
+            return
+        try:
+            self.controller.select_result_for_run(record.run_id)
+        except ValueError as exc:
+            self.selection_error.setText(str(exc))
+            self.selection_error.show()
+            return
+        self._set_route(DetectRoute.RESULTS)
+
+    def _open_export_detail(self, export_id: str) -> None:
+        try:
+            self.controller.select_export(export_id)
+        except (RuntimeError, ValueError) as exc:
+            self.selection_error.setText(str(exc))
+            self.selection_error.show()
+            return
+        self._set_route(DetectRoute.EXPORT_DETAIL)
+
+    def _view_completed_export(self) -> None:
+        receipt = self.controller.export_receipt
+        if receipt is not None:
+            self._open_export_detail(receipt.export_id)
+
+    def _show_in_folder(self, path: str) -> None:
+        QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+
+    def _navigate_new_detection(self) -> None:
+        route = adaptive_new_detection_route(
+            model_compatible=(
+                self.controller.model_state is ModelIntakeState.COMPATIBLE
+                and self.controller.model_reference is not None
+            ),
+            recordings_reviewed=self.controller.recordings_reviewed,
+            active_run=self.controller.active_run is not None,
+        )
+        if route is DetectRoute.RUN_DETAIL and self.controller.active_run is not None:
+            self.controller.select_run(self.controller.active_run.run_id)
+        self._set_route(route)
 
     def _build_run_view(self) -> QWidget:
         view = QWidget()
@@ -538,32 +806,12 @@ class DetectWorkspacePage(QScrollArea):
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(16)
 
-        self.run_summary_card = Card()
-        self.run_summary_card.setAccessibleName("Run input summary and readiness")
-        self.run_summary_card.content_layout.addWidget(Text("Run inputs", role="heading"))
-        summary = QGridLayout()
-        summary.setHorizontalSpacing(18)
-        summary.setVerticalSpacing(6)
-        summary.addWidget(Text("Detection Model", role="caption"), 0, 0)
-        summary.addWidget(Text("Included recordings", role="caption"), 0, 1)
-        self.run_summary_model = Text("Not selected", role="subheading", word_wrap=True)
-        self.run_summary_recordings = Text("0 recordings", role="subheading")
-        summary.addWidget(self.run_summary_model, 1, 0)
-        summary.addWidget(self.run_summary_recordings, 1, 1)
-        summary.setColumnStretch(0, 2)
-        summary.setColumnStretch(1, 1)
-        self.run_summary_card.content_layout.addLayout(summary)
-        self.run_blocker = Text("Choose a compatible Detection Model.", role="body", word_wrap=True)
-        self.run_blocker.setAccessibleName("Run readiness")
-        self.run_summary_card.content_layout.addWidget(self.run_blocker)
-        outer.addWidget(self.run_summary_card)
-        outer.addWidget(self.settings_card)
-
         self.run_guidance = QLabel()
         self.run_guidance.setWordWrap(True)
         self.run_guidance.setAccessibleName("Detect Run guidance")
         self.run_guidance.setStyleSheet(
-            "padding: 12px; border: 1px solid #CBD5E1; border-left: 4px solid #2563EB; "
+            "padding: 12px; color: #0F172A; background: #EFF6FF; "
+            "border: 1px solid #CBD5E1; border-left: 4px solid #2563EB; "
             "border-radius: 7px;"
         )
         outer.addWidget(self.run_guidance)
@@ -598,6 +846,9 @@ class DetectWorkspacePage(QScrollArea):
         self.cancel_run_button.clicked.connect(self.controller.cancel_active_run)
         actions.addWidget(self.cancel_run_button)
         actions.addStretch()
+        self.open_run_result_button = Button("Open Result", variant="primary")
+        self.open_run_result_button.clicked.connect(self._open_selected_run_result)
+        actions.addWidget(self.open_run_result_button)
         self.open_run_log_button = Button("Open Run log", variant="outline")
         self.open_run_log_button.setAccessibleDescription(
             "Open the diagnostic log for this detection run."
@@ -620,8 +871,8 @@ class DetectWorkspacePage(QScrollArea):
         self.run_layout.setColumnStretch(1, 1)
         outer.addLayout(self.run_layout)
         footer = QHBoxLayout()
-        self.run_back_button = Button("Back to Recordings", variant="outline")
-        self.run_back_button.clicked.connect(lambda: self._set_route("recordings"))
+        self.run_back_button = Button("Back to Runs", variant="outline")
+        self.run_back_button.clicked.connect(lambda: self._set_route(DetectRoute.RUNS))
         footer.addWidget(self.run_back_button)
         footer.addStretch()
         outer.addLayout(footer)
@@ -629,7 +880,7 @@ class DetectWorkspacePage(QScrollArea):
         return view
 
     def _open_run_log(self) -> None:
-        record = self.controller.current_run
+        record = self.controller.selected_run
         if record is None:
             return
         path = self.controller.safe_run_log_path(record.run_id)
@@ -1154,12 +1405,74 @@ class DetectWorkspacePage(QScrollArea):
         }[state]
         self.model_detail.setText(correction)
         self.model_detail.setVisible(bool(correction))
-        self.model_picker.setEnabled(state is not ModelIntakeState.LOADING)
+        inputs_locked = self.controller.is_run_active
+        self.model_picker.setEnabled(
+            state is not ModelIntakeState.LOADING and not inputs_locked
+        )
         self.clear_model_button.setEnabled(
-            selected is not None and state is not ModelIntakeState.LOADING
+            selected is not None
+            and state is not ModelIntakeState.LOADING
+            and not inputs_locked
         )
         if state is not ModelIntakeState.LOADING:
             self.model_picker.setFolderPath("" if selected is None else str(selected))
+
+    def _render_refinement_model(self) -> None:
+        state = self.controller.refinement_model_state
+        status = {
+            ModelIntakeState.EMPTY: "Not selected",
+            ModelIntakeState.LOADING: "Checking",
+            ModelIntakeState.COMPATIBLE: "Compatible",
+            ModelIntakeState.INCOMPATIBLE: "Incompatible",
+            ModelIntakeState.MISSING: "Missing files",
+        }[state]
+        self.refinement_model_status_badge.setText(status)
+        self.refinement_model_status_badge.setIntent(
+            {
+                ModelIntakeState.EMPTY: "neutral",
+                ModelIntakeState.LOADING: "warning",
+                ModelIntakeState.COMPATIBLE: "success",
+                ModelIntakeState.INCOMPATIBLE: "danger",
+                ModelIntakeState.MISSING: "danger",
+            }[state]
+        )
+        self.refinement_model_status_badge.setAccessibleName(
+            f"Random Forest model status: {status}"
+        )
+        reference = self.controller.refinement_model_reference
+        selected = self.controller.selected_refinement_model_root
+        self.refinement_model_name.setText(
+            reference.snapshot.label if reference is not None else ""
+        )
+        self.refinement_model_name.setVisible(reference is not None)
+        correction = {
+            ModelIntakeState.EMPTY: "",
+            ModelIntakeState.LOADING: "",
+            ModelIntakeState.COMPATIBLE: "",
+            ModelIntakeState.INCOMPATIBLE: (
+                "This folder does not contain a compatible Random Forest model. "
+                "Choose a different model folder."
+            ),
+            ModelIntakeState.MISSING: (
+                "The selected Random Forest model files are unavailable. "
+                "Choose the model folder again."
+            ),
+        }[state]
+        self.refinement_model_detail.setText(correction)
+        self.refinement_model_detail.setVisible(bool(correction))
+        inputs_locked = self.controller.is_run_active
+        self.refinement_model_picker.setEnabled(
+            state is not ModelIntakeState.LOADING and not inputs_locked
+        )
+        self.clear_refinement_model_button.setEnabled(
+            selected is not None
+            and state is not ModelIntakeState.LOADING
+            and not inputs_locked
+        )
+        if state is not ModelIntakeState.LOADING:
+            self.refinement_model_picker.setFolderPath(
+                "" if selected is None else str(selected)
+            )
 
     def _render_readiness(self) -> None:
         settings_locked = self.controller.is_run_active
@@ -1169,36 +1482,30 @@ class DetectWorkspacePage(QScrollArea):
             self.combine_nearby,
         ):
             field.setEnabled(not settings_locked)
-        collection = self.controller.active_collection
         snapshot = self.controller.snapshot
         reference = self.controller.model_reference
-        self.setup_continue_button.setEnabled(collection is not None)
+        model_ready = (
+            self.controller.model_state is ModelIntakeState.COMPATIBLE
+            and reference is not None
+        )
+        self.models_continue_button.setEnabled(model_ready)
+        self.recordings_continue_button.setEnabled(self.controller.recordings_reviewed)
         self.run_summary_model.setText(
             reference.snapshot.label if reference is not None else "Not selected"
         )
         included = 0 if snapshot is None else snapshot.counts.included
         self.run_summary_recordings.setText(f"{included:,} recording{'s' if included != 1 else ''}")
-        record = self.controller.current_run
-        completed = (
-            record is not None
-            and record.status is DetectRunStatus.COMPLETED
-            and self.controller.current_result is not None
+        self.start_detection_button.setText("Start detection")
+        self.start_detection_button.setAccessibleDescription(
+            "Check the selected model and recordings, then start detection."
         )
-        if completed:
-            self.start_detection_button.setText("Continue to Results")
-            self.start_detection_button.setAccessibleDescription(
-                "Open the result saved by this run."
-            )
-            self.start_detection_button.setEnabled(True)
-        elif self.controller.is_run_active:
+        if self.controller.is_run_active:
             self.start_detection_button.setText("Detection running")
             self.start_detection_button.setEnabled(False)
         else:
-            self.start_detection_button.setText("Start detection")
-            self.start_detection_button.setAccessibleDescription(
-                "Check the selected model and recordings, then start detection."
-            )
             self.start_detection_button.setEnabled(self.controller.inputs_ready)
+        self.change_model_button.setEnabled(not settings_locked)
+        self.change_recordings_button.setEnabled(not settings_locked)
         if self.controller.is_run_active:
             self.run_blocker.setText("Detection is running with the selected inputs.")
             return
@@ -1308,21 +1615,23 @@ class DetectWorkspacePage(QScrollArea):
         self.controller.clear_inventory_decision(entry.key.rstrip("/"), is_folder=entry.is_folder)
 
     def _render_run_header(self) -> None:
-        record = self.controller.current_run
+        record = self.controller.active_run
         if record is None:
             self.active_run_label.setText("No active Run")
             self.active_run_badge.setText("Idle")
             self.active_run_badge.setAccessibleName("Detect Run status: Idle")
+            self.active_run_badge.setIntent("neutral")
             self.view_run_button.setVisible(False)
             return
         status = record.status.value.capitalize()
         self.active_run_label.setText(record.title)
         self.active_run_badge.setText(status)
+        self.active_run_badge.setIntent("warning")
         self.active_run_badge.setAccessibleName(f"Detect Run status: {status}")
-        self.view_run_button.setVisible(self.current_route != "run")
+        self.view_run_button.setVisible(self.current_route is not DetectRoute.RUN_DETAIL)
 
     def _render_run(self) -> None:
-        record = self.controller.current_run
+        record = self.controller.selected_run
         if record is None:
             self.run_title.setText("Run not started")
             self.run_stage.setText("Waiting for verified setup")
@@ -1337,10 +1646,12 @@ class DetectWorkspacePage(QScrollArea):
             )
             self.cancel_run_button.setEnabled(False)
             self.open_run_log_button.setEnabled(False)
+            self.open_run_result_button.setEnabled(False)
             return
 
         status = record.status.value.capitalize()
-        result = self.controller.current_result
+        result_item = self.controller.result_item_for_run(record.run_id)
+        result = None if result_item is None else result_item.result
         guidance = {
             DetectRunStatus.PREPARING: "Preparing the recordings.",
             DetectRunStatus.RUNNING: "Searching recordings for possible calls.",
@@ -1348,14 +1659,14 @@ class DetectWorkspacePage(QScrollArea):
                 "Cancellation requested. Waiting for detection to stop safely."
             ),
             DetectRunStatus.CANCELLED: (
-                "This run was cancelled. Review setup and start a new run."
+                "This run was cancelled. Review the inputs and start a new detection."
             ),
             DetectRunStatus.INTERRUPTED: (
-                "Detection stopped unexpectedly. Review setup and start a new run."
+                "Detection stopped unexpectedly. Review the inputs and start a new detection."
             ),
             DetectRunStatus.FAILED: (
                 _researcher_run_text(record.error_message)
-                or "The run failed. Review setup and start a new run."
+                or "The run failed. Review the inputs and start a new detection."
             ),
             DetectRunStatus.COMPLETED: (
                 (
@@ -1393,7 +1704,11 @@ class DetectWorkspacePage(QScrollArea):
         )
         self.run_guidance.setText(guidance)
         self.cancel_run_button.setEnabled(
-            record.status in {DetectRunStatus.PREPARING, DetectRunStatus.RUNNING}
+            record.active
+            and record.status in {DetectRunStatus.PREPARING, DetectRunStatus.RUNNING}
+        )
+        self.open_run_result_button.setEnabled(
+            record.status is DetectRunStatus.COMPLETED and result is not None
         )
         self.open_run_log_button.setEnabled(
             self.controller.safe_run_log_path(record.run_id) is not None
@@ -1403,10 +1718,13 @@ class DetectWorkspacePage(QScrollArea):
         self._render_run_header()
         self._render_run()
         self._render_model()
-        for button in self.step_buttons:
-            button.setEnabled(True)
+        self._render_refinement_model()
+        self.run_history_page.render()
         self.result_explorer.render()
+        self.export_history_page.render()
+        self.export_detail_page.render()
         self.export_page.render()
+        self._update_route_heading()
         collection = self.controller.active_collection
         proposal = self.controller.proposal
         self.relink_card.setVisible(
@@ -1480,210 +1798,246 @@ class DetectWorkspacePage(QScrollArea):
         )
         if recordings_attention and not self._recordings_attention_active:
             self._recordings_attention_active = True
-            if self.current_route == "setup":
-                self._set_route("recordings")
+            if self.current_route is DetectRoute.NEW_DETECTION:
+                self._set_route(DetectRoute.RECORDINGS)
         elif not recordings_attention:
             self._recordings_attention_active = False
         self._render_inventory()
         self._render_readiness()
 
-    def _set_route(self, route: str) -> None:
-        if route not in {"setup", "recordings", "run", "results", "export"}:
-            raise ValueError(f"Unknown Detect route: {route}")
-        route_changed = getattr(self, "current_route", None) != route
-        self.current_route = route
-        self.setup_button.setChecked(route == "setup")
-        self.recordings_button.setChecked(route == "recordings")
-        self.run_button.setChecked(route == "run")
-        self.results_button.setChecked(route == "results")
-        self.export_button.setChecked(route == "export")
-        self.route_stack.setCurrentWidget(
-            {
-                "setup": self.setup_view,
-                "recordings": self.recordings_view,
-                "run": self.run_view,
-                "results": self.result_explorer,
-                "export": self.export_page,
-            }[route]
-        )
-        if route == "setup":
-            self.page_title.setText("Prepare candidate detection")
-            self.page_description.setText(
-                "Choose a detection Model and recordings folder in either order."
+    def _update_route_heading(self) -> None:
+        record = self.controller.selected_run
+        titles = {
+            DetectRoute.NEW_DETECTION: (
+                "New detection",
+                "Review the selected inputs and candidate settings.",
+            ),
+            DetectRoute.RECORDINGS: (
+                "Recordings",
+                "Choose the WAV files to search in this recordings folder.",
+            ),
+            DetectRoute.MODELS: (
+                "Models",
+                "Choose the detection model and optional Random Forest model.",
+            ),
+            DetectRoute.RUNS: ("Runs", "Open current and previous detection Runs."),
+            DetectRoute.RUN_DETAIL: (
+                "Run" if record is None else record.title,
+                "Follow progress or review the completed Run.",
+            ),
+            DetectRoute.RESULTS: (
+                "Results",
+                "Review possible calls at their original recording times.",
+            ),
+            DetectRoute.EXPORTS: ("Exports", "Open completed corpus exports."),
+            DetectRoute.EXPORT_DETAIL: (
+                "Export details",
+                "Check the saved files against their receipt.",
+            ),
+            DetectRoute.EXPORT_NEW: (
+                "New export",
+                "Choose a format and destination for the selected calls.",
+            ),
+        }
+        title, description = titles[self.current_route]
+        self.page_title.setText(title)
+        self.page_description.setText(description)
+
+    def _set_route(self, route: str | DetectRoute) -> None:
+        parsed = parse_detect_route(route)
+        route_changed = getattr(self, "current_route", None) is not parsed
+        self.current_route = parsed
+        self.route_stack.setCurrentWidget(self._route_pages[parsed])
+        active = active_sidebar_route(parsed)
+        colors = ALPACA_LIGHT.colors
+        selected = interactions(ALPACA_LIGHT).selected_surface
+        for name, button in self._navigation.items():
+            current = name is active
+            button.setChecked(current)
+            button.setAccessibleDescription("Current page" if current else "")
+            button.setIcon(
+                make_icon(
+                    button.property("icon_name"),
+                    color=colors.primary if current else colors.text_muted,
+                    size=18,
+                )
             )
-        elif route == "recordings":
-            self.page_title.setText("Recordings")
-            self.page_description.setText("Approve the WAVs that belong to this recordings folder.")
-        elif route == "run":
-            self.page_title.setText(
-                "Detect Run"
-                if self.controller.current_run is None
-                else self.controller.current_run.title
+            button.setStyleSheet(
+                f"QPushButton {{ text-align: left; border: 0; border-radius: 8px; "
+                f"padding: 0 14px; background: {selected if current else 'transparent'}; "
+                f"color: {colors.primary_hover if current else colors.text_muted}; "
+                f"font-weight: {600 if current else 400}; }}"
+                f"QPushButton:hover {{ background: {selected}; "
+                f"color: {colors.primary_hover}; }}"
+                f"QPushButton:focus {{ border: 1px solid {colors.info}; }}"
             )
-            self.page_description.setText(
-                "Review candidate settings and inputs, then follow detection progress."
-            )
-        elif route == "results":
-            self.page_title.setText("Results")
-            self.page_description.setText(
-                "Review possible calls at their original times in each recording."
-            )
-        else:
-            self.page_title.setText("Plan corpus export")
-            self.page_description.setText(
-                "Choose a format and destination. Export becomes available after calls are "
-                "selected."
-            )
-        routes = ("setup", "recordings", "run", "results", "export")
-        labels = ("Setup", "Recordings", "Run", "Results", "Export")
-        for index, (name, label, button) in enumerate(
-            zip(routes, labels, self.step_buttons, strict=True), start=1
-        ):
-            button.setAccessibleName(
-                f"Current step {index} of 5: {label}"
-                if name == route
-                else f"Step {index} of 5: {label}"
-            )
-        self.setup_button.setAccessibleDescription(
-            "Current Detect page" if route == "setup" else "Open Detect setup"
-        )
-        self.recordings_button.setAccessibleDescription(
-            "Current Detect page" if route == "recordings" else "Open recordings folder"
-        )
-        self.run_button.setAccessibleDescription(
-            "Current Detect page" if route == "run" else "Open Detect Run details"
-        )
-        self.results_button.setAccessibleDescription(
-            "Current Detect page" if route == "results" else "Open Detect Results"
-        )
-        self.export_button.setAccessibleDescription(
-            "Current Detect page" if route == "export" else "Open corpus export"
-        )
+        self._update_route_heading()
         self._render_run_header()
         if route_changed:
-            QTimer.singleShot(0, lambda: self.verticalScrollBar().setValue(0))
-            current_button = self.step_buttons[routes.index(route)]
-            QTimer.singleShot(0, current_button.setFocus)
+            QTimer.singleShot(0, lambda: self.content_scroll.verticalScrollBar().setValue(0))
+            QTimer.singleShot(0, self.focus_initial)
 
     def focus_initial(self) -> None:
-        if self.relink_card.isVisible():
-            self.relink_confirm.setFocus()
-            return
-        if self.current_route == "run":
+        if self.current_route is DetectRoute.MODELS:
+            buttons = self.model_picker.findChildren(QPushButton)
+            (buttons[0] if buttons else self.models_continue_button).setFocus()
+        elif self.current_route is DetectRoute.RECORDINGS:
+            if self.relink_card.isVisible():
+                self.relink_confirm.setFocus()
+                return
+            buttons = self.folder_picker.findChildren(QPushButton)
+            (buttons[0] if buttons else self.recordings_continue_button).setFocus()
+        elif self.current_route is DetectRoute.NEW_DETECTION:
             target = (
-                self.cancel_run_button if self.cancel_run_button.isEnabled() else self.run_button
+                self.start_detection_button
+                if self.start_detection_button.isEnabled()
+                else self.change_model_button
             )
             target.setFocus()
-            return
-        if self.current_route == "results":
+        elif self.current_route is DetectRoute.RUNS:
+            self.run_history_page.focus_initial()
+        elif self.current_route is DetectRoute.RUN_DETAIL:
+            target = (
+                self.cancel_run_button
+                if self.cancel_run_button.isEnabled()
+                else (
+                    self.open_run_result_button
+                    if self.open_run_result_button.isEnabled()
+                    else self.run_back_button
+                )
+            )
+            target.setFocus()
+        elif self.current_route is DetectRoute.RESULTS:
             self.result_explorer.focus_initial()
-            return
-        if self.current_route == "export":
-            self.export_page.focus_initial()
-            return
-        picker = self.model_picker if self.current_route == "setup" else self.relink_picker
-        buttons = picker.findChildren(QPushButton)
-        if buttons:
-            buttons[0].setFocus()
+        elif self.current_route is DetectRoute.EXPORTS:
+            self.export_history_page.focus_initial()
+        elif self.current_route is DetectRoute.EXPORT_DETAIL:
+            self.export_detail_page.focus_initial()
         else:
-            self.back_button.setFocus()
+            self.export_page.focus_initial()
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         super().resizeEvent(event)
-        compact = event.size().width() < 760
-        if compact != self._compact:
-            self._compact = compact
-            margin = 22 if compact else 48
-            self.outer.setContentsMargins(margin, 26 if compact else 34, margin, 36)
-            self.heading_layout.removeItem(self.heading_copy)
-            self.heading_layout.removeWidget(self.back_button)
-            self.run_header_layout.removeItem(self.run_header_labels)
-            self.run_header_layout.removeWidget(self.active_run_badge)
-            self.run_header_layout.removeWidget(self.view_run_button)
-            if compact:
-                self.heading_layout.addLayout(self.heading_copy, 0, 0)
-                self.heading_layout.addWidget(self.back_button, 1, 0, Qt.AlignmentFlag.AlignLeft)
-                self.run_header_layout.addLayout(self.run_header_labels, 0, 0, 1, 2)
-                self.run_header_layout.addWidget(self.active_run_badge, 1, 0)
-                self.run_header_layout.addWidget(self.view_run_button, 1, 1)
-            else:
-                self.heading_layout.addLayout(self.heading_copy, 0, 0)
-                self.heading_layout.addWidget(self.back_button, 0, 1, Qt.AlignmentFlag.AlignTop)
-                self.run_header_layout.addLayout(self.run_header_labels, 0, 0)
-                self.run_header_layout.addWidget(self.active_run_badge, 0, 1)
-                self.run_header_layout.addWidget(self.view_run_button, 0, 2)
-            self.setup_layout.removeWidget(self.model_card)
-            self.setup_layout.removeWidget(self.collection_card)
-            for row in (
-                self.minimum_score_row,
-                self.window_overlap_row,
-                self.combine_nearby_row,
-            ):
-                self.settings_layout.removeWidget(row)
-            if compact:
-                self.setup_layout.addWidget(self.model_card, 0, 0)
-                self.setup_layout.addWidget(self.collection_card, 1, 0)
-                self.setup_layout.setColumnStretch(0, 1)
-                self.setup_layout.setColumnStretch(1, 0)
-                self.settings_layout.addWidget(self.minimum_score_row, 0, 0)
-                self.settings_layout.addWidget(self.window_overlap_row, 1, 0)
-                self.settings_layout.addWidget(self.combine_nearby_row, 2, 0)
-                self.settings_layout.setColumnStretch(0, 1)
-                self.settings_layout.setColumnStretch(1, 0)
-                self.settings_layout.setColumnStretch(2, 0)
-            else:
-                self.setup_layout.addWidget(self.model_card, 0, 0)
-                self.setup_layout.addWidget(self.collection_card, 0, 1)
-                self.setup_layout.setColumnStretch(0, 1)
-                self.setup_layout.setColumnStretch(1, 1)
-                self.settings_layout.addWidget(self.minimum_score_row, 0, 0)
-                self.settings_layout.addWidget(self.window_overlap_row, 0, 1)
-                self.settings_layout.addWidget(self.combine_nearby_row, 0, 2)
-                for column in range(3):
-                    self.settings_layout.setColumnStretch(column, 1)
-            self.inventory_layout.removeWidget(self.inventory_table_card)
-            self.inventory_layout.removeWidget(self.inventory_detail_card)
-            if compact:
-                self.inventory_layout.addWidget(self.inventory_table_card, 0, 0)
-                self.inventory_layout.addWidget(self.inventory_detail_card, 1, 0)
-            else:
-                self.inventory_layout.addWidget(self.inventory_table_card, 0, 0)
-                self.inventory_layout.addWidget(self.inventory_detail_card, 0, 1)
-            self.run_layout.removeWidget(self.run_progress_card)
-            self.run_layout.removeWidget(self.run_activity_card)
-            if compact:
-                self.run_layout.addWidget(self.run_progress_card, 0, 0)
-                self.run_layout.addWidget(self.run_activity_card, 1, 0)
-            else:
-                self.run_layout.addWidget(self.run_progress_card, 0, 0)
-                self.run_layout.addWidget(self.run_activity_card, 0, 1)
-            self.result_explorer.set_compact(compact)
-            self.export_page.set_compact(compact)
-            for layout in (
-                self.setup_layout,
-                self.settings_layout,
-                self.setup_view.layout(),
-                self.inventory_layout,
-                self.recordings_view.layout(),
-                self.run_layout,
-                self.run_view.layout(),
-                self.result_explorer.layout(),
-                self.export_page.layout(),
-            ):
-                layout.invalidate()
-                layout.activate()
-            self.route_stack.layout().invalidate()
-            self.route_stack.layout().activate()
-            for widget in (
-                self.setup_view,
-                self.recordings_view,
-                self.run_view,
-                self.result_explorer,
-                self.export_page,
-                self.route_stack,
-                self.content,
-            ):
-                widget.updateGeometry()
+        compact = event.size().width() < 820
+        if compact == self._compact:
+            return
+        self._compact = compact
+        margin = 20 if compact else 38
+        self.outer.setContentsMargins(margin, 24 if compact else 30, margin, 36)
+
+        if compact:
+            self._root_layout.setDirection(QBoxLayout.Direction.TopToBottom)
+            self.sidebar.setMinimumWidth(0)
+            self.sidebar.setMaximumWidth(16_777_215)
+            self.sidebar.setFixedHeight(78)
+            self.sidebar.setStyleSheet(
+                f"QFrame#detectSidebar {{ background: {ALPACA_LIGHT.colors.surface}; "
+                f"border-bottom: 1px solid {ALPACA_LIGHT.colors.border}; }}"
+            )
+            self.sidebar_layout.setContentsMargins(12, 8, 12, 8)
+            self.sidebar_layout.setSpacing(0)
+            self.sidebar_brand.hide()
+            self.navigation_layout.setDirection(QBoxLayout.Direction.LeftToRight)
+            self.nav_scroll.setFixedHeight(58)
+            for button in self._navigation.values():
+                button.setMinimumWidth(145)
+                button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        else:
+            self._root_layout.setDirection(QBoxLayout.Direction.LeftToRight)
+            self.sidebar.setMinimumWidth(220)
+            self.sidebar.setMaximumWidth(220)
+            self.sidebar.setMinimumHeight(0)
+            self.sidebar.setMaximumHeight(16_777_215)
+            self.sidebar.setStyleSheet(
+                f"QFrame#detectSidebar {{ background: {ALPACA_LIGHT.colors.surface}; "
+                f"border-right: 1px solid {ALPACA_LIGHT.colors.border}; }}"
+            )
+            self.sidebar_layout.setContentsMargins(18, 27, 18, 18)
+            self.sidebar_layout.setSpacing(7)
+            self.sidebar_brand.show()
+            self.navigation_layout.setDirection(QBoxLayout.Direction.TopToBottom)
+            self.nav_scroll.setMinimumHeight(0)
+            self.nav_scroll.setMaximumHeight(16_777_215)
+            for button in self._navigation.values():
+                button.setMinimumWidth(0)
+                button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+        for widget in (
+            self.back_button,
+            self.active_run_label,
+            self.active_run_badge,
+            self.view_run_button,
+        ):
+            self.header_layout.removeWidget(widget)
+        if compact:
+            self.header_layout.addWidget(self.back_button, 0, 0, 1, 2)
+            self.header_layout.addWidget(self.active_run_label, 1, 0)
+            self.header_layout.addWidget(self.active_run_badge, 1, 1)
+            self.header_layout.addWidget(self.view_run_button, 1, 2)
+        else:
+            self.header_layout.addWidget(self.back_button, 0, 0)
+            self.header_layout.addWidget(self.active_run_label, 0, 2)
+            self.header_layout.addWidget(self.active_run_badge, 0, 3)
+            self.header_layout.addWidget(self.view_run_button, 0, 4)
+
+        for widget in (self.model_card, self.refinement_model_card):
+            self.models_layout.removeWidget(widget)
+        for row in (
+            self.minimum_score_row,
+            self.window_overlap_row,
+            self.combine_nearby_row,
+        ):
+            self.settings_layout.removeWidget(row)
+        self.inventory_layout.removeWidget(self.inventory_table_card)
+        self.inventory_layout.removeWidget(self.inventory_detail_card)
+        self.run_layout.removeWidget(self.run_progress_card)
+        self.run_layout.removeWidget(self.run_activity_card)
+        if compact:
+            self.models_layout.addWidget(self.model_card, 0, 0)
+            self.models_layout.addWidget(self.refinement_model_card, 1, 0)
+            self.models_layout.setColumnStretch(0, 1)
+            self.models_layout.setColumnStretch(1, 0)
+            self.settings_layout.addWidget(self.minimum_score_row, 0, 0)
+            self.settings_layout.addWidget(self.window_overlap_row, 1, 0)
+            self.settings_layout.addWidget(self.combine_nearby_row, 2, 0)
+            self.settings_layout.setColumnStretch(0, 1)
+            self.settings_layout.setColumnStretch(1, 0)
+            self.settings_layout.setColumnStretch(2, 0)
+            self.inventory_layout.addWidget(self.inventory_table_card, 0, 0)
+            self.inventory_layout.addWidget(self.inventory_detail_card, 1, 0)
+            self.run_layout.addWidget(self.run_progress_card, 0, 0)
+            self.run_layout.addWidget(self.run_activity_card, 1, 0)
+        else:
+            self.models_layout.addWidget(self.model_card, 0, 0)
+            self.models_layout.addWidget(self.refinement_model_card, 0, 1)
+            self.models_layout.setColumnStretch(0, 1)
+            self.models_layout.setColumnStretch(1, 1)
+            self.settings_layout.addWidget(self.minimum_score_row, 0, 0)
+            self.settings_layout.addWidget(self.window_overlap_row, 0, 1)
+            self.settings_layout.addWidget(self.combine_nearby_row, 0, 2)
+            for column in range(3):
+                self.settings_layout.setColumnStretch(column, 1)
+            self.inventory_layout.addWidget(self.inventory_table_card, 0, 0)
+            self.inventory_layout.addWidget(self.inventory_detail_card, 0, 1)
+            self.run_layout.addWidget(self.run_progress_card, 0, 0)
+            self.run_layout.addWidget(self.run_activity_card, 0, 1)
+        self.result_explorer.set_compact(compact)
+        self.export_page.set_compact(compact)
+        for layout in (
+            self._root_layout,
+            self.sidebar_layout,
+            self.navigation_layout,
+            self.header_layout,
+            self.models_layout,
+            self.settings_layout,
+            self.inventory_layout,
+            self.run_layout,
+            self.route_stack.layout(),
+        ):
+            layout.invalidate()
+            layout.activate()
+        for widget in (*self._route_pages.values(), self.route_stack, self.content):
+            widget.updateGeometry()
 
     @property
     def is_compact(self) -> bool:
