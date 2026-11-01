@@ -513,6 +513,7 @@ class MainWindow(QMainWindow):
         controller: WorkspaceController,
         *,
         back_to_studio: Callable[[], None] | None = None,
+        application_exit_request: Callable[[], None] | None = None,
     ):
         super().__init__()
         self.controller = controller
@@ -531,6 +532,7 @@ class MainWindow(QMainWindow):
         self._exit_ready = False
         self._exit_completed_emitted = False
         self._back_to_studio = back_to_studio
+        self._application_exit_request = application_exit_request
 
         central = QWidget()
         self._root_layout = QBoxLayout(QBoxLayout.Direction.LeftToRight, central)
@@ -665,6 +667,10 @@ class MainWindow(QMainWindow):
             self._emit_exit_completed()
             super().closeEvent(event)
             return
+        if self._application_exit_request is not None and not self._exit_requested:
+            event.ignore()
+            self._application_exit_request()
+            return
         if self._exit_requested:
             event.ignore()
             return
@@ -742,6 +748,10 @@ class MainWindow(QMainWindow):
             return
         self._exit_requested = True
         self.controller.request_shutdown()
+
+    def begin_application_exit(self) -> None:
+        """Begin a coordinator-approved exit through Train's existing shutdown path."""
+        self._begin_exit()
 
     def _shutdown_ready(self) -> None:
         if self._exit_requested:

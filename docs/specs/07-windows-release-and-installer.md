@@ -1,25 +1,67 @@
-# 07 — Controlled Windows installer and native qualification (later phase)
+# 07 — Controlled Windows BioCall Studio installer and native qualification
 
-**Scoped references:** [release process](../RELEASE_PROCESS.md); [native UX gate](../design/PROTOTYPE_ACCEPTANCE.md) (Windows row); `IT-WIN-*` in [integration index](../INTEGRATION_TEST_BEHAVIORS.md); [path/OS fixtures](../INTEGRATION_TEST_DATA.md) as needed.
+**Status:** revised by ST-11; Windows freezing, installer production, signing, clean-machine tests
+and publication are **deferred** to a separately approved packaging stage. macOS or offscreen Qt
+evidence cannot satisfy this specification.
 
-## User-visible outcome
+## Installed outcome
 
-On a clean supported Windows x86-64 machine, the user installs a **versioned `.exe` installer**, launches native PySide6/`alp-ui` Trainer, selects a Collection, creates a Dataset, trains/reopens CNN+RF with bundled Worker **and verifies both published Models structurally reload**, and uninstalls cleanly. No Python/venv or sibling checkout required. Publication is explicitly **deferred** until native gates pass.
+On a clean supported Windows x86-64 machine, a non-developer installs one versioned **BioCall
+Studio** `.exe`, opens the Studio launchpad, runs real Train and Detect workflows, restarts/relinks
+and uninstalls cleanly. Review remains an explicit placeholder. No Python, venv, source checkout,
+shell, network access or sibling repository is required.
 
-## Implementation
+The package includes Qt/`alp-ui`, fonts, icons and every Train Dataset/CNN/RF and Detect CNN/RF
+Worker runtime. Workers launch through the frozen `--worker` entry. Train inputs and Detect source
+recordings remain byte-identical; immutable Models, Results and exports are reopened and verified.
+Detect's versioned metadata stays in the standard per-user BioCall Studio application-data root,
+outside source folders, while exports go only to the user-selected destination.
 
-1. In actual Windows x86-64 CI/VM and one clean-install target, freeze Windows binaries (GUI/Worker, Qt plugins/fonts/icons and model runtimes) using validated packaging choice; produce reproducible installer via a maintained explicit tool (e.g., Inno Setup, review selected license and reproducible scripting). The installer, Add/Remove Programs entry, Start menu shortcut, taskbar and application window must display **BioCall Studio Train** and use the checked-in multi-size `assets/branding/icons/icon.ico`; record its digest and reject any old product name or generic Qt/Python icon. No shell or global interpreter fallback.
-2. Test drive-letter, Unicode/NFC/case collisions, reserved names, relative containment, UNC where supported, reparse/junction escape, long paths, read-only and file-sharing/locked replacement. Install into Program Files as standard app but save application config/logs in user-writable standard locations, Collection `.alpaca/` next to selected data subject to permission checks.
-3. Native UI: FolderPicker dialog and cancellation, keyboard HelpHint, plots with numeric accessible alternatives, 100%/150% DPI, scroll/focus, DataTable and no missing resources; perform Windows-specific accessibility review rather than citing macOS screenshots.
-4. Run installed app and real Worker cancellation/restart, Dataset and both Models **plus both trusted new-process Model export/reload checks** under the [Model export contract](../science/MODEL_EXPORT_CONTRACT.md). Confirm the **direct toolbox scientific training runtime** and all other dependencies are bundled; any pertinent toolbox defect encountered during Windows qualification may be fixed/tested/committed upstream following [the shared workflow](../agent/UPSTREAM_TOOLBOX_WORKFLOW.md), then reinstalled and re-tested on Windows. Build the release from a pinned toolbox revision/wheel, **never** a local editable path or Trainer-only scientific patch; no sibling checkout is needed. No inference imports or scoring are required. Validate clean install/upgrades/uninstall, no deleted user Collection, installer permissions and dependency licensing/security.
-5. Sign installer and executables if distribution policy requires, verify digest, record dependency/source SHAs, release manifest, Windows-specific tests/logs and approval; if signing/build infrastructure is absent or mascot/name redistribution and trademark clearance from `assets/branding/README.md` remains unresolved, report the blocker and withhold public distribution. No automatic promotion from macOS build. Record actual toolbox commit SHA and Windows-compatible wheel identity; if the upstream fix is uncommitted, unavailable or unverified in the shipped environment, block release.
+## Build, install and security requirements
 
-## Blocking installed-app UX parity
+1. Build from one clean reviewed tag with pinned Python, PySide6, `alp-ui`, direct
+   `bioacoustics-dl-toolbox` and scientific wheels. Record source SHAs and wheel/lock/branding
+   SHA-256 values. Editable checkouts and machine-specific absolute paths are forbidden.
+2. Select and license a maintained Windows freezer and installer tool (for example Inno Setup),
+   then bundle the exact GUI/Worker/science resources tested. No global interpreter or shell
+   fallback is allowed.
+3. Installer, Add/Remove Programs, Start menu, taskbar and windows must say **BioCall Studio** and
+   use `assets/branding/icons/icon.ico`; validate its embedded sizes and digest. Reject the former
+   Train-only name and generic Qt/Python icons.
+4. Install binaries under Program Files and keep mutable application data under the standard
+   per-user location with separate `train/v1` and `detect/v1` ownership. Test drive letters,
+   Unicode/NFC/case collisions, reserved names, long paths, read-only paths, file locks, UNC where
+   supported and reparse/junction containment.
+5. Exercise fresh install, upgrade, restart, moved/relinked recordings and uninstall. Uninstall
+   must remove installed binaries/shortcuts without deleting source recordings, Train Collections,
+   Detect exports or per-user data unless an explicit separately reviewed removal option identifies
+   them.
+6. Sign executables and installer according to the distribution policy, verify signatures and
+   SHA-256, run dependency/license/security review, publish an immutable manifest and require
+   explicit owner promotion. Missing credentials or legal approval blocks distribution.
 
-**`IT-WIN-005`:** Run the actual installed app on supported native Windows. Check the **BioCall Studio Train** name and supplied icon in installer/Start menu/taskbar/window/sidebar, all navigation/action patterns, `FolderPicker`, HelpHint, plots and numeric alternatives, empty/invalid/progress/done states and 100%/150% DPI + narrow width against the prototype and current pinned `alp-ui` Showcase. Save `docs/design/evidence/spec-07-installed/` screenshots plus keyboard/DPI report and use the [Prototype acceptance](../design/PROTOTYPE_ACCEPTANCE.md) review. Explicitly document native-platform differences and seek owner acceptance; a changed main layout/CTA, stale identity or missing screen **blocks** installer release even if the package launches.
+## Preserved native test IDs
 
-## Tests / exit
+- `IT-WIN-001`: real Windows path, case/Unicode collision, reparse containment, file-lock and
+  atomic-update coverage for both workflow-owned data boundaries.
+- `IT-WIN-002`: native Qt/`alp-ui` folder pickers, keyboard HelpHints, bundled Train/Detect
+  QProcess launch, global admission, cancel/crash recovery and shared safe quit.
+- `IT-WIN-003`: installed Studio builds/reopens a real Dataset and CNN/RF Models, structurally
+  reloads both, runs Detect CNN→RF, exports/reopens WAV+TSV, restarts/relinks and preserves exact
+  provenance with byte-identical inputs.
+- `IT-WIN-004`: clean install/upgrade/uninstall, BioCall Studio ICO/identity, per-user data,
+  manifest/digest/security/signing evidence and preservation of user-owned Collections/exports.
+- `IT-WIN-005`: installed Studio/Train/Detect normal and compact UI at 100%/150% DPI, keyboard and
+  focus order, accessible HelpHints, plots and numeric alternatives, empty/error/busy/success
+  states, Review placeholder and owner-reviewed native differences. Save native screenshots under
+  `docs/design/evidence/spec-07-installed/`.
 
-`IT-WIN-001`…`IT-WIN-005`, `TD-OS/UI/PATH/RUN/TRAIN`; capture native run IDs, installer hash, OS build/arch/DPI/privileges, signing outcome. At least one clean Windows installed-app run produces real Dataset and both Model formats and leaves input WAVs byte-identical. This spec follows completed Mac release as the next numbered vertical unless the owner changes platform priority.
+Installed configuration coverage must include representative basic and advanced CNN/RF fields,
+HelpHint/Wiki access, saved preset persistence and exact resolved Model settings.
 
-**Installed config/preset acceptance:** include a real installed-app smoke verifying advanced CNN/RF controls, per-field `HelpHint`/Wiki links and saved configuration persistence/compatibility across app restarts, without access to `../TRAINING_REFERENCE` or sibling sources. See [configuration catalog](../science/TRAINING_CONFIGURATION_CATALOG.md), [presets](../science/TRAINING_PRESETS.md), existing native release UX test IDs. No prediction functionality.
+## Promotion blockers
+
+Missing native hardware/VM evidence, committed scientific dependency wheels, bundled Worker
+coverage, immutable/checksum verification, path-containment results, clean uninstall evidence,
+screenshots, signing/security/legal review or owner approval blocks promotion. Do not advertise a
+Windows installer from a successful source-tree or macOS run.

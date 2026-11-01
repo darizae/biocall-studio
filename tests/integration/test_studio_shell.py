@@ -232,8 +232,8 @@ def test_real_worker_survives_switch_and_hidden_workspace_quit_uses_train_policy
     assert controller._run_process is process
 
     coordinator.shell_window.close()
-    dialog = coordinator.train_window.close_dialog
-    assert coordinator.train_window.isVisible()
+    dialog = coordinator.exit_dialog
+    assert coordinator.shell_window.isVisible()
     assert dialog is not None and dialog.isVisible()
     assert dialog.defaultButton().text() == "Keep app open"
     assert dialog.focusWidget() is dialog.defaultButton()
@@ -245,13 +245,14 @@ def test_real_worker_survives_switch_and_hidden_workspace_quit_uses_train_policy
 
     coordinator.show_studio()
     coordinator.shell_window.close()
-    dialog = coordinator.train_window.close_dialog
+    dialog = coordinator.exit_dialog
     assert dialog is not None
     stop_button = next(
-        button for button in dialog.buttons() if button.text() == "Stop Run and Exit"
+        button for button in dialog.buttons() if button.text() == "Stop work and Exit"
     )
     stop_button.click()
     qtbot.waitUntil(lambda: controller._shutdown_finished, timeout=15_000)
+    qtbot.waitUntil(lambda: coordinator.detect_controller._shutdown_finished, timeout=15_000)
     assert controller._run_process is None
     assert not coordinator.shell_window.isVisible()
     assert not coordinator.train_window.isVisible()

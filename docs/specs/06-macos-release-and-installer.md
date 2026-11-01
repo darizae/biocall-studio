@@ -1,32 +1,83 @@
-# 06 — Controlled macOS packaging, installable DMG and release pipeline
+# 06 — Controlled macOS BioCall Studio packaging and installable DMG
 
-**Scoped references:** [release process](../RELEASE_PROCESS.md); [packaged Worker boundary](../ARCHITECTURE.md) §4; [native UX gate](../design/PROTOTYPE_ACCEPTANCE.md) (installed-app row); `IT-MAC-*` / `IT-E2E-*` in [integration index](../INTEGRATION_TEST_BEHAVIORS.md). Inspect [source map](../agent/SOURCE_MAP.md) only for packaging dependencies.
+**Status:** revised by ST-11; every installer, signing, notarization, clean-machine and
+installed-app check below is **deferred** to a separately approved packaging stage. No `.app` or
+`.dmg` was produced by ST-11.
 
-## User-visible outcome
+**Scoped references:** [release process](../RELEASE_PROCESS.md),
+[ST-11](ST-11-unified-qualification.md), `IT-E2E-*` / `IT-MAC-*` in the
+[integration index](../INTEGRATION_TEST_BEHAVIORS.md), and the checked-in suite branding in
+`assets/branding/`.
 
-A non-developer obtains a **versioned `.dmg`** and installs a usable `.app` to `/Applications` on a clean supported macOS system. It launches the Qt Trainer, uses the `alp-ui` native FolderPicker/help/plots, reads a real Collection, builds immutable Dataset and trains/reopens CNN/RF through bundled Worker **and structurally reloads each complete exported Model** with no source checkout, venv, shell, network or globally installed Python. Input WAV hashes are unchanged. Public distribution requires valid signing/notarization/stapling.
+## Installed outcome
 
-## Build/release implementation requirements
+A non-developer installs one versioned **BioCall Studio** `.app` from a signed, notarized and
+stapled `.dmg`. The app opens the Studio launchpad and the real Train and Detect workflows;
+Review remains an explicit placeholder. A clean machine needs no source checkout, shell, venv,
+network connection or global Python.
 
-1. Design deterministic release metadata: tag/commit and clean tree, supported macOS/architecture matrix (Apple Silicon first, Intel policy documented), pinned Python/Qt + scientific binary wheels, `../alp-ui` wheel SHA, `../alpaca-pipelines` reference source SHA/adapter, **direct `../bioacoustics-dl-toolbox` package/SHA and built wheel digest**, Qt/fonts/icons/licenses and stable bundle ID. The bundle, Finder, Dock and application menu must display **BioCall Studio Train** and use the checked-in `assets/branding/icons/icon.icns`; validate the supplied raster-backed ICNS at native sizes and record its digest. No old product name or generic Qt/Python icon may appear. Use secure dependency lock/hashes. **If packaging exposes a toolbox defect or missing reusable capability, the agent may fix/test/commit `../bioacoustics-dl-toolbox` upstream and reinstall it in the Trainer `.venv` under [the upstream workflow](../agent/UPSTREAM_TOOLBOX_WORKFLOW.md); never hide the issue with a Trainer-only patched scientific copy.** Build an independently reproducible wheel from the identified **committed** toolbox revision; an editable checkout is not a release dependency. No hardcoded developer absolute paths or embedded HPC references.
-2. Configure and test a real native freezer (evaluate PyInstaller one-folder `.app` as default, record actual compatibility with `PySide6-Essentials`, `alp-ui` resources and CNN/RF runtime from the pinned **direct toolbox** and RF stack). Worker launches the bundled entry via `--worker`, not the machine interpreter, inherited CWD or shell. Preserve writable app data outside signed bundle and portable per-Collection `.alpaca/` publication.
-3. Reproducible candidate workflow: PR static/unit and appropriate macOS integrations; versioned tag/explicit dispatch builds release candidate; sign `.app` with Developer ID Application, hardened runtime with minimum justified entitlements, `codesign --verify --deep --strict`, package drag-to-Applications DMG, sign/notarize as applicable, staple and validate via `spctl`/Gatekeeper from downloaded/quarantined DMG. Never store Apple credentials or signing secrets in files/ZIP/log output.
-4. Test clean-target install and first-run GUI plus Worker. On installed `.app`, execute `IT-E2E-001`, `IT-MAC-001`...`IT-MAC-004` **and `IT-TRAIN-008` / `IT-TRAIN-009` structural Model export/reload smoke cases** on supported native Mac machines, using locally generated real WAV fixtures with correct source provenance. Exercise folder cancel, HelpHint keyboard, Plot values/text alternatives, Run cancel/restart, files with spaces/Unicode and artifact relinking. Do not consider dev environment launch packaged proof.
-5. Publish release manifest with Git SHA, dependency/source digests, installer SHA-256, OS/arch, native test matrix, code-signing/notarization result, legal notices, SBOM where practical and explicit owner promotion. Retain previous released installer for rollback. No automated updates or unsigned public release.
+The installed app must run every bundled scientific boundary used by the source application:
 
-## Failures and gates
+- Train Dataset Build, CNN Training and Random Forest Training Workers;
+- Detect CNN candidate detection and Random Forest refinement Workers;
+- verified corpus export and reopen for WAV snippets, concatenated WAV and Raven TSV;
+- shared safe quit and the global one-scientific-Run admission rule.
 
-- Missing committed/verified toolbox source revision, built wheel or matching installed scientific runtime => **block promotion**; a green editable-checkout test cannot substitute for the shipped wheel.
-- Missing credentials / macOS runner / proprietary distribution approvals, or unresolved mascot/name redistribution and trademark clearance recorded in `assets/branding/README.md` => mark **blocked**, no invented `.dmg` or “release ready” status. Unsigned local QA builds must say `development-only`.
-- Broken bundled fonts/icons/theme, `FolderPicker`, HelpHint, Plot, `QProcess`, scientific imports/checkpoints/**structural Model export/reload for both families**, quarantine first run, or read/write state inside sealed bundle => **fail**.
-- Windows remains separate spec 07; it is not silently covered here.
+Train's source WAVs remain read-only while its immutable Dataset/Model/Run outputs retain the
+existing Collection-owned contract. Detect never writes metadata into a recordings folder: its
+versioned Collection, inventory, Run, Result, selection and history metadata stays under Qt's
+per-user BioCall Studio application-data root (`train/v1` and `detect/v1`). Detect writes an
+immutable export only to the destination explicitly chosen by the user.
 
-## Blocking installed-app UX parity
+## Build and release requirements
 
-**`IT-MAC-004`:** On a clean supported native Mac, open the **installed** `.app` from the `.dmg` and reproduce the user-visible route/state matrix, including the **BioCall Studio Train** name and supplied icon in Finder/Dock/window/sidebar, `FolderPicker`, HelpHint, tables, `Plot`, fonts, icons, empty/error/busy/finished views, and narrow layout. Capture representative installed-app screenshots in `docs/design/evidence/spec-06-installed/`, compare to prototype and the pinned `alp-ui` Showcase, and record the six dimensions in [Prototype acceptance](../design/PROTOTYPE_ACCEPTANCE.md). Any missing resource, altered hierarchy, stale product identity or unapproved UX regression **fails installer promotion** even if signing succeeded.
+1. Build from one clean, reviewed and tagged BioCall Studio commit. Record the Python, PySide6,
+   `alp-ui` and `bioacoustics-dl-toolbox` versions, committed upstream SHAs, wheel SHA-256 values,
+   scientific lock, fixture revision and supported macOS/architecture matrix. Editable sibling
+   checkouts and developer absolute paths are forbidden release inputs.
+2. Use a validated native freezer. The default evaluation remains a one-folder `.app` with all Qt
+   plugins, fonts, `alp-ui` resources and scientific runtimes bundled. Every Worker must launch the
+   frozen app's `--worker` entry, never `/usr/bin/python`, a user venv, a shell or inherited CWD.
+3. The bundle identifier and every Finder, Dock, menu and window surface must say **BioCall
+   Studio** and use `assets/branding/icons/icon.icns`. Validate native ICNS sizes and record the
+   asset digest; reject the former Train-only name and generic Qt/Python icons.
+4. Keep writable state outside the sealed bundle using the standard per-user application-data
+   directory. Exercise fresh state, existing state, restart, moved/relinked recording folders and
+   uninstall. Uninstall must not delete Train Collections, source recordings, Detect exports or
+   per-user data unless a separate explicit removal choice names those targets.
+5. Sign the `.app` with Developer ID Application and hardened runtime using only justified
+   entitlements. Verify with `codesign --verify --deep --strict`, sign the drag-to-Applications
+   DMG, notarize, staple and validate a downloaded/quarantined copy with Gatekeeper. Credentials
+   remain in the release runner keychain/vault and never enter files or logs.
+6. Publish an immutable manifest containing source/dependency/brand digests, installer SHA-256,
+   OS build and architecture, native test results, signing/notarization/stapling results, licenses,
+   SBOM where practical, known limitations and explicit owner promotion. Retain the prior verified
+   installer for rollback.
 
-## Tests / exit
+## Preserved native test IDs
 
-`IT-E2E-001`, `IT-MAC-001`, `IT-MAC-002`, `IT-MAC-003`, `IT-MAC-004` and `TD-OS/UI/RUN/TRAIN`. All supported macOS architectures pass installed-app E2E and Gatekeeper checks; a tested, checksummed, notarized `.dmg` is promoted through explicit release approval. Update [release record](../RELEASE_PROCESS.md) with actual evidence and command logs.
+- `IT-E2E-001`: from a clean installed app, launch Studio; create and reopen a real Train Dataset,
+  CNN and RF Model; structurally reload both Models; use those Models in Detect CNN→RF; export and
+  reopen WAV+TSV; restart/relink; confirm immutable provenance and unchanged inputs.
+- `IT-MAC-001`: verify versioned BioCall Studio bundle identity, ICNS, embedded resources,
+  signature, hardened runtime, notarization, stapling and Gatekeeper/quarantine launch.
+- `IT-MAC-002`: prove bundled Train and Detect Workers launch without system Python, cancel and
+  recover without orphans, use per-user writable state, and preserve safe shared quit.
+- `IT-MAC-003`: reproduce the candidate from the recorded tag and dependency wheels, validate the
+  manifest/digests and withhold promotion when credentials, legal clearance or evidence is absent.
+- `IT-MAC-004`: on the installed app, exercise Studio/Train/Detect normal and compact layouts,
+  navigation, focus, keyboard HelpHints, copy, tables, plots, empty/error/busy/success states and
+  Review placeholder. Save actual installed-app screenshots under
+  `docs/design/evidence/spec-06-installed/`; offscreen Qt grabs are not native Cocoa evidence.
 
-**Installed config/preset acceptance:** include a real installed-app smoke verifying advanced CNN/RF controls, per-field `HelpHint`/Wiki links and saved configuration persistence/compatibility across app restarts, without access to `../TRAINING_REFERENCE` or sibling sources. See [configuration catalog](../science/TRAINING_CONFIGURATION_CATALOG.md), [presets](../science/TRAINING_PRESETS.md), existing native release UX test IDs. No prediction functionality.
+Installed configuration coverage must include representative basic and advanced CNN/RF fields,
+keyboard-accessible HelpHints/Wiki links, saved preset persistence after restart, and exact resolved
+settings in exported Models.
+
+## Promotion blockers
+
+Any missing committed toolbox source/wheel, bundled Worker/runtime, source/output checksum,
+immutable-result verification, per-user write boundary, clean uninstall result, native screenshot,
+signing/notarization evidence, dependency license/security review or owner approval blocks
+promotion. An unsigned local build must be labelled `development-only`. Windows remains governed
+by spec 07 and cannot be inferred from macOS evidence.

@@ -6,7 +6,7 @@ import json
 import os
 import sys
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from enum import StrEnum
 from pathlib import Path
 from threading import Event
@@ -363,6 +363,7 @@ class DetectWorkspaceController(QObject):
         self._run_stderr = BoundedStderrCapture()
         self._run_error_code = ""
         self._protocol_error = ""
+        self._run_admission: Callable[[str, str], None] | None = None
         self.export_result: ResultArtifact | None = None
         self.export_selection: FrozenResultSelection | None = None
         self.export_snapshot: ExportSnapshot | None = None
@@ -441,6 +442,14 @@ class DetectWorkspaceController(QObject):
             and not self.is_model_loading
             and not self.is_run_active
         )
+
+    def set_run_admission(self, admission: Callable[[str, str], None] | None) -> None:
+        """Install the Studio-wide scientific resource gate."""
+        self._run_admission = admission
+
+    def _admit_run(self, run_id: str, label: str) -> None:
+        if self._run_admission is not None:
+            self._run_admission(run_id, label)
 
     @property
     def recordings_reviewed(self) -> bool:
@@ -1658,6 +1667,8 @@ class DetectWorkspaceController(QObject):
         ):
             raise ValueError("Recordings changed; rescan before starting a Detect Run.")
 
+        self._admit_run(request.run_id, "Detect boundary check")
+
         repository = DetectRunRepository(
             self.store.application_data_root, collection.ref.collection_id
         )
@@ -1764,6 +1775,8 @@ class DetectWorkspaceController(QObject):
             collection.source_root, snapshot
         ):
             raise ValueError("Recordings changed; rescan before starting a Detect Run.")
+
+        self._admit_run(request.run_id, "Candidate detection")
 
         repository = DetectRunRepository(
             self.store.application_data_root, collection.ref.collection_id
@@ -1911,6 +1924,8 @@ class DetectWorkspaceController(QObject):
             or not snapshot_is_quickly_current(collection.source_root, snapshot)
         ):
             raise ValueError("Recordings changed; rescan before refining this Result.")
+
+        self._admit_run(request.run_id, "Random Forest refinement")
 
         repository = DetectRunRepository(
             self.store.application_data_root, collection.ref.collection_id

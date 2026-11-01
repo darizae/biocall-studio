@@ -4,6 +4,7 @@ import logging
 import sys
 import time
 import uuid
+from collections.abc import Callable
 from pathlib import Path
 from threading import Event
 
@@ -187,6 +188,7 @@ class WorkspaceController(QObject):
         self._cancel_grace_ms = cancel_grace_ms
         self._kill_grace_ms = kill_grace_ms
         self._build_request_path: Path | None = None
+        self._run_admission: Callable[[str, str], None] | None = None
         self._power_error_message = ""
         self._shutdown_requested = False
         self._shutdown_finished = False
@@ -468,6 +470,14 @@ class WorkspaceController(QObject):
             return False
         return inputs_match_scan(self._scan_root, self.scan_result)
 
+    def set_run_admission(self, admission: Callable[[str, str], None] | None) -> None:
+        """Install the Studio-wide scientific resource gate without changing standalone Train."""
+        self._run_admission = admission
+
+    def _admit_run(self, run_id: str, label: str) -> None:
+        if self._run_admission is not None:
+            self._run_admission(run_id, label)
+
     def start_dataset_build(self, config: BuildConfig, *, dataset_id: str | None = None) -> str:
         """Persist and supervise one Dataset Build in the current app environment."""
         if (
@@ -488,6 +498,7 @@ class WorkspaceController(QObject):
             dataset_id,
         )
         assert_run_start_allowed(self._runs, reservation)
+        self._admit_run(run_id, "Dataset Build")
         state = new_run(
             run_id=run_id,
             request_id=request_id,
@@ -589,6 +600,8 @@ class WorkspaceController(QObject):
         final = self.collection_path / ".alpaca" / "models" / request.model_id
         if final.exists():
             raise RunConflictError(f"The prospective model output already exists: {model_id}")
+        family_label = "CNN Training" if config.family == "cnn" else "Random Forest Training"
+        self._admit_run(run_id, family_label)
         run_name = str(config.effective_values["run_name"]).strip()
         state = new_run(
             run_id=run_id,

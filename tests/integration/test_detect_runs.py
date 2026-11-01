@@ -298,6 +298,10 @@ def test_application_close_stops_detect_worker_before_windows_exit(qtbot, tmp_pa
     )
 
     coordinator.shell_window.close()
+    dialog = coordinator.exit_dialog
+    assert dialog is not None and dialog.isVisible()
+    stop = next(button for button in dialog.buttons() if button.text() == "Stop work and Exit")
+    stop.click()
     qtbot.waitUntil(lambda: controller._shutdown_finished, timeout=10_000)
     qtbot.waitUntil(lambda: train._shutdown_finished, timeout=10_000)
     qtbot.waitUntil(
