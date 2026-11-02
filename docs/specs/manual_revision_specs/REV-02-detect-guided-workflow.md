@@ -1,7 +1,8 @@
 # REV-02 — Guided Detect workflow and reachable corpus planning
 
-**Branch:** `detect-rev02-guided-detect`, created from the reviewed local `detect` after REV-01
-acceptance. **Predecessor:** REV-01. **Successor:** REV-03. **Status:** planned.
+**Historical branch:** `detect-rev02-guided-detect`. **Predecessor:** REV-01.
+**Successor:** REV-03. **Status:** implemented and included in the current merged `main` source
+baseline.
 
 ## Outcome and boundaries
 

@@ -4,7 +4,7 @@ Use fast deterministic, Qt-free tests for pure behaviors: filename/path parsers,
 
 ## Naming and coverage
 
-An indexed case appears **exactly** in the asserting test function docstring, e.g. `"""Case: UT-COL-001."""`. Table rows below define intended cases, **not completion**. ST-05–ST-11 rows remain pre-registered planned contracts; none is covered merely by being listed. A test counts as covered only after the exact behavior is asserted and an applicable run passes. Do not renumber an existing ID to reuse it for different behavior. Add edge variants under the same case where the invariant is unchanged; add an ID when the behavior is materially distinct.
+An indexed case appears **exactly** in the asserting test function docstring, e.g. `"""Case: UT-COL-001."""`. Table rows below define intended cases, **not completion**. None is covered merely by being listed or by existing in the merged baseline. A test counts as covered only after the exact behavior is asserted and an applicable run passes. Do not renumber an existing ID to reuse it for different behavior. Add edge variants under the same case where the invariant is unchanged; add an ID when the behavior is materially distinct.
 
 | Case ID | Pure behavior and failure contrasts | Data class | Spec |
 |---|---|---|---|
@@ -12,6 +12,7 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-PATH-002` | Unicode NFC/casefold filename collisions cannot silently resolve an identity | TD-PATH | 01 |
 | `UT-CLI-001` | Version/help and invalid-option handling complete without importing optional Qt/`alp-ui`; real GUI startup remains owned by `IT-UI-001` and uses isolated Application Settings | TD-UI | 01, 05f |
 | `UT-CLI-002` | Canonical `biocall-studio` argument parsing and private Worker dispatch accept only the five REV-01 modes; missing/invalid Worker arguments fail without GUI import and version lookup uses the unified distribution. | TD-UI, TD-RUN | [REV-01](specs/manual_revision_specs/REV-01-project-consolidation.md) |
+| `UT-DEV-001` | Repository test-runner modes force invisible offscreen Qt for ordinary/quick runs, keep package exclusion explicit, and refuse visible Cocoa execution or marker overrides without acknowledgement. | TD-UI | Test infrastructure |
 | `UT-STU-001` | Pure workspace-route policy: Studio is the startup route; Train/Detect/Review and return transitions are explicit; unknown routes fail closed; navigation decisions do not mutate Train context or imply runnable Detect features. | TD-UI | ST-02 |
 | `UT-DET-001` | unique identity, schema migration/rejection, app-data ownership and root-reference serialization (no original path in exported metadata). | TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
 | `UT-DET-002` | valid/missing/inaccessible/changed/relink state decisions, confirmation and stale inventory invalidation; reject unrelated-root takeover. | TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
@@ -39,7 +40,7 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-DET-024` | Bulk inclusion includes every and only valid WAV, replaces exclusions only after confirmation, rejects stale inventory revisions and leaves the complete prior decision document unchanged on cancel/validation/write failure. | TD-WAV, TD-CACHE, TD-FAIL | [REV-02](specs/manual_revision_specs/REV-02-detect-guided-workflow.md) |
 | `UT-DET-025` | Typed Detect route validation, adaptive New detection entry, nested-route sidebar highlighting, and fail-closed invalid-route rejection. | TD-UI | [REV-04](specs/manual_revision_specs/REV-04-Detect-Navigation-and-History.md) |
 | `UT-DET-026` | Versioned export-history schema, newest-first bounded ordering, duplicate identity, containment, strict partial loading, and atomic-write recovery. | TD-PATH, TD-FAIL | [REV-04](specs/manual_revision_specs/REV-04-Detect-Navigation-and-History.md) |
-| `UT-STU-002` | **Planned ST-11:** pure cross-workspace quit/admission policy and independent Train/Detect ownership; no duplicate Run IDs, hidden Worker's lifetime not inferred from visibility. | TD-UI, TD-RUN | [ST-11](specs/ST-11-unified-qualification.md) |
+| `UT-STU-002` | Pure cross-workspace quit/admission policy and independent Train/Detect ownership; no duplicate Run IDs, hidden Worker's lifetime not inferred from visibility. | TD-UI, TD-RUN | [ST-11](specs/ST-11-unified-qualification.md) |
 | `UT-STU-003` | Unified-package ownership audit rejects the removed namespace, forbidden reverse dependencies and workflow-specific code under `shared`; canonical app-data decisions yield separate contained Train and Detect roots. | TD-PATH, TD-CACHE | [REV-01](specs/manual_revision_specs/REV-01-project-consolidation.md) |
 | `UT-COL-001` | Positive name parses anchored complete stem, integer ms and unique label; reject malformed/missing fields and overflow | TD-COL | 02 |
 | `UT-COL-002` | Exact unique source-stem resolution; overlapping prefixes, duplicate names and same-source duplicate interval rejected | TD-COL | 02 |

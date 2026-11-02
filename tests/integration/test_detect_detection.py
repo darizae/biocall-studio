@@ -5,6 +5,7 @@ import os
 import shutil
 import struct
 import wave
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -419,9 +420,7 @@ def test_guided_detect_routes_bulk_badges_run_and_selection_free_export(
         qtbot.waitUntil(lambda width=width: page.is_compact == (width < 820))
         assert page.content_scroll.horizontalScrollBar().maximum() == 0
         assert page.navigation_layout.direction() is (
-            QBoxLayout.Direction.LeftToRight
-            if width < 820
-            else QBoxLayout.Direction.TopToBottom
+            QBoxLayout.Direction.LeftToRight if width < 820 else QBoxLayout.Direction.TopToBottom
         )
 
     evidence_value = os.environ.get("BIOCALL_REV04_EVIDENCE_DIR")
@@ -836,103 +835,108 @@ def test_result_empty_partial_missing_corrupt_persistence_and_native_screenshots
     reopened.shutdown()
 
 
+@contextmanager
+def _detection_failure_case(qtbot, genuine_cnn, app_data: Path, *, delay: float = 0):
+    controller = DetectWorkspaceController(app_data, worker_step_delay_seconds=delay)
+    _select_inputs(qtbot, controller, genuine_cnn.model.root, genuine_cnn.root)
+    repository = DetectRunRepository(app_data, controller.active_collection.ref.collection_id)
+    try:
+        yield controller, repository
+    finally:
+        controller.shutdown()
+
+
 @pytest.mark.qt
-def test_stale_input_cancellation_crash_and_publication_collision_are_atomic(
-    qapp, qtbot, genuine_cnn, tmp_path
-):
+def test_changed_wav_after_detection_freeze_publishes_no_result(qtbot, genuine_cnn, tmp_path):
     """Case: IT-DET-014."""
-    settings = DetectionSettings(0.5, 50, 0, 1)
+    with _detection_failure_case(qtbot, genuine_cnn, tmp_path / "stale-data", delay=0.05) as (
+        controller,
+        repository,
+    ):
+        controller.start_detection(DetectionSettings(0.5, 50, 0, 1))
+        stale_path = genuine_cnn.root / "recordings" / "REC_A.wav"
+        original = stale_path.read_bytes()
+        stale_path.write_bytes(original + b"changed")
+        try:
+            record = _wait_terminal(qtbot, controller)
+            assert record.status is DetectRunStatus.FAILED
+            assert record.error_code == "input_changed"
+            assert not repository.result_path(record.artifact_id).exists()
+        finally:
+            stale_path.write_bytes(original)
 
-    stale_data = tmp_path / "stale-data"
-    stale_controller = DetectWorkspaceController(stale_data, worker_step_delay_seconds=0.05)
-    _select_inputs(qtbot, stale_controller, genuine_cnn.model.root, genuine_cnn.root)
-    stale_controller.start_detection(settings)
-    stale_path = genuine_cnn.root / "recordings" / "REC_A.wav"
-    original = stale_path.read_bytes()
-    stale_path.write_bytes(original + b"changed")
-    stale_record = _wait_terminal(qtbot, stale_controller)
-    assert stale_record.status is DetectRunStatus.FAILED
-    assert stale_record.error_code == "input_changed"
-    stale_repository = DetectRunRepository(
-        stale_data, stale_controller.active_collection.ref.collection_id
-    )
-    assert not stale_repository.result_path(stale_record.artifact_id).exists()
-    stale_path.write_bytes(original)
-    stale_controller.shutdown()
 
-    cancel_data = tmp_path / "cancel-data"
-    cancel_controller = DetectWorkspaceController(cancel_data, worker_step_delay_seconds=0.2)
-    _select_inputs(qtbot, cancel_controller, genuine_cnn.model.root, genuine_cnn.root)
-    cancel_controller.start_detection(settings)
-    qtbot.waitUntil(lambda: cancel_controller.is_run_active, timeout=10_000)
-    cancel_controller.cancel_active_run()
-    cancelled = _wait_terminal(qtbot, cancel_controller)
-    assert cancelled.status is DetectRunStatus.CANCELLED
-    cancel_repository = DetectRunRepository(
-        cancel_data, cancel_controller.active_collection.ref.collection_id
-    )
-    assert not cancel_repository.result_path(cancelled.artifact_id).exists()
-    cancel_controller.shutdown()
+@pytest.mark.qt
+def test_cancelled_detection_publishes_no_result(qtbot, genuine_cnn, tmp_path):
+    """Case: IT-DET-014."""
+    with _detection_failure_case(qtbot, genuine_cnn, tmp_path / "cancel-data", delay=0.2) as (
+        controller,
+        repository,
+    ):
+        controller.start_detection(DetectionSettings(0.5, 50, 0, 1))
+        qtbot.waitUntil(lambda: controller.is_run_active, timeout=10_000)
+        controller.cancel_active_run()
+        record = _wait_terminal(qtbot, controller)
+        assert record.status is DetectRunStatus.CANCELLED
+        assert not repository.result_path(record.artifact_id).exists()
 
-    collision_data = tmp_path / "collision-data"
-    collision_controller = DetectWorkspaceController(collision_data)
-    _select_inputs(qtbot, collision_controller, genuine_cnn.model.root, genuine_cnn.root)
-    request = collision_controller.freeze_detection_request(settings)
-    collision_repository = DetectRunRepository(
-        collision_data, collision_controller.active_collection.ref.collection_id
-    )
-    collision = collision_repository.result_path(request.artifact_id)
-    collision.mkdir()
-    marker = collision / "existing.txt"
-    marker.write_text("existing\n")
-    collision_controller.start_detection_request(request)
-    failed = _wait_terminal(qtbot, collision_controller)
-    assert failed.status is DetectRunStatus.FAILED
-    assert failed.error_code == "publication_failed"
-    assert marker.read_text() == "existing\n"
-    assert not (collision_repository.run_directory(failed.run_id) / "receipt.json").exists()
-    assert not collision_repository.staging_path(failed.launch_id).exists()
-    collision_controller.shutdown()
 
-    receipt_data = tmp_path / "receipt-data"
-    receipt_controller = DetectWorkspaceController(receipt_data, worker_step_delay_seconds=0.2)
-    _select_inputs(qtbot, receipt_controller, genuine_cnn.model.root, genuine_cnn.root)
-    receipt_controller.start_detection(settings)
-    qtbot.waitUntil(lambda: receipt_controller.current_run is not None, timeout=10_000)
-    receipt_repository = DetectRunRepository(
-        receipt_data, receipt_controller.active_collection.ref.collection_id
-    )
-    receipt_path = (
-        receipt_repository.run_directory(receipt_controller.current_run.run_id) / "receipt.json"
-    )
-    receipt_path.write_text("{}\n")
-    receipt_failed = _wait_terminal(qtbot, receipt_controller)
-    assert receipt_failed.status is DetectRunStatus.FAILED
-    assert receipt_failed.error_code == "publication_failed"
-    assert receipt_path.read_text() == "{}\n"
-    assert not receipt_repository.result_path(receipt_failed.artifact_id).exists()
-    assert not receipt_repository.staging_path(receipt_failed.launch_id).exists()
-    receipt_controller.shutdown()
+@pytest.mark.qt
+def test_detection_publication_collision_preserves_existing_output(qtbot, genuine_cnn, tmp_path):
+    """Case: IT-DET-014."""
+    with _detection_failure_case(qtbot, genuine_cnn, tmp_path / "collision-data") as (
+        controller,
+        repository,
+    ):
+        request = controller.freeze_detection_request(DetectionSettings(0.5, 50, 0, 1))
+        collision = repository.result_path(request.artifact_id)
+        collision.mkdir()
+        marker = collision / "existing.txt"
+        marker.write_text("existing\n")
+        controller.start_detection_request(request)
+        record = _wait_terminal(qtbot, controller)
+        assert record.status is DetectRunStatus.FAILED
+        assert record.error_code == "publication_failed"
+        assert marker.read_text() == "existing\n"
+        assert not (repository.run_directory(record.run_id) / "receipt.json").exists()
+        assert not repository.staging_path(record.launch_id).exists()
 
-    crash_data = tmp_path / "crash-data"
-    crash_controller = DetectWorkspaceController(crash_data, worker_step_delay_seconds=0.2)
-    _select_inputs(qtbot, crash_controller, genuine_cnn.model.root, genuine_cnn.root)
-    crash_controller.start_detection(settings)
-    qtbot.waitUntil(
-        lambda: (
-            crash_controller.run_process is not None
-            and crash_controller.run_process.processId() > 0
-        ),
-        timeout=10_000,
-    )
-    crash_controller.run_process.kill()
-    crashed = _wait_terminal(qtbot, crash_controller)
-    assert crashed.status is DetectRunStatus.INTERRUPTED
-    crash_repository = DetectRunRepository(
-        crash_data, crash_controller.active_collection.ref.collection_id
-    )
-    assert not crash_repository.result_path(crashed.artifact_id).exists()
-    crash_controller.shutdown()
+
+@pytest.mark.qt
+def test_invalid_detection_receipt_publishes_no_result(qtbot, genuine_cnn, tmp_path):
+    """Case: IT-DET-014."""
+    with _detection_failure_case(qtbot, genuine_cnn, tmp_path / "receipt-data", delay=0.2) as (
+        controller,
+        repository,
+    ):
+        controller.start_detection(DetectionSettings(0.5, 50, 0, 1))
+        qtbot.waitUntil(lambda: controller.current_run is not None, timeout=10_000)
+        receipt_path = repository.run_directory(controller.current_run.run_id) / "receipt.json"
+        receipt_path.write_text("{}\n")
+        record = _wait_terminal(qtbot, controller)
+        assert record.status is DetectRunStatus.FAILED
+        assert record.error_code == "publication_failed"
+        assert receipt_path.read_text() == "{}\n"
+        assert not repository.result_path(record.artifact_id).exists()
+        assert not repository.staging_path(record.launch_id).exists()
+
+
+@pytest.mark.qt
+def test_crashed_detection_publishes_no_result(qtbot, genuine_cnn, tmp_path):
+    """Case: IT-DET-014."""
+    with _detection_failure_case(qtbot, genuine_cnn, tmp_path / "crash-data", delay=0.2) as (
+        controller,
+        repository,
+    ):
+        controller.start_detection(DetectionSettings(0.5, 50, 0, 1))
+        qtbot.waitUntil(
+            lambda: controller.run_process is not None and controller.run_process.processId() > 0,
+            timeout=10_000,
+        )
+        controller.run_process.kill()
+        record = _wait_terminal(qtbot, controller)
+        assert record.status is DetectRunStatus.INTERRUPTED
+        assert not repository.result_path(record.artifact_id).exists()
 
 
 @pytest.mark.qt
@@ -1221,9 +1225,7 @@ def test_real_rf_reference_probability_persists_independent_native_derived_resul
             )
             page.resize(700, 780)
             qtbot.waitUntil(lambda: page.is_compact)
-            qtbot.waitUntil(
-                lambda: page.content_scroll.horizontalScrollBar().maximum() == 0
-            )
+            qtbot.waitUntil(lambda: page.content_scroll.horizontalScrollBar().maximum() == 0)
             page.content_scroll.verticalScrollBar().setValue(0)
             compact = evidence / f"{label}-compact.png"
             assert page.grab().save(str(compact), "PNG") and compact.stat().st_size > 10_000

@@ -1,6 +1,6 @@
 # Agent routing — read the minimum necessary
 
-**Start:** `AGENTS.md` → [sequence and branch gate](../IMPLEMENTATION_SEQUENCE.md) → **one current stage spec**. Verify paths, real Git state and code. **Do not preload other specs, all Train docs, all test indexes or entire sibling repositories.** ST-01 and ST-02 are owner-approved; next implementation stage is ST-03 unless the real reviewed branch shows otherwise.
+**Start:** `AGENTS.md` → [sequence and branch gate](../IMPLEMENTATION_SEQUENCE.md) → **one task-owning spec** when applicable. Verify paths, real Git state and code. **Do not preload other specs, all Train docs, all test indexes or entire sibling repositories.** Current `main` contains the merged source baseline through ST-11 and REV-04; no next implementation stage is declared. Installed-platform release work remains separately gated.
 
 | Current work | Read only these authorities *when relevant* |
 |---|---|

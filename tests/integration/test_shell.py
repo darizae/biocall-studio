@@ -20,7 +20,6 @@ def test_native_shell_routes_between_select_and_wiki(qapp, qtbot, workspace):
     """Case: IT-UI-001."""
     app = create_application()
     assert create_application() is app is qapp is QApplication.instance()
-    assert app.styleHints().colorScheme() is Qt.ColorScheme.Light
     assert app.organizationName() == "BioCall Studio"
     assert app.applicationName() == "biocall-studio"
     assert app.applicationDisplayName() == "BioCall Studio"
@@ -51,6 +50,13 @@ def test_native_shell_routes_between_select_and_wiki(qapp, qtbot, workspace):
     assert picker_button.focusPolicy() != Qt.FocusPolicy.NoFocus
     qapp.processEvents()
     assert window.focusWidget() is picker_button
+
+
+@pytest.mark.native_cocoa
+def test_native_cocoa_application_reports_forced_light_scheme(qapp):
+    """Case: IT-UI-001."""
+    app = create_application()
+    assert app.styleHints().colorScheme() is Qt.ColorScheme.Light
 
 
 def test_folder_picker_keeps_pending_selection_when_native_dialog_is_cancelled(

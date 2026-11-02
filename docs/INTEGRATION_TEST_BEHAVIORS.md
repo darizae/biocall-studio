@@ -30,12 +30,10 @@ record are under `design/evidence/st-02-native/`; installed and Windows qualific
 
 ## 1b. Stage-owned Detect integration cases (ST-03–ST-10)
 
-ST-03 implements `IT-DET-001`–`002`; ST-04 implements `IT-DET-003`–`005`; ST-05 implements
-`IT-DET-006`–`008`; and ST-06 implements `IT-DET-009`–`011` pending owner review. ST-07–ST-10
-rows remain planned, unexecuted acceptance contracts. Each stage implements **only its own rows**,
-using genuine
-Qt/Worker/WAV/scientific boundaries where named. The whole-Studio E2E appears exclusively in ST-11.
-No planned case counts as covered.
+The merged source baseline contains implementations for ST-03 through ST-10 and the ST-11
+whole-Studio qualification cases. Each row remains an acceptance contract rather than automatic
+proof: inspect its assertions and current execution evidence, and report native/installed-platform
+gaps separately. The whole-Studio E2E appears exclusively in ST-11.
 
 | Case ID | Public seam / expected result | Data | Spec |
 |---|---|---|---|
@@ -197,7 +195,7 @@ exact persisted values are compared at the public Plot binding seam, the 10,001-
 a responsive live window, and CLI/startup tests carry their indexed IDs. See the
 [Spec 05f ledger](design/evidence/README.md#spec-05f--ui-chart-scale-and-cli-coverage-closeout).
 
-Detect inference cases are pre-registered **planned** in section 1b above and owned only by their ST-07/ST-09 stage; they are **not** Train acceptance cases. See [PREDICTION](PREDICTION.md) for the science contract.
+Detect inference cases in section 1b are owned only by their ST-07/ST-09 stage; they are **not** Train acceptance cases. Their presence in the merged baseline is not current execution evidence. See [PREDICTION](PREDICTION.md) for the science contract.
 
 ## 5d. Local logging and diagnostics (pre-release)
 

@@ -1,6 +1,6 @@
 # ST-09 — Optional RF refinement and Result lineage
 
-**Branch:** `detect-st09-rf-refinement` from reviewed `detect`. **Predecessors:** ST-05 RF Model intake, ST-07 CNN Result, ST-08 Results UX. **Successor:** ST-10. **Status:** implemented; awaiting owner review.
+**Historical branch:** `detect-st09-rf-refinement`. **Predecessors:** ST-05 RF Model intake, ST-07 CNN Result, ST-08 Results UX. **Successor:** ST-10. **Status:** implemented and included in the current merged `main` source baseline.
 
 ## Scope and ownership
 

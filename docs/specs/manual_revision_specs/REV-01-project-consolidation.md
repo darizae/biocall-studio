@@ -1,8 +1,8 @@
 # REV-01 — BioCall Studio project consolidation
 
-**Branch:** `detect-rev01-project-consolidation`, created from the reviewed local `detect`
-after ST-10 acceptance. **Predecessor:** ST-10. **Successor:** REV-02. **Status:** planned;
-the current ST-03–ST-10 commits do not by themselves prove acceptance.
+**Historical branch:** `detect-rev01-project-consolidation`. **Predecessor:** ST-10.
+**Successor:** REV-02. **Status:** implemented and included in the current merged `main` source
+baseline.
 
 ## Outcome and boundaries
 

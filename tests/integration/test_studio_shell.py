@@ -124,7 +124,6 @@ def test_approved_launch_language_and_light_theme_survive_host_dark_appearance(
     coordinator = _coordinator(qtbot, WorkspaceController(tmp_path / "settings"))
     shell = coordinator.shell_window
 
-    assert qapp.styleHints().colorScheme() is Qt.ColorScheme.Light
     assert qapp.property("alp_ui_theme") == ALPACA_LIGHT
     assert qapp.palette().window().color().name().upper() == (
         ALPACA_LIGHT.colors.background.upper()
@@ -147,7 +146,15 @@ def test_approved_launch_language_and_light_theme_survive_host_dark_appearance(
         qtbot.waitUntil(lambda width=width: shell.launchpad._compact == (width < 900))
         assert shell.launchpad.findChildren(Text)
         assert shell.launchpad.grab().size().width() > 0
+    _finish(qtbot, coordinator)
 
+
+@pytest.mark.native_cocoa
+def test_native_cocoa_light_scheme_survives_host_dark_appearance(qapp, qtbot, tmp_path):
+    """Case: IT-UI-006."""
+    qapp.styleHints().setColorScheme(Qt.ColorScheme.Dark)
+    coordinator = _coordinator(qtbot, WorkspaceController(tmp_path / "settings"))
+    assert qapp.styleHints().colorScheme() is Qt.ColorScheme.Light
     _finish(qtbot, coordinator)
 
 

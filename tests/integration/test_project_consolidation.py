@@ -13,7 +13,7 @@ import pytest
 
 from biocall_studio.shared.owner_lifetime import OwnerLease
 
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.packaged]
 
 
 def test_unified_wheel_shell_and_private_workers_have_one_installed_identity(tmp_path):

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.packaged]
 
 
 def test_training_wheels_use_committed_toolbox_artifact_without_sibling_imports(tmp_path):

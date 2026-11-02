@@ -33,9 +33,35 @@ private `--worker <mode> ...` argument in development.
 
 ## Tests and audit
 
+Use the repository runner instead of invoking the Qt suite directly on an interactive desktop. Its
+default `background` mode selects Qt's offscreen platform, runs every ordinary non-soak test except
+the explicitly Cocoa-only assertions, and never maps application windows onto the desktop:
+
 ```bash
-python -m pytest tests/unit -q
-python -m pytest tests/integration -q
+.venv/bin/python scripts/run_tests.py background
+.venv/bin/python scripts/run_tests.py background tests/integration/test_detect_runs.py -q
+```
+
+For a shorter TDD loop, `quick` additionally excludes wheel/install boundary tests marked
+`packaged`. It is not the before-commit full suite:
+
+```bash
+.venv/bin/python scripts/run_tests.py quick tests/unit -q
+```
+
+Native Cocoa qualification remains separate because offscreen rendering cannot prove macOS color
+scheme, window-manager, native-dialog or installed-app behavior. This command may cover or focus
+the active desktop and therefore requires an explicit acknowledgement. Run it only with the
+owner's agreement or in a dedicated macOS test session:
+
+```bash
+.venv/bin/python scripts/run_tests.py native --allow-visible
+```
+
+The background run and native run are complementary evidence; never report the background run as
+native Cocoa, installed macOS or Windows qualification. Then run the non-pytest audits:
+
+```bash
 python -m ruff check src tests scripts
 python scripts/audit_test_ids.py
 python scripts/verify_handoff.py
@@ -50,10 +76,10 @@ BIOCALL_STUDIO_SOAK_REPORT=/tmp/biocall-studio-soak-observations.json \
   python -m pytest -m soak tests/integration/test_long_running_runs.py -q -s
 ```
 
-Real Qt/application/filesystem and QProcess integration runs locally on native macOS with isolated
-temporary Collections and application data. Offscreen rendering does not replace native visual or
-dialog review. Windows commands, filesystem locking, QProcess behavior, packaging, and installers
-remain unqualified until exercised on native Windows under the release gate.
+Real Qt/application/filesystem and QProcess integration uses isolated temporary Collections and
+application data in both modes. Offscreen rendering does not replace native visual or dialog
+review. Windows commands, filesystem locking, QProcess behavior, packaging, and installers remain
+unqualified until exercised on native Windows under the release gate.
 
 ## Data and release boundaries
 

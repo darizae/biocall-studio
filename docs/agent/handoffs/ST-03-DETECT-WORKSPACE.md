@@ -1,7 +1,8 @@
 # ST-03 → ST-04 Detect workspace handoff
 
-**Gate:** implemented on `detect-st03-workspace`; pending owner review. This is not approval to
-merge into `detect` or begin ST-04.
+**Historical gate:** implemented on `detect-st03-workspace`; later included in the merged `main`
+source baseline. This handoff remains implementation evidence, not installed-platform approval or
+authority to begin new stage work.
 
 ## Accepted input boundary for review
 

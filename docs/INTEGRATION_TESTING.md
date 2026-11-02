@@ -34,4 +34,13 @@ Run `python scripts/audit_test_ids.py` to catch unknown IDs and find referenced 
 
 ## macOS/CI/Windows division
 
-CI starts with Qt-free unit and static checks. Run workflow, GUI and process suites on **native macOS** with explicit dependencies/fixtures. `QT_QPA_PLATFORM=offscreen` may support fast model tests but cannot qualify dialogs or a packaged app. Native macOS **installed DMG** tests and native Windows **installed EXE** tests are separate release gates; `IT-MAC-*` must verify Gatekeeper/signing/Worker and `IT-WIN-*` the real Windows installer. Native Windows tests remain release gates and run on actual Windows: path case behavior, reserved names/reparse points, write locks, QProcess/`alp-ui`/packaging, and a real Dataset + both Model families. No emulation or macOS-only portability test may claim `IT-WIN-*` passed. HPC and network are never used as ordinary test resources.
+CI starts with Qt-free unit and static checks. On an interactive Mac, use
+`scripts/run_tests.py background` for invisible ordinary workflow, GUI-model and process coverage;
+use its explicitly acknowledged `native` mode only in a suitable native test session. Offscreen Qt
+does not qualify macOS color-scheme/window-manager behavior, dialogs or a packaged app. Native
+macOS **installed DMG** tests and native Windows **installed EXE** tests are separate release gates;
+`IT-MAC-*` must verify Gatekeeper/signing/Worker and `IT-WIN-*` the real Windows installer. Native
+Windows tests remain release gates and run on actual Windows: path case behavior, reserved names/
+reparse points, write locks, QProcess/`alp-ui`/packaging, and a real Dataset + both Model families.
+No emulation or macOS-only portability test may claim `IT-WIN-*` passed. HPC and network are never
+used as ordinary test resources.

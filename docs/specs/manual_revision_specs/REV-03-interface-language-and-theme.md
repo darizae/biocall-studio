@@ -1,8 +1,7 @@
 # REV-03 — Plain-language interface and light-only visual pass
 
-**Branch:** `detect-rev03-ui-language`, created from the reviewed local `detect` after REV-02
-acceptance. **Predecessor:** REV-02. **Successor:** ST-11. **Status:** proposed copy pending owner
-approval; implementation must not begin until the tooltip table below is accepted or revised.
+**Historical branch:** `detect-rev03-ui-language`. **Predecessor:** REV-02. **Successor:** REV-04.
+**Status:** implemented and included in the current merged `main` source baseline.
 
 ## Outcome and scope
 

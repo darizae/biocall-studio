@@ -34,6 +34,7 @@ addopts = "-ra --strict-markers --import-mode=importlib -m 'not soak'"
 markers = [
   "integration: real filesystem or component boundary",
   "qt: real Qt widget/model integration",
+  "native_cocoa: visible macOS Cocoa behavior excluded from background test runs",
   "packaged: native packaged executable",
   "soak: explicitly invoked long-duration durability verification",
 ]

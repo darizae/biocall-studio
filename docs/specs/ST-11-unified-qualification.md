@@ -1,6 +1,6 @@
 # ST-11 — Whole-Studio qualification and release-spec revision
 
-**Branch:** `detect-st11-qualification` from reviewed `detect`. **Predecessors:** approved ST-03…ST-10 and REV-01…REV-03. **Status:** planned; packaging, signing and public release remain separate unexecuted work.
+**Historical branch:** `detect-st11-qualification`. **Predecessors:** ST-03…ST-10 and REV-01…REV-04. **Status:** implemented and included in the current merged `main` source baseline; packaging, signing and public release remain separate unexecuted work.
 
 ## Scope and ownership
 

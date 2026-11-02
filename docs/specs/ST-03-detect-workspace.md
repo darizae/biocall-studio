@@ -1,6 +1,6 @@
 # ST-03 — Detect workspace identity, metadata and relinking
 
-**Branch:** `detect-st03-workspace`, created from reviewed local `detect`. **Predecessor:** owner-approved ST-02. **Successor:** ST-04. **Status:** implemented pending owner review; not accepted or merged.
+**Historical branch:** `detect-st03-workspace`. **Predecessor:** ST-02. **Successor:** ST-04. **Status:** implemented and included in the current merged `main` source baseline; installed-platform claims remain separate.
 
 ## Scope and ownership
 

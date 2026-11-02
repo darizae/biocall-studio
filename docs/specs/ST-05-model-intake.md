@@ -1,6 +1,6 @@
 # ST-05 — Trusted CNN/RF Model intake and scientific compatibility
 
-**Branch:** `detect-st05-model-intake` from reviewed `detect`. **Predecessor:** ST-04 inventory contract. **Successor:** ST-06. **Status:** planned; **no new-audio prediction in this stage**.
+**Historical branch:** `detect-st05-model-intake`. **Predecessor:** ST-04 inventory contract. **Successor:** ST-06. **Status:** implemented and included in the current merged `main` source baseline; **no new-audio prediction belongs to this stage**.
 
 ## Scope and ownership
 

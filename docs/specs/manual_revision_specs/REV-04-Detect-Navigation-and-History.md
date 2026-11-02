@@ -1,5 +1,8 @@
 # REV-04 — Detect Navigation and History
 
+**Historical branch:** `detect-rev04-navigation`. **Predecessor:** REV-03. **Successor:** ST-11.
+**Status:** implemented and included in the current merged `main` source baseline.
+
 ## Summary
 
 - Create `detect-rev04-navigation` from reviewed `detect` commit `feff56b`; update

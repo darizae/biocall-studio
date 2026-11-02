@@ -1,6 +1,6 @@
 # ST-06 — Detect Run lifecycle, Workers and privacy-safe logging
 
-**Branch:** `detect-st06-workers` from reviewed `detect`. **Predecessor:** ST-05 verified Model and ST-04 inventory inputs. **Successor:** ST-07. **Status:** implemented; awaiting owner review.
+**Historical branch:** `detect-st06-workers`. **Predecessor:** ST-05 verified Model and ST-04 inventory inputs. **Successor:** ST-07. **Status:** implemented and included in the current merged `main` source baseline.
 
 ## Scope and ownership
 
