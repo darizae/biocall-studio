@@ -10,7 +10,7 @@
 
 ## Source discovery
 
-Recurse deterministically, with bounded work and no symlink following by default. Exclude app-owned/Train-generated directories and recognized `positives/` snippets; `recordings/` is the default inclusion candidate in a recognizable Train Collection. Unknown WAVs are candidates for explicit folder/file approval, not automatically accepted. Separate **excluded**, **invalid** and **undecided**. Validate header/format, path containment, duplicates/collisions and staleness; do not turn an unreadable input into a zero-detection recording. Storage and inventory schemas are owned by [ST-03](specs/ST-03-detect-workspace.md)/[ST-04](specs/ST-04-wav-discovery.md), with accepted contracts in `docs/agent/handoffs/`; do not copy Train metadata.
+Recurse deterministically, with bounded work and no symlink following by default. Exclude app-owned/Train-generated directories and recognized `positives/` snippets; `recordings/` is the default inclusion candidate in a recognizable Train Collection. Unknown WAVs are candidates for explicit folder/file approval, not automatically accepted. Separate **excluded**, **invalid** and **undecided**. Validate header/format, path containment, duplicates/collisions and staleness; do not turn an unreadable input into a zero-detection recording. The implemented Detect storage and inventory contracts live in the owning source code and indexed tests; do not copy Train metadata.
 
 ## Scientific order
 
@@ -19,7 +19,7 @@ Recurse deterministically, with bounded work and no symlink following by default
 
 Ground interoperability in [Train Model export](science/MODEL_EXPORT_CONTRACT.md), [binary classification](science/BINARY_CLASSIFICATION_CONTRACT.md) and inspected `../bioacoustics-dl-toolbox` / `../alpaca-pipelines` source, not assumed APIs.
 
-## Corpus export ([ST-10](specs/ST-10-corpus-export.md))
+## Corpus export
 
 - **Individual snippets:** origin-linked collision-safe names recording source identity and start/end in source time.
 - **Concatenated WAV + Raven TSV:** selection rows refer to offsets in the **concatenated** waveform; a separate provenance map records original source/interval.
@@ -31,4 +31,4 @@ Honor the implemented PCM-preserving format checks, interval/frame rounding, ord
 
 Use explicit unavailable/incompatible Model states; plain-language errors; background scanning and workers; cancellable Runs; per-file failure reporting; privacy-safe, bounded application/Worker JSONL logs consistent with Train diagnostics, without creating shared Run identity. Real inference and export acceptance is recorded in [ST-11 source qualification](ST-11_QUALIFICATION.md); it does not qualify installed releases.
 
-**Implementation authority:** the [ST-03–ST-11 sequence](IMPLEMENTATION_SEQUENCE.md) and one active stage spec own detailed acceptance and test IDs. This page records stable scientific/domain invariants only; do not add competing stage specs or whole-Studio tests here.
+**Implementation authority:** the current [status and work policy](IMPLEMENTATION_SEQUENCE.md), owning source code and indexed tests; this page records stable scientific/domain invariants without duplicating completed implementation specs.
