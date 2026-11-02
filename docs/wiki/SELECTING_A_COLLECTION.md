@@ -62,4 +62,3 @@ The timestamp describes the original recording, not the position within the crop
 
 Select Source Recordings, choose how many negative Snippets to mine, configure `train`/`val` Splits, and **Build Dataset**. The resulting **Dataset** is immutable. Use any Dataset to train either a CNN or a Random Forest **Model**. Training generates metrics and a reusable Model under a readable label and stable ID.
 
-The browser [Training prototype](../design/prototypes/training-first/index.html) demonstrates these screens. It can inspect selected browser-visible WAV headers and offer a **downloadable manifest preview**, but browser security prevents it from silently writing `.alpaca/collection.json` into the selected folder. Dataset Build, Training, and persistent local metadata in the prototype are simulated; the native app will implement those operations.

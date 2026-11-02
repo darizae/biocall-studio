@@ -1,4 +1,4 @@
-# BioCall Studio Train — Ubiquitous language
+# BioCall Studio — Train vocabulary
 
 Use these exact capitalized domain nouns in UI, code, docs, spec IDs and test descriptions. Prefer singular nouns for types and titles. Scientific source intervals use **integer milliseconds** unless a field explicitly says otherwise.
 
@@ -21,9 +21,9 @@ Use these exact capitalized domain nouns in UI, code, docs, spec IDs and test de
 | **Binary Single-Label Classification** | The **only** Trainer task: each Dataset Snippet is assigned exactly one of two mutually exclusive classes, `target` or `noise`. Model class mappings have exactly two indices. Library multi-label/multi-class capability is not enabled; see [binary scope](science/BINARY_CLASSIFICATION_CONTRACT.md). |
 | **CNN** | Convolutional neural network trained on compatible audio-derived tensors; may have per-epoch train/validation loss and device selection. |
 | **Random Forest (RF)** | Tabular feature classifier trained on a fixed versioned acoustic-feature schema. Report feature extraction, fitting, validation, feature importance and classifier metrics; not CNN loss curves. |
-| **Model** | Immutable published trained family-specific weights/estimator and a portable manifest (ID, human-readable label, Dataset ID, config, schema, metrics, provenance **and versioned settings needed by a later Prediction consumer; structurally reloadable now**). |
+| **Model** | Immutable published trained family-specific weights/estimator and a portable manifest (ID, human-readable label, Dataset ID, config, schema, metrics, provenance **and versioned settings required by Detect; structurally reloadable**). |
 | **Model Export Contract** | Versioned manifest, binary artifacts, exact CNN architecture/transforms or RF ordered features, class map, integrity and provenance; structurally checked during Training. |
-| **Segment Scoring (future)** | Prediction-only operation on supplied bounded audio intervals using saved Model transforms; **not** a Trainer operation or acceptance test. See `docs/PREDICTION.md`. |
+| **RF refinement** | Detect-only assessment of candidate recording intervals from an existing CNN Result; produces a separately linked immutable Result, not a Train Run. See [Detect contract](PREDICTION.md). |
 | **Run** | Persisted scientific execution of either Dataset Build or Training with state/progress/logs/input reservations and optional published output pointer. |
 | **Active Run** | The single executing/starting/cancelling Run under Application Controller supervision; no queue. |
 | **Worker Process** | Separate OS process launched by QProcess using the current application environment; does heavy Dataset Build/Training work, not GUI operations. |

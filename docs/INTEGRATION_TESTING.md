@@ -1,4 +1,4 @@
-# Integration testing strategy — native Trainer
+# Integration testing strategy — BioCall Studio
 
 ## Purpose and evidence levels
 

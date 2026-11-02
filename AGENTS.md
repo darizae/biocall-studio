@@ -4,7 +4,7 @@ One Python/PySide6/`alp-ui` desktop application: **Train** (preserve scientific/
 
 ## Minimal entry route
 
-1. Read [ROUTING](docs/agent/ROUTING.md), then **only the one task-owning spec** from [the sequence](docs/IMPLEMENTATION_SEQUENCE.md) when the task is stage-specific. Do not infer a new active stage from historical specs.
+1. Read [ROUTING](docs/agent/ROUTING.md), then **only the current task-owning spec**, if any, from [the status page](docs/IMPLEMENTATION_SEQUENCE.md). Completed implementation specs were intentionally removed; do not infer a new active stage or reconstruct them.
 2. Verify file paths and real branch/checkout/installed dependency state before changing anything. A ZIP, screenshot, spec or test index is not an executed test.
 3. Execute stage work on its documented `detect-stNN-purpose` branch from the reviewed baseline. Use a focused branch from current `main` for explicitly requested cross-cutting maintenance. Do not reorganize Train or load all sibling repositories. Local merge policy is in [Git delivery](docs/agent/GIT_DELIVERY.md). **Never push**.
 

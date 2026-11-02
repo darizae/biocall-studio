@@ -12,11 +12,11 @@
 
 ## Native acceptance — red-first and prototype parity
 
-- The **unchanged** interactive prototype contains no persisted preset UI. Add Save/Load/Delete/Rename/Duplicate only in the native app according to the [additive Spec 05 UX brief](../design/SPEC05_CONFIGURATION_EXTENSION.md), while preserving the existing prototype form hierarchy. The native app persists to OS user data. Use public `alp-ui` `SelectInput`, `TextInput` / modal confirmation, `Button`, `HelpHint`, form validation and alerts as available; inspect current exports. Do not add a bespoke visual system or modify unrelated prototype screens.
+- The historical browser prototype did not include persisted presets. The native Train UI provides Save/Load/Delete/Rename/Duplicate while preserving the existing Train workflow hierarchy. The native app persists to OS user data. Use public `alp-ui` `SelectInput`, `TextInput` / modal confirmation, `Button`, `HelpHint`, form validation and alerts as available; inspect current exports. Do not add a bespoke visual system or modify unrelated prototype screens.
 - `UT-TRAIN-009`: default + named presets; family isolation, roundtrip all typed keys, no filesystem/Dataset paths, change detection, overwrite/duplicate policy and immutable Run snapshot.
 - `UT-TRAIN-010`: incompatibility, old schema, corrupt files, unsafe names, atomic interruption and migrated optional defaults produce explicit safe outcomes; no stale preset mutation.
 - `IT-TRAIN-013`: actual Qt save/load/rename/duplicate/delete, restart persistence, keyboard/focus and HelpHint/Wiki deep links, current Dataset unchanged, real stored files, honest warning/error states.
 - `IT-TRAIN-014`: starting a real Worker after loading a preset uses exact resolved values and preserves preset separately; editing/deleting a preset after completed Run leaves Model training record and checkpoint unchanged.
 - `IT-MAC-004`/`IT-WIN-005`: installed apps can write/load presets and reopen Model, even when sibling checkouts are absent.
 
-**Evidence:** `docs/design/evidence/spec-05-native/presets-list.png`, `presets-unsaved.png`, `presets-confirm-delete.png`, `train-cnn-advanced.png`, `train-rf-advanced.png`, alongside native prototype/Showcase fidelity ledger. Do not accept spec 05 without these real macOS screenshots and indexed behavior tests.
+**Evidence:** Review `tests/integration/test_training_ui.py` and any genuine native captures available in the checkout. Rerun the owning indexed tests for changes; historical screenshots alone do not prove a fresh pass.

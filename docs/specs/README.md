@@ -1,20 +1,9 @@
-# Implementation specs — one stage at a time
+# Current specifications
 
-[Sequence and gates](../IMPLEMENTATION_SEQUENCE.md) governs order, branches and acceptance. **Owner-approved:** [ST-01 prototype](ST-01-prototype.md) (design approval, not browser-automation qualification) and [ST-02 shell](ST-02-native-shell.md). **Next active implementation:** [ST-03 workspace](ST-03-detect-workspace.md). Prepared future specs, including the post-ST-10 revision series, are **not permission** to implement them before predecessor review.
+Completed ST-01–ST-10 and REV-01–REV-04 implementation specs were removed after source integration; the [current status](../IMPLEMENTATION_SEQUENCE.md), [domain contract](../PREDICTION.md), [native UX matrix](../design/UX_PARITY_MATRIX.md) and [indexed tests](../INTEGRATION_TEST_BEHAVIORS.md) remain authoritative. Do not restore the old specs for maintenance.
 
-| Stage | Spec |
-|---|---|
-| 03 | [Collection identity, storage and relink](ST-03-detect-workspace.md) |
-| 04 | [WAV inventory](ST-04-wav-discovery.md) |
-| 05 | [Model intake](ST-05-model-intake.md) |
-| 06 | [Workers and logs](ST-06-detect-workers.md) |
-| 07 | [CNN detection](ST-07-cnn-detection.md) |
-| 08 | [Results UX](ST-08-results-ux.md) |
-| 09 | [RF refinement](ST-09-rf-refinement.md) |
-| 10 | [Corpus export](ST-10-corpus-export.md) |
-| REV-01 | [Project/package consolidation](manual_revision_specs/REV-01-project-consolidation.md) |
-| REV-02 | [Guided Detect workflow](manual_revision_specs/REV-02-detect-guided-workflow.md) |
-| REV-03 | [Interface language and light-only theme](manual_revision_specs/REV-03-interface-language-and-theme.md) |
-| 11 | [Whole-Studio qualification](ST-11-unified-qualification.md) |
+- **Proposed, not implemented:** [REV-05 — output-size and free-space preflight](manual_revision_specs/REV-05-output-size-preflight.md).
+- **Retained qualification reference:** [ST-11](ST-11-unified-qualification.md) for existing installed-release traceability; results are in [ST-11 qualification](../ST-11_QUALIFICATION.md).
+- **Deferred installed releases:** [macOS](06-macos-release-and-installer.md) and [Windows](07-windows-release-and-installer.md). They are unchanged by this cleanup.
 
-Run only the owning indexed `UT-*`/`IT-*` behaviors plus affected regressions during a stage. Whole-Studio E2E belongs exclusively to ST-11. The existing macOS/Windows release specifications are revised there, not duplicated.
+Test definitions stay in the existing [unit](../UNIT_TESTING.md) and [integration](../INTEGRATION_TEST_BEHAVIORS.md) indexes, not in a new plan.
