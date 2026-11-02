@@ -13,6 +13,9 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-CLI-001` | Version/help and invalid-option handling complete without importing optional Qt/`alp-ui`; real GUI startup remains owned by `IT-UI-001` and uses isolated Application Settings | TD-UI | 01, 05f |
 | `UT-CLI-002` | Canonical `biocall-studio` argument parsing and private Worker dispatch accept only the five REV-01 modes; missing/invalid Worker arguments fail without GUI import and version lookup uses the unified distribution. | TD-UI, TD-RUN | [REV-01](specs/manual_revision_specs/REV-01-project-consolidation.md) |
 | `UT-DEV-001` | Repository test-runner modes force invisible offscreen Qt for ordinary/quick runs, keep package exclusion explicit, and refuse visible Cocoa execution or marker overrides without acknowledgement. | TD-UI | Test infrastructure |
+| `UT-SIZE-001` | Exact PCM/WAV/TSV byte arithmetic, binary unit formatting/round-up, overflow and unsupported formats. | TD-WAV, TD-FAIL | [REV-05 proposed](specs/manual_revision_specs/REV-05-output-size-preflight.md) |
+| `UT-SIZE-002` | Train/Detect size adapters: verified exact vs ranged/unknown estimates, historical-cohort confidence and no fake precision. | TD-CACHE, TD-RUN | [REV-05 proposed](specs/manual_revision_specs/REV-05-output-size-preflight.md) |
+| `UT-SIZE-003` | Per-volume free/peak/reserve decisions, stale inputs, unknown capacity and confirmation policy. | TD-PATH, TD-FAIL | [REV-05 proposed](specs/manual_revision_specs/REV-05-output-size-preflight.md) |
 | `UT-STU-001` | Pure workspace-route policy: Studio is the startup route; Train/Detect/Review and return transitions are explicit; unknown routes fail closed; navigation decisions do not mutate Train context or imply runnable Detect features. | TD-UI | ST-02 |
 | `UT-DET-001` | unique identity, schema migration/rejection, app-data ownership and root-reference serialization (no original path in exported metadata). | TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
 | `UT-DET-002` | valid/missing/inaccessible/changed/relink state decisions, confirmation and stale inventory invalidation; reject unrelated-root takeover. | TD-PATH, TD-CACHE | [ST-03](specs/ST-03-detect-workspace.md) |
@@ -56,8 +59,8 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-RUN-002` | Orphan/restart/cancel policy and published-pointer validity decisions are conservative | TD-RUN | 04 |
 | `UT-UI-001` | Mutable Dataset/Model display names are validated and atomically stored outside immutable manifests; Run renaming preserves stable identity and history | TD-UI, TD-PATH, TD-RUN | UI pass |
 | `UT-POWER-001` | Application Settings v2→v3 migration and strict boolean validation; keep-awake request/effective-state idempotence, retryable acquisition failure and unsupported-platform distinction | TD-FAIL | 05g |
-| `UT-AUDIO-001` | PCM frame-interval and desktop adapter compatibility; details/edge cases in [Spec 04.5](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) | TD-WAV | 04.5 |
-| `UT-AUDIO-002` | Manifest metadata, integrity hashing and exception policy; [Spec 04.5](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) | TD-WAV, TD-FAIL | 04.5 |
+| `UT-AUDIO-001` | PCM frame-interval and desktop adapter compatibility; see `tests/unit/test_audio.py` | TD-WAV | 04.5 |
+| `UT-AUDIO-002` | Manifest metadata, integrity hashing and exception policy; see `tests/unit/test_audio.py` | TD-WAV, TD-FAIL | 04.5 |
 | `UT-TRAIN-001` | CNN settings bounds and resolved config; strict binary single-label `target`/`noise` mapping and split coverage; reject multi-label/multi-class config, extra classes, multi-hot targets or editable `num_classes` | TD-TRAIN | 05 |
 | `UT-TRAIN-002` | RF settings bounds, feature names/order/schema matching and threshold semantics | TD-TRAIN | 05 |
 | `UT-TRAIN-003` | Family-specific metrics, positive-class selection, null/undefined ROC-AUC and validation counts | TD-TRAIN | 05 |
@@ -73,22 +76,6 @@ An indexed case appears **exactly** in the asserting test function docstring, e.
 | `UT-LOG-003` | App/Run log containment rejects traversal and symlink escapes; diagnostics readers/exporters revalidate records and never copy corrupt or unknown fields verbatim | TD-PATH, TD-FAIL | 05d |
 | `UT-LOG-004` | App/Worker byte budgets, bounded rotation, age/total pruning, stderr storm bounds and non-recursive degraded-sink fallback | TD-RUN, TD-FAIL | 05d |
 
-**Reported status:** ST-02 implements `UT-STU-001` in
-`tests/unit/test_studio_navigation.py`; the stage handoff records the fresh command and result.
-Listing the ID here is not independent passing evidence.
-
-**Reported status:** Spec 05c completes `UT-TRAIN-001`–`010`, including exact ordered RF feature
-schema, explicit positive-probability mapping, undefined metrics and structural estimator rejection.
-The [Spec 05 evidence](design/evidence/README.md#spec-05c--real-rf-training-and-phase-05-acceptance)
-records the fresh commands and results; listing the IDs here is not independent passing evidence.
-
-**Reported status:** Spec 05d implements `UT-LOG-001`–`004`; the
-[native diagnostics ledger](design/evidence/README.md#spec-05d--local-logging-and-diagnostics)
-records the red-first boundary and fresh verification. Listing the IDs is not passing evidence.
-
-**Reported status:** Spec 05g implements `UT-POWER-001`; the
-[Spec 05g ledger](design/evidence/README.md#spec-05g--long-running-runs-safe-exit-and-optional-keep-awake)
-records the fresh migration, adapter-decision and native integration commands. Listing the ID is
-not passing evidence.
+Historical implementation notes belong to their owning specs and tests; this index lists contracts, not fresh execution evidence.
 
 Do not add unit tests that instantiate a fake repository/GUI just to mirror an `IT-*` case. Conversely, if the algorithm truly depends on WAV decoder/frame reads, include a minimal actual WAV integration test for that boundary. See [`INTEGRATION_TESTING.md`](INTEGRATION_TESTING.md) and its indexed behavior plan.

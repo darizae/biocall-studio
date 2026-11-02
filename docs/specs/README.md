@@ -1,20 +1,12 @@
-# Implementation specs — one stage at a time
+# Implementation specifications
 
-[Sequence and gates](../IMPLEMENTATION_SEQUENCE.md) governs order, branches and acceptance. **Owner-approved:** [ST-01 prototype](ST-01-prototype.md) (design approval, not browser-automation qualification) and [ST-02 shell](ST-02-native-shell.md). **Next active implementation:** [ST-03 workspace](ST-03-detect-workspace.md). Prepared future specs, including the post-ST-10 revision series, are **not permission** to implement them before predecessor review.
+[Roadmap and current status](../IMPLEMENTATION_SEQUENCE.md) is the only stage-order authority. Historical ST-01–ST-11 and REV-01–REV-04 specs are retained as scoped implementation records, **not** invitations to repeat completed work. Use [agent routing](../agent/ROUTING.md) to open only the spec for the requested task. The current source baseline is recorded in the roadmap; macOS/Windows installed-release gates remain separate.
 
-| Stage | Spec |
+| Area | Owning documents |
 |---|---|
-| 03 | [Collection identity, storage and relink](ST-03-detect-workspace.md) |
-| 04 | [WAV inventory](ST-04-wav-discovery.md) |
-| 05 | [Model intake](ST-05-model-intake.md) |
-| 06 | [Workers and logs](ST-06-detect-workers.md) |
-| 07 | [CNN detection](ST-07-cnn-detection.md) |
-| 08 | [Results UX](ST-08-results-ux.md) |
-| 09 | [RF refinement](ST-09-rf-refinement.md) |
-| 10 | [Corpus export](ST-10-corpus-export.md) |
-| REV-01 | [Project/package consolidation](manual_revision_specs/REV-01-project-consolidation.md) |
-| REV-02 | [Guided Detect workflow](manual_revision_specs/REV-02-detect-guided-workflow.md) |
-| REV-03 | [Interface language and light-only theme](manual_revision_specs/REV-03-interface-language-and-theme.md) |
-| 11 | [Whole-Studio qualification](ST-11-unified-qualification.md) |
+| Detect stages | [ST-03](ST-03-detect-workspace.md) · [ST-04](ST-04-wav-discovery.md) · [ST-05](ST-05-model-intake.md) · [ST-06](ST-06-detect-workers.md) · [ST-07](ST-07-cnn-detection.md) · [ST-08](ST-08-results-ux.md) · [ST-09](ST-09-rf-refinement.md) · [ST-10](ST-10-corpus-export.md) |
+| Subsequent refinements | [REV-01](manual_revision_specs/REV-01-project-consolidation.md) · [REV-02](manual_revision_specs/REV-02-detect-guided-workflow.md) · [REV-03](manual_revision_specs/REV-03-interface-language-and-theme.md) · [REV-04](manual_revision_specs/REV-04-Detect-Navigation-and-History.md) |
+| Qualification | [ST-11](ST-11-unified-qualification.md) — source-app qualification; installed releases still deferred |
+| Proposed shared capability | [REV-05 output-size preflight](manual_revision_specs/REV-05-output-size-preflight.md) — **spec only, not implemented or approved** |
 
-Run only the owning indexed `UT-*`/`IT-*` behaviors plus affected regressions during a stage. Whole-Studio E2E belongs exclusively to ST-11. The existing macOS/Windows release specifications are revised there, not duplicated.
+Testing IDs belong in the existing [unit](../UNIT_TESTING.md) and [integration](../INTEGRATION_TEST_BEHAVIORS.md) indexes. Do not create a second test plan or run the full Train→Detect scenario in a narrowly scoped revision.

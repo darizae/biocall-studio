@@ -1,4 +1,4 @@
-# Indexed integration-test behaviors — Trainer
+# Indexed integration-test behaviors — BioCall Studio
 
 All rows are **target acceptance criteria**, not claims of implementation or a passing test. Test functions that establish a row must contain its exact `IT-*` ID in the test-function docstring, cover each observable assertion, and execute successfully on the required real boundary. Detailed pure variants live in [`UNIT_TESTING.md`](UNIT_TESTING.md). Minimum differentiating resources are listed in [`INTEGRATION_TEST_DATA.md`](INTEGRATION_TEST_DATA.md).
 
@@ -12,6 +12,14 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-UI-004` | Prototype Select/Wiki/empty-state structure is exercised with real `alp-ui` Widgets, an accessible inline Wiki action, keyboard Tab/Space and HelpHint, and no demo scientific completions. **Separately required native macOS evidence:** persist real Trainer screenshots (not only pytest tmp files), compare side by side with both bundled prototype and sibling Showcase, log deviations and update README with truthful native shots before claiming UI acceptance. | TD-UI |
 | `IT-UI-005` | The UI-pass revision uses readable `alp-ui` typography, concise non-redundant copy with no user-facing internal IDs, a top-right Run state, and top-to-bottom numbered preparation. A Training draft stays visibly reopenable until discarded or launched. Dataset/Model/Run names are editable; Collection unbind and Dataset/Model/terminal-Run delete actions are confirmed, contained, and non-cascading. Active Run activity sits beside progress and Output remains below. | TD-UI, TD-PATH, TD-RUN |
 
+
+## Proposed shared storage preflight (REV-05; not implemented)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-SIZE-001` | Actual tiny WAV-backed Train Dataset Build and Detect corpus export byte sizes, destination/staging use, scientific content and source bytes unchanged. **Separate targeted workflows**, not a Studio E2E. | TD-WAV, TD-FAIL |
+| `IT-SIZE-002` | Train CNN/RF and Detect CNN/RF estimated range or unknown from real configurations/results; cancel confirmation leaves no new Worker/Run. | TD-TRAIN, TD-RUN |
+| `IT-SIZE-003` | Native Qt preflight, approved plain copy/HelpHints, compact/focus, capacity injection, stale/unknown/tight/insufficient and disk-full recovery. | TD-UI, TD-PATH, TD-FAIL |
 
 ## 1a. Studio shell (ST-02)
 
@@ -106,11 +114,7 @@ reserved for ST-11.
 | `IT-DB-004` | Dataset detail reopens complete immutable manifest, split counts and materialized files; deletion is explicit, rejects active input reservation and does not erase any existing Model. | TD-SPLIT, TD-RUN |
 | `IT-DB-005` | Native Builder/Dataset views match prototype recording selection, controls/hints, count preview, disabled/underfill and Dataset detail/list flows; real config/Run state, accessible Qt interactions and native evidence pass six-dimension review. | TD-UI, TD-MINE, TD-SPLIT |
 
-Spec 03 implementation evidence: `tests/integration/test_dataset_build.py` asserts all five rows at
-their real artifact, QProcess and native-widget seams. The tracked Cocoa comparison set and
-six-dimension review are in [`design/evidence/spec-03-native/`](design/evidence/spec-03-native/) and
-the [evidence ledger](design/evidence/README.md). Spec 04 still owns persisted Run lifecycle,
-cancellation/recovery and every `IT-RUN-*` case.
+Implementation assertions: `tests/integration/test_dataset_build.py`.
 
 ## 4. Run and Worker boundary (spec 04)
 
@@ -128,28 +132,21 @@ cancellation/recovery and every `IT-RUN-*` case.
 | `IT-POWER-001` | Settings and Training expose synchronized accessible keep-awake controls, canonical Wiki/help, persistence/reacquisition and truthful On/Off/Not active states; toggling remains independent of a real Run and failed settings writes do not misstate OS state. | TD-UI, TD-RUN, TD-FAIL |
 | `IT-POWER-002` | Actual macOS/Windows adapter acquires/releases automatic idle-sleep inhibition and abnormal GUI-process death releases OS-owned protection; unsupported platforms are not claimed. | TD-FAIL |
 
-Spec 04 implementation evidence: `tests/integration/test_run.py` asserts all five rows through real
-QProcess, persistence, restart, reservation and native-widget seams. The tracked Cocoa comparison
-set and six-dimension review are in
-[`design/evidence/spec-04-native/`](design/evidence/spec-04-native/) and the
-[evidence ledger](design/evidence/README.md). Packaged Worker launch remains owned by Spec 06.
-
-Spec 05g extends the accepted lifecycle with `IT-RUN-006`–`009` and `IT-POWER-001`–`002`.
-Its explicit soak is excluded from ordinary pytest selection and must be invoked with `-m soak`;
-the [Spec 05g evidence ledger](design/evidence/README.md#spec-05g--long-running-runs-safe-exit-and-optional-keep-awake)
-records the native platform, duration, resources, artifact hashes and UI review. Windows native
-power and installed-app requalification remain owned by Specs 07 and 06/07 respectively.
+Run/Worker assertions: `tests/integration/test_run.py`, `test_power_and_exit.py`,
+`test_owner_lifetime.py`; the ≥600-second soak remains separate.
 
 ## 4.5 Upstream PCM/WAV extraction — **Spec 04.5**
 
-`IT-AUDIO-001`–`IT-AUDIO-004` are defined in [Spec 04.5](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md): real-WAV byte equivalence, cancel/error cleanup, already-published Dataset compatibility and actual Worker import from the committed sibling toolbox. The spec is their **single detailed acceptance owner**; do not duplicate its cases here. Use `TD-WAV`, `TD-PATH`, `TD-SPLIT`, `TD-FAIL`.
+These cases exercise the Train PCM extraction boundary; the historical Spec 04.5 document is
+not in this checkout. Use `tests/integration/test_audio_extraction.py`,
+`test_dataset_build.py` and `test_run.py` rather than reconstructing the missing spec.
 
-| Case ID | Detailed owner | Data |
+| Case ID | Observable boundary | Data |
 |---|---|---|
-| `IT-AUDIO-001` | [Spec 04.5 exact acceptance case](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) | TD-WAV |
-| `IT-AUDIO-002` | [Spec 04.5 exact acceptance case](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) | TD-WAV, TD-FAIL |
-| `IT-AUDIO-003` | [Spec 04.5 exact acceptance case](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) | TD-WAV, TD-SPLIT, TD-FAIL |
-| `IT-AUDIO-004` | [Spec 04.5 exact acceptance case](specs/SPEC_04_5_UPSTREAM_AUDIO_EXTRACTION.md) | TD-PATH, TD-FAIL |
+| `IT-AUDIO-001` | Real WAV extraction preserves selected PCM frames and format. | TD-WAV |
+| `IT-AUDIO-002` | Failure/cancellation leaves no broken published WAV. | TD-WAV, TD-FAIL |
+| `IT-AUDIO-003` | Dataset Build preserves snippet/source provenance and PCM compatibility. | TD-WAV, TD-SPLIT, TD-FAIL |
+| `IT-AUDIO-004` | Real Worker imports committed toolbox extractor and rejects invalid source/arguments. | TD-PATH, TD-FAIL |
 
 ## 5. CNN and RF Training + structurally reloadable Model exports (spec 05)
 
@@ -180,22 +177,10 @@ power and installed-app requalification remain owned by Specs 07 and 06/07 respe
 | `IT-TRAIN-013` | Save/load full detailed overrides while **More settings** is closed; after restart and switching families the overrides are retained and reappear on expansion. Qt create/load/rename/duplicate/overwrite/delete saved config, confirm destructive action, restart and restore actual user-settings files in isolated OS test directory, handle invalid/corrupt/incompatible config; current Dataset and family drafts remain correctly isolated. | TD-PRESET, TD-UI, TD-FAIL |
 | `IT-TRAIN-014` | Start genuine training from loaded preset; snapshot resolved config into Run independently of later preset edits/deletion, confirm scientific execution and immutable Model export remain unchanged after restart. | TD-PRESET, TD-TRAIN, TD-EXPORT |
 
-**Reported status:** Spec 05c completes `IT-TRAIN-001`–`014` with genuine CNN and RF Workers on
-the same source-WAV-backed Dataset, trusted fresh-process reloads, package independence and reviewed
-native evidence. See the [Spec 05c ledger](design/evidence/README.md#spec-05c--real-rf-training-and-phase-05-acceptance)
-for the fresh commands and results; this index alone does not establish acceptance.
-
-Spec 05e subsequently hardens the existing IDs at their actual public seams: both native Start
-actions launch real Workers, both families cover Worker loss and publication failure, and the
-Models UI is reconstructed from persisted settings. See the
-[Spec 05e ledger](design/evidence/README.md#spec-05e--critical-training-path-and-failure-recovery-verification).
-
-Spec 05f closes the existing UI/plot/scale ownership gaps: all detailed native fields are exercised,
-exact persisted values are compared at the public Plot binding seam, the 10,001-record model runs in
-a responsive live window, and CLI/startup tests carry their indexed IDs. See the
-[Spec 05f ledger](design/evidence/README.md#spec-05f--ui-chart-scale-and-cli-coverage-closeout).
-
-Detect inference cases in section 1b are owned only by their ST-07/ST-09 stage; they are **not** Train acceptance cases. Their presence in the merged baseline is not current execution evidence. See [PREDICTION](PREDICTION.md) for the science contract.
+Train CNN/RF and Model publication assertions live in `tests/integration/test_cnn_training.py`,
+`test_rf_training.py` and `test_training_ui.py`; historical native reference:
+[`design/evidence/spec-05-native/`](design/evidence/spec-05-native/). This index is not execution evidence.
+Detect scientific inference is independently owned by ST-07/ST-09.
 
 ## 5d. Local logging and diagnostics (pre-release)
 
@@ -206,10 +191,8 @@ Detect inference cases in section 1b are owned only by their ST-07/ST-09 stage; 
 | `IT-LOG-003` | Incremental QProcess stderr draining remains bounded during a storm; invalid protocol, cancellation, crash, nonzero exit, receipt mismatch and restart reconciliation retain accurate non-success Run states and sanitized diagnostics without deadlock or false publication. | TD-RUN, TD-FAIL, TD-PATH |
 | `IT-LOG-004` | Native Run detail exposes keyboard-usable Open log only for a contained existing log and explains older missing logs; Settings exposes Open diagnostics folder and confirmed Export diagnostics actions, and the resulting new ZIP revalidates/sanitizes only current app plus explicitly selected Run records. Native screenshots and six-dimension review cover desktop and narrow additions. | TD-UI, TD-RUN, TD-PATH |
 
-**Reported status:** Spec 05d implements `IT-LOG-001`–`004` in the macOS development app. See the
-[native diagnostics ledger](design/evidence/README.md#spec-05d--local-logging-and-diagnostics) for
-actual commands, privacy/stderr/scientific assertions and the installed-platform limits retained
-for Specs 06/07.
+Logging assertions: `tests/integration/test_diagnostics.py`; installed-platform
+qualification remains deferred to the release gates below.
 
 ## 6. Native macOS installer and release gates (spec 06)
 

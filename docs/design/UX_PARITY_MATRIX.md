@@ -1,8 +1,8 @@
 # BioCall Studio — UX parity matrix
 
-**Native visual anchor:** current Train Python UI + genuine screenshots under `docs/design/evidence/spec-*-native/`; `../alp-ui/gallery/showcase.py` and installed public components. **New interaction reference:** the owner-approved ST-01 `docs/design/prototypes/studio-detect/`. Train must retain its present navigation, controls and behavior. Browser data/progress are illustrative, never scientific proof.
+**Native visual anchor:** current Train Python UI + genuine screenshots under `docs/design/evidence/spec-*-native/`; `../alp-ui/gallery/showcase.py` and installed public components. **Interaction reference:** the owner-approved ST-01 `docs/design/prototypes/studio-detect/`. Train must retain its present navigation, controls and behavior. Browser data/progress are illustrative, never scientific proof.
 
-| Surface | Implemented ST-01 route and reachable prototype states | Verification when implemented natively |
+| Surface | Historical ST-01 prototype route and states | Native implementation/evidence owner |
 |---|---|---|
 | Studio launchpad | `#studio`; three concise keyboard-operable cards with Open Train, Open Detect and Coming later actions; suite branding; one global prototype banner | ST-02 uses native `alp-ui` cards/buttons and suite branding; Cocoa normal/compact evidence and `IT-STU-001`/`006` pass. The production UI correctly omits the prototype-only banner. |
 | Train entry/return | `#train-reference`; genuine `spec-01-native/select.png` and `spec-05-native/train-cnn.png` presented as concise reference evidence; return to `#studio` | ST-02 retains the actual Train window/controller and adds one optional header-level Back to Studio action that remains visible in its compact layout; `IT-STU-002`/`003` pass. |
@@ -22,7 +22,7 @@
 
 **Evidence:** the prototype uses the genuine Train screenshots above. Browser review must exercise every route, the documented prototype states, selection-dependent recording and export data, original/refined Result independence, keyboard navigation, HelpHint/guide dismissal, cancellation, Show in folder, and normal/narrow desktop widths. Store representative screenshots under the prototype's `evidence/` folder when that review is completed. For the 2026-10-27 UX revision, local HTTP assets were served successfully and the Brave tab was visible, but the Browser Use origin gate denied page observation; browser flows and screenshots remain explicitly blocked rather than claimed. Use [prototype acceptance](PROTOTYPE_ACCEPTANCE.md) and the route/state IDs in this table as the durable acceptance record. Browser interaction does not establish scientific or native correctness.
 
-**Acceptance boundary:** owner approved the ST-01 design direction on 2026-10-28; automated browser interaction remained blocked. Treat each prototype state as a design requirement, not executed evidence. ST-02 verifies the native Studio/Train switch; later stages verify their own Detect interactions.
+**Acceptance boundary:** owner approved ST-01 on 2026-10-28; browser interaction remained blocked. Native Detect subsequently adopted the REV-04 sidebar (Models, Recordings, New detection, Runs, Results, Exports) instead of the prototype’s original stepper; source qualification through ST-11 is recorded in [ST-11 qualification](../ST-11_QUALIFICATION.md). Historical hash routes above are *prototype* identifiers, not current native route names.
 
 **ST-02 native observation:** `docs/design/evidence/st-02-native/` records genuine macOS Cocoa
 Studio, retained Train, Detect landing and Review landing views at 1180 px and 700 px widths. Native
@@ -30,10 +30,10 @@ line icons replace the prototype's CSS-drawn workspace symbols; the card hierarc
 priority remain aligned. Detect deliberately stops at an unavailable landing without the prototype's
 future setup/sidebar controls. Windows and installed-application qualification remain unavailable.
 
-## Native implementation rules for ST-03–ST-11
+## Native interface rules (retained for subsequent work)
 
-**ST-02 is owner-approved.** ST-01 prototype states remain visual/behavioral requirements without an automated browser-pass claim; native Qt tests at each owning stage establish working desktop behavior. Preserve the Train UI; use only verified public `alp-ui` components and appropriate layout composition, not a literal CSS screenshot clone.
+**ST-02 is owner-approved.** ST-01 prototype states remain visual/behavioral requirements without an automated browser-pass claim; the owning native Qt tests and evidence establish desktop behavior. Preserve the Train UI; use only verified public `alp-ui` components and appropriate layout composition, not a literal CSS screenshot clone.
 
 A screen must have a clear heading, purposeful controls and one unambiguous next action (when applicable). Do **not** introduce floating fine-print captions, repeated status disclaimers, unexplained acronyms, disconnected badges, fabricated progress/metrics or inert "future" actions. Explain technical choices with a short researcher-readable label and an adjacent keyboard-accessible `HelpHint`/tooltip **only when useful**; longer procedures go in Wiki/help. Labels, errors and statuses must say what the user can do, never mention stage numbers, libraries, backend details or implementation plans.
 
-Verify each owned route/state in real Qt, actual keyboard/focus, normal and compact layouts, readable/accessible typography and meaningful disabled/loading/error/cancel/retry states using real artifacts. Capture genuine native screenshots and document intentional prototype divergences briefly. Do not reopen already-approved ST-01 browser-automation as a prerequisite. **Whole-Studio Train→Detect→RF→Export interaction is reserved for ST-11**; earlier stages verify only their owned native surfaces.
+Verify each owned route/state in real Qt, actual keyboard/focus, normal and compact layouts, readable/accessible typography and meaningful disabled/loading/error/cancel/retry states using real artifacts. Capture genuine native screenshots and document intentional prototype divergences briefly. Do not reopen already-approved ST-01 browser-automation as a prerequisite. **Whole-Studio Train→Detect→RF→Export qualification belongs to ST-11**; narrow follow-on revisions verify only their own seams.
