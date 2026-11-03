@@ -2,13 +2,13 @@
 
 > **Status:** Owner-approved planning spec, NOT implemented. Do not start implementation or infer test passes from this document. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
 
-**Sequence:** RV-04 begins only after RV-03 has passed its owner-reviewed gate and the shared REV-05 prerequisite has been verified in the real checkout.
+**Sequence:** RV-04 begins only after RV-03 has passed its owner-reviewed gate.
 
 **Series:** [Locked scope, prerequisites and coverage](README.md) · [Status](../../IMPLEMENTATION_SEQUENCE.md)
 
 ## Strict ownership and exclusions
 
-**Owner:** Review background generation supervision, private spectrogram cache persistence, quota/eviction/flush, and **Review-only estimate adapter**. **Entry:** approved RV-03 and verified shared REV-05 implementation (the latter was already a mandatory RV-01 entry prerequisite). Do not recreate `shared/StorageEstimate`, Train/Detect output estimates or a second filesystem capacity service. RV-05 owns researcher-facing integration/UI; RV-06 owns export estimate inputs and corpus publication.
+**Owner:** Review background generation supervision, private spectrogram cache persistence, quota/eviction/flush, and **Review-only estimate adapter**. **Entry:** approved RV-03; shared REV-05 is already part of RV-01's reviewed baseline. Do not recreate `shared/StorageEstimate`, Train/Detect output estimates or a second filesystem capacity service. RV-05 owns researcher-facing integration/UI; RV-06 owns export estimate inputs and corpus publication.
 
 ## Detailed hybrid generation, cache and capacity contract
 

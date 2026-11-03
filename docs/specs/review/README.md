@@ -1,12 +1,12 @@
 # Review — ordered, owner-approved implementation specifications
 
-**Status:** approved planning, not source implementation. **Sequence:** REV-05 completion/verification → RV-01 → RV-02 → RV-03 → RV-04 → RV-05 → RV-06 → RV-07 → RV-08. Each stage is isolated, sequential and requires an explicit owner review gate. No stage may be silently skipped, co-implemented with a later stage, or begun from an unreviewed predecessor. These documents supersede the earlier single-file Review planning proposal; do not keep or publish `docs/specs/REVIEW-workspace-plan.md` as a competing authority.
+**Status:** approved planning, not source implementation. **Sequence:** completed REV-05 baseline → RV-01 → RV-02 → RV-03 → RV-04 → RV-05 → RV-06 → RV-07 → RV-08. Each stage is isolated, sequential and requires an explicit owner review gate. No stage may be silently skipped, co-implemented with a later stage, or begun from an unreviewed predecessor. These documents supersede the earlier single-file Review planning proposal; do not keep or publish `docs/specs/REVIEW-workspace-plan.md` as a competing authority.
 
-## Non-negotiable REV-05 entry lock
+## REV-05 prerequisite — satisfied on reviewed `main`
 
-**Shared output-size and free-space preflight (REV-05) MUST have been implemented, tested, and accepted in the actual reviewed Studio checkout before RV-01 begins.** The first Review stage is a consumer of a base in which REV-05 is already complete. RV-01–RV-08 must **never** implement or re-plan shared REV-05 infrastructure. Review owns only its spectrogram/export sizing inputs and preflight adapter (RV-04/RV-06). Verify its actual Qt-free `StorageEstimate` contract, platform capacity adapter, Train/Detect adoption, indexed `UT-SIZE-*` / `IT-SIZE-*` evidence, source SHA and approved handoff. **If verification fails, stop the Review sequence and obtain the corrected reviewed base.**
+REV-05 is **implemented and owner-reviewed** on the current `main` baseline (`c00d8808a2d1`, 2026-11-03). The source contains the Qt-free `StorageEstimate` contract in `src/biocall_studio/shared/storage.py`, Train/Detect sizing adapters, native preflight integration and indexed `UT-SIZE-*` / `IT-SIZE-*` cases. Its [completed RV-01 handoff](../manual_revision_specs/REV-05-output-size-preflight.md#mandatory-final-handoff-to-review-rv-01) is the authoritative transition; the historical 2026-11-02 missing-implementation warning no longer applies.
 
-The 2026-11-02 repository archive and GitHub `main` at `5ff1d6d41e9b68e1cd2de3f357b74a6346ac491e` still describe REV-05 as *proposed*, and the inspected code did not establish that shared implementation; this is a **baseline discrepancy**, not permission to redo REV-05. Do **not** falsely mark that historic snapshot implemented. The REV-05 spec now requires a final implementation handoff that explicitly declares successful completion and enables RV-01 **only after verification**. See [REV-05](../manual_revision_specs/REV-05-output-size-preflight.md#mandatory-final-handoff-to-review-rv-01).
+RV-01 begins on this **reviewed, REV-05-complete base**. Review must reuse the existing shared contract: only Review-specific spectrogram sizing/preflight belongs to RV-04 and export sizing/preflight to RV-06. Never re-plan or reimplement REV-05 in RV-01–RV-08. At implementation time verify the actual checkout/dependency versions; if the shared contract is absent from a different checkout, obtain the correct reviewed base rather than creating a replacement.
 
 ## Stage route (read only the active stage)
 
@@ -21,7 +21,7 @@ The 2026-11-02 repository archive and GitHub `main` at `5ff1d6d41e9b68e1cd2de3f3
 | 7 | [RV-07 — Studio and Detect migration](RV-07-studio-detect-migration.md) | Single exit policy, remove new Detect export route, legacy readers retained |
 | 8 | [RV-08 — Whole-Studio qualification](RV-08-qualification.md) | Full Train→Detect→Review→Export and regression sign-off |
 
-**Strict chain:** RV-01 must wait for completed REV-05. RV-02 waits for RV-01 sign-off, RV-03 for RV-02, and so forth, even if their internal contracts are independently testable. Tests/implementation may not be pulled into a sibling stage to bypass review. All stage branches start from the *latest reviewed* integration base; no automatic merges or pushes.
+**Strict chain:** RV-01 starts from the reviewed REV-05-complete baseline. RV-02 waits for RV-01 sign-off, RV-03 for RV-02, and so forth, even if their internal contracts are independently testable. Tests/implementation may not be pulled into a sibling stage to bypass review. All stage branches start from the *latest reviewed* integration base; no automatic merges or pushes.
 
 ## Locked owner decisions and export truth table
 
@@ -41,7 +41,7 @@ The 2026-11-02 repository archive and GitHub `main` at `5ff1d6d41e9b68e1cd2de3f3
 | Spectrograms | Hybrid on-demand + nearby prefetch + optional **Generate all** asynchronously. Estimate disk use before bulk generation via REV-05. Automatic bounded cache eviction plus manual individual/multi-item Clear spectrograms, independently of label state. Deleting cache must not delete annotations/recordings. |
 | Scale | Tens of thousands of eligible candidates; acceptance must exercise >=50,000 candidate metadata plus real audio boundaries. No 10,000-candidate export ceiling. |
 | Output | Preserve individual PCM WAV snippets, concatenated WAV + Raven TSV + provenance, and Both. One export interface after finalization with format selection and Show in folder. |
-| Presentation | Minimal readable text; use recognizable accessible status icons, ideally existing public `alp-ui`, upstream generic primitive only if verified missing. No repetitive captions, dev language, fake progress/status. The owner approved the UI wording table in §8. |
+| Presentation | Minimal readable text; use recognizable accessible status icons, ideally existing public `alp-ui`, upstream generic primitive only if verified missing. No repetitive captions, dev language, fake progress/status. The approved wording is in [RV-05](RV-05-native-review-ui.md). |
 | Releases | macOS/Windows installer/signing/distribution tasks untouched; no implicit packaging qualification. |
 
 ### Export truth table
@@ -150,4 +150,3 @@ The owning stage must assert the requirement or link to an exact acceptance test
 - Entire Train→Detect→Review→Export E2E test belongs to **RV-08 only**, updating existing ST-11-owned cases in place. Any `alp-ui` or scientific-toolbox gap needs a separate repository branch, test, commit, SHA and downstream requalification.
 - Reviewed local integration requires separate owner approval. **Never automatically push, open a PR, merge, tag, publish or perform macOS/Windows release tasks.**
 
-**Docs-only PR change:** add this index and eight contained stage specs; append the REV-05 completion handoff; minimally link the series from `docs/IMPLEMENTATION_SEQUENCE.md`, `docs/specs/README.md`, and `docs/agent/ROUTING.md`. Do not preemptively change `docs/PREDICTION.md` or UX matrix to claim Review is shipped; RV-06/RV-07 update their historical claims on real migration. This is planning, not executed tests or source implementation.

@@ -2,7 +2,7 @@
 
 > **Status:** Owner-approved planning spec, NOT implemented. Do not start implementation or infer test passes from this document. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
 
-**Sequence:** RV-01 begins only after the reviewed base has been confirmed and the shared REV-05 prerequisite has been verified in the real checkout.
+**Sequence:** RV-01 starts from reviewed `main` with REV-05 already implemented and owner-reviewed. RV-02 requires RV-01's explicit owner approval.
 
 **Series:** [Locked scope, prerequisites and coverage](README.md) · [Status](../../IMPLEMENTATION_SEQUENCE.md)
 
@@ -33,7 +33,7 @@ These are stage scope definitions, **not registered or executed tests**. Validat
 
 ## Verified repository baseline and source authority
 
-Read `AGENTS.md` and `docs/agent/ROUTING.md` first on every implementation stage; then read only the stage's owning sections and concrete dependencies. The planning inspection used the supplied 2026-11-02 repository archive and GitHub `main` at `5ff1d6d41e9b68e1cd2de3f357b74a6346ac491e` (2026-11-02). All requested documentation exists: `docs/PREDICTION.md`, `docs/IMPLEMENTATION_SEQUENCE.md`, `docs/design/{UX_PARITY_MATRIX,PROTOTYPE_ACCEPTANCE,ALP_UI_CONSUMER_CONTRACT}.md`, `docs/specs/manual_revision_specs/{REV-05-output-size-preflight.md,detect-revision-notes.txt,UI-pass-revision-spec.md}`, `docs/{UNIT_TESTING,INTEGRATION_TEST_BEHAVIORS,INTEGRATION_TEST_DATA}.md`, and `AGENTS.md`/`docs/agent/ROUTING.md`.
+Read `AGENTS.md` and `docs/agent/ROUTING.md` first on every implementation stage; then read only the stage's owning sections and concrete dependencies. The earlier planning inspection used a 2026-11-02 snapshot; current implementation planning must use the updated reviewed `main` baseline (`c00d8808a2d1` on 2026-11-03) and verify its actual checkout SHA at RV-01 entry. All requested documentation exists: `docs/PREDICTION.md`, `docs/IMPLEMENTATION_SEQUENCE.md`, `docs/design/{UX_PARITY_MATRIX,PROTOTYPE_ACCEPTANCE,ALP_UI_CONSUMER_CONTRACT}.md`, `docs/specs/manual_revision_specs/{REV-05-output-size-preflight.md,detect-revision-notes.txt,UI-pass-revision-spec.md}`, `docs/{UNIT_TESTING,INTEGRATION_TEST_BEHAVIORS,INTEGRATION_TEST_DATA}.md`, and `AGENTS.md`/`docs/agent/ROUTING.md`.
 
 Observed current source-of-truth seams:
 
@@ -43,7 +43,7 @@ Observed current source-of-truth seams:
 - `src/biocall_studio/cli.py` has a closed list of supervised Worker modes. Review generation/export execution must follow the canonical owner-lease and Worker protocol rather than inventing an unsupervised thread/process path.
 - `docs/design/ALP_UI_CONSUMER_CONTRACT.md` verifies `alp-ui` `DataTable`, `Button`, `HelpHint`, `ProgressBar`, etc.; public `Plot` only supports line/bar and does not implement a spectrogram. Use native PySide6 for Review-specific audio/spectral interactions; upstream changes only for truly generic missing primitives.
 
-**REV-05 is a completed prerequisite for this plan and must NOT be planned or implemented again.** Historical documents in the inspected snapshot still call it proposed, and the inspected `studio/application/storage.py` does not expose the described shared `StorageEstimate`; therefore there is a **baseline verification discrepancy**. At RV-04 and RV-06 entry, verify the *actual implementation checkout and installed dependency contract* for the implemented REV-05 API, tests and free-space policy. If absent, record a prerequisite/blocker and obtain the correct reviewed base; **do not silently reimplement REV-05 within Review**. Historical documentation may be stale. The Review stages own only their workflow-specific size adapters and integration.
+**REV-05 is implemented and owner-reviewed on the reviewed `main` baseline (`c00d8808a2d1`).** Its Qt-free `src/biocall_studio/shared/storage.py` implements `StorageEstimate`, `OperationSizePlan`, `assess_storage`, `query_filesystem_capacity` and `require_storage_admission`. Train/Detect adapters and indexed `UT-SIZE-*` / `IT-SIZE-*` cases are present. RV-01 must not duplicate shared preflight. At RV-04/RV-06, implement only Review-specific sizing inputs/adapters against that existing API and verify the actual dependency versions; if a different checkout lacks REV-05, recover the reviewed base instead of reimplementing it.
 
 Other useful authority: `docs/ARCHITECTURE.md`, `docs/agent/GIT_DELIVERY.md`, `docs/agent/SPEC_WRITING_AND_IMPLEMENTATION_PRINCIPLES.md`, and the existing test/fixture indexes. `docs/PREDICTION.md` and `docs/design/UX_PARITY_MATRIX.md` are *historical* on Detect corpus-export ownership and must be updated during migration, not used to overrule the owner decision. The prototype at `docs/design/prototypes/studio-detect/` is a **visual-principles** reference, never a predefined Review workflow.
 

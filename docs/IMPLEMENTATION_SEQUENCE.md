@@ -1,6 +1,6 @@
 # BioCall Studio — current implementation status
 
-**Source baseline:** ST-01–ST-11 and REV-01–REV-04 are merged into `main`. REV-05 is implemented and owner-reviewed on `studio-rev05-storage-preflight` for handoff to RV-01. ST-02 is owner-approved; ST-01 remains the approved [prototype](design/prototypes/studio-detect/index.html) reference, but browser interactions were not automated. [ST-11 qualification](ST-11_QUALIFICATION.md) records native source-app evidence. None of this qualifies installers, signing, notarization or Windows execution.
+**Source baseline:** ST-01–ST-11 and REV-01–REV-05 are merged into `main` (REV-05 present at `c00d8808a2d1`, 2026-11-03); RV-01 is the next planned, not-yet-implemented Review stage. ST-02 is owner-approved; ST-01 remains the approved [prototype](design/prototypes/studio-detect/index.html) reference, but browser interactions were not automated. [ST-11 qualification](ST-11_QUALIFICATION.md) records native source-app evidence. None of this qualifies installers, signing, notarization or Windows execution.
 
 Completed stage/revision **implementation specs and obsolete agent handoffs have been removed**. Their behavior is represented by the source code, [Detect domain contract](PREDICTION.md), [Model export contract](science/MODEL_EXPORT_CONTRACT.md), [UX matrix](design/UX_PARITY_MATRIX.md), and indexed [unit](UNIT_TESTING.md) / [integration](INTEGRATION_TEST_BEHAVIORS.md) cases. Historical stage IDs remain searchable in Git history and test indexes; do not recreate completed specs for routine maintenance.
 

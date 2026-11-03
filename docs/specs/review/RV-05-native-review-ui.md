@@ -2,7 +2,7 @@
 
 > **Status:** Owner-approved planning spec, NOT implemented. Do not start implementation or infer test passes from this document. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
 
-**Sequence:** RV-05 begins only after RV-04 has passed its owner-reviewed gate and the shared REV-05 prerequisite has been verified in the real checkout.
+**Sequence:** RV-05 begins only after RV-04 has passed its owner-reviewed gate.
 
 **Series:** [Locked scope, prerequisites and coverage](README.md) · [Status](../../IMPLEMENTATION_SEQUENCE.md)
 
