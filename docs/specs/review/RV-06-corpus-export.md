@@ -31,6 +31,12 @@
 
 **Migration sequence within RV-06/RV-07:** add Review-owned frozen export adapter/publisher with compatibility tests first; then expose Review UI; then remove Detect's export planning button/sidebar and controller initiation route, while retaining legacy history/open/verify paths. Update `docs/PREDICTION.md`, `docs/design/UX_PARITY_MATRIX.md`, relevant existing tests and minimal navigation docs to reflect ownership. Do not discard `IT-DET-019`–`021` scientific invariants or turn old input artifacts into writable new-session artifacts.
 
+## Spectrogram provenance without export changes (owner decision 2026-11-03)
+
+A Finalized Review session freezes **effective spectrogram settings provenance** (versioned pipeline/settings digest and selected preset's historical name/revision) as part of the session manifest's reproducible history; no PNG/image cache bytes become scientific corpus input or a required export dependency. Editing/renaming/deleting user presets or evicting spectrograms must not change a finalized session, invalidate its saved human decisions or block legitimate independent re-export. Export **only** original candidate frame bounds under the existing three formats and fixed human/model-only truth table: never substitute the potentially longer spectrogram context window. A successor may inherit settings but is a separate editable parent-linked session. Do not add spectrogram image export or a new mode to this stage.
+
+**Qualification extension:** existing `UT-REVW-010/011`, `IT-REVW-009/010` compare PCM/Raven/receipts before and after cache flush, preset edit/deletion, finalized reopen and successor changes; unchanged source/Result/finalization bytes and historical Detect exports.
+
 ## Owning acceptance cases (proposed; register in existing indexes before TDD)
 
 These are stage scope definitions, **not registered or executed tests**. Validate IDs against [unit](../../UNIT_TESTING.md), [integration](../../INTEGRATION_TEST_BEHAVIORS.md), and [fixture index](../../INTEGRATION_TEST_DATA.md); register exact case text there before implementation. Never create a second test index.

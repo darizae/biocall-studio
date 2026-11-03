@@ -19,6 +19,12 @@
 - The current placeholder remains a placeholder for this domain-only stage. No UI promises or scientific toolchain overhaul.
 
 
+## Spectrogram preset handoff (owner decision 2026-11-03)
+
+RV-01 continues to validate/projection-index **Detect Results only**. Do not accept the unrelated WAV selected by Review's future **Test WAV** settings action as a Result, candidate, recording relink or corpus source. Project verified recording sample rate/channels, source identity and exact original candidate frames needed for later RV-02 settings snapshot and RV-03 context; avoid computing a spectrogram or freezing a preset in RV-01. The actual default/selected preset is supplied at **RV-02 session creation**, not stored in the immutable Result. See [spectrogram pre-spec](SPECTROGRAM_GENERATION_INVESTIGATION.md) and [owner decisions](SPECTROGRAM_DECISIONS.md).
+
+**Qualification extension:** existing `UT-REVW-002`/`IT-REVW-001` reject arbitrary test WAVs and retain valid original frame/rate identity; no extra intake test series.
+
 ## Owning acceptance cases (proposed; register in existing indexes before TDD)
 
 These are stage scope definitions, **not registered or executed tests**. Validate IDs against [unit](../../UNIT_TESTING.md), [integration](../../INTEGRATION_TEST_BEHAVIORS.md), and [fixture index](../../INTEGRATION_TEST_DATA.md); register exact case text there before implementation. Never create a second test index.

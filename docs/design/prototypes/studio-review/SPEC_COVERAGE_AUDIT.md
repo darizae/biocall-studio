@@ -78,3 +78,21 @@ Duplicate `title` hints on the session name, already-visible status/progress and
 **57/57 primary**, **22/22 recovery**, **20/20 specification-regression**, **1/1 close/resume**, **3/3 provenance**, **69/69 fixed-shortcut and hover/focus**, and **17/17 tooltip synchronization** assertions pass in rendered Chromium. These are *executed checks* (some scenarios overlap), **not** 189 unique scientific tests. No recorded page/JavaScript runtime errors. New screenshots: `evidence/12-shortcut-reference.png`, `evidence/13-shortcut-tooltip-700.png`, and `evidence/13-shortcut-tooltip-520.png`.
 
 **Honest scope:** all approved researcher-facing *prototype flows* are represented consistently with the unchanged Review rules; this is not an assertion that every scientific/data-integrity/native requirement is implemented. The explicit RV-01–RV-08 stage gates in the original coverage table remain **unverified** wherever they require real Results, validated source WAVs, transactional persistence, Qt/`alp-ui`, Workers, filesystem preflight, actual exports, immutable receipts or native 50k qualification. Direct localhost browser navigation/real-origin refresh remains unverified due to sandbox restrictions. No spec changes declare the prototype owner-approved.
+
+
+## Scientific spectrogram generation and settings — RV-01 through RV-08 synchronization (2026-11-03)
+
+The prior shortcut re-audit above documents the earlier prototype revision. Owner approval of Q1–Q8 now adds the following **targeted planned obligations**; the full native Review subsystem remains unimplemented. The research specification `docs/specs/review/SPECTROGRAM_GENERATION_INVESTIGATION.md` requires measurements and numerical reference tests **before** final generator choices are locked.
+
+| Stage | Planned specification location | Interactive representation | Required separate qualification |
+|---|---|---|---|
+| RV-01 | Spectrogram preset reference does not expand Result intake/eligible set | Choose Result → select preset; Test WAV restricted to settings | Candidate/Result boundary, invalid standalone WAV never creates Review record |
+| RV-02 | Frozen effective session snapshot; edit/delete and Closed/Finalized/successor semantics | Save preset with usage counts; Save and use in this session; Change preset | SQLite durable snapshot, rollback, immutable Finalized, successor inheritance |
+| RV-03 | Python STFT, power-average stereo, context boundaries, image-only pixels and Qt axes | Bounded Test WAV spectrum; Gallery/One-by-one mock axes | Golden numerical tone/impulse/stereo tests; Qt frame/pixel/HiDPI mapping |
+| RV-04 | Revisioned content identity and safe cache invalidation; calibrated incremental sizing using REV-05 | Change preset estimate, image invalidation, Generate all thumbs, cancel/retry | Worker stale-publication/crash, cache-sharing, free-space unknown/full, calibration |
+| RV-05 | Five simple controls, minimal Advanced, Default/user presets, HelpHints, saved examples | Spectrograms → Settings, Test WAV/Compare, edit/confirm/delete | Public `alp-ui`, accessible widgets, copy consistency, compact 520px |
+| RV-06 | Frozen finalization provenance, no image dependency of corpus export | Finalized session read-only despite user preset changes | Export byte/truth-table parity after edits and cache deletion |
+| RV-07 | Settings route under Review and supervised generation work on navigation/exit | Global shell, active Review session preserved | Worker lifetime, exit, source tamper and same-session concurrency |
+| RV-08 | Cross-stage science/UX/stress qualification & prior shortcut preservation | 17 new browser checks; existing fixed bindings still present | Actual Python/Qt, representative 50k sizing, all native + previously approved regression cases |
+
+**Verified here:** a *focused* 17/17 browser check run in a constrained Chromium environment with a local WAV numerical preview; source is `evidence/spectrogram-settings-browser-checks.txt`. Not verified: prior full browser suite rerun, Python/R scientific parity, Qt, disk and 50k workloads. The root-level `UX_PARITY_MATRIX.md` and `PROTOTYPE_ACCEPTANCE.md` were missing from this ZIP and remain explicit external parity blockers.

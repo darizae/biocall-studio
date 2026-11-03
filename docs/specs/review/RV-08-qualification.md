@@ -19,6 +19,12 @@
 - Re-home the existing `IT-DET-022` and `IT-STU-007` / `IT-STU-008` **in place**, reflecting new export ownership, not cloning the same E2E path into Review-specific tests. Rerun affected `UT-DET`/`IT-DET`, `UT-STU`/`IT-STU`, `UT-SIZE`/`IT-SIZE` and new Review tests. Separate ≥600 s soak only when explicitly initiated.
 - If current library SHAs, real device/native Qt, real Model, LFS fixture or source checkout is unavailable, record the exact **blocked** case, not a fictitious pass. Validate release work remains deferred and outside this plan.
 
+## Spectrogram generation research gate and cross-stage acceptance (owner decision 2026-11-03)
+
+Before declaring native Review qualified, verify [independent spectrogram pre-spec](SPECTROGRAM_GENERATION_INVESTIGATION.md) exit evidence and [recorded owner decisions](SPECTROGRAM_DECISIONS.md): representative WAVs and an R-reference numerical tolerance; channel-power stereo including phase-opposed signal; source frame clamp/context; Balanced 2,000/2,048/1,000 at 48 kHz; selected sound detail/overlap/floor/ceiling/contrast/color; metadata-driven UI axes and highlight at normal/150–200% display scale with no axes stored in image; one protected Default + named user presets, Advanced, independent Test WAV/Compare/examples, impact-confirmed preset edits, Closed/Finalized/successor snapshot stability and explicit Open-session switch; measured vs calibrated time and incremental bytes plus REV-05 admission/cancel/late-epoch safeguards. Verify thumbnail-only Generate all and detail on demand at 50k; after a settings swap neither labels nor source, Result, export or finalized decisions change.
+
+Re-exercise the prototype **new controls**, existing fixed One by one shortcuts and existing approved copy in normal/compact browser layout, then native Qt/`alp-ui` separately. Use the pre-spec **synchronization matrix** to map stage, surface and existing `UT-REVW-*`/`IT-REVW-*` test owners without creating another E2E suite. The supplied planning ZIP did not contain two referenced root UX documents; recover them before claiming full UX parity, or label that check blocked. Never count the standalone Linux pilot or browser illustration as native/real-storage scientific qualification.
+
 ## Final owner qualification checklist
 
 - [ ] Review accepts **Detect Results only**; CNN-only all eligible, RF-derived accepted-only, no rejected/unscored UI; original/derived Results unchanged.

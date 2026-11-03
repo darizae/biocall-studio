@@ -1,0 +1,28 @@
+# Spectrogram settings addendum — isolated Chromium checks, 2026-11-03
+
+Scope: new prototype extension only. The browser harness loaded the real checked-in
+HTML, CSS and JS with localStorage shim; direct localhost navigation was blocked
+by environment policy. One actual supplied 48 kHz PCM WAV was passed into the
+browser input and numerically rendered for preview. This test does NOT establish
+Python/R parity, native scientific validity, disk storage, real 50k scale, or
+previous full suite regression. No JavaScript page errors observed.
+
+baseline loaded and reviewed shortcuts intact: PASS
+settings route and protected Default: PASS
+simple five plus advanced three: PASS
+draft scientific choices update: PASS
+explicit save dialog: PASS
+new user preset stored and original sessions intact: PASS
+real selected WAV decoded, spectrogram computed: PASS
+side-by-side comparison renders: PASS
+example saved without source WAV: PASS
+session change dialog estimates/warning: PASS
+session copied user snapshot, other sessions default: PASS
+editing used preset offers explicit apply-current alternative: PASS
+save only leaves snapshot unchanged: PASS
+explicit save and use swaps only current session: PASS
+deletion preserves session snapshot: PASS
+fixed labeling shortcut still commits: PASS
+compact settings has no page-level horizontal overflow: PASS
+
+Total: 17/17 PASS. Earlier prototype browser suites were not rerun in full.

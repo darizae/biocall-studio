@@ -21,6 +21,12 @@
 7. Real native Qt from each workspace: open-session quit confirmation, combined Worker confirmation, Save and Exit success, cancel, blocked persistence, blocked stopping, same-session reopen; no impact on Train behavior. Run targeted `IT-STU-*`/`IT-DET-*` regressions. Whole-Studio source integration stays RV-08.
 
 
+## Spectrogram settings navigation and Worker ownership (owner decision 2026-11-03)
+
+Keep **Spectrograms → Settings** inside Review's existing route group; the session-start preset chooser is an entry to that same editor, not a suite-wide Settings subsystem. A settings draft, Test WAV and saved examples must not create a Detect Result, global source importer or new independent long-running Studio Run. **Generation/regeneration Workers** created by an Open session's confirmed setting change remain owned by Review even after navigation to Train/Detect; inherited one-open-session and suite exit rules above apply **unchanged**. No stale worker may publish an old settings epoch after cancellation, closing, switching or restart; stop/lease failures preserve the suite-open safety policy. Test-WAV preview buffers are transient and are released on close/navigation without durable paths.
+
+**Qualification extension:** `UT-REVW-012`, `IT-REVW-011/012` check global exit during active regeneration, session persistence on failure, one combined dialog, no Train/Detect route/shortcut regressions and no accidental export restoration.
+
 ## Owning acceptance cases (proposed; register in existing indexes before TDD)
 
 These are stage scope definitions, **not registered or executed tests**. Validate IDs against [unit](../../UNIT_TESTING.md), [integration](../../INTEGRATION_TEST_BEHAVIORS.md), and [fixture index](../../INTEGRATION_TEST_DATA.md); register exact case text there before implementation. Never create a second test index.

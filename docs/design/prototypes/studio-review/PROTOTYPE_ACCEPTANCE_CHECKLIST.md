@@ -75,3 +75,21 @@ These are small additions beyond RV-05/REV-05's locked approved wording, not rep
 | Recoverable operation notifications | “Spectrograms cleared.”, “Export cancelled.”, “Choose a destination to export.” | Concise action/error responses not enumerated by RV-05 |
 
 **Approval status: pending, including the fixed-key/tooltip additions.** No new wording above is represented as already owner-approved. Approved main workflow strings were not replaced, and no extra export-as-detected route was created.
+
+
+## Spectrogram preset and WAV-preview acceptance addendum (2026-11-03)
+
+The owner approved the eight product directions in `docs/specs/review/SPECTROGRAM_DECISIONS.md`; these are *not* permission to waive scientific numeric verification or native performance measurements. The prototype's 17 dedicated new smoke assertions (recorded in `evidence/spectrogram-settings-browser-checks.txt`) cover the following observable paths:
+
+| Browser interaction | Observed / expected acceptance | Native obligation |
+|---|---|---|
+| Review → Spectrograms → Settings | Default is protected; five simple controls; collapsed Advanced has exactly three additional controls | Public `alp-ui` selectors and short HelpHints; real keyboard focus, screen reader and compact window |
+| New/edit/discard/save preset | Unsaved settings have no effect until confirmed; unique user names; Default cannot edit/delete | Persistence rollback and durable preset revisions; unit-test invalid and malformed settings |
+| Preset save impact | Open/Closed/Finalized usage counts; **Save preset** leaves *all* session snapshots and caches untouched | SQLite transactional boundary; explicit session reference counting, deletion and rename |
+| Save and use in session / Change preset | Changes only the current Open session on deliberate choice; warning and illustrated time/storage costs; labels unchanged | REV-05 cache-volume admission, compare-and-swap epoch; reject late workers and preserve last valid snapshot on failure |
+| Test WAV → Compare → Save example | Bounded real local WAV in-memory browser render; side-by-side; deliberate example image saving, enlargement and removal; no source WAV retained | Native Python STFT numeric parity and independent test-file lifecycle, no Detect/Review ingestion |
+| Create/Resume/Finalized/successor | Preset at creation; snapshots survive editing/deletion; Finalized read-only | RV-02 and RV-06 restart/finalization and immutable export tests |
+| Axes/thumbnail/detail and 50k work | Prototype labels derive from selected range/context; generated images remain mock assets; bulk uses thumbnails only | Frame-accurate Qt overlay/ticks; HiDPI and source-clamp measurements; cache calibration at 1k/50k |
+| Label shortcuts and compact view | Focused F shortcut regression and 520 px no-horizontal-scroll regression passed | Full previously approved shortcut/HelpHint/native parity suite still due |
+
+**Evidence boundary:** these 17 checks ran in an isolated, headless Chromium test harness, using an in-memory browser storage shim because direct navigation to localhost was not permitted. They are not native Review, lifecycle-disk or spectrogram-science qualification. The pre-existing broader browser regression suite was not rerun after this amendment. Missing `docs/design/UX_PARITY_MATRIX.md` and `docs/design/PROTOTYPE_ACCEPTANCE.md` in the provided ZIP prevent claiming parity against those two requested documents.

@@ -21,3 +21,47 @@
 .search-recording{width:150px;min-width:110px}
 @media(max-width:770px){.search-recording{width:120px}}
 @media(max-width:560px){.search-recording{width:115px}}
+
+/* Additive spectrogram settings prototype: visual semantics translate to native Qt/ALP UI. */
+.settings-layout{display:grid;grid-template-columns:225px minmax(0,1fr);gap:16px;align-items:start}
+.preset-list{padding:16px;display:flex;flex-direction:column;gap:7px;min-width:0}
+.preset-list h3{margin-bottom:9px}
+.preset-item{width:100%;min-height:44px;display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--line);background:#fff;border-radius:7px;padding:9px 10px;text-align:left;color:var(--text);cursor:pointer}
+.preset-item.active{border-color:#64aa93;background:#edf8f2}
+.preset-item span{color:#587064;font-size:11px}
+.preset-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.spectro-editor{min-width:0}
+.spectro-editor h2{font-size:19px;margin:0}
+.spec-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 16px}
+.spec-field{min-width:0;display:flex;flex-direction:column;gap:6px}
+.spec-field label{font-size:13px;color:#44566a;font-weight:700;display:flex;align-items:center;gap:7px}
+.spec-field .input{width:100%;min-width:0}
+.helpmark{border:1px solid #9baaba;border-radius:50%;display:inline-grid;place-items:center;width:17px;height:17px;font-size:11px;font-weight:bold;cursor:help;color:#53697d;background:#f5f8fb}
+.helpmark:focus-visible{outline:2px solid #1c8a6b;outline-offset:2px}
+.advanced-settings{margin:3px 0 5px;border-top:1px solid var(--line);padding-top:10px}
+.advanced-settings summary{cursor:pointer;font-weight:700;font-size:13px;color:#465f73;padding:6px 0}
+.advanced-fields{padding:13px 0 3px}
+.spectro-try{padding-top:13px;border-top:1px solid var(--line);gap:7px;flex-wrap:wrap}
+.preview-pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:13px}
+.preview-cell{min-width:0;display:flex;flex-direction:column;gap:8px}
+.preview-cell>strong{font-size:13px}
+.preview-chart{display:grid;grid-template-columns:36px minmax(0,1fr);grid-template-rows:minmax(0,auto) 25px;gap:0 3px;border-radius:7px;background:#131b28;padding:8px 8px 3px;overflow:hidden}
+.preview-chart img,.preview-chart canvas{grid-column:2;grid-row:1;display:block;width:100%;aspect-ratio:740/245;object-fit:fill;border:1px solid #4b596d;min-width:0}
+.preview-viridis{filter:hue-rotate(90deg) saturate(.78)}
+.preview-axis{font-size:10px;color:#c3cddb;font-variant-numeric:tabular-nums}
+.preview-axis.y{grid-column:1;grid-row:1;display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;padding:0 2px 0 0}
+.preview-axis.x{grid-column:2;grid-row:2;display:flex;align-items:flex-start;justify-content:space-between;padding-top:3px}
+.saved-examples{border-top:1px solid var(--line);padding-top:13px}
+.examples-row{display:flex;gap:12px;overflow-x:auto;padding:9px 0}
+.example-item{min-width:135px;width:160px;display:flex;flex-direction:column;gap:6px}
+.example-item>button:first-child{border:1px solid #d9e2ed;background:#fff;border-radius:6px;cursor:pointer;padding:5px;text-align:left}
+.example-item img{width:100%;height:64px;object-fit:cover;display:block;border-radius:3px}
+.example-item span{display:block;color:#566a7f;font-size:12px;margin-top:5px}
+.opened-example{max-width:760px;border-top:1px solid var(--line);padding-top:10px}
+.opened-example img{width:100%;display:block;margin-bottom:9px}
+.modal #modal-preset-select{display:block;width:100%;margin:6px 0 9px}
+.modal:has(#modal-preset-select){width:min(520px,100%)}
+.modal:has(#modal-extra){width:min(550px,100%)}
+.modal-actions{flex-wrap:wrap}
+@media(max-width:860px){.settings-layout{grid-template-columns:180px minmax(0,1fr)}.spec-fields{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.settings-layout{grid-template-columns:1fr}.preset-list{padding:12px}.preset-list .preset-item{max-width:100%}.spec-fields{grid-template-columns:minmax(0,1fr)}.preview-pair{grid-template-columns:minmax(0,1fr)}.modal-actions .button{flex:1 1 auto}}
