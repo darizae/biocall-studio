@@ -54,3 +54,13 @@ First register cases in the existing indexes; use the smallest generated `TD-WAV
 Run owning tests and affected Train/Detect regressions first, then full feasible ordinary unit/integration suites, Ruff and test-ID audit **before an implementation commit**. Use real native Qt evidence for native UI acceptance; no new whole-Studio Train→Detect end-to-end test here (that remains ST-11's owner), no 600-second soak unless separately initiated, no installer claims. Any upstream toolbox or `alp-ui` defect must have its own targeted branch, test and commit under the existing upstream process; no speculative library refactor.
 
 **Exit gate:** owner approves exact UI strings, measured-vs-estimated error bounds and uncertainty policy, documented peak/headroom behavior, real-WAV/Qt negative-path evidence, scoped indexed test results, and a clean reviewed branch. Do not implement this spec or merge automatically as part of documentation cleanup. No push or release publication.
+
+## Mandatory final handoff to Review RV-01
+
+**Final instruction for REV-05's implementing agent (not a declaration of completion in this historical spec):** before closing REV-05, verify that the **shared Qt-free `StorageEstimate` implementation**, filesystem free-space adapter, actual Train and Detect consumers, `UT-SIZE-*` / `IT-SIZE-*` cases, real-WAV and real-Qt evidence, cancellation/disk-full behavior and reviewed commit SHA genuinely exist and passed the REV-05 owner gate. Record the real branch/SHA, dependency origins, full feasible test and audit results, and unresolved limitations. Update the implementation status and routing documentation to **Implemented** only at that point; never mark the feature complete from this spec alone.
+
+The final REV-05 implementation handoff **must contain this explicit statement only after verification**:
+
+> **REV-05 has been implemented, tested, and owner-reviewed in the confirmed base. Its shared output-size and free-space preflight is the required completed prerequisite for the first Review stage, RV-01; RV-01 may now begin on that reviewed base. Review must reuse REV-05 rather than reimplement it.**
+
+If any required evidence or actual code is absent, the handoff must instead state **“REV-05 is not verified complete; RV-01 is blocked”** and list the exact missing evidence. Do not start RV-01, branch from an unreviewed base, treat the historical “proposed” marker as implementation proof, or move the REV-05 work into any Review stage. See [Review stage index](../review/README.md).

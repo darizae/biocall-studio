@@ -6,6 +6,8 @@ Completed stage/revision **implementation specs and obsolete agent handoffs have
 
 **Proposed, not implemented:** [REV-05 — shared output-size and free-space preflight](specs/manual_revision_specs/REV-05-output-size-preflight.md) for Train and Detect with an extension point for Review. Implement only after explicit owner approval, including the proposed UI copy.
 
+**Approved Review planning series (not implemented):** [Review index and locked decisions](specs/review/README.md), with sequential [RV-01](specs/review/RV-01-result-intake.md) → RV-08 stage specifications linked there. **Hard prerequisite:** verified, owner-reviewed **implementation** of REV-05 in the actual checkout **before RV-01**; the inspected snapshot still calls REV-05 proposed, so do not assert completion without implementation/test/handoff evidence. The final instruction in [REV-05](specs/manual_revision_specs/REV-05-output-size-preflight.md#mandatory-final-handoff-to-review-rv-01) must explicitly declare verified completion and hand off to RV-01. Review exports replace *new* Detect corpus exports only in RV-06/RV-07, after compatibility proof. No stage implementation or release work is authorized by this docs-only planning series.
+
 **Release work deferred:** existing [macOS](specs/06-macos-release-and-installer.md) and [Windows](specs/07-windows-release-and-installer.md) specs and [release process](RELEASE_PROCESS.md) remain outside current scope. The [ST-11 spec](specs/ST-11-unified-qualification.md) is retained solely because the pending macOS release spec references it.
 
 ## Work and acceptance rules
