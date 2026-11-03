@@ -46,6 +46,7 @@ from biocall_studio.train.domain.training import (
     freeze_training_config,
 )
 from biocall_studio.train.gui.power import KeepAwakeControl
+from biocall_studio.train.gui.storage import StorageSection, confirm_storage
 from biocall_studio.train.persistence.datasets import DatasetArtifact, list_datasets, load_dataset
 from biocall_studio.train.persistence.training_presets import PresetRecord, PresetStore
 
@@ -275,6 +276,7 @@ class TrainingPage(QScrollArea):
         self._compact = False
         self._updating = False
         self.manage_dialog: PresetManagerDialog | None = None
+        self.storage_estimate = None
         self.field_widgets: dict[str, QWidget] = {}
         self.field_controls: dict[str, QWidget] = {}
         self.help_hints: dict[str, HelpHint] = {}
@@ -436,6 +438,8 @@ class TrainingPage(QScrollArea):
         self.keep_awake_wiki_button = self.power_control.wiki_button
         self.keep_awake_retry_button = self.power_control.retry_button
         self.keep_awake_error = self.power_control.error
+        self.storage_section = StorageSection()
+        card.content_layout.addWidget(self.storage_section)
         actions = QHBoxLayout()
         actions.addStretch()
         self.start_button = Button("Start Training", size="large")
@@ -906,7 +910,26 @@ class TrainingPage(QScrollArea):
         else:
             self.error_alert.hide()
         active = self.controller.active_run is not None
-        self.start_button.setEnabled(not errors and not active)
+        storage_ready = False
+        if not errors and dataset is not None:
+            try:
+                frozen = freeze_training_config(
+                    self.draft,
+                    dataset,
+                    self.capabilities,
+                    preset_origin=self._preset_origins[self.family],
+                )
+                self.storage_estimate = self.controller.estimate_training_storage(frozen)
+            except (OSError, RuntimeError, ValueError):
+                self.storage_estimate = None
+                self.storage_section.clear()
+            else:
+                self.storage_section.set_estimate(self.storage_estimate, variable=True)
+                storage_ready = self.storage_estimate.can_start
+        else:
+            self.storage_estimate = None
+            self.storage_section.clear()
+        self.start_button.setEnabled(not errors and not active and storage_ready)
         modified_details = sum(
             field.key in self.draft.modified_keys()
             for field in fields_for_family(self.family)
@@ -944,6 +967,23 @@ class TrainingPage(QScrollArea):
             return
         if self.artifact is None:
             return
+        try:
+            prior_digest = (
+                None if self.storage_estimate is None else self.storage_estimate.input_digest
+            )
+            estimate = self.controller.estimate_training_storage(
+                self.last_frozen_config,
+                expected_digest=prior_digest,
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            self.launch_alert.title_widget.setText("Training could not start")
+            self.launch_alert.text_widget.setText(str(exc))
+            self.launch_alert.show()
+            return
+        self.storage_estimate = estimate
+        self.storage_section.set_estimate(estimate, variable=True)
+        if not estimate.can_start or not confirm_storage(self, estimate):
+            return
         family_label = "CNN" if self.family == "cnn" else "Random Forest"
         dataset_name = self.controller.dataset_name(self.artifact.dataset_id, self.artifact.label)
         default_label = f"{dataset_name} · {family_label}"
@@ -959,6 +999,8 @@ class TrainingPage(QScrollArea):
             self.controller.start_training(
                 self.last_frozen_config,
                 model_label=label,
+                storage_digest=estimate.input_digest,
+                confirm_storage=estimate.requires_confirmation,
             )
         except (OSError, ValueError) as exc:
             self.launch_alert.title_widget.setText("Training could not start")

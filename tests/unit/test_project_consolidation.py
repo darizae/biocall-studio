@@ -38,6 +38,7 @@ def test_unified_package_has_strict_workflow_ownership_and_no_removed_namespace(
         "integrity.py",
         "owner_lifetime.py",
         "paths.py",
+        "storage.py",
     }
 
     for path in package.rglob("*.py"):

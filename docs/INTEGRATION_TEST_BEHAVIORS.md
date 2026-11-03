@@ -13,7 +13,7 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-UI-005` | The UI-pass revision uses readable `alp-ui` typography, concise non-redundant copy with no user-facing internal IDs, a top-right Run state, and top-to-bottom numbered preparation. A Training draft stays visibly reopenable until discarded or launched. Dataset/Model/Run names are editable; Collection unbind and Dataset/Model/terminal-Run delete actions are confirmed, contained, and non-cascading. Active Run activity sits beside progress and Output remains below. | TD-UI, TD-PATH, TD-RUN |
 
 
-## Proposed shared storage preflight (REV-05; not implemented)
+## Shared storage preflight implementation acceptance (REV-05)
 
 | Case ID | Public seam / expected result | Data |
 |---|---|---|

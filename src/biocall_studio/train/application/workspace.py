@@ -10,6 +10,13 @@ from threading import Event
 
 from PySide6.QtCore import QObject, QProcess, QStandardPaths, QThread, QTimer, Signal
 
+from biocall_studio.shared.storage import (
+    CapacityObservation,
+    StorageEstimate,
+    assess_storage,
+    query_filesystem_capacity,
+    require_storage_admission,
+)
 from biocall_studio.train.application.collection_scan import (
     CollectionScanCancelled,
     ScanProgress,
@@ -25,6 +32,11 @@ from biocall_studio.train.application.power import (
     KeepAwakeManager,
     PowerAdapter,
     native_power_adapter,
+)
+from biocall_studio.train.application.storage import (
+    estimate_dataset_artifacts,
+    estimate_model_artifacts,
+    training_input_digest,
 )
 from biocall_studio.train.domain.collection import ScanResult
 from biocall_studio.train.domain.dataset import BuildConfig
@@ -150,6 +162,7 @@ class WorkspaceController(QObject):
         diagnostics: DiagnosticSession | None = None,
         diagnostic_debug: bool = False,
         power_adapter: PowerAdapter | None = None,
+        capacity_probe: Callable[[Path, str], CapacityObservation] | None = None,
     ):
         super().__init__()
         if settings_dir is None:
@@ -189,6 +202,7 @@ class WorkspaceController(QObject):
         self._kill_grace_ms = kill_grace_ms
         self._build_request_path: Path | None = None
         self._run_admission: Callable[[str, str], None] | None = None
+        self._capacity_probe = capacity_probe or query_filesystem_capacity
         self._power_error_message = ""
         self._shutdown_requested = False
         self._shutdown_finished = False
@@ -478,7 +492,64 @@ class WorkspaceController(QObject):
         if self._run_admission is not None:
             self._run_admission(run_id, label)
 
-    def start_dataset_build(self, config: BuildConfig, *, dataset_id: str | None = None) -> str:
+    def estimate_dataset_storage(
+        self,
+        config: BuildConfig,
+        *,
+        expected_digest: str | None = None,
+    ) -> StorageEstimate:
+        if self.scan_result is None or self.collection_path is None:
+            raise ValueError("Rescan the Collection before estimating Dataset storage.")
+        plan, digest = estimate_dataset_artifacts(self.scan_result, config)
+        label = self.collection_path.name or "Dataset folder"
+        capacity = self._capacity_probe(self.collection_path, label)
+        return assess_storage(
+            operation="train.dataset_build",
+            input_digest=digest,
+            expected_input_digest=expected_digest,
+            expected_final=plan.expected_final,
+            target_peaks={label: plan.peak_bytes},
+            capacities={label: capacity},
+            confidence=plan.confidence,
+            basis=plan.basis,
+        )
+
+    def estimate_training_storage(
+        self,
+        config: FrozenTrainingConfig,
+        *,
+        expected_digest: str | None = None,
+    ) -> StorageEstimate:
+        if self.collection_path is None:
+            raise ValueError("Select a validated Collection before estimating Model storage.")
+        artifact = load_dataset(self.collection_path, config.dataset_id)
+        plan = estimate_model_artifacts(
+            family=config.family,
+            effective_values=config.effective_values,
+            snippet_count=len(artifact.snippets),
+        )
+        digest = training_input_digest(artifact, config)
+        label = self.collection_path.name or "Model folder"
+        capacity = self._capacity_probe(self.collection_path, label)
+        return assess_storage(
+            operation=f"train.{config.family}_model",
+            input_digest=digest,
+            expected_input_digest=expected_digest,
+            expected_final=plan.expected_final,
+            target_peaks={label: plan.peak_bytes},
+            capacities={label: capacity},
+            confidence=plan.confidence,
+            basis=plan.basis,
+        )
+
+    def start_dataset_build(
+        self,
+        config: BuildConfig,
+        *,
+        dataset_id: str | None = None,
+        storage_digest: str | None = None,
+        confirm_storage: bool = False,
+    ) -> str:
         """Persist and supervise one Dataset Build in the current app environment."""
         if (
             self.scan_result is None
@@ -487,6 +558,8 @@ class WorkspaceController(QObject):
             or not self.current_inputs_ready()
         ):
             raise ValueError("Rescan the Collection before Dataset Build.")
+        storage = self.estimate_dataset_storage(config, expected_digest=storage_digest)
+        require_storage_admission(storage, confirmed=confirm_storage)
         run_id = f"run-{uuid.uuid4()}"
         request_id = f"request-{uuid.uuid4()}"
         dataset_id = dataset_id or f"dataset-{uuid.uuid4()}"
@@ -564,6 +637,8 @@ class WorkspaceController(QObject):
         *,
         model_label: str,
         model_id: str | None = None,
+        storage_digest: str | None = None,
+        confirm_storage: bool = False,
     ) -> str:
         """Persist and supervise one genuine CNN or Random Forest Training Run."""
         if self.collection_path is None or self.collection_id is None:
@@ -575,6 +650,8 @@ class WorkspaceController(QObject):
             TrainingDataset.from_artifact(dataset)
         except (OSError, ValueError) as exc:
             raise ValueError(f"Selected Dataset is missing or unsafe: {exc}") from exc
+        storage = self.estimate_training_storage(config, expected_digest=storage_digest)
+        require_storage_admission(storage, confirmed=confirm_storage)
         run_id = f"run-{uuid.uuid4()}"
         request_id = f"request-{uuid.uuid4()}"
         model_id = model_id or f"model-{uuid.uuid4()}"

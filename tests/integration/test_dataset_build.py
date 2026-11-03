@@ -5,6 +5,7 @@ import json
 import shutil
 import wave
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -12,8 +13,10 @@ from alp_ui.components import DataTable, HelpHint, NumberInput, ProgressBar, Sel
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QInputDialog, QMessageBox
 
+from biocall_studio.shared.storage import CapacityObservation, StorageDecision
 from biocall_studio.studio.application.app import create_application
 from biocall_studio.train.application.collection_scan import scan_collection
+from biocall_studio.train.application.storage import estimate_dataset_artifacts
 from biocall_studio.train.application.workspace import WorkspaceController
 from biocall_studio.train.domain.dataset import BuildConfig, Interval, protected_intervals
 from biocall_studio.train.gui.dataset import DatasetBuilderPage, DatasetDetailPage
@@ -70,13 +73,20 @@ def _wav_frames(path: Path) -> bytes:
 def test_real_source_audio_is_materialized_with_protected_windows_and_grouped_splits(
     tmp_path, wav_factory
 ):
-    """Cases: IT-DB-001, IT-AUDIO-003, IT-STU-009."""
+    """Cases: IT-DB-001, IT-AUDIO-003, IT-STU-009, IT-SIZE-001."""
     root = _collection(tmp_path / "collection", wav_factory)
     result = _published(root)
+    storage, _digest = estimate_dataset_artifacts(result, _config(result))
     source_bytes = {path: path.read_bytes() for path in root.glob("recordings/*.wav")}
     positive_bytes = {path: path.read_bytes() for path in root.glob("positives/*.wav")}
 
     artifact = build_dataset(root, result, _config(result), dataset_id="dataset-real-a")
+
+    actual_output_bytes = sum(
+        path.stat().st_size for path in artifact.root.rglob("*") if path.is_file()
+    )
+    assert storage.expected_final.low_bytes <= actual_output_bytes
+    assert actual_output_bytes <= storage.expected_final.high_bytes
 
     assert artifact.root == root / ".alpaca" / "datasets" / "dataset-real-a"
     assert artifact.manifest["counts"] == {
@@ -289,7 +299,7 @@ def test_dataset_reopens_and_explicit_delete_preserves_models_and_inputs(tmp_pat
 def test_native_builder_controls_states_worker_and_dataset_navigation(
     qapp, qtbot, tmp_path, wav_factory, monkeypatch
 ):
-    """Cases: IT-DB-005, IT-UI-005."""
+    """Cases: IT-DB-005, IT-UI-005, IT-SIZE-003."""
     create_application()
     root = _collection(tmp_path / "collection", wav_factory)
     result = _published(root)
@@ -317,6 +327,30 @@ def test_native_builder_controls_states_worker_and_dataset_navigation(
     assert builder.build_button.text() == "Build Dataset"
     assert builder.source_model.selected_count == 3
     assert builder.build_button.isEnabled()
+    assert builder.storage_section.isVisible()
+    assert builder.storage_section.output.text().startswith("Estimated output: ")
+    assert builder.storage_section.peak.text().startswith(
+        "Space needed while running: about "
+    )
+    assert builder.storage_section.free.text().startswith("Free on collection: ")
+    storage_hints = {
+        hint.objectName(): (hint.accessibleName(), hint.accessibleDescription())
+        for hint in builder.storage_section.findChildren(HelpHint)
+    }
+    assert storage_hints == {
+        "REV05-ESTIMATED-OUTPUT": (
+            "More about Estimated output",
+            "Approximate space the finished files will use.",
+        ),
+        "REV05-SPACE-WHILE-RUNNING": (
+            "More about Space while running",
+            "Includes temporary files. Some are removed when the task finishes.",
+        ),
+    }
+    assert all(
+        hint.focusPolicy() != Qt.FocusPolicy.NoFocus
+        for hint in builder.storage_section.findChildren(HelpHint)
+    )
 
     hint = builder.findChild(HelpHint)
     assert hint is not None
@@ -333,7 +367,64 @@ def test_native_builder_controls_states_worker_and_dataset_navigation(
     assert builder.source_model.selected_count == 1
     assert not builder.build_button.isEnabled()
     assert "at least two" in builder.preview_alert.text_widget.text().lower()
+    assert not builder.storage_section.isVisible()
     builder.select_all.setChecked(True)
+
+    observed_paths = []
+
+    def capacity(path, label, free=1):
+        observed_paths.append((path, label))
+        return CapacityObservation(
+            label,
+            "collection-volume",
+            free,
+            datetime(2026, 11, 3, tzinfo=UTC),
+        )
+
+    controller._capacity_probe = capacity
+    builder._refresh()
+    assert observed_paths[-1] == (root, "collection")
+    assert builder.storage_estimate.decision is StorageDecision.INSUFFICIENT
+    assert builder.storage_section.note.text() == (
+        "Not enough free space for this operation. Choose another destination or free up space."
+    )
+    assert not builder.build_button.isEnabled()
+
+    controller._capacity_probe = lambda path, label: CapacityObservation(
+        label,
+        "unknown-volume",
+        None,
+        datetime(2026, 11, 3, tzinfo=UTC),
+        "PermissionError",
+    )
+    builder._refresh()
+    assert builder.storage_estimate.decision is StorageDecision.UNKNOWN
+    assert builder.storage_section.free.text() == "Can't check free space on this destination."
+    assert builder.build_button.isEnabled()
+    monkeypatch.setattr(
+        "biocall_studio.train.gui.dataset.confirm_storage",
+        lambda _parent, estimate: not estimate.requires_confirmation,
+    )
+    builder.build_button.click()
+    assert controller.active_run is None
+
+    controller._capacity_probe = lambda path, label: CapacityObservation(
+        label,
+        "collection-volume",
+        2 * 1024**3,
+        datetime(2026, 11, 3, tzinfo=UTC),
+    )
+    builder._refresh()
+    prior = builder.storage_estimate
+    builder.seed.setValue(int(builder.seed.value()) + 1)
+    stale = controller.estimate_dataset_storage(
+        builder.config(), expected_digest=prior.input_digest
+    )
+    assert stale.decision is StorageDecision.STALE
+    builder.seed.setValue(int(builder.seed.value()) - 1)
+    builder.resize(700, 700)
+    qapp.processEvents()
+    assert builder.storage_section.isVisible()
 
     builder.negative_amount.setValue(20)
     builder.margin.setCurrentIndex(builder.margin.count() - 1)

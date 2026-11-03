@@ -65,6 +65,7 @@ from biocall_studio.detect.gui.history import (
     RunHistoryPage,
 )
 from biocall_studio.detect.gui.results import ResultExplorer
+from biocall_studio.detect.gui.storage import StorageSection, confirm_storage
 
 
 def _duration(row: InventoryRecording) -> str:
@@ -239,6 +240,7 @@ class DetectWorkspacePage(QWidget):
         self._recordings_attention_active = False
         self._rendered_inventory_id: str | None = None
         self.selected_key: str | None = None
+        self.storage_estimate = None
         self.setObjectName("detectWorkspacePage")
         self.setAccessibleName("Detect workspace")
 
@@ -402,6 +404,13 @@ class DetectWorkspacePage(QWidget):
         )
         self.folder_picker.folderChanged.connect(self.controller.choose_source_root)
         self.relink_picker.folderChanged.connect(self.controller.choose_source_root)
+        self.minimum_score.valueChanged.connect(lambda _value: self._render_readiness())
+        self.window_overlap.currentIndexChanged.connect(
+            lambda _index: self._render_readiness()
+        )
+        self.combine_nearby.currentIndexChanged.connect(
+            lambda _index: self._render_readiness()
+        )
         self.current_route = DetectRoute.MODELS
         self._navigate_new_detection()
         self._render()
@@ -488,6 +497,8 @@ class DetectWorkspacePage(QWidget):
         for column in range(3):
             self.settings_layout.setColumnStretch(column, 1)
         card.content_layout.addLayout(self.settings_layout)
+        self.storage_section = StorageSection()
+        card.content_layout.addWidget(self.storage_section)
         actions = QHBoxLayout()
         actions.addStretch()
         self.start_detection_button = Button("Start detection", variant="primary")
@@ -502,17 +513,35 @@ class DetectWorkspacePage(QWidget):
     def _run_primary_action(self) -> None:
         self._start_detection()
 
-    def _start_detection(self) -> None:
+    def _detection_settings(self) -> DetectionSettings:
         overlaps = (0, 25, 50, 75)
         gaps = (0, 200, 500)
-        settings = DetectionSettings(
+        return DetectionSettings(
             minimum_score=float(self.minimum_score.value()),
             window_overlap_percent=overlaps[self.window_overlap.currentIndex()],
             combine_gap_ms=gaps[self.combine_nearby.currentIndex()],
             batch_size=16,
         )
+
+    def _start_detection(self) -> None:
+        settings = self._detection_settings()
         try:
-            self.controller.start_detection(settings)
+            prior_digest = (
+                None if self.storage_estimate is None else self.storage_estimate.input_digest
+            )
+            estimate = self.controller.estimate_detection_storage(
+                settings,
+                expected_digest=prior_digest,
+            )
+            self.storage_estimate = estimate
+            self.storage_section.set_estimate(estimate, variable=True)
+            if not estimate.can_start or not confirm_storage(self, estimate):
+                return
+            self.controller.start_detection(
+                settings,
+                storage_digest=estimate.input_digest,
+                confirm_storage=estimate.requires_confirmation,
+            )
         except (OSError, RuntimeError, ValueError) as exc:
             self.selection_error.setText(str(exc))
             self.selection_error.setVisible(True)
@@ -1499,11 +1528,28 @@ class DetectWorkspacePage(QWidget):
         self.start_detection_button.setAccessibleDescription(
             "Check the selected model and recordings, then start detection."
         )
+        storage_ready = False
+        if self.controller.inputs_ready and not self.controller.is_run_active:
+            try:
+                self.storage_estimate = self.controller.estimate_detection_storage(
+                    self._detection_settings()
+                )
+            except (OSError, RuntimeError, ValueError):
+                self.storage_estimate = None
+                self.storage_section.clear()
+            else:
+                self.storage_section.set_estimate(self.storage_estimate, variable=True)
+                storage_ready = self.storage_estimate.can_start
+        else:
+            self.storage_estimate = None
+            self.storage_section.clear()
         if self.controller.is_run_active:
             self.start_detection_button.setText("Detection running")
             self.start_detection_button.setEnabled(False)
         else:
-            self.start_detection_button.setEnabled(self.controller.inputs_ready)
+            self.start_detection_button.setEnabled(
+                self.controller.inputs_ready and storage_ready
+            )
         self.change_model_button.setEnabled(not settings_locked)
         self.change_recordings_button.setEnabled(not settings_locked)
         if self.controller.is_run_active:

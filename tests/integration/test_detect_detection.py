@@ -7,6 +7,7 @@ import struct
 import wave
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 import joblib
@@ -45,6 +46,12 @@ from biocall_studio.detect.domain.runs import DetectRunStatus
 from biocall_studio.detect.gui.results import CandidateResultModel
 from biocall_studio.detect.gui.workspace import DetectWorkspacePage
 from biocall_studio.detect.persistence.runs import DetectRunRepository
+from biocall_studio.shared.storage import (
+    CapacityObservation,
+    StorageDecision,
+    StoragePreflightError,
+    query_filesystem_capacity,
+)
 from biocall_studio.train.application.collection_scan import scan_collection
 from biocall_studio.train.domain.dataset import BuildConfig
 from biocall_studio.train.domain.training import (
@@ -591,7 +598,7 @@ def test_real_run_publishes_reopenable_metadata_result_and_native_controls(
 def test_native_result_history_recording_candidates_selection_and_keyboard_navigation(
     qapp, qtbot, genuine_cnn, tmp_path, monkeypatch
 ):
-    """Case: IT-DET-015."""
+    """Cases: IT-DET-015, IT-SIZE-002, IT-SIZE-003."""
     source = tmp_path / "result-source"
     shutil.copytree(genuine_cnn.root / "recordings", source / "recordings")
     app_data = tmp_path / "application-data"
@@ -605,7 +612,39 @@ def test_native_result_history_recording_candidates_selection_and_keyboard_navig
     page.raise_()
     page.activateWindow()
 
-    controller.start_detection(DetectionSettings(0.0, 50, 0, 4))
+    settings = DetectionSettings(0.0, 50, 0, 4)
+    estimate = controller.estimate_detection_storage(settings)
+    assert estimate.expected_final.kind == "range"
+    assert page.storage_section.isVisible()
+    assert page.storage_section.note.text() == (
+        "Output size varies with the recording and settings."
+    )
+    first_digest = estimate.input_digest
+    changed = controller.estimate_detection_storage(DetectionSettings(0.0, 25, 0, 4))
+    assert changed.input_digest != first_digest
+    stale = controller.estimate_detection_storage(
+        DetectionSettings(0.0, 25, 0, 4), expected_digest=first_digest
+    )
+    assert stale.decision is StorageDecision.STALE
+    controller._capacity_probe = lambda path, label: CapacityObservation(
+        label,
+        "tight-detect-volume",
+        700 * 1024**2,
+        datetime(2026, 11, 3, tzinfo=UTC),
+    )
+    tight = controller.estimate_detection_storage(settings)
+    assert tight.decision is StorageDecision.TIGHT
+    before_runs = controller.runs
+    with pytest.raises(StoragePreflightError, match="confirmation"):
+        controller.start_detection(settings, storage_digest=tight.input_digest)
+    assert controller.runs == before_runs
+    assert controller.run_process is None
+    controller._capacity_probe = query_filesystem_capacity
+    page.resize(700, 790)
+    qtbot.waitUntil(lambda: page.is_compact)
+    assert page.storage_section.isVisible()
+
+    controller.start_detection(settings)
     first_run = _wait_terminal(qtbot, controller)
     assert first_run.status is DetectRunStatus.COMPLETED
     assert controller.current_result is not None
@@ -627,6 +666,8 @@ def test_native_result_history_recording_candidates_selection_and_keyboard_navig
     qtbot.waitUntil(lambda: page.focusWidget() is explorer.history_select.control)
     assert {hint.accessibleName() for hint in explorer.findChildren(HelpHint)} == {
         "More about Result selection",
+        "More about Estimated output",
+        "More about Space while running",
     }
     assert isinstance(explorer.recording_table, DataTable)
     assert isinstance(explorer.candidate_table, DataTable)
@@ -997,7 +1038,7 @@ def _canonical_rf_reference(raw: dict[str, float], *, n_mfcc: int) -> dict[str, 
 def test_real_rf_reference_probability_persists_independent_native_derived_result(
     qapp, qtbot, genuine_cnn, genuine_rf, tmp_path
 ):
-    """Cases: IT-DET-017, IT-STU-009."""
+    """Cases: IT-DET-017, IT-STU-009, IT-SIZE-002."""
     source = tmp_path / "rf-result-source"
     shutil.copytree(genuine_cnn.root / "recordings", source / "recordings")
     app_data = tmp_path / "application-data"
@@ -1025,6 +1066,21 @@ def test_real_rf_reference_probability_persists_independent_native_derived_resul
     assert controller.refinement_model_reference.snapshot.family is ModelFamily.RANDOM_FOREST
     rf_reference = controller.refinement_model_reference
 
+    rf_estimate = controller.estimate_refinement_storage()
+    assert rf_estimate.expected_final.kind == "range"
+    controller._capacity_probe = lambda path, label: CapacityObservation(
+        label,
+        "tight-rf-volume",
+        700 * 1024**2,
+        datetime(2026, 11, 3, tzinfo=UTC),
+    )
+    tight = controller.estimate_refinement_storage()
+    before_runs = controller.runs
+    with pytest.raises(StoragePreflightError, match="confirmation"):
+        controller.start_refinement(storage_digest=tight.input_digest)
+    assert controller.runs == before_runs
+    assert controller.run_process is None
+    controller._capacity_probe = query_filesystem_capacity
     controller.start_refinement()
     child_run = _wait_terminal(qtbot, controller)
     assert child_run.status is DetectRunStatus.COMPLETED

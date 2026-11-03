@@ -99,6 +99,24 @@ The endpoint is two structurally verified training Models with their Dataset, Ru
 configuration and provenance. Return to the Studio launchpad to use either Model in the Detect
 workflow; Train and Detect keep separate state inside the same application.
 
+## Check storage before writing output
+
+Dataset Build, CNN and Random Forest Training, candidate detection, RF call checking, and corpus
+export show a compact **Storage** section before they start. **Estimated output** describes the
+finished files. **Space needed while running** also includes bounded staging, request, Run and log
+overhead that may be removed after completion. A range means the output depends on the recordings,
+Model structure, settings or candidates that survive detection; it is not a precise prediction.
+
+Displayed KB, MB, GB and TB values use binary units: 1 KB = 1,024 bytes, 1 MB = 1,024 KB, and so
+on. Estimates round upward so a positive amount is never shown as zero. BioCall Studio checks each
+destination filesystem separately and keeps a reserve of the larger of 512 MB or 10% of estimated
+peak use. Known free space below **peak + one reserve** is insufficient. Space from **peak + one
+reserve** up to **peak + two reserves** is tight and requires confirmation; at or above **peak +
+two reserves** is ready. An unknown capacity also requires confirmation. This deliberately keeps
+the 512 MB floor on small volumes instead of making a small percentage look safe. The capacity is
+checked again at start, but it is not reserved; other applications can still consume disk space.
+Normal disk-full handling and private-staging cleanup remain active independently of the estimate.
+
 ## What this represents for actual field data
 
 A researcher supplies original recordings in `recordings/` and manually exported known-call clips

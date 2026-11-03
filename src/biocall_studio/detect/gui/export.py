@@ -23,6 +23,7 @@ from biocall_studio.detect.domain.exports import (
     ExportState,
     safe_snippet_relative_path,
 )
+from biocall_studio.detect.gui.storage import StorageSection, confirm_storage
 
 
 def _source_time(nanoseconds: int) -> str:
@@ -43,6 +44,7 @@ class ExportPage(QWidget):
         super().__init__()
         self.controller = controller
         self._compact = False
+        self.storage_estimate = None
         self.setAccessibleName("Corpus export")
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -167,6 +169,8 @@ class ExportPage(QWidget):
             "Return to Results and choose at least one interval.", role="body", word_wrap=True
         )
         card.content_layout.addWidget(self.status_detail)
+        self.storage_section = StorageSection()
+        card.content_layout.addWidget(self.storage_section)
         self.start_button = Button("Export corpus", variant="primary")
         self.start_button.setAccessibleName("Export selected calls")
         card.content_layout.addWidget(self.start_button)
@@ -217,7 +221,27 @@ class ExportPage(QWidget):
         destination = self.destination_picker.folderPath().strip()
         if not destination:
             return
-        self.controller.start_export(self._mode(), Path(destination))
+        try:
+            prior_digest = (
+                None if self.storage_estimate is None else self.storage_estimate.input_digest
+            )
+            estimate = self.controller.estimate_export_storage(
+                self._mode(),
+                Path(destination),
+                expected_digest=prior_digest,
+            )
+            self.storage_estimate = estimate
+            self.storage_section.set_estimate(estimate)
+            if not estimate.can_start or not confirm_storage(self, estimate):
+                return
+            self.controller.start_export(
+                self._mode(),
+                Path(destination),
+                storage_digest=estimate.input_digest,
+                confirm_storage=estimate.requires_confirmation,
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            self.status_detail.setText(str(exc))
 
     def _show_output(self) -> None:
         try:
@@ -308,6 +332,32 @@ class ExportPage(QWidget):
             detail = "Choose a persistent destination folder to continue."
         elif state is ExportState.READY and not count:
             detail = "Return to Results and choose at least one interval."
+        storage_ready = False
+        storage_error = ""
+        if (
+            state is ExportState.READY
+            and count
+            and destination
+            and not active
+            and not self.controller.export_history_warning
+        ):
+            try:
+                self.storage_estimate = self.controller.estimate_export_storage(
+                    mode,
+                    Path(destination),
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                self.storage_estimate = None
+                storage_error = str(exc)
+                self.storage_section.clear()
+            else:
+                self.storage_section.set_estimate(self.storage_estimate)
+                storage_ready = self.storage_estimate.can_start
+        else:
+            self.storage_estimate = None
+            self.storage_section.clear()
+        if storage_error:
+            detail = storage_error
         self.status_detail.setText(detail)
         history_warning = getattr(self.controller, "export_history_warning", "")
         self.start_button.setEnabled(
@@ -316,6 +366,7 @@ class ExportPage(QWidget):
             and state is ExportState.READY
             and not active
             and not history_warning
+            and storage_ready
         )
         self.cancel_button.setVisible(active)
         self.cancel_button.setEnabled(active)

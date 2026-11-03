@@ -25,6 +25,14 @@ from biocall_studio.detect.application.model_intake import (
     recheck_model_reference,
 )
 from biocall_studio.detect.application.owner_lifetime import DetectOwnerLease
+from biocall_studio.detect.application.storage import (
+    DetectionRecordingFacts,
+    estimate_detection_metadata,
+    estimate_export_artifacts,
+    estimate_refinement_metadata,
+    export_input_digest,
+    preview_export_snapshot,
+)
 from biocall_studio.detect.domain import RootBindingDecision
 from biocall_studio.detect.domain.detection import DetectionSettings
 from biocall_studio.detect.domain.export_history import (
@@ -97,6 +105,14 @@ from biocall_studio.detect.workflows.exports import (
     freeze_export_snapshot,
     publish_export,
     verify_export_directory,
+)
+from biocall_studio.shared.storage import (
+    CapacityObservation,
+    StorageEstimate,
+    assess_storage,
+    query_filesystem_capacity,
+    require_storage_admission,
+    storage_input_digest,
 )
 
 
@@ -317,6 +333,7 @@ class DetectWorkspaceController(QObject):
         worker_step_delay_seconds: float = 0.0,
         cancel_grace_ms: int = 1_500,
         kill_grace_ms: int = 3_000,
+        capacity_probe: Callable[[Path, str], CapacityObservation] | None = None,
     ):
         super().__init__()
         self.store = DetectWorkspaceStore(application_data_root)
@@ -364,6 +381,7 @@ class DetectWorkspaceController(QObject):
         self._run_error_code = ""
         self._protocol_error = ""
         self._run_admission: Callable[[str, str], None] | None = None
+        self._capacity_probe = capacity_probe or query_filesystem_capacity
         self.export_result: ResultArtifact | None = None
         self.export_selection: FrozenResultSelection | None = None
         self.export_snapshot: ExportSnapshot | None = None
@@ -895,7 +913,48 @@ class DetectWorkspaceController(QObject):
         self.state_changed.emit()
         return frozen
 
-    def start_export(self, mode: ExportMode, destination_parent: Path) -> None:
+    def estimate_export_storage(
+        self,
+        mode: ExportMode,
+        destination_parent: Path,
+        *,
+        expected_digest: str | None = None,
+    ) -> StorageEstimate:
+        if self.export_result is None or self.export_selection is None:
+            raise ValueError("Freeze a Result selection before estimating export storage.")
+        collection = self.active_collection
+        if collection is None or self.root_decision is not RootBindingDecision.VALID:
+            raise ValueError("The recordings folder is unavailable or stale.")
+        snapshot = preview_export_snapshot(
+            result=self.export_result,
+            selection=self.export_selection,
+            mode=ExportMode(mode),
+            source_root=collection.source_root,
+            destination_parent=Path(destination_parent),
+        )
+        plan = estimate_export_artifacts(snapshot)
+        digest = export_input_digest(snapshot)
+        label = Path(destination_parent).name or "Export folder"
+        capacity = self._capacity_probe(Path(destination_parent), label)
+        return assess_storage(
+            operation="detect.export",
+            input_digest=digest,
+            expected_input_digest=expected_digest,
+            expected_final=plan.expected_final,
+            target_peaks={label: plan.peak_bytes},
+            capacities={label: capacity},
+            confidence=plan.confidence,
+            basis=plan.basis,
+        )
+
+    def start_export(
+        self,
+        mode: ExportMode,
+        destination_parent: Path,
+        *,
+        storage_digest: str | None = None,
+        confirm_storage: bool = False,
+    ) -> None:
         if self.is_export_active:
             raise RuntimeError("An export is already running.")
         if self._pending_export_history_record is not None:
@@ -905,6 +964,12 @@ class DetectWorkspaceController(QObject):
         collection = self.active_collection
         if collection is None or self.root_decision is not RootBindingDecision.VALID:
             raise ValueError("The recordings folder is unavailable or stale.")
+        storage = self.estimate_export_storage(
+            mode,
+            destination_parent,
+            expected_digest=storage_digest,
+        )
+        require_storage_admission(storage, confirmed=confirm_storage)
         thread = _ExportThread(
             result=self.export_result,
             selection=self.export_selection,
@@ -1741,11 +1806,88 @@ class DetectWorkspaceController(QObject):
             raise TypeError("CNN first-pass settings must be a DetectionSettings value.")
         return self.freeze_run_request(settings.to_mapping())
 
-    def start_detection(self, settings: DetectionSettings) -> str:
-        request = self.freeze_detection_request(settings)
-        return self.start_detection_request(request)
+    def estimate_detection_storage(
+        self,
+        settings: DetectionSettings,
+        *,
+        expected_digest: str | None = None,
+    ) -> StorageEstimate:
+        collection = self.active_collection
+        snapshot = self.snapshot
+        model = self.model_reference
+        if collection is None or snapshot is None or model is None:
+            raise ValueError("A current Model and recording inventory are required.")
+        model_snapshot = model.snapshot
+        if model_snapshot.window_length_samples is None:
+            raise ValueError("The selected CNN Model has no window size.")
+        rows_by_key = {row.recording_key: row for row in snapshot.recordings}
+        rows = []
+        for key in snapshot.included_keys:
+            row = rows_by_key[key]
+            if row.status is not RecordingStatus.VALID or row.wav is None:
+                raise ValueError("Included recordings must have validated WAV facts.")
+            rows.append(
+                DetectionRecordingFacts(
+                    key,
+                    row.wav.sample_rate_hz,
+                    row.wav.frame_count,
+                )
+            )
+        hop = settings.hop_samples(model_snapshot.window_length_samples)
+        plan, windows = estimate_detection_metadata(
+            rows,
+            model_sample_rate_hz=model_snapshot.sample_rate_hz,
+            window_samples=model_snapshot.window_length_samples,
+            hop_samples=hop,
+        )
+        digest = storage_input_digest(
+            {
+                "operation": "detect.cnn_result",
+                "collection_id": collection.ref.collection_id,
+                "binding_revision": collection.ref.binding_revision,
+                "inventory_id": snapshot.inventory_id,
+                "inventory_digest": snapshot.digest,
+                "model_snapshot_id": model_snapshot.snapshot_id,
+                "model_digest": canonical_digest(model_snapshot.to_dict()),
+                "settings": settings.to_mapping(),
+                "window_count": windows,
+            }
+        )
+        destination = self.store.paths_for(collection.ref.collection_id).collection_directory
+        label = "BioCall Studio data"
+        capacity = self._capacity_probe(destination, label)
+        return assess_storage(
+            operation="detect.cnn_result",
+            input_digest=digest,
+            expected_input_digest=expected_digest,
+            expected_final=plan.expected_final,
+            target_peaks={label: plan.peak_bytes},
+            capacities={label: capacity},
+            confidence=plan.confidence,
+            basis=plan.basis,
+        )
 
-    def start_detection_request(self, request: DetectRunRequest) -> str:
+    def start_detection(
+        self,
+        settings: DetectionSettings,
+        *,
+        storage_digest: str | None = None,
+        confirm_storage: bool = False,
+    ) -> str:
+        request = self.freeze_detection_request(settings)
+        return self.start_detection_request(
+            request,
+            storage_digest=storage_digest,
+            confirm_storage=confirm_storage,
+        )
+
+    def start_detection_request(
+        self,
+        request: DetectRunRequest,
+        *,
+        storage_digest: str | None = None,
+        confirm_storage: bool = False,
+    ) -> str:
         """Launch the real scientific CNN Worker through the ST-06 QProcess boundary."""
         collection = self.active_collection
         snapshot = self.snapshot
@@ -1759,7 +1901,7 @@ class DetectWorkspaceController(QObject):
             and self._run_process.state() is not QProcess.ProcessState.NotRunning
         ):
             raise RunConflictError("Only one Active Detect Run is allowed.")
-        DetectionSettings.from_mapping(dict(request.settings))
+        settings = DetectionSettings.from_mapping(dict(request.settings))
         if (
             request.reservation_owner_id != self.reservation_owner_id
             or request.collection_id != collection.ref.collection_id
@@ -1775,6 +1917,12 @@ class DetectWorkspaceController(QObject):
             collection.source_root, snapshot
         ):
             raise ValueError("Recordings changed; rescan before starting a Detect Run.")
+
+        storage = self.estimate_detection_storage(
+            settings,
+            expected_digest=storage_digest,
+        )
+        require_storage_admission(storage, confirmed=confirm_storage)
 
         self._admit_run(request.run_id, "Candidate detection")
 
@@ -1868,10 +2016,61 @@ class DetectWorkspaceController(QObject):
             artifact_id=f"pub_{uuid.uuid4().hex}",
         )
 
-    def start_refinement(self) -> str:
-        return self.start_refinement_request(self.freeze_refinement_request())
+    def estimate_refinement_storage(
+        self,
+        *,
+        expected_digest: str | None = None,
+    ) -> StorageEstimate:
+        item = self.selected_result_item
+        parent = None if item is None else item.result
+        collection = self.active_collection
+        model = self.refinement_model_reference
+        if not isinstance(parent, DetectionResult) or collection is None or model is None:
+            raise ValueError("An original Result and Random Forest Model are required.")
+        plan = estimate_refinement_metadata(parent.candidate_count)
+        digest = storage_input_digest(
+            {
+                "operation": "detect.rf_result",
+                "parent_result_id": parent.result_id,
+                "parent_result_digest": parent.result_digest,
+                "model_snapshot_id": model.snapshot.snapshot_id,
+                "model_digest": canonical_digest(model.snapshot.to_dict()),
+                "candidate_count": parent.candidate_count,
+            }
+        )
+        destination = self.store.paths_for(collection.ref.collection_id).collection_directory
+        label = "BioCall Studio data"
+        capacity = self._capacity_probe(destination, label)
+        return assess_storage(
+            operation="detect.rf_result",
+            input_digest=digest,
+            expected_input_digest=expected_digest,
+            expected_final=plan.expected_final,
+            target_peaks={label: plan.peak_bytes},
+            capacities={label: capacity},
+            confidence=plan.confidence,
+            basis=plan.basis,
+        )
 
-    def start_refinement_request(self, request: DetectRunRequest) -> str:
+    def start_refinement(
+        self,
+        *,
+        storage_digest: str | None = None,
+        confirm_storage: bool = False,
+    ) -> str:
+        return self.start_refinement_request(
+            self.freeze_refinement_request(),
+            storage_digest=storage_digest,
+            confirm_storage=confirm_storage,
+        )
+
+    def start_refinement_request(
+        self,
+        request: DetectRunRequest,
+        *,
+        storage_digest: str | None = None,
+        confirm_storage: bool = False,
+    ) -> str:
         """Launch RF scoring only for candidates in one immutable original Result."""
         item = self.selected_result_item
         parent = None if item is None else item.result
@@ -1892,6 +2091,8 @@ class DetectWorkspaceController(QObject):
             and self._run_process.state() is not QProcess.ProcessState.NotRunning
         ):
             raise RunConflictError("Only one Active Detect Run is allowed.")
+        storage = self.estimate_refinement_storage(expected_digest=storage_digest)
+        require_storage_admission(storage, confirmed=confirm_storage)
         selected_keys = tuple(
             sorted(
                 recording.recording_key for recording in parent.recordings if recording.candidates

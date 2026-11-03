@@ -1,6 +1,6 @@
 # REV-05 — Shared output-size and free-space preflight
 
-**Status:** proposed; specification only. **Base:** reviewed current `main` after REV-04/ST-11 source qualification. **Branch when authorized:** `studio-rev05-storage-preflight`. Train and Detect are in scope; Review is a future consumer, not a new workflow in this revision. Installer/release qualification is out of scope.
+**Status:** implemented, tested and owner-reviewed on 2026-11-03. **Base:** reviewed `main` at `0047f1d` after REV-04/ST-11 source qualification. **Branch:** `studio-rev05-storage-preflight`. Train and Detect are in scope; Review is a future consumer, not a new workflow in this revision. Installer/release qualification is out of scope.
 
 ## Outcome and ownership
 
@@ -21,7 +21,7 @@ Before starting a disk-writing operation, show researchers an intelligible estim
 6. `StorageEstimate` records: version, operation, frozen input/config digest, target volume(s), expected final bytes (`exact | range | unavailable`), peak additional bytes (includes **staging, retries/temporary copies, retained checkpoints** as applicable), confidence/basis (`arithmetic | measured | insufficient evidence`), observed free bytes/time, reserved headroom policy, and `ready | tight | insufficient | unknown | stale` decision with reason. Do not store source absolute paths or HPC-derived identities in portable artifacts or diagnostic logs. No persisted disk reservation is implied; other programs can consume space.
 7. Capacity rule: compare **peak additional bytes + conservative reserve** against free bytes on **each** destination volume, using documented reserve policy (initial floor `max(512 MiB, 10% of estimated peak)`; revise against evidence and small-volume usability). A missing/denied capacity query is **unknown**, never “enough”. If peak cannot be bounded, show the uncertainty and require explicit confirmation; if known space is insufficient, disable Start/Export and offer **Change destination** when supported. If tight, require explicit confirmation; if ready, the existing Start/Export button is sufficient. Recheck once at start, and enforce normal Worker disk-full, cancel and atomic cleanup behavior independently of this estimate. Preflight is **not** a guarantee or a substitute for staging/publishing safely.
 
-## Native UI and proposed copy (approval required)
+## Native UI and approved copy
 
 Integrate one compact **Storage** section into the existing Train Build/Start Training and Detect Run/Export preparation screen only when there is a proposed output. Put information beside the actual primary action, not in a new route, floating caption, decorative alert or repeated explanatory card. Keep the active destination discoverable; show its drive/folder label only when useful. Do not display technical digest, filesystem identifier, algorithm/model-internal size multipliers, “immutable”, “source-time”, “backend”, or separate storage status badges. Use normal text size, accessible contrast, keyboard focus and actual Qt confirmation.
 
@@ -38,11 +38,11 @@ Integrate one compact **Storage** section into the existing Train Build/Start Tr
 | Insufficient space | **Not enough free space for this operation. Choose another destination or free up space.** | Omit; Start/Export disabled. |
 | Normal action | Keep current **Build Dataset**, **Start Training**, **Start detection** or **Export** label | Omit; do not introduce a redundant “Proceed?” dialog when clearly safe. |
 
-All sample wording above is *proposed*, not silently approved product copy. Inspect the current nine Detect HelpHints and Train field hints, retain their plain-language conventions and submit only new/changed strings for owner approval **before** implementation. Use consistent locale-aware numeric formatting and accessible non-color-only status. No unsolicited tooltips on every value, extraneous subtitles, overlines, repeated status alerts or tiny captions. Avoid saying “we”; tests must assert the exact approved strings and keyboard accessibility.
+The wording above is the approved product copy. It retains the plain-language conventions of the existing Detect and Train HelpHints. Use consistent numeric formatting and accessible non-color-only status. No unsolicited tooltips on every value, extraneous subtitles, overlines, repeated status alerts or tiny captions. Avoid saying “we”; tests assert the exact strings and keyboard accessibility.
 
 ## Stage-owned TDD and validation
 
-First register cases in the existing indexes; use the smallest generated `TD-WAV`, `TD-RUN`, `TD-FAIL`, `TD-UI`, `TD-CACHE` inputs. No remote connection in ordinary tests. Proposed IDs below are reserved, not passed:
+The implementation registers these cases in the existing indexes and uses the smallest generated `TD-WAV`, `TD-RUN`, `TD-FAIL`, `TD-UI`, `TD-CACHE` inputs. No remote connection is used in ordinary tests:
 
 - `UT-SIZE-001` — exact PCM/snippet/concat/TSV and binary unit/rounding arithmetic; overflow and mixed-format rejection.
 - `UT-SIZE-002` — deterministic Train Build/Train Model and Detect CNN/RF metadata sizing adapters, conservative range/unknown decision and historical-data confidence gate; no fake precision.

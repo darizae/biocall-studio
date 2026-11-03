@@ -423,12 +423,14 @@ def test_detect_routes_use_approved_help_plain_language_and_compact_result_state
         "Corpus export formats": "Individual snippets creates one WAV per selected call. Concatenated creates one WAV and a Raven table, and requires matching audio formats.",
         "RF refinement": "Optionally use a Random Forest model to check the calls found by the detection model. The original results stay unchanged.",
         "Result selection": "Selections are saved separately for each result.",
+        "Estimated output": "Approximate space the finished files will use.",
+        "Space while running": "Includes temporary files. Some are removed when the task finishes.",
     }
     actual_help = {
         hint.accessibleName().removeprefix("More about "): hint.toolTip()
         for hint in page.findChildren(HelpHint)
     }
-    assert len(page.findChildren(HelpHint)) == 9
+    assert len(page.findChildren(HelpHint)) == 15
     assert actual_help == approved_help
     approved_ids = {
         "CTX-01": "Minimum detection score",
@@ -441,6 +443,8 @@ def test_detect_routes_use_approved_help_plain_language_and_compact_result_state
         "CTX-08": None,
         "CTX-09": "RF refinement",
         "CTX-10": "Result selection",
+        "REV05-ESTIMATED-OUTPUT": "Estimated output",
+        "REV05-SPACE-WHILE-RUNNING": "Space while running",
     }
     actual_ids = {
         hint.objectName(): hint.accessibleName().removeprefix("More about ")

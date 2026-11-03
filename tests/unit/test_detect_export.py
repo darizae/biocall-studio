@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from biocall_studio.detect.application.storage import estimate_export_artifacts
 from biocall_studio.detect.domain.detection import DetectionSettings
 from biocall_studio.detect.domain.exports import (
     FORMAT_POLICY,
@@ -34,6 +35,7 @@ from biocall_studio.detect.domain.rf_refinement import (
     RefinementDecision,
 )
 from biocall_studio.detect.workflows.exports import ensure_publish_target_available
+from biocall_studio.shared.storage import pcm_wav_bytes
 
 
 def _result(
@@ -191,6 +193,26 @@ def test_exact_frame_byte_and_raven_offset_arithmetic_has_no_accumulated_drift()
             snapshot.candidates[0],
             source_end_frame=snapshot.candidates[0].frame_count + 1,
         )
+
+
+def test_storage_plan_counts_snippets_concat_and_tsv_once() -> None:
+    """Case: UT-SIZE-001."""
+    result = _result(
+        (("recordings/a.wav", "7", 8_000, 1, ((1, 4), (10, 15))),)
+    )
+    snapshot = _snapshot(result, mode=ExportMode.BOTH)
+    plan = estimate_export_artifacts(snapshot)
+
+    expected_audio = (
+        pcm_wav_bytes(3, channels=1, sample_width_bytes=2)
+        + pcm_wav_bytes(5, channels=1, sample_width_bytes=2)
+        + pcm_wav_bytes(8, channels=1, sample_width_bytes=2)
+    )
+    tsv, _rows = render_raven_tsv(snapshot)
+    assert plan.expected_final.kind == "exact"
+    assert plan.expected_final.high_bytes is not None
+    assert plan.expected_final.high_bytes > expected_audio + len(tsv)
+    assert plan.peak_bytes == plan.expected_final.high_bytes
 
 
 def test_snapshot_freezes_selection_digest_lineage_and_reproducible_order():

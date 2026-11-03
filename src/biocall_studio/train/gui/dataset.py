@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
 from biocall_studio.train.application.workspace import WorkspaceController
 from biocall_studio.train.domain.collection import ScanResult
 from biocall_studio.train.domain.dataset import BuildConfig
+from biocall_studio.train.gui.storage import StorageSection, confirm_storage
 from biocall_studio.train.persistence.datasets import (
     DatasetArtifact,
     dataset_dependents,
@@ -193,6 +194,7 @@ class DatasetBuilderPage(QScrollArea):
         self.result: ScanResult | None = None
         self.source_model: SourceSelectionModel | None = None
         self.is_compact = False
+        self.storage_estimate = None
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setAccessibleName("Dataset Builder")
@@ -354,6 +356,8 @@ class DatasetBuilderPage(QScrollArea):
                 copy_id="CTX-20",
             )
         )
+        self.storage_section = StorageSection()
+        self.settings_card.content_layout.addWidget(self.storage_section)
         self.build_button = Button("Build Dataset", size="large", loading_text="Building Dataset…")
         self.build_button.setIcon(make_icon("plus", color=ALPACA_LIGHT.colors.on_primary, size=16))
         self.build_button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
@@ -530,12 +534,43 @@ class DatasetBuilderPage(QScrollArea):
             self.preview_alert.show()
         else:
             self.preview_alert.hide()
-        self.build_button.setEnabled(not error and not self.controller.is_building)
+        storage_ready = False
+        if not error:
+            try:
+                self.storage_estimate = self.controller.estimate_dataset_storage(config)
+            except (OSError, RuntimeError, ValueError):
+                self.storage_estimate = None
+                self.storage_section.clear()
+            else:
+                self.storage_section.set_estimate(self.storage_estimate)
+                storage_ready = self.storage_estimate.can_start
+        else:
+            self.storage_estimate = None
+            self.storage_section.clear()
+        self.build_button.setEnabled(
+            not error and not self.controller.is_building and storage_ready
+        )
 
     def _start_build(self) -> None:
         try:
-            self.controller.start_dataset_build(self.config())
-        except ValueError as exc:
+            config = self.config()
+            prior_digest = (
+                None if self.storage_estimate is None else self.storage_estimate.input_digest
+            )
+            estimate = self.controller.estimate_dataset_storage(
+                config,
+                expected_digest=prior_digest,
+            )
+            self.storage_estimate = estimate
+            self.storage_section.set_estimate(estimate)
+            if not estimate.can_start or not confirm_storage(self, estimate):
+                return
+            self.controller.start_dataset_build(
+                config,
+                storage_digest=estimate.input_digest,
+                confirm_storage=estimate.requires_confirmation,
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
             self.show_build_error(str(exc))
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802

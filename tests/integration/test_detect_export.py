@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import wave
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,7 @@ from PySide6.QtGui import QDesktopServices
 
 from biocall_studio.detect.application.controller import DetectWorkspaceController
 from biocall_studio.detect.application.navigation import DetectRoute
+from biocall_studio.detect.application.storage import estimate_export_artifacts
 from biocall_studio.detect.domain.detection import DetectionSettings
 from biocall_studio.detect.domain.export_history import ExportAvailability
 from biocall_studio.detect.domain.exports import (
@@ -39,6 +41,12 @@ from biocall_studio.detect.workflows.exports import (
     freeze_export_snapshot,
     publish_export,
     verify_export_directory,
+)
+from biocall_studio.shared.storage import (
+    CapacityObservation,
+    EstimateConfidence,
+    assess_storage,
+    storage_input_digest,
 )
 
 pytestmark = [pytest.mark.integration]
@@ -209,7 +217,7 @@ def test_real_snippet_pcm_headers_checksums_and_source_frames_are_exact(tmp_path
 
 
 def test_both_mode_concat_pcm_raven_offsets_and_receipt_reopen_are_exact(tmp_path, wav_factory):
-    """Case: IT-DET-020."""
+    """Cases: IT-DET-020, IT-SIZE-001."""
     source = tmp_path / "source"
     first = wav_factory(source / "recordings" / "alpha.wav", frames=80, rate=8_000)
     second = wav_factory(source / "recordings" / "beta.wav", frames=90, rate=8_000)
@@ -223,9 +231,15 @@ def test_both_mode_concat_pcm_raven_offsets_and_receipt_reopen_are_exact(tmp_pat
     destination = tmp_path / "exports"
     destination.mkdir()
     snapshot = _freeze(result, source, destination, ExportMode.BOTH, token="2")
+    storage = estimate_export_artifacts(snapshot)
 
     receipt = publish_export(snapshot, source_root=source)
     final = Path(receipt.final_destination)
+    actual_output_bytes = sum(
+        path.stat().st_size for path in final.rglob("*") if path.is_file()
+    )
+    assert actual_output_bytes == storage.expected_final.high_bytes
+    assert storage.peak_bytes == actual_output_bytes
     _, first_pcm = _pcm(first)
     _, second_pcm = _pcm(second)
     expected = first_pcm[2 * 2 : 9 * 2] + first_pcm[20 * 2 : 31 * 2] + second_pcm[4 * 2 : 17 * 2]
@@ -279,7 +293,7 @@ def test_both_mode_concat_pcm_raven_offsets_and_receipt_reopen_are_exact(tmp_pat
 def test_stale_permission_collision_disk_error_and_cancel_publish_nothing(
     tmp_path, wav_factory, monkeypatch
 ):
-    """Case: IT-DET-021."""
+    """Cases: IT-DET-021, IT-SIZE-003."""
     source = tmp_path / "source"
     wav = wav_factory(source / "recordings" / "bird.wav", frames=128, rate=8_000)
     result = _result_for_sources(source, (("recordings/bird.wav", ((4, 40), (50, 90))),))
@@ -488,7 +502,7 @@ def test_export_history_restart_verification_isolation_and_save_retry(
 class _ExportUiController(QObject):
     state_changed = Signal()
 
-    def __init__(self, result, frozen, receipt):
+    def __init__(self, result, frozen, receipt, snapshot):
         super().__init__()
         self.export_result = result
         self.export_selection = frozen
@@ -500,8 +514,34 @@ class _ExportUiController(QObject):
         self.is_export_active = False
         self.started: tuple[ExportMode, Path] | None = None
         self.cancelled = False
+        self.plan = estimate_export_artifacts(snapshot)
+        self.storage_input_digest = storage_input_digest(snapshot.to_dict())
+        self.free_bytes: int | None = 2 * 1024**3
+        self.storage_calls: list[Path] = []
 
-    def start_export(self, mode: ExportMode, destination: Path) -> None:
+    def estimate_export_storage(self, _mode, destination, **_kwargs):
+        destination = Path(destination)
+        self.storage_calls.append(destination)
+        label = destination.name or "Export folder"
+        return assess_storage(
+            operation="detect.export",
+            input_digest=self.storage_input_digest,
+            expected_final=self.plan.expected_final,
+            target_peaks={label: self.plan.peak_bytes},
+            capacities={
+                label: CapacityObservation(
+                    label,
+                    "test-volume",
+                    self.free_bytes,
+                    datetime(2026, 11, 3, tzinfo=UTC),
+                    "PermissionError" if self.free_bytes is None else "",
+                )
+            },
+            confidence=EstimateConfidence.ARITHMETIC,
+            basis=self.plan.basis,
+        )
+
+    def start_export(self, mode: ExportMode, destination: Path, **_kwargs) -> None:
         self.started = (mode, destination)
 
     def cancel_export(self) -> None:
@@ -518,7 +558,7 @@ class _ExportUiController(QObject):
 def test_native_export_controls_freeze_destination_compact_status_and_show_folder(
     qapp, qtbot, tmp_path, wav_factory, monkeypatch
 ):
-    """Case: IT-DET-021."""
+    """Cases: IT-DET-021, IT-SIZE-003."""
     source = tmp_path / "source"
     wav_factory(source / "recordings" / "bird.wav", frames=80, rate=8_000)
     result = _result_for_sources(source, (("recordings/bird.wav", ((2, 10),)),))
@@ -526,7 +566,7 @@ def test_native_export_controls_freeze_destination_compact_status_and_show_folde
     destination.mkdir()
     snapshot = _freeze(result, source, destination, ExportMode.BOTH, token="8")
     receipt = publish_export(snapshot, source_root=source)
-    controller = _ExportUiController(result, _frozen(result), receipt)
+    controller = _ExportUiController(result, _frozen(result), receipt, snapshot)
     page = ExportPage(controller)  # type: ignore[arg-type]
     qtbot.addWidget(page)
     page.show()
@@ -539,6 +579,44 @@ def test_native_export_controls_freeze_destination_compact_status_and_show_folde
     page.destination_picker.setFolderPath(str(destination))
     page.render()
     assert page.start_button.isEnabled()
+    assert controller.storage_calls[-1] == destination
+    assert page.storage_section.isVisible()
+    assert page.storage_section.output.text().startswith("Estimated output: about ")
+    assert page.storage_section.peak.text().startswith(
+        "Space needed while running: about "
+    )
+    assert {
+        hint.accessibleName(): hint.accessibleDescription()
+        for hint in page.storage_section.findChildren(HelpHint)
+    } == {
+        "More about Estimated output": "Approximate space the finished files will use.",
+        "More about Space while running": (
+            "Includes temporary files. Some are removed when the task finishes."
+        ),
+    }
+
+    controller.free_bytes = 1
+    page.render()
+    assert not page.start_button.isEnabled()
+    assert page.storage_section.note.text() == (
+        "Not enough free space for this operation. Choose another destination or free up space."
+    )
+    controller.free_bytes = None
+    page.render()
+    assert page.start_button.isEnabled()
+    assert page.storage_section.free.text() == "Can't check free space on this destination."
+    monkeypatch.setattr("biocall_studio.detect.gui.export.confirm_storage", lambda *_args: False)
+    page.start_button.click()
+    assert controller.started is None
+
+    controller.free_bytes = 2 * 1024**3
+    second_destination = tmp_path / "second-exports"
+    second_destination.mkdir()
+    page.destination_picker.setFolderPath(str(second_destination))
+    page.render()
+    assert controller.storage_calls[-1] == second_destination
+    page.destination_picker.setFolderPath(str(destination))
+    monkeypatch.setattr("biocall_studio.detect.gui.export.confirm_storage", lambda *_args: True)
     page.start_button.click()
     assert controller.started == (ExportMode.BOTH, destination)
 

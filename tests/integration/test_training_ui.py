@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import UTC, datetime
 from html import unescape
 
 import pytest
@@ -10,11 +11,13 @@ from alp_ui.components import HelpHint, NumberInput, SelectInput, Text
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QAbstractButton, QInputDialog, QLabel, QMessageBox, QWidget
 
+from biocall_studio.shared.storage import CapacityObservation, StorageDecision
 from biocall_studio.studio.application.app import create_application
 from biocall_studio.train.application.collection_scan import scan_collection
 from biocall_studio.train.application.workspace import WorkspaceController
 from biocall_studio.train.domain.dataset import BuildConfig
 from biocall_studio.train.domain.training import field_definitions, fields_for_family
+from biocall_studio.train.gui.storage import confirm_storage
 from biocall_studio.train.gui.training import TrainingPage
 from biocall_studio.train.gui.window import MainWindow
 from biocall_studio.train.persistence.collection_metadata import publish_collection_metadata
@@ -311,6 +314,8 @@ APPROVED_TRAIN_CONTEXT_HELP = {
     "Model families": "CNN learns from spectrograms. Random Forest learns from calculated sound features.",
     "Collection folders": "Choose a folder containing `recordings/` and `positives/`. BioCall Studio reads the WAV files in place and does not copy them.",
     "Clip times": "Write start and end times in whole milliseconds. 1,000 ms equals 1 second.",
+    "Estimated output": "Approximate space the finished files will use.",
+    "Space while running": "Includes temporary files. Some are removed when the task finishes.",
 }
 
 APPROVED_TRAIN_CONTEXT_IDS = {
@@ -332,6 +337,8 @@ APPROVED_TRAIN_CONTEXT_IDS = {
     "CTX-26": "Collection folders",
     "CTX-27": "Clip times",
     "CTX-28": None,
+    "REV05-ESTIMATED-OUTPUT": "Estimated output",
+    "REV05-SPACE-WHILE-RUNNING": "Space while running",
 }
 
 
@@ -688,7 +695,7 @@ def test_native_training_page_primary_disclosure_family_drafts_and_wiki(
 def test_native_validation_preserves_values_blocks_launch_and_resets(
     qapp, qtbot, tmp_path, wav_factory, monkeypatch
 ):
-    """Cases: IT-TRAIN-011, IT-UI-005."""
+    """Cases: IT-TRAIN-011, IT-UI-005, IT-SIZE-002, IT-SIZE-003."""
     window, _dataset = _window(qtbot, tmp_path, wav_factory)
     page = window.training_page
     page.more_settings.click()
@@ -731,6 +738,15 @@ def test_native_validation_preserves_values_blocks_launch_and_resets(
     page.reset_field("spectrogram.hop_length")
     assert page.field_value("spectrogram.hop_length") == 441
     assert page.start_button.isEnabled()
+    assert page.storage_estimate.expected_final.kind == "range"
+    assert page.storage_section.note.text() == (
+        "Output size varies with the recording and settings."
+    )
+    cnn_high = page.storage_estimate.expected_final.high_bytes
+    page.family_input.setCurrentIndex(1)
+    assert page.storage_estimate.expected_final.kind == "range"
+    assert page.storage_estimate.expected_final.high_bytes < cnn_high
+    page.family_input.setCurrentIndex(0)
     assert (
         not {
             "src_dir",
@@ -743,6 +759,43 @@ def test_native_validation_preserves_values_blocks_launch_and_resets(
     )
 
     started: dict[str, object] = {}
+    window.controller._capacity_probe = lambda path, label: CapacityObservation(
+        label,
+        "tight-volume",
+        700 * 1024**2,
+        datetime(2026, 11, 3, tzinfo=UTC),
+    )
+    page._validate_and_refresh()
+    assert page.storage_estimate.decision is StorageDecision.TIGHT
+    assert page.storage_section.note.text() == "Storage may run low while this runs. Continue?"
+
+    def accept_dialog(dialog):
+        buttons = {button.text(): button for button in dialog.buttons()}
+        assert set(buttons) == {"Cancel", "Continue"}
+        assert dialog.defaultButton().text() == "Cancel"
+        assert dialog.escapeButton().text() == "Cancel"
+        buttons["Continue"].click()
+        return 0
+
+    monkeypatch.setattr(QMessageBox, "exec", accept_dialog)
+    assert confirm_storage(page, page.storage_estimate)
+    monkeypatch.setattr(
+        "biocall_studio.train.gui.training.confirm_storage", lambda *_args: False
+    )
+    page.start_button.click()
+    assert not started
+    assert window.controller.active_run is None
+
+    window.controller._capacity_probe = lambda path, label: CapacityObservation(
+        label,
+        "ready-volume",
+        2 * 1024**3,
+        datetime(2026, 11, 3, tzinfo=UTC),
+    )
+    page._validate_and_refresh()
+    monkeypatch.setattr(
+        "biocall_studio.train.gui.training.confirm_storage", lambda *_args: True
+    )
     monkeypatch.setattr(
         QInputDialog,
         "getText",
@@ -751,9 +804,11 @@ def test_native_validation_preserves_values_blocks_launch_and_resets(
     monkeypatch.setattr(
         window.controller,
         "start_training",
-        lambda config, *, model_label: started.update(
+        lambda config, *, model_label, storage_digest, confirm_storage: started.update(
             config=config,
             model_label=model_label,
+            storage_digest=storage_digest,
+            confirm_storage=confirm_storage,
         ),
     )
     page.start_button.click()
@@ -762,6 +817,8 @@ def test_native_validation_preserves_values_blocks_launch_and_resets(
     assert started == {
         "config": page.last_frozen_config,
         "model_label": "UI verified CNN",
+        "storage_digest": page.storage_estimate.input_digest,
+        "confirm_storage": False,
     }
     assert window.controller.active_run is None
 
