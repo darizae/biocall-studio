@@ -2,7 +2,7 @@
 
 > **Status:** Owner-approved planning spec, NOT implemented. Do not start implementation or infer test passes from this document. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
 
-**Sequence:** RV-08 begins only after RV-07 has passed its owner-reviewed gate and the shared REV-05 prerequisite has been verified in the real checkout.
+**Sequence:** RV-08 begins only after RV-07 has passed its owner-reviewed gate.
 
 **Series:** [Locked scope, prerequisites and coverage](README.md) · [Status](../../IMPLEMENTATION_SEQUENCE.md)
 
@@ -38,7 +38,7 @@
 
 ---
 
-**Planning completion boundary:** This document is a PR-ready planning artifact, not a created GitHub PR and not evidence of an implemented Review workspace. The first implementation action, after owner approval of the documentation PR and confirmation of the reviewed base/REV-05 dependency, is RV-01's stage-owned tests and Result intake — not a speculative redesign of Train/Detect or reimplementation of shared storage preflight.
+**Planning completion boundary:** This is an approved specification, not evidence that Review is implemented. After explicit authorization to start RV-01 on the reviewed REV-05-complete base, the first implementation action is RV-01's stage-owned tests and Result intake—not a Train/Detect redesign or shared preflight reimplementation.
 
 ## Existing qualification test ownership (no new duplicate cases)
 
