@@ -1,0 +1,24 @@
+PASS Missing recording uses approved copy
+PASS Missing recording disables audio
+PASS Relink simulation recovers
+PASS Changed recording uses approved copy
+PASS Render error displays retry
+PASS Retry recovers spectrogram
+PASS Insufficient storage disables generation
+PASS Insufficient storage uses approved copy
+PASS Unknown capacity explains uncertainty
+PASS Unknown capacity asks confirmation
+PASS Cancelled preflight starts no task
+PASS Tight capacity asks confirmation
+PASS Tight confirmed starts worker demo
+PASS Simultaneous open/processing exit uses approved combined copy
+PASS Simulated export failure occurs
+PASS Export failure leaves receipt list unchanged
+PASS Export failure approved copy
+PASS Failed export can be retried
+PASS Combined WAV size limit uses approved error
+PASS Combined WAV size disables export
+PASS Alternative individual format recovers export
+PASS No script errors in edge scenarios
+
+SUMMARY 22 / 22
