@@ -13,3 +13,11 @@
 }
 /* Keep content-sized scientific inspection and export surfaces from turning into blank cards. */
 .focus-frame,.export-grid{align-items:start}
+
+/* Fixed Review shortcut tooltips: visible on hover and keyboard focus, never clipped by panels. */
+.review-tooltip{position:fixed;z-index:90;transform:translateX(-50%);max-width:min(340px,calc(100vw - 16px));width:max-content;padding:8px 11px;border-radius:6px;background:#203449;color:#fff;font-size:12px;font-weight:600;line-height:1.4;text-align:center;box-shadow:0 5px 20px #10233448;pointer-events:none;white-space:normal}
+.review-tooltip[hidden]{display:none}
+.modal p{white-space:pre-line}
+.search-recording{width:150px;min-width:110px}
+@media(max-width:770px){.search-recording{width:120px}}
+@media(max-width:560px){.search-recording{width:115px}}

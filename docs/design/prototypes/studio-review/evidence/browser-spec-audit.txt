@@ -1,0 +1,28 @@
+PASS Intake visibly distinguishes CNN and RF-derived
+PASS Original Marsh CNN Result selectable independently
+scroll_before 460
+scroll_after 460 {'scroll': 460, 'saved': 460}
+PASS List scroll restored after Detect and back
+PASS Workspace navigation retains list mode and current filter
+PASS One by one Next follows reverse time sort
+PASS One by one Previous uses current sequence
+PASS Gallery filter retained while inspecting
+PASS One by one can revisit outside gallery filter
+PASS Gallery filtered view restored
+PASS Save failure does not label/advance/revise
+PASS Save failure shows approved message
+PASS Close failure keeps session Open
+PASS Finalization failure keeps session editable
+PASS Exit save failure remains in Studio
+PASS Missing recording play control disabled
+PASS Missing recording action blocked
+PASS Missing recording disables export
+PASS Missing recording blocks Generate all
+PASS Changed recording blocks export with approved message
+PASS No javascript runtime errors
+SUMMARY 20 / 20
+PASS Close/Resume preserves focused item, view and filter {'current': 2, 'view': 'one', 'filter': 'all'}
+PASS No JavaScript errors []
+PASS Single-item bulk action carries bulk provenance
+PASS Individually confirmed bulk acceptance upgrades provenance
+PASS Undo preserves prior bulk provenance

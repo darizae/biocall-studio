@@ -2,7 +2,7 @@
 
 > **Status:** Owner-approved planning spec, NOT implemented. Do not start implementation or infer test passes from this document. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
 
-**Sequence:** RV-08 begins only after RV-07 has passed its owner-reviewed gate and the shared REV-05 prerequisite has been verified in the real checkout.
+**Sequence:** RV-08 begins only after RV-07 has passed its owner-reviewed gate.
 
 **Series:** [Locked scope, prerequisites and coverage](README.md) · [Status](../../IMPLEMENTATION_SEQUENCE.md)
 
@@ -14,7 +14,7 @@
 
 - One genuine source-app chain: Train Dataset/Model → Detect Collection/CNN Result → optional RF-derived Result (RF-accepted only in Review) → open Review session → on-demand and bulk spectrograms → human Call/Not a call/Unreviewed decisions and Accept all/undo → partial warning → Finalize → Review-owned WAV snippets/concatenation/Raven/both → receipt reopen, source-time and scientific checksum verification.
 - Explicit closed-session pause/resume, finalized child session, multiple exports from same snapshot, cross-workspace navigation and exit warning when Review is hidden; busy Worker/cancellation/disk-full/recovery, missing/relinked/changed WAV and history-write interruption.
-- Native Gallery/List/One by one at ≥50,000 candidates with real event loop and actual audio/playback; accessible statuses/buttons/HelpHints and exact owner-approved text in normal/compact layouts. Cache quota, eviction, individual/multi Clear spectrograms, regeneration and REV-05 measured-vs-estimated preflight; unchanged labels and source bytes.
+- Native Gallery/List/One by one at ≥50,000 candidates with real event loop and actual audio/playback; accessible statuses/buttons/HelpHints and exact owner-approved text in normal/compact layouts. Explicitly check **all fixed RV-05 shortcut bindings**, their button tooltips on hover/focus (also at compact width), collision-free slider/text/modal focus behavior, auto-advance/Undo, read-only mode and no shortcuts leaking to Train/Detect. Cache quota, eviction, individual/multi Clear spectrograms, regeneration and REV-05 measured-vs-estimated preflight; unchanged labels and source bytes.
 - Scalable publication of 10,001 and ≥50,000 distinct valid candidates, verifying real WAV/Raven output files, metadata receipts, streamed verification/reopen, bounded resources, >4GiB concatenation guard and old Detect v1 export compatibility. Distinguish feasible generated row scale from source-audio/real native constraints; never invent results.
 - Re-home the existing `IT-DET-022` and `IT-STU-007` / `IT-STU-008` **in place**, reflecting new export ownership, not cloning the same E2E path into Review-specific tests. Rerun affected `UT-DET`/`IT-DET`, `UT-STU`/`IT-STU`, `UT-SIZE`/`IT-SIZE` and new Review tests. Separate ≥600 s soak only when explicitly initiated.
 - If current library SHAs, real device/native Qt, real Model, LFS fixture or source checkout is unavailable, record the exact **blocked** case, not a fictitious pass. Validate release work remains deferred and outside this plan.
@@ -26,7 +26,7 @@
 - [ ] Single normal workflow including **Accept all**, mixed partial review warning and proper provenance of Call/Not a call/Unreviewed.
 - [ ] One explicit Open session at a time; Close saves/pauses; finalization freezes; finalized successor independent; navigation preserves progress.
 - [ ] Exit warning from any workspace with an Open session, one combined Worker confirmation, Save and Exit safe across failures.
-- [ ] Gallery/List/One by one operate on same persistent labels at >=50k candidate scale; automatic advance and explicit Previous/Next and keyboard/undo all work.
+- [ ] Gallery/List/One by one operate on same persistent labels at >=50k candidate scale; automatic advance and explicit Previous/Next and keyboard/undo all work. Verify the **exact non-configurable RV-05 F/D/S, J/K/L, arrow/Space and Ctrl/⌘Z bindings**, accessible hover/focus tooltips, and suppressed shortcuts during typing, seeking, modal display, modifier chords and other workspaces.
 - [ ] Playback uses real native Qt normal-speed audible context, detected interval highlighted, no full recording timeline and no false-negative authoring.
 - [ ] Hybrid asynchronous cache generation, prior storage estimate/REV-05 recheck, background prefetch, cache eviction and multi-select clearing; regeneration cannot affect labels.
 - [ ] All three corpus output modes preserved with frame-exact PCM/Raven/provenance and Show in folder; **Review is only new-export owner**.
@@ -38,7 +38,7 @@
 
 ---
 
-**Planning completion boundary:** This document is a PR-ready planning artifact, not a created GitHub PR and not evidence of an implemented Review workspace. The first implementation action, after owner approval of the documentation PR and confirmation of the reviewed base/REV-05 dependency, is RV-01's stage-owned tests and Result intake — not a speculative redesign of Train/Detect or reimplementation of shared storage preflight.
+**Planning completion boundary:** This is an approved specification, not evidence that Review is implemented. After explicit authorization to start RV-01 on the reviewed REV-05-complete base, the first implementation action is RV-01's stage-owned tests and Result intake—not a Train/Detect redesign or shared preflight reimplementation.
 
 ## Existing qualification test ownership (no new duplicate cases)
 

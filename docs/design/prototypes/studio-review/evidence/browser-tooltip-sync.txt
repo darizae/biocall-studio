@@ -1,0 +1,18 @@
+PASS RV-05 Accept all HelpHint verbatim
+PASS Accept all HelpHint visible by hover
+PASS Accept all HelpHint accessible on focus
+PASS RV-05 Clear spectrograms HelpHint verbatim
+PASS Clear spectrograms tooltip visible by hover
+PASS Clear spectrograms tooltip accessible on focus
+PASS Tooltip does not overlay a modal
+PASS Modal keyboard starts on Close
+PASS Modal Tab focus remains trapped
+PASS Modal Shift+Tab focus remains trapped
+PASS Escape returns focus to shortcut reference button
+PASS Finalized session cannot be relabeled through shortcuts
+PASS Finalized session allows Next keyboard navigation
+PASS Finalized label buttons correctly disabled
+PASS Search finds expected recording subset
+PASS Session view and search restored after navigation
+PASS No script errors
+SUMMARY 17 / 17

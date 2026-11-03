@@ -1,6 +1,6 @@
 # BioCall Studio — agent instructions
 
-One Python/PySide6/`alp-ui` desktop application: **Train** (preserve scientific/GUI/Worker behavior), **Detect**, **Review** (placeholder). The current `main` baseline contains the merged ST-01–ST-11 and REV-01–REV-04 source work; installed macOS/Windows packaging remains a separate unexecuted release gate. Browser automation was not completed and does not count as test evidence. The approved ST-01 prototype remains the design requirement for native Studio/Detect screens.
+One Python/PySide6/`alp-ui` desktop application: **Train** (preserve scientific/GUI/Worker behavior), **Detect**, **Review** (placeholder). The current `main` baseline contains the merged ST-01–ST-11 and REV-01–REV-05 source work; installed macOS/Windows packaging remains a separate unexecuted release gate. Browser automation was not completed and does not count as test evidence. The approved ST-01 prototype remains the design requirement for native Studio/Detect screens.
 
 ## Minimal entry route
 
@@ -17,4 +17,4 @@ One Python/PySide6/`alp-ui` desktop application: **Train** (preserve scientific/
 - **TDD per stage:** add its indexed cases first (pure `UT-*`, real-boundary `IT-*`), assert meaningful failure/cancel/non-mutation, use minimum `TD-*` fixtures, real WAV/Qt/QProcess/Model only where the owned seam requires it. Run scoped tests while implementing, then the full feasible ordinary unit + integration suites, lint and audit **before each implementation commit**. The ≥600-second soak is separately initiated. Record exact pass/fail/skip/block evidence. **ST-11 alone owns the complete cross-workflow Studio end-to-end integration test.**
 - On the owner's interactive Mac, run ordinary and targeted pytest through `.venv/bin/python scripts/run_tests.py background [pytest arguments]`; it forces invisible offscreen Qt. Never run the visible `native` mode unless the owner explicitly accepts desktop interruption or a dedicated macOS test session is available. See [Development](docs/DEVELOPMENT.md#tests-and-audit) for the non-duplicated mode definitions and qualification limits.
 
-Routing and task gates are authoritative over incidental broken links to old historical notes; do not reconstruct missing legacy files. No next implementation stage is currently declared; inspect the real merged baseline and the user's requested scope.
+Routing and task gates are authoritative over incidental broken links to old historical notes; do not reconstruct missing legacy files. RV-01 is the next planned Review stage, not yet implemented; begin it only with explicit owner authorization from the reviewed baseline.

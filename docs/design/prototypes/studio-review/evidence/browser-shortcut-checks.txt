@@ -1,0 +1,71 @@
+PASS label-call: tooltip copy exactly matches RV-05 
+PASS label-call: accessible shortcut exposed 
+PASS label-call: pointer tooltip visible 
+PASS label-call: focus tooltip visible 
+PASS label-reject: tooltip copy exactly matches RV-05 
+PASS label-reject: accessible shortcut exposed 
+PASS label-reject: pointer tooltip visible 
+PASS label-reject: focus tooltip visible 
+PASS label-clear: tooltip copy exactly matches RV-05 
+PASS label-clear: accessible shortcut exposed 
+PASS label-clear: pointer tooltip visible 
+PASS label-clear: focus tooltip visible 
+PASS prev: tooltip copy exactly matches RV-05 
+PASS prev: accessible shortcut exposed 
+PASS next: tooltip copy exactly matches RV-05 
+PASS next: accessible shortcut exposed 
+PASS next: pointer tooltip visible 
+PASS next: focus tooltip visible 
+PASS play: tooltip copy exactly matches RV-05 
+PASS play: accessible shortcut exposed 
+PASS play: pointer tooltip visible 
+PASS play: focus tooltip visible 
+PASS undo: tooltip copy exactly matches RV-05 
+PASS undo: accessible shortcut exposed 
+PASS Help dialog: F — Call 
+PASS Help dialog: D — Not a call 
+PASS Help dialog: S — Clear label 
+PASS Help dialog: J / ← — Previous 
+PASS Help dialog: K / Space — Play / Pause 
+PASS Help dialog: L / → — Next 
+PASS Help dialog: Ctrl / ⌘ + Z — Undo 
+PASS Help dialog: separate readable lines 
+PASS Modal captures label shortcut 
+PASS Escape dismisses shortcut dialog 
+PASS F labels Call, persists then advances 
+PASS Ctrl+Z restores previously unreviewed candidate 
+PASS D labels Not a call and advances 
+PASS S clears label without auto advance 
+PASS Undo restores cleared Call 
+PASS L moves Next 
+PASS J moves Previous 
+PASS Right arrow moves Next 
+PASS Left arrow moves Previous 
+PASS K starts actual WAV playback 
+PASS Space pauses playback 
+PASS Legacy C no longer acts as shortcut 
+PASS Legacy X no longer acts as shortcut 
+PASS Legacy U no longer acts as shortcut 
+PASS Alt+F has no labeling side effect 
+PASS Ctrl+F does not label 
+PASS Typing session name does not label or navigate 
+PASS Seeking with slider does not navigate candidate 
+PASS Shortcuts work with a button focused 
+PASS Gallery plain label shortcuts disabled 
+PASS Undo does not trigger in Studio shell 
+PASS List recording search filters actual rows 
+PASS Typing search does not relabel 
+PASS Cleared search restores full set 
+PASS 700px: tooltip fits viewport 
+PASS 700px: full tooltip text readable 
+PASS 700px: keyboard-focus tooltip remains visible 
+PASS 700px: no document horizontal overflow 
+PASS 700px: no JS errors 
+PASS 520px: tooltip fits viewport 
+PASS 520px: full tooltip text readable 
+PASS 520px: keyboard-focus tooltip remains visible 
+PASS 520px: no document horizontal overflow 
+PASS 520px: no JS errors 
+PASS No JS errors normal desktop 
+
+SUMMARY 69 / 69

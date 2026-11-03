@@ -1,55 +1,65 @@
-PASS | Results intake and completed CNN/RF | 
-PASS | RF result only eligible count displayed | 
-PASS | Gallery thumbnails bound | 
-PASS | Gallery bounded elements | 28
-PASS | List compact bounded rows | 
-PASS | Not a call filter | 
-PASS | Sorting | 
-PASS | Multiple selection | 
-PASS | Bulk labels changed | 
-PASS | Bulk undo restores prior labels | 
-PASS | Explicit next revisits labeled to unreviewed | 
-PASS | C labels then advances | 
-PASS | Undo individual | 
-PASS | X keyboard label | 
-PASS | Previous moves irrespective of status | 
-PASS | U clear label | 
-PASS | Real demo audio playback | 0.422063
-PASS | Space pauses audio | 
-PASS | Clip seeking | 
-PASS | Accept all confirm approved | 
-PASS | Accept all leaves rejected unchanged and zero unreviewed | 
-PASS | Undo Accept all | 
-PASS | Clearing cache preserves annotations | 
-PASS | Generation progress displayed | 
-PASS | Generation cancel | 
-PASS | Generate all complete | 
-PASS | Manual full clear resets cache | 
-PASS | Full clear still preserves labels | 
-PASS | Regeneration works | 
-PASS | Close marks Closed instead of Finalized | 
-PASS | Resume returns Open | 
-PASS | Partial-review warning approved | 
-PASS | Finalize snapshot and export route | 
-PASS | Export progress/completion | 
-PASS | Export mixed provenance presentation | 
-PASS | Show in folder preview | 
-PASS | Finalized successor independent session | 
-PASS | Parent snapshot stays finalized | 
-PASS | Train/Detect navigation retains Open | 
-PASS | Exit warning from Detect | 
-PASS | Keep app open preserves session | 
-PASS | Save and Exit closes open session | 
-PASS | Session persists in browser storage | 
-PASS | 700px detail navigation reachable | 
-PASS | 700px no horizontal document overflow | 
-PASS | 520px no document overflow | 
-PASS | RF accepted-only 17 candidates | 
-PASS | Missing source approved error | 
-PASS | Insufficient storage disables Generate all | 
-PASS | Large result reaches 50k | 
+PASS Results intake and completed CNN/RF
+PASS RF result only eligible count displayed
+PASS Gallery thumbnails bound
+PASS Gallery bounded elements
+PASS List compact bounded rows
+PASS Not a call filter
+PASS Sorting
+PASS Multiple selection
+PASS Bulk labels changed
+PASS Bulk undo restores prior labels
+PASS Explicit next revisits labeled to unreviewed
+PASS F labels then advances
+PASS Undo individual
+PASS D keyboard label
+PASS Previous moves irrespective of status
+PASS S clear label
+PASS Real demo audio playback
+PASS Space pauses audio
+PASS Clip seeking
+PASS Accept all confirm approved
+PASS Accept all leaves rejected unchanged and zero unreviewed
+PASS Undo Accept all
+PASS Clearing cache preserves annotations
+PASS Generation progress displayed
+PASS Generation cancel
+PASS Generate all complete
+PASS Manual full clear resets cache
+PASS Full clear still preserves labels
+PASS Regeneration works
+PASS Close marks Closed instead of Finalized
+PASS Resume returns Open
+PASS Partial-review warning approved
+PASS Finalize snapshot and export route
+PASS Export progress/completion
+PASS Export mixed provenance presentation
+PASS Show in folder preview
+PASS Finalized successor independent session
+PASS Parent snapshot stays finalized
+PASS Train/Detect navigation retains Open
+PASS Exit warning from Detect
+PASS Keep app open preserves session
+PASS Save and Exit closes open session
+PASS Session persists in browser storage
+PASS 700px detail navigation reachable
+PASS 700px no horizontal document overflow
+PASS 520px no document overflow
+PASS RF accepted-only 17 candidates
+PASS Missing source approved error
+PASS Insufficient storage disables Generate all
+PASS Large result reaches 50k
+PASS 50k virtualized rows
+PASS 50k filter responsive
+PASS 50k virtualized gallery cards
+PASS 50k accept all in compact storage
+PASS 50k Accept all undo
+PASS No runtime errors primary
+PASS No runtime errors compact
+
+SUMMARY 57 / 57
+ Large result reaches 50k | 
 PASS | 50k virtualized rows | 35
-PASS | 50k filter responsive | 0.186 s
+PASS | 50k filter responsive | 0.388 s
 PASS | 50k virtualized gallery cards | 
 PASS | 50k accept all in compact storage | 
 PASS | 50k Accept all undo | 
