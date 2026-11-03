@@ -1,10 +1,6 @@
 # RV-05 — Native researcher-facing Review workspace
 
-> **Status:** Owner-approved planning spec, NOT implemented. Do not start implementation or infer test passes from this document. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
-
-**Sequence:** RV-05 begins only after RV-04 has passed its owner-reviewed gate.
-
-**Series:** [Locked scope, prerequisites and coverage](README.md) · [Status](../../IMPLEMENTATION_SEQUENCE.md)
+> **Status:** Owner-approved planning; not implemented. Begin only after explicit stage authorization and the predecessor's owner gate.
 
 ## Strict ownership and exclusions
 
@@ -16,15 +12,15 @@
 
 1. **Review landing / no session:** show available verified completed Detect Results by recognizable name, Result kind (CNN/RF), date and eligible count. **Choose Result** then **Start session**; if existing Closed/Finalized sessions exist, make them accessible without a new route maze. If the Result is empty, use **No detections to review.** No random folders or standalone annotation imports.
 2. **Open session header:** editable human session name, `Open` status, concise reviewed count/progress and session actions. One persistent switch between Gallery, List and One by one. `Close session` and `Finalize` should be findable without a cluster of competing buttons. The navigation path and saved view state must survive leaving Review for Train/Detect/Studio and returning.
-3. **Gallery:** efficient thumbnail grid ordered by deterministic source recording/time (unless user selects a sort), row-local label symbol, contextual audio and keyboard navigation. Filter All/Unreviewed/Call/Not a call; multi-select and batch operations use one discoverable action area rather than per-tile buttons. Show a genuine placeholder/spinner only for images actually generating.
-4. **List:** compact sortable model/view for tens of thousands; human-readable recording/time, duration, prediction information where genuinely useful, label status and availability. Select many for labeling/cache actions as appropriate; avoid hidden IDs and per-row heavy icons/widgets. No machine-generated explanation columns.
+3. **Gallery:** efficient thumbnail grid ordered by deterministic source recording/time (unless user selects a sort), label symbol and clear access to the individual audio player. Filter All/Unreviewed/Call/Not a call; multi-select is for **Clear spectrograms**, not another bulk-label workflow. Keep **Accept all** as the only approved bulk-label action in the session action area. Show a placeholder only for images actually generating.
+4. **List:** virtualized, sortable model/view for at least 50,000 candidates; human-readable recording/time, duration, prediction information where genuinely useful, label status and availability. Measure cold/warm scroll, filter and sort latency, memory and event-loop responsiveness without constructing per-row widgets. Multi-select for cache clearing; **Accept all** independently applies to eligible Unreviewed candidates. Do not add selective bulk-label buttons, hidden IDs or per-row heavy widgets. No machine-generated explanation columns.
 5. **One by one:** large detailed spectrogram with marked candidate interval, clip seek/play/pause, **Previous**, **Next** buttons, three states/actions and persistent reviewed progress. On Call/Not a call: persist first, then advance to next unreviewed. Previous/Next work regardless of label state, and keyboard shortcuts are discoverable in a single appropriate place (e.g. application shortcut listing, not captions per button). Disable impossible navigation clearly; no dead ends when all items are reviewed.
 6. **Cache controls:** lightweight storage information near Generate all, the manual Clear spectrograms action reachable from multi-selection and single item; no repeated explanatory cards. Automatic eviction generally silent; if image unavailable, show retry/actionable failure without altering label. Cache deletion must not be mislabeled “Delete annotation”.
 7. **Finalization/export:** explicit Finalize after session work. If Unreviewed >0, one warning; then show export destination, Storage estimate and format choice. Completed export offers **Show in folder**. New export from the same finalized session remains possible. On failure/cancel, navigate back to same finalized session, not to a blank workflow.
 8. **Closed and Finalized:** Closed shows **Resume**; Finalized shows read-only labels/exports and **Continue in new session**. Starting a successor produces its own editable session, not an in-place toggle. Human-readable parent context may be included in details when genuinely necessary, never raw UUID/hash captions.
 9. **Global exit:** exit initiated by macOS window close/menu, Studio, Train or Detect all invokes the same policy. Correct default/cancel focus, keyboard/escape, no double confirmation for simultaneous Worker and open session. Preserve existing operation text when no Review session exists.
 
-**Presentation standards:** native PySide6 + public `alp-ui` components. Use real Qt screen sizes/normal and compact widths, 100%/150% display scaling where available, light theme compatibility, readable text, accessible names/focus and correct tab order. Status icons must differ in shape/text as well as color. Investigate installed API/owner-approved showcase before proposing new `alp-ui` public components. No custom global CSS/styling that bypasses the library. The owner revision notes explicitly prohibit unnecessary subtitles, overlines, generic success/immutability cards, tiny captions, repeated folder or Result names, developer jargon/IDs and unreadable tooltips. Any HelpHint must explain what an operation *does for a researcher*, not its stored IDs or Worker implementation. Important information remains visible, not tooltip-only.
+**Presentation standards:** native PySide6 + public `alp-ui` components. Use real Qt screen sizes/normal and compact widths, 100%/150% display scaling where available, light theme compatibility, readable text, accessible names/focus and correct tab order. Status icons must differ in shape/text as well as color. Investigate installed API/owner-approved showcase before proposing new `alp-ui` public components. No custom global CSS/styling that bypasses the library. The owner feedback in [Detect revision notes](../manual_revision_specs/detect-revision-notes.txt) and [UI pass revision](../manual_revision_specs/UI-pass-revision-spec.md) prohibits unnecessary subtitles, overlines, generic success/immutability cards, tiny captions, repeated names, developer jargon/IDs and unreadable tooltips. Any HelpHint must explain what an operation *does for a researcher*, not its stored IDs or Worker implementation. Important information remains visible, not tooltip-only.
 
 ### Approved wording inventory (owner approved 2026-11-02)
 
@@ -74,9 +70,7 @@
 
 **Only genuinely new copy encountered during implementation** (e.g., corrupt database, second-instance conflict, incompatible WAV format, save failure while exiting) requires an owner-reviewed compact delta table before landing RV-05/RV-07; never quietly ship developer-oriented fallback wording. The approved table is the frozen baseline, not license to invent more cards.
 
-## Owning acceptance cases (proposed; register in existing indexes before TDD)
-
-These are stage scope definitions, **not registered or executed tests**. Validate IDs against [unit](../../UNIT_TESTING.md), [integration](../../INTEGRATION_TEST_BEHAVIORS.md), and [fixture index](../../INTEGRATION_TEST_DATA.md); register exact case text there before implementation. Never create a second test index.
+## Acceptance cases (register in existing test indexes during stage TDD)
 
 | ID | Owner | Positive assertions | Negative / non-mutation assertions |
 |---|---|---|---|
@@ -85,9 +79,5 @@ These are stage scope definitions, **not registered or executed tests**. Validat
 | `IT-REVW-008` | RV-05 | 50k Result rows, virtual scroll/filter/sort/load, measured latency/memory and real event-loop responsiveness | no 50k eager widgets/thumbnails, no unbounded queues, no frozen UI under cache churn |
 
 **Gate:** Owner accepts real Qt screenshots (normal/compact), focus/keyboard/a11y and exact approved copy. Submit only any new/changed copy in one compact delta table for explicit approval.
-
-## Delivery and evidence gate
-
-Record reviewed baseline SHA and branch, actual implementation files, focused and full feasible ordinary test commands and pass/fail/skip/block results, Ruff, `scripts/audit_test_ids.py`, `git diff --check`, source/Result checksum non-mutation, and current dependency import origins/SHAs. Capture real native Qt/audio/Worker evidence only for boundaries owned here; do not claim whole-Studio qualification before RV-08. Confirm a clean narrowly scoped diff and hand the branch/commit SHA to the owner. No automatic merge or push.
 
 **Next:** RV-06 may be prepared only after this gate is explicitly approved.

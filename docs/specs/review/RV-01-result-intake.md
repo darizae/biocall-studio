@@ -1,10 +1,6 @@
 # RV-01 — Detect Result intake and eligibility
 
-> **Status:** Owner-approved planning spec, NOT implemented. Do not start implementation or infer test passes from this document. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
-
-**Sequence:** RV-01 starts from reviewed `main` with REV-05 already implemented and owner-reviewed. RV-02 requires RV-01's explicit owner approval.
-
-**Series:** [Locked scope, prerequisites and coverage](README.md) · [Status](../../IMPLEMENTATION_SEQUENCE.md)
+> **Status:** Owner-approved planning; not implemented. Begin only after explicit stage authorization and the predecessor's owner gate.
 
 ## Strict ownership and exclusions
 
@@ -19,9 +15,7 @@
 - The current placeholder remains a placeholder for this domain-only stage. No UI promises or scientific toolchain overhaul.
 
 
-## Owning acceptance cases (proposed; register in existing indexes before TDD)
-
-These are stage scope definitions, **not registered or executed tests**. Validate IDs against [unit](../../UNIT_TESTING.md), [integration](../../INTEGRATION_TEST_BEHAVIORS.md), and [fixture index](../../INTEGRATION_TEST_DATA.md); register exact case text there before implementation. Never create a second test index.
+## Acceptance cases (register in existing test indexes during stage TDD)
 
 | ID | Owner | Positive assertions | Negative / non-mutation assertions |
 |---|---|---|---|
@@ -33,7 +27,7 @@ These are stage scope definitions, **not registered or executed tests**. Validat
 
 ## Verified repository baseline and source authority
 
-Read `AGENTS.md` and `docs/agent/ROUTING.md` first on every implementation stage; then read only the stage's owning sections and concrete dependencies. The earlier planning inspection used a 2026-11-02 snapshot; current implementation planning must use the updated reviewed `main` baseline (`c00d8808a2d1` on 2026-11-03) and verify its actual checkout SHA at RV-01 entry. All requested documentation exists: `docs/PREDICTION.md`, `docs/IMPLEMENTATION_SEQUENCE.md`, `docs/design/{UX_PARITY_MATRIX,PROTOTYPE_ACCEPTANCE,ALP_UI_CONSUMER_CONTRACT}.md`, `docs/specs/manual_revision_specs/{REV-05-output-size-preflight.md,detect-revision-notes.txt,UI-pass-revision-spec.md}`, `docs/{UNIT_TESTING,INTEGRATION_TEST_BEHAVIORS,INTEGRATION_TEST_DATA}.md`, and `AGENTS.md`/`docs/agent/ROUTING.md`.
+The earlier planning inspection used a 2026-11-02 snapshot; current implementation planning must use the updated reviewed `main` baseline (`c00d8808a2d1` on 2026-11-03) and verify its actual checkout SHA at RV-01 entry. Consult only the current Detect Result contract and owning source/tests for intake; Review UI feedback belongs to RV-05.
 
 Observed current source-of-truth seams:
 
@@ -46,9 +40,5 @@ Observed current source-of-truth seams:
 **REV-05 is implemented and owner-reviewed on the reviewed `main` baseline (`c00d8808a2d1`).** Its Qt-free `src/biocall_studio/shared/storage.py` implements `StorageEstimate`, `OperationSizePlan`, `assess_storage`, `query_filesystem_capacity` and `require_storage_admission`. Train/Detect adapters and indexed `UT-SIZE-*` / `IT-SIZE-*` cases are present. RV-01 must not duplicate shared preflight. At RV-04/RV-06, implement only Review-specific sizing inputs/adapters against that existing API and verify the actual dependency versions; if a different checkout lacks REV-05, recover the reviewed base instead of reimplementing it.
 
 Other useful authority: `docs/ARCHITECTURE.md`, `docs/agent/GIT_DELIVERY.md`, `docs/agent/SPEC_WRITING_AND_IMPLEMENTATION_PRINCIPLES.md`, and the existing test/fixture indexes. `docs/PREDICTION.md` and `docs/design/UX_PARITY_MATRIX.md` are *historical* on Detect corpus-export ownership and must be updated during migration, not used to overrule the owner decision. The prototype at `docs/design/prototypes/studio-detect/` is a **visual-principles** reference, never a predefined Review workflow.
-
-## Delivery and evidence gate
-
-Record reviewed baseline SHA and branch, actual implementation files, focused and full feasible ordinary test commands and pass/fail/skip/block results, Ruff, `scripts/audit_test_ids.py`, `git diff --check`, source/Result checksum non-mutation, and current dependency import origins/SHAs. Capture real native Qt/audio/Worker evidence only for boundaries owned here; do not claim whole-Studio qualification before RV-08. Confirm a clean narrowly scoped diff and hand the branch/commit SHA to the owner. No automatic merge or push.
 
 **Next:** RV-02 may be prepared only after this gate is explicitly approved.

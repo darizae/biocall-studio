@@ -1,10 +1,6 @@
 # RV-08 — Whole-Studio source-app qualification and final sign-off
 
-> **Status:** Owner-approved planning spec, NOT implemented. Do not start implementation or infer test passes from this document. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
-
-**Sequence:** RV-08 begins only after RV-07 has passed its owner-reviewed gate.
-
-**Series:** [Locked scope, prerequisites and coverage](README.md) · [Status](../../IMPLEMENTATION_SEQUENCE.md)
+> **Status:** Owner-approved planning; not implemented. Begin only after explicit stage authorization and the predecessor's owner gate.
 
 ## Strict ownership and exclusions
 
@@ -53,9 +49,5 @@ Update **existing** `IT-DET-022`, `IT-STU-007` and `IT-STU-008` in [integration]
 **Scientific toolbox:** inspect actual `bioacoustics-dl-toolbox` source and dependencies before reusing WAV/spectral utilities. Only upstream a numerical transform if genuinely reusable and the existing toolbox is the right owner. Keep separate branch, reference/numerical parity tests, commit SHA and downstream retesting; no speculative dependency upgrades, GPU frameworks or wholesale Train inference refactor.
 
 **Measure/decide during owning stages, not as new product surveys:** CPU FFT/hop/color scale/frequency bounds and image resolution/encoding; mono/stereo playback/display policy; real Qt audio adapter supported on the test Mac; thumbnail/detail cache strategy; cache quota/eviction thresholds; SQLite synchronous/journal choice and bounded bulk undo log; 50k-view scroll/filter/sort latency; bounded export document format and RIFF writer capacity; estimates against actual cache and export byte counts; per-Worker concurrency and cancellation deadline. Report evidence and choices in the stage handoff; owner approves any *researcher-visible* deviation from this contract.
-
-## Delivery and evidence gate
-
-Record reviewed baseline SHA and branch, actual implementation files, focused and full feasible ordinary test commands and pass/fail/skip/block results, Ruff, `scripts/audit_test_ids.py`, `git diff --check`, source/Result checksum non-mutation, and current dependency import origins/SHAs. Capture real native Qt/audio/Worker evidence only for boundaries owned here; do not claim whole-Studio qualification before RV-08. Confirm a clean narrowly scoped diff and hand the branch/commit SHA to the owner. No automatic merge or push.
 
 **Next:** No installer, release or subsequent implementation is implicitly authorized.

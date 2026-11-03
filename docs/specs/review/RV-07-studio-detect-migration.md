@@ -1,10 +1,6 @@
 # RV-07 — Studio integration, application exit and Detect export retirement
 
-> **Status:** Owner-approved planning spec, NOT implemented. Do not start implementation or infer test passes from this document. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
-
-**Sequence:** RV-07 begins only after RV-06 has passed its owner-reviewed gate.
-
-**Series:** [Locked scope, prerequisites and coverage](README.md) · [Status](../../IMPLEMENTATION_SEQUENCE.md)
+> **Status:** Owner-approved planning; not implemented. Begin only after explicit stage authorization and the predecessor's owner gate.
 
 ## Strict ownership and exclusions
 
@@ -21,9 +17,7 @@
 7. Real native Qt from each workspace: open-session quit confirmation, combined Worker confirmation, Save and Exit success, cancel, blocked persistence, blocked stopping, same-session reopen; no impact on Train behavior. Run targeted `IT-STU-*`/`IT-DET-*` regressions. Whole-Studio source integration stays RV-08.
 
 
-## Owning acceptance cases (proposed; register in existing indexes before TDD)
-
-These are stage scope definitions, **not registered or executed tests**. Validate IDs against [unit](../../UNIT_TESTING.md), [integration](../../INTEGRATION_TEST_BEHAVIORS.md), and [fixture index](../../INTEGRATION_TEST_DATA.md); register exact case text there before implementation. Never create a second test index.
+## Acceptance cases (register in existing test indexes during stage TDD)
 
 | ID | Owner | Positive assertions | Negative / non-mutation assertions |
 |---|---|---|---|
@@ -32,9 +26,5 @@ These are stage scope definitions, **not registered or executed tests**. Validat
 | `IT-REVW-012` | RV-07 | Detect new-export actions/routes truly gone, Review export only; historical Detect exports/reports remain accessible | removed route cannot be reached by deep link/callback; no new writes under Detect export history; old artifacts unchanged |
 
 **Gate:** Owner reviews real native quit/return from all workspaces, no duplicate dialog or dead Detect export path, old outputs still accessible and Train unchanged.
-
-## Delivery and evidence gate
-
-Record reviewed baseline SHA and branch, actual implementation files, focused and full feasible ordinary test commands and pass/fail/skip/block results, Ruff, `scripts/audit_test_ids.py`, `git diff --check`, source/Result checksum non-mutation, and current dependency import origins/SHAs. Capture real native Qt/audio/Worker evidence only for boundaries owned here; do not claim whole-Studio qualification before RV-08. Confirm a clean narrowly scoped diff and hand the branch/commit SHA to the owner. No automatic merge or push.
 
 **Next:** RV-08 may be prepared only after this gate is explicitly approved.

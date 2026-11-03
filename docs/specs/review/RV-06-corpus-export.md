@@ -1,10 +1,6 @@
 # RV-06 — Review-owned corpus export and large-scale publication
 
-> **Status:** Owner-approved planning spec, NOT implemented. Do not start implementation or infer test passes from this document. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
-
-**Sequence:** RV-06 begins only after RV-05 has passed its owner-reviewed gate.
-
-**Series:** [Locked scope, prerequisites and coverage](README.md) · [Status](../../IMPLEMENTATION_SEQUENCE.md)
+> **Status:** Owner-approved planning; not implemented. Begin only after explicit stage authorization and the predecessor's owner gate.
 
 ## Strict ownership and exclusions
 
@@ -31,9 +27,7 @@
 
 **Migration sequence within RV-06/RV-07:** add Review-owned frozen export adapter/publisher with compatibility tests first; then expose Review UI; then remove Detect's export planning button/sidebar and controller initiation route, while retaining legacy history/open/verify paths. Update `docs/PREDICTION.md`, `docs/design/UX_PARITY_MATRIX.md`, relevant existing tests and minimal navigation docs to reflect ownership. Do not discard `IT-DET-019`–`021` scientific invariants or turn old input artifacts into writable new-session artifacts.
 
-## Owning acceptance cases (proposed; register in existing indexes before TDD)
-
-These are stage scope definitions, **not registered or executed tests**. Validate IDs against [unit](../../UNIT_TESTING.md), [integration](../../INTEGRATION_TEST_BEHAVIORS.md), and [fixture index](../../INTEGRATION_TEST_DATA.md); register exact case text there before implementation. Never create a second test index.
+## Acceptance cases (register in existing test indexes during stage TDD)
 
 | ID | Owner | Positive assertions | Negative / non-mutation assertions |
 |---|---|---|---|
@@ -43,9 +37,5 @@ These are stage scope definitions, **not registered or executed tests**. Validat
 | `IT-REVW-010` | RV-06 | all three PCM/Raven formats and mixed human/model-only receipt provenance; old Detect v1 outputs still verify/read | sample/frame/TSV offset mismatch, incompatible mono/format, 4 GiB, changed WAV, history-write failure do not corrupt originals or finalized session |
 
 **Gate:** Owner accepts measured >10k/≥50k output plan/write/reopen/verification including complete scientific files, memory/timing data, v1 compatibility and publisher failure recovery; changing the constant alone is explicitly insufficient.
-
-## Delivery and evidence gate
-
-Record reviewed baseline SHA and branch, actual implementation files, focused and full feasible ordinary test commands and pass/fail/skip/block results, Ruff, `scripts/audit_test_ids.py`, `git diff --check`, source/Result checksum non-mutation, and current dependency import origins/SHAs. Capture real native Qt/audio/Worker evidence only for boundaries owned here; do not claim whole-Studio qualification before RV-08. Confirm a clean narrowly scoped diff and hand the branch/commit SHA to the owner. No automatic merge or push.
 
 **Next:** RV-07 may be prepared only after this gate is explicitly approved.

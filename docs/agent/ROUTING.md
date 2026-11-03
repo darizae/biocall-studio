@@ -1,6 +1,6 @@
 # Agent routing — minimum task context
 
-Read [`AGENTS.md`](../../AGENTS.md), then **only the owning current contract and code/tests** for the request. Verify real paths, Git state and installed source. Completed ST-01–ST-10 and REV-01–REV-04 implementation specs/handoffs have been removed; do not look for or reconstruct them. Do not preload all documentation or sibling repositories.
+Use **only the owning current contract and code/tests** for the request. Verify real paths, Git state and installed source. Completed ST-01–ST-10 and REV-01–REV-04 implementation specs/handoffs have been removed; do not look for or reconstruct them. Do not preload all documentation or sibling repositories.
 
 | Task | Start here; open further material only for a concrete dependency |
 |---|---|
@@ -8,7 +8,7 @@ Read [`AGENTS.md`](../../AGENTS.md), then **only the owning current contract and
 | Train behavior | Owning Train module/tests; [training catalog](../science/TRAINING_CONFIGURATION_CATALOG.md) only for configuration changes. Preserve existing Train scientific behavior. |
 | Native UI/copy | [UX matrix](../design/UX_PARITY_MATRIX.md), actual native screens, accepted [prototype](../design/prototypes/studio-detect/index.html), [public alp-ui contract](../design/ALP_UI_CONSUMER_CONTRACT.md) only when controls are involved |
 | REV-05 storage preflight (implemented) | [REV-05](../specs/manual_revision_specs/REV-05-output-size-preflight.md), shared storage contract, and owning Train/Detect adapters/tests. No full-Studio E2E. |
-| Review (planned sequential RV-01→RV-08) | [Review index and locked decisions](../specs/review/README.md) → **only the active stage**. REV-05 is implemented, tested, owner-reviewed and handed off on the reviewed base; RV-01 must reuse its shared preflight contract. No duplicate shared preflight or early corpus export UI migration. |
+| Review (planned sequential RV-01→RV-08) | [Review index and locked decisions](../specs/review/README.md) → **only the active RV stage**. REV-05 is complete; Review-specific sizing belongs to RV-04/RV-06. No early Detect export migration. |
 | Scientific/toolbox or UI-library change | [Source map](SOURCE_MAP.md) and [upstream workflow](UPSTREAM_TOOLBOX_WORKFLOW.md); inspect only the actual owning API/fixtures |
 | Documentation or qualification | Exact affected files, [status](../IMPLEMENTATION_SEQUENCE.md), existing [test indexes](../UNIT_TESTING.md), [ST-11 evidence](../ST-11_QUALIFICATION.md) where relevant |
 | Deferred installed release | Only after separate authorization: [macOS](../specs/06-macos-release-and-installer.md), [Windows](../specs/07-windows-release-and-installer.md), [release process](../RELEASE_PROCESS.md) |
