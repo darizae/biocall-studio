@@ -1,6 +1,6 @@
 # RV-02 — Durable sessions, human labels and finalization
 
-> **Status:** Implementation handoff prepared on `review-rv02-sessions-and-annotations`; owner code/evidence review and local integration remain pending. Test results must come from the current handoff, never from this contract. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
+> **Status:** Owner-approved and locally integrated into `review` at merge `0cae437`. Test results must come from an actual execution, never from this contract. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
 
 **Sequence:** RV-02 begins only after RV-01 has passed its owner-reviewed gate.
 

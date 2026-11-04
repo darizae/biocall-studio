@@ -20,16 +20,16 @@ The HPC is a **permissioned archive and scientific compatibility reference**, no
 
 | Class | Discriminating variants / generated strategy | Consumers |
 |---|---|---|
-| **TD-UI** | Initial empty state, bound Collection, interrupted Scan/Run, keyboard FolderPicker cancel/HelpHint, native Plot with numeric summary, navigation/Qt screenshot parity, standalone theme assets | 01, 05–07 |
+| **TD-UI** | Initial empty state, bound Collection, interrupted Scan/Run, keyboard FolderPicker cancel/HelpHint, native Plot with numeric summary, navigation/Qt screenshot parity, standalone theme assets, Review audio proof focus/shortcuts/paint geometry | 01, 05–07, Review RV-03 |
 | **TD-PATH** | valid relative stems; traversal/absolute path; Windows-reserved names; casefold/NFC collision; symlink escape; relocation | 01–02, 06 |
 | **TD-COL** | two distinct recordings, multiple timestamped positives; wrong source stem/prefix collision; duplicate interval; missing/nested folders; invalid format/non-WAV file; zero positives | 02 |
-| **TD-WAV** | real mono/stereo PCM WAV with distinct waveform/frame rates; float if decoder supports; short/truncated/unsupported header; mismatched clip duration; near-boundary source time | 02–03 |
-| **TD-CACHE** | first scan; warm reopen; added/removed/touched/replaced WAV; schema mismatch; corrupted/partially written JSONL; relocated binding | 02 |
+| **TD-WAV** | real mono/stereo PCM WAV with distinct waveform/frame rates; 8/16/24/32-bit PCM and phase-opposed channels where owned; float if decoder supports; short/truncated/unsupported header; mismatched clip duration; near-boundary source time | 02–03, Review RV-03 |
+| **TD-CACHE** | first scan; warm reopen; added/removed/touched/replaced WAV; schema mismatch; corrupted/partially written JSONL; relocated binding; Review renderer/settings/source identity invalidation | 02, Review RV-03 |
 | **TD-SCALE** | generated tens-of-thousands row/partition metadata, including a 50,000-candidate Review index; short synthetic WAVs where necessary; paged reading/memory and I/O counters | 02, Review RV-02 |
 | **TD-MINE** | multiple positives/merged protected windows; margin; sufficient eligible noise; zero space underfill; boundary/cross-chunk windows; repeat seed | 03 |
 | **TD-SPLIT** | ≥2 distinct recording groups with train/val candidate target and noise; class balance feasible/infeasible; repeat seed and changed configuration | 03 |
 | **TD-RUN** | startup/running/cancelled/failed/crashed/orphaned process; second Run; active input delete and stale output; collision | 03–06 |
-| **TD-FAIL** | permissions, disk full/injected write error, corrupt manifest, missing/deleted source, worker exit code, interruption at staging/finalization transaction boundary | 02–05, Review RV-02 |
+| **TD-FAIL** | permissions, disk full/injected write error, corrupt manifest, missing/deleted source, worker exit code, multimedia/device failure, interruption at staging/finalization transaction boundary | 02–05, Review RV-02–03 |
 | **TD-TRAIN** | real small Dataset with train and val source groups, both `target` and `noise`; RF feature shape/schema mismatch; undefined val metric; minimal CPU CNN and RF with loadable outputs | 05–06 |
 | **TD-CONFIG** | complete typed CNN and RF configurations, all legacy non-path mapping assertions, default and advanced nondefault settings, unsupported/derived options, invalid FFT/bands/ranges, unavailable device, per-field Wiki anchors and HelpHint inventory; no reference filesystem paths | 05–07 |
 | **TD-PRESET** | temporary user preset store, two named CNN/RF presets, saved vs unsaved draft, conflicting names, rename/duplicate/delete/overwrite, invalid/obsolete schema, atomic write failure, reload after app restart and no original Dataset path in files | 05–07 |

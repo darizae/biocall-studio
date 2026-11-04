@@ -34,6 +34,13 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-REVW-002` | The real SQLite Review store commits individual labels, Unreviewed-only bulk acceptance and atomic batch undo/redo; a 50,000-candidate session reopens with its current position after restart, Close/Resume retains decisions, a live second owner is rejected and committed labels survive abrupt process loss without changing source Result or WAV bytes. | TD-SCALE, TD-RUN, TD-WAV, TD-FAIL |
 | `IT-REVW-003` | Real transactional finalization freezes an independently digest-verified snapshot, counts partial review accurately and creates a linked editable child with copied decisions/settings while the parent remains byte-for-byte stable across restart. Lock, corruption and process loss during finalization publish no partial snapshot; preset edit/rename/delete and a failed atomic settings switch do not change session label, eligibility or source digests. | TD-CACHE, TD-RUN, TD-FAIL |
 
+## Review audio and spectrograms (RV-03)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-REVW-004` | Real bounded mono/stereo PCM WAV context reads preserve exact source frames and original multichannel playback bytes; phase-opposed stereo remains visible through channel-power STFT, numeric time/frequency pixels match the reference geometry, and data-only rasters align with metadata-driven axes/detection edges. Missing, changed, truncated or unsupported WAV input fails without silent padding, source writes or false render success. | TD-WAV, TD-PATH, TD-FAIL |
+| `IT-REVW-005` | A real Qt multimedia adapter and native proof widget exercise natural-speed load/play/pause/seek, metadata-driven paint/resize, Previous/Next, fixed playback/navigation shortcuts and focus exclusions in the Qt event loop. Rapid switching, injected device/stream failure and close stop the sole player without overlap, blocking the GUI or changing labels. | TD-UI, TD-WAV, TD-FAIL, TD-OS |
+
 ## 1a. Studio shell (ST-02)
 
 | Case ID | Public seam / expected result | Data |
