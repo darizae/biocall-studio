@@ -10,4 +10,4 @@ Studio owns application identity, launchpad and workspace switching. Each worksp
 
 Source WAVs remain read-only. Detect metadata/results live outside the recording root in app-owned storage. Audio is materialized only by an explicit Corpus Export to a visible user-selected destination. Both Train and Detect may reference the same recording files without sharing Collection identity or Run outputs.
 
-[Detect contract](PREDICTION.md) · [implementation stages](IMPLEMENTATION_SEQUENCE.md) · [native UX matrix](design/UX_PARITY_MATRIX.md).
+[Detect contract](PREDICTION.md) · [implementation stages](IMPLEMENTATION_SEQUENCE.md) · [accepted Studio/Detect prototype](design/prototypes/studio-detect/index.html) · [native UI evidence](design/evidence/st-11-native/README.md).
