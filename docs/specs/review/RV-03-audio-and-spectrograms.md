@@ -1,6 +1,6 @@
 # RV-03 — Exact audio context, spectrogram rendering and playback
 
-> **Status:** Implementation handoff prepared on `review-rv03-audio-and-spectrograms`; owner code/evidence review and local integration remain pending. Test results must come from the current handoff, never from this contract. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
+> **Status:** Owner-approved on 2026-11-04 and present on local `review` at source commit `22c8982`. Test results must come from a current execution, never from this contract. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
 
 **Sequence:** RV-03 begins only after RV-02 has passed its owner-reviewed gate.
 

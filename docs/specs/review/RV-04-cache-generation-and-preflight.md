@@ -1,6 +1,6 @@
 # RV-04 — Hybrid generation, storage preflight and cache lifecycle
 
-> **Status:** Owner-approved planning spec, NOT implemented. Do not start implementation or infer test passes from this document. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
+> **Status:** Implementation handoff prepared on `review-rv04-cache-generation-and-preflight` from reviewed base `eadc9f1`; owner code/evidence review and local integration remain pending. Test results must come from the current handoff, never from this contract. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
 
 **Sequence:** RV-04 begins only after RV-03 has passed its owner-reviewed gate.
 

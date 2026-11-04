@@ -31,7 +31,10 @@ def test_broken_live_markdown_link_remains_a_failure(tmp_path):
 
 def test_required_current_review_contract_cannot_disappear(tmp_path):
     problems = handoff.audit_repository(tmp_path)
-    assert "Missing active Review stage contract: docs/specs/review/RV-03-audio-and-spectrograms.md" in problems
+    assert (
+        "Missing active Review stage contract: "
+        "docs/specs/review/RV-03-audio-and-spectrograms.md"
+    ) in problems
     assert "Missing current handoff file: docs/agent/ROUTING.md" in problems
 
 
@@ -58,7 +61,10 @@ def test_missing_markdown_image_is_a_failure(tmp_path):
 
 def test_native_gate_checks_current_st11_evidence(tmp_path):
     errors = handoff.audit_repository(tmp_path, require_native_ux=True)
-    assert "Missing ST-11 native evidence: docs/design/evidence/st-11-native/review-normal.png" in errors
+    assert (
+        "Missing ST-11 native evidence: "
+        "docs/design/evidence/st-11-native/review-normal.png"
+    ) in errors
     assert all("spec-01-native" not in error for error in errors)
 
 

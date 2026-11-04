@@ -41,6 +41,12 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-REVW-004` | Real bounded mono/stereo PCM WAV context reads preserve exact source frames and original multichannel playback bytes; phase-opposed stereo remains visible through channel-power STFT, numeric time/frequency pixels match the reference geometry, and data-only rasters align with metadata-driven axes/detection edges. Missing, changed, truncated or unsupported WAV input fails without silent padding, source writes or false render success. | TD-WAV, TD-PATH, TD-FAIL |
 | `IT-REVW-005` | A real Qt multimedia adapter and native proof widget exercise natural-speed load/play/pause/seek, metadata-driven paint/resize, Previous/Next, fixed playback/navigation shortcuts and focus exclusions in the Qt event loop. Rapid switching, injected device/stream failure and close stop the sole player without overlap, blocking the GUI or changing labels. | TD-UI, TD-WAV, TD-FAIL, TD-OS |
 
+## Review cache generation and storage preflight (RV-04)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-REVW-006` | Real supervised asynchronous WAV→spectrogram→PNG generation publishes only checksum-validated contained cache objects, reuses identical objects across sessions, bounds 50,000-item bulk scheduling, rechecks REV-05 admission and supports cancel/retry, LRU eviction, selected clearing and regeneration. Low/unknown/disk-full capacity, permission failure, interrupted staging, stale session epoch, symlink escape and corrupted PNG recover without changing labels, source Results or WAV bytes or leaving an orphan Worker. | TD-WAV, TD-CACHE, TD-SCALE, TD-PATH, TD-RUN, TD-FAIL |
+
 ## 1a. Studio shell (ST-02)
 
 | Case ID | Public seam / expected result | Data |

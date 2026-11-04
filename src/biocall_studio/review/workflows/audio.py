@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import io
 import os
+import threading
 import wave
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
@@ -54,6 +56,82 @@ class CandidateAudio:
             raise ValueError("Candidate audio samples must be read-only.")
         if not self.wav_bytes.startswith(b"RIFF") or b"WAVE" not in self.wav_bytes[:16]:
             raise ValueError("Candidate playback clip is not a WAV payload.")
+
+
+@dataclass(frozen=True, slots=True)
+class _VerifiedIdentity:
+    signature: tuple[int, int, int, int, int]
+    source_sha256: str
+
+
+class SourceIdentityCache:
+    """Bound validated source hashes by stable kernel file facts within one supervisor."""
+
+    def __init__(self, *, max_entries: int = 64):
+        if type(max_entries) is not int or not 1 <= max_entries <= 1_024:
+            raise ValueError("Source identity cache limit is invalid.")
+        self.max_entries = max_entries
+        self._entries: OrderedDict[tuple[str, str], _VerifiedIdentity] = OrderedDict()
+        self._lock = threading.RLock()
+        self._stripes = tuple(threading.Lock() for _ in range(16))
+
+    @staticmethod
+    def _signature(facts: os.stat_result) -> tuple[int, int, int, int, int]:
+        return (
+            facts.st_dev,
+            facts.st_ino,
+            facts.st_size,
+            facts.st_mtime_ns,
+            facts.st_ctime_ns,
+        )
+
+    @property
+    def entry_count(self) -> int:
+        with self._lock:
+            return len(self._entries)
+
+    def verify(
+        self,
+        stream,
+        source: Path,
+        expected_sha256: str,
+        cancelled: Callable[[], bool] | None,
+    ) -> os.stat_result:
+        key = (str(source), expected_sha256)
+        stripe = self._stripes[hash(key) % len(self._stripes)]
+        with stripe:
+            before = os.fstat(stream.fileno())
+            signature = self._signature(before)
+            with self._lock:
+                cached = self._entries.get(key)
+                if cached is not None and cached.signature == signature:
+                    self._entries.move_to_end(key)
+                    return before
+            stream.seek(0)
+            digest = _hash_stream(stream, cancelled)
+            after = os.fstat(stream.fileno())
+            try:
+                path_facts = source.stat()
+            except OSError as exc:
+                raise AudioSourceError(
+                    AudioSourceProblem.MISSING,
+                    "Recording disappeared while verifying its identity.",
+                ) from exc
+            if (
+                digest != expected_sha256
+                or self._signature(after) != signature
+                or self._signature(path_facts) != signature
+            ):
+                raise AudioSourceError(
+                    AudioSourceProblem.CHANGED,
+                    "Recording content does not match the frozen Detect source.",
+                )
+            with self._lock:
+                self._entries[key] = _VerifiedIdentity(signature, digest)
+                self._entries.move_to_end(key)
+                while len(self._entries) > self.max_entries:
+                    self._entries.popitem(last=False)
+            return before
 
 
 def _cancelled(check: Callable[[], bool] | None) -> None:
@@ -158,6 +236,7 @@ def read_candidate_audio(
     *,
     context_seconds: int,
     cancelled: Callable[[], bool] | None = None,
+    identity_cache: SourceIdentityCache | None = None,
 ) -> CandidateAudio:
     """Verify a source and read only the exact clamped candidate context.
 
@@ -175,13 +254,24 @@ def read_candidate_audio(
     source = _resolve_source(Path(source_root), candidate.recording_key)
     try:
         with source.open("rb", buffering=0) as raw:
-            before = os.fstat(raw.fileno())
-            source_digest = _hash_stream(raw, cancelled)
-            if source_digest != candidate.source_sha256:
-                raise AudioSourceError(
-                    AudioSourceProblem.CHANGED,
-                    "Recording content does not match the frozen Detect source.",
+            if identity_cache is None:
+                before = os.fstat(raw.fileno())
+                source_digest = _hash_stream(raw, cancelled)
+                if source_digest != candidate.source_sha256:
+                    raise AudioSourceError(
+                        AudioSourceProblem.CHANGED,
+                        "Recording content does not match the frozen Detect source.",
+                    )
+            else:
+                if not isinstance(identity_cache, SourceIdentityCache):
+                    raise TypeError("Review source identity cache is invalid.")
+                before = identity_cache.verify(
+                    raw,
+                    source,
+                    candidate.source_sha256,
+                    cancelled,
                 )
+                source_digest = candidate.source_sha256
             raw.seek(0)
             try:
                 reader_context = wave.open(raw, "rb")
@@ -242,8 +332,11 @@ def read_candidate_audio(
                     parts.append(chunk)
                     remaining -= actual
             payload = b"".join(parts)
-            raw.seek(0)
-            verified_digest = _hash_stream(raw, cancelled)
+            if identity_cache is None:
+                raw.seek(0)
+                verified_digest = _hash_stream(raw, cancelled)
+            else:
+                verified_digest = source_digest
             after = os.fstat(raw.fileno())
         path_after = source.stat()
     except AudioSourceError:
@@ -259,6 +352,7 @@ def read_candidate_audio(
         and before.st_ino == after.st_ino == path_after.st_ino
         and before.st_size == after.st_size == path_after.st_size
         and before.st_mtime_ns == after.st_mtime_ns == path_after.st_mtime_ns
+        and before.st_ctime_ns == after.st_ctime_ns == path_after.st_ctime_ns
     )
     if not stable_file or verified_digest != source_digest:
         raise AudioSourceError(
@@ -283,5 +377,6 @@ __all__ = [
     "AudioSourceError",
     "AudioSourceProblem",
     "CandidateAudio",
+    "SourceIdentityCache",
     "read_candidate_audio",
 ]

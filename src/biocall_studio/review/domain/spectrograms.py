@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import re
 from dataclasses import dataclass
@@ -14,6 +15,7 @@ SPECTROGRAM_RENDER_VERSION = "review-raster-v1"
 CHANNEL_POLICY = "independent-channel-power-mean"
 
 _CONTENT_KEY = re.compile(r"spec_[0-9a-f]{64}")
+_SHA256 = re.compile(r"[0-9a-f]{64}")
 _FREQUENCY_MAX_CHOICES = frozenset((3_000, 4_200, 8_000))
 _CONTEXT_CHOICES = frozenset((1, 2, 3))
 _CONTRAST_CHOICES = frozenset((40, 50, 65))
@@ -310,6 +312,159 @@ class SpectrogramMetadata:
     interpolation: str
     orientation: str
     short_clip_window: bool
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.algorithm_version, str)
+            or not self.algorithm_version
+            or not isinstance(self.render_version, str)
+            or not self.render_version
+            or not isinstance(self.source_sha256, str)
+            or _SHA256.fullmatch(self.source_sha256) is None
+            or not isinstance(self.candidate_id, str)
+            or not self.candidate_id
+        ):
+            raise ValueError("Spectrogram metadata identity is invalid.")
+        integers = (
+            self.sample_rate_hz,
+            self.channels,
+            self.source_frame_count,
+            self.context_start_frame,
+            self.context_end_frame,
+            self.candidate_start_frame,
+            self.candidate_end_frame,
+            self.window_samples,
+            self.requested_window_samples,
+            self.n_fft,
+            self.hop_samples,
+            self.width,
+            self.height,
+            self.contrast_db,
+        )
+        if any(type(value) is not int for value in integers):
+            raise ValueError("Spectrogram metadata contains a non-integer count.")
+        if (
+            self.sample_rate_hz <= 0
+            or self.channels <= 0
+            or self.source_frame_count <= 0
+            or not 0
+            <= self.context_start_frame
+            < self.context_end_frame
+            <= self.source_frame_count
+            or not self.context_start_frame
+            <= self.candidate_start_frame
+            < self.candidate_end_frame
+            <= self.context_end_frame
+            or min(
+                self.window_samples,
+                self.requested_window_samples,
+                self.n_fft,
+                self.hop_samples,
+            )
+            <= 0
+            or self.n_fft < self.window_samples
+            or self.n_fft & (self.n_fft - 1)
+        ):
+            raise ValueError("Spectrogram metadata frame geometry is invalid.")
+        if not isinstance(self.tier, SpectrogramImageTier) or (
+            self.width,
+            self.height,
+        ) != self.tier.dimensions:
+            raise ValueError("Spectrogram metadata image tier is invalid.")
+        if not isinstance(self.palette, Palette) or self.contrast_db not in _CONTRAST_CHOICES:
+            raise ValueError("Spectrogram metadata display settings are invalid.")
+        if (
+            not isinstance(self.frequency_min_hz, (int, float))
+            or not isinstance(self.frequency_max_hz, (int, float))
+            or not math.isfinite(self.frequency_min_hz)
+            or not math.isfinite(self.frequency_max_hz)
+            or self.frequency_min_hz < 0
+            or self.frequency_min_hz >= self.frequency_max_hz
+        ):
+            raise ValueError("Spectrogram metadata frequency extent is invalid.")
+        if (
+            not isinstance(self.frame_centers_x2, tuple)
+            or not self.frame_centers_x2
+            or any(type(value) is not int for value in self.frame_centers_x2)
+            or tuple(sorted(self.frame_centers_x2)) != self.frame_centers_x2
+            or self.frame_centers_x2[0] < 2 * self.context_start_frame
+            or self.frame_centers_x2[-1] > 2 * self.context_end_frame
+        ):
+            raise ValueError("Spectrogram metadata time centers are invalid.")
+        frequencies = (*self.frequency_centers_hz, *self.frequency_edges_hz)
+        if (
+            any(
+                not isinstance(value, (int, float)) or not math.isfinite(value)
+                for value in frequencies
+            )
+            or tuple(sorted(self.frequency_centers_hz)) != self.frequency_centers_hz
+            or tuple(sorted(self.frequency_edges_hz)) != self.frequency_edges_hz
+            or len(self.frequency_edges_hz) != len(self.frequency_centers_hz) + 1
+        ):
+            raise ValueError("Spectrogram metadata frequency bins are invalid.")
+        try:
+            settings = json.loads(self.settings_json)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("Spectrogram metadata settings are invalid.") from exc
+        if not isinstance(settings, dict) or not isinstance(self.short_clip_window, bool):
+            raise ValueError("Spectrogram metadata settings are invalid.")
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "algorithm_version": self.algorithm_version,
+            "render_version": self.render_version,
+            "source_sha256": self.source_sha256,
+            "candidate_id": self.candidate_id,
+            "sample_rate_hz": self.sample_rate_hz,
+            "channels": self.channels,
+            "source_frame_count": self.source_frame_count,
+            "channel_policy": self.channel_policy,
+            "dc_policy": self.dc_policy,
+            "context_start_frame": self.context_start_frame,
+            "context_end_frame": self.context_end_frame,
+            "candidate_start_frame": self.candidate_start_frame,
+            "candidate_end_frame": self.candidate_end_frame,
+            "window_samples": self.window_samples,
+            "requested_window_samples": self.requested_window_samples,
+            "n_fft": self.n_fft,
+            "hop_samples": self.hop_samples,
+            "window_function": self.window_function,
+            "frame_centers_x2": list(self.frame_centers_x2),
+            "frequency_centers_hz": list(self.frequency_centers_hz),
+            "frequency_edges_hz": list(self.frequency_edges_hz),
+            "frequency_min_hz": self.frequency_min_hz,
+            "frequency_max_hz": self.frequency_max_hz,
+            "width": self.width,
+            "height": self.height,
+            "tier": self.tier.value,
+            "palette": self.palette.value,
+            "contrast_db": self.contrast_db,
+            "settings_json": self.settings_json,
+            "amplitude_scaling": self.amplitude_scaling,
+            "frequency_scale": self.frequency_scale,
+            "interpolation": self.interpolation,
+            "orientation": self.orientation,
+            "short_clip_window": self.short_clip_window,
+        }
+
+    @classmethod
+    def from_dict(cls, raw: object) -> SpectrogramMetadata:
+        fields = cls.__dataclass_fields__
+        if not isinstance(raw, dict) or set(raw) != set(fields):
+            raise ValueError("Spectrogram metadata document is invalid.")
+        try:
+            return cls(
+                **{
+                    **raw,
+                    "frame_centers_x2": tuple(raw["frame_centers_x2"]),
+                    "frequency_centers_hz": tuple(raw["frequency_centers_hz"]),
+                    "frequency_edges_hz": tuple(raw["frequency_edges_hz"]),
+                    "tier": SpectrogramImageTier(raw["tier"]),
+                    "palette": Palette(raw["palette"]),
+                }
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Spectrogram metadata document is invalid.") from exc
 
     @property
     def context_frame_count(self) -> int:

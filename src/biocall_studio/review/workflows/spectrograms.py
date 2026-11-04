@@ -249,7 +249,11 @@ def _apply_palette(relative_db: np.ndarray, contrast_db: int, palette: Palette) 
     return rgb.tobytes(order="C")
 
 
-def _content_key(request: SpectrogramRenderRequest, *, width: int, height: int) -> str:
+def spectrogram_content_key(request: SpectrogramRenderRequest) -> str:
+    """Return the complete immutable cache identity without rendering pixels."""
+    if not isinstance(request, SpectrogramRenderRequest):
+        raise TypeError("Spectrogram render request is invalid.")
+    width, height = request.tier.dimensions
     payload = {
         "algorithm_version": request.algorithm_version,
         "render_version": request.render_version,
@@ -360,7 +364,7 @@ def render_spectrogram(
         short_clip_window=plan.short_clip_window,
     )
     return SpectrogramRaster(
-        content_key=_content_key(request, width=width, height=height),
+        content_key=spectrogram_content_key(request),
         width=width,
         height=height,
         rgb_bytes=_apply_palette(
@@ -377,4 +381,5 @@ __all__ = [
     "SpectrogramRenderRequest",
     "calculate_stft_power",
     "render_spectrogram",
+    "spectrogram_content_key",
 ]
