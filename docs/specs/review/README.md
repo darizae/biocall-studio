@@ -1,6 +1,6 @@
 # Review — ordered, owner-approved implementation specifications
 
-**Status:** approved planning, not source implementation. **Sequence:** completed REV-05 baseline → RV-01 → RV-02 → RV-03 → RV-04 → RV-05 → RV-06 → RV-07 → RV-08. Each stage is isolated, sequential and requires an explicit owner review gate. No stage may be silently skipped, co-implemented with a later stage, or begun from an unreviewed predecessor. These documents supersede the earlier single-file Review planning proposal; do not keep or publish `docs/specs/REVIEW-workspace-plan.md` as a competing authority.
+**Status:** RV-01 is implemented and owner-approved on the local `review` integration branch; RV-02 has an isolated implementation handoff pending owner review. RV-03–RV-08 remain approved planning only. **Sequence:** completed REV-05 baseline → RV-01 → RV-02 → RV-03 → RV-04 → RV-05 → RV-06 → RV-07 → RV-08. Each stage is isolated, sequential and requires an explicit owner review gate. No stage may be silently skipped, co-implemented with a later stage, or begun from an unreviewed predecessor. These documents supersede the earlier single-file Review planning proposal; do not keep or publish `docs/specs/REVIEW-workspace-plan.md` as a competing authority.
 
 ## Additive spectrogram planning (owner choices recorded, native research pending)
 
