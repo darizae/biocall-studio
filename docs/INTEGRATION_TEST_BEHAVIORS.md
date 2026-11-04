@@ -27,6 +27,13 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 |---|---|---|
 | `IT-REVW-001` | Real completed, receipt-verified CNN and RF Detect Result publications reopen into the isolated `review/v1` paged index with CNN-all/RF-accepted-only eligibility and unchanged source-frame/rate/channel provenance. Corrupt, missing, changed, relink-needed or unsafe Result/source states remain actionable and unavailable without changing Detect Result or recording bytes; an arbitrary test WAV is rejected as input. | TD-WAV, TD-PATH, TD-RUN, TD-FAIL |
 
+## Review sessions and annotations (RV-02)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-REVW-002` | The real SQLite Review store commits individual labels, Unreviewed-only bulk acceptance and atomic batch undo/redo; a 50,000-candidate session reopens with its current position after restart, Close/Resume retains decisions, a live second owner is rejected and committed labels survive abrupt process loss without changing source Result or WAV bytes. | TD-SCALE, TD-RUN, TD-WAV, TD-FAIL |
+| `IT-REVW-003` | Real transactional finalization freezes an independently digest-verified snapshot, counts partial review accurately and creates a linked editable child with copied decisions/settings while the parent remains byte-for-byte stable across restart. Lock, corruption and process loss during finalization publish no partial snapshot; preset edit/rename/delete and a failed atomic settings switch do not change session label, eligibility or source digests. | TD-CACHE, TD-RUN, TD-FAIL |
+
 ## 1a. Studio shell (ST-02)
 
 | Case ID | Public seam / expected result | Data |

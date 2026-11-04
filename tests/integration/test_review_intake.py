@@ -231,6 +231,8 @@ def test_persisted_detect_results_intake_is_paged_safe_and_source_immutable(
     intake = ReviewResultIntake(suite_root)
     cnn_inspection = intake.intake(collection.ref.collection_id, cnn.result_id)
     rf_inspection = intake.intake(collection.ref.collection_id, rf.result_id)
+    cnn_prepared = intake.prepare_session(collection.ref.collection_id, cnn.result_id)
+    rf_prepared = intake.prepare_session(collection.ref.collection_id, rf.result_id)
 
     assert cnn_inspection.availability is IntakeAvailability.READY
     assert cnn_inspection.manifest is not None
@@ -240,6 +242,16 @@ def test_persisted_detect_results_intake_is_paged_safe_and_source_immutable(
     assert rf_inspection.manifest.eligible_candidate_count == 1
     assert rf_inspection.manifest.parent_result_id == cnn.result_id
     assert rf_inspection.manifest.parent_result_digest == cnn.result_digest
+    assert cnn_prepared.source.eligibility_threshold == pytest.approx(0.5)
+    assert cnn_prepared.source.score_semantics == cnn.score_semantics
+    assert tuple(row.candidate_id for row in cnn_prepared.candidates) == tuple(
+        row.candidate_id for row in candidates
+    )
+    assert rf_prepared.source.eligibility_threshold == pytest.approx(0.6)
+    assert rf_prepared.source.score_semantics == rf.score_semantics
+    assert rf_prepared.source.parent_eligibility_threshold == pytest.approx(0.5)
+    assert rf_prepared.source.parent_score_semantics == cnn.score_semantics
+    assert tuple(row.candidate_id for row in rf_prepared.candidates) == (first.candidate_id,)
     assert (
         intake.intake(collection.ref.collection_id, rf.result_id).manifest
         == rf_inspection.manifest

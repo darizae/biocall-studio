@@ -13,7 +13,7 @@ from biocall_studio.detect.application.discovery import validate_recording_sourc
 from biocall_studio.detect.domain import RootBindingDecision, validate_collection_id
 from biocall_studio.detect.domain.inventory import InventorySnapshot
 from biocall_studio.detect.domain.results import DetectionResult
-from biocall_studio.detect.domain.rf_refinement import ResultArtifact
+from biocall_studio.detect.domain.rf_refinement import DerivedResult, ResultArtifact
 from biocall_studio.detect.domain.runs import DetectRunStatus
 from biocall_studio.detect.persistence import (
     DetectWorkspaceStore,
@@ -30,6 +30,7 @@ from biocall_studio.review.domain.intake import (
     build_review_projection,
     projection_digest,
 )
+from biocall_studio.review.domain.sessions import ReviewSessionSource
 
 _RESULT_ID = re.compile(r"pub_[0-9a-f]{32}")
 _DATABASE_SCHEMA_VERSION = 1
@@ -63,6 +64,12 @@ class ReviewIntakeInspection:
     @property
     def eligible_candidate_count(self) -> int | None:
         return None if self.manifest is None else self.manifest.eligible_candidate_count
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedReviewSession:
+    source: ReviewSessionSource
+    candidates: tuple[EligibleCandidate, ...]
 
 
 _CREATE_STATEMENTS = (
@@ -282,7 +289,7 @@ class ReviewIntakeStore:
                         manifest.recording_count,
                         manifest.failed_recording_count,
                         manifest.eligible_candidate_count,
-                    ),
+                    )
                 )
                 connection.executemany(
                     """
@@ -334,7 +341,7 @@ class ReviewIntakeStore:
                             row.contributing_windows,
                         )
                         for row in projection.candidates
-                    )
+                    ),
                 )
         verified = self.load_manifest(manifest.collection_id, manifest.result_id)
         if verified != manifest:
@@ -606,6 +613,40 @@ class ReviewResultIntake:
         manifest = self.store.save(projection)
         return ReviewIntakeInspection(availability, manifest, message)
 
+    def prepare_session(self, collection_id: str, result_id: str) -> PreparedReviewSession:
+        """Return only a currently verified Result projection for session creation."""
+        try:
+            origin = self._load_origin(collection_id, result_id)
+            projection = self._projection(origin)
+        except (FileNotFoundError, OSError, ValueError) as exc:
+            raise ValueError(
+                "The Detect Result, its completed Run, or its verified lineage is unavailable."
+            ) from exc
+        availability, message = self._source_state(origin, projection)
+        if availability is not IntakeAvailability.READY:
+            raise ValueError(message)
+        self.store.save(projection)
+        if isinstance(origin.result, DerivedResult):
+            score_semantics = origin.result.score_semantics
+            eligibility_threshold = origin.result.threshold
+            if origin.parent is None:
+                raise ValueError("RF Review source lost its verified parent lineage.")
+            parent_score_semantics = origin.parent.score_semantics
+            parent_eligibility_threshold = origin.parent.settings.minimum_score
+        else:
+            score_semantics = origin.result.score_semantics
+            eligibility_threshold = origin.result.settings.minimum_score
+            parent_score_semantics = None
+            parent_eligibility_threshold = None
+        source = ReviewSessionSource.from_projection(
+            projection,
+            score_semantics=score_semantics,
+            eligibility_threshold=eligibility_threshold,
+            parent_score_semantics=parent_score_semantics,
+            parent_eligibility_threshold=parent_eligibility_threshold,
+        )
+        return PreparedReviewSession(source=source, candidates=projection.candidates)
+
     def reopen(self, collection_id: str, result_id: str) -> ReviewIntakeInspection:
         try:
             manifest = self.store.load_manifest(collection_id, result_id)
@@ -642,6 +683,7 @@ class ReviewResultIntake:
 
 __all__ = [
     "IntakeAvailability",
+    "PreparedReviewSession",
     "ReviewIntakeInspection",
     "ReviewIntakeStorageError",
     "ReviewIntakeStore",
