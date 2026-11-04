@@ -11,6 +11,7 @@ class SuiteDataPaths:
     root: Path
     train: Path
     detect: Path
+    review: Path
 
     @classmethod
     def from_root(cls, root: Path) -> SuiteDataPaths:
@@ -20,6 +21,9 @@ class SuiteDataPaths:
         resolved = candidate.resolve(strict=False)
         train = resolved / "train" / "v1"
         detect = resolved / "detect" / "v1"
-        if not train.is_relative_to(resolved) or not detect.is_relative_to(resolved):
+        review = resolved / "review" / "v1"
+        if not all(
+            path.is_relative_to(resolved) for path in (train, detect, review)
+        ):
             raise ValueError("Workflow application-data roots must stay inside the suite root.")
-        return cls(root=resolved, train=train, detect=detect)
+        return cls(root=resolved, train=train, detect=detect, review=review)

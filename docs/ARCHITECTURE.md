@@ -11,13 +11,15 @@ biocall_studio/
   shared/                 paths, streamed integrity hashing, owner leases
   train/                  application, domain, persistence, workflows, gui, data
   detect/                 application, domain, persistence, workflows, gui
+  review/                 domain and persistence (later stages add application/workflows/gui)
   resources/branding/     one suite-owned resource set
 ```
 
-`shared` contains only infrastructure used by both workflows. Train remains the authoritative
+`shared` contains only infrastructure used across workflows. Train remains the authoritative
 producer of Dataset and Model contracts; Detect imports those public contracts and does not copy
-them into shared code. Domain and shared modules are Qt-free. Studio owns application identity,
-theme installation, branding, navigation, and the canonical data-root decision.
+them into shared code. Review consumes verified immutable Detect Results without taking ownership
+of them. Domain and shared modules are Qt-free. Studio owns application identity, theme
+installation, branding, navigation, and the canonical data-root decision.
 
 ## Storage and identity
 
@@ -28,12 +30,15 @@ versioned roots:
 <suite-data>/
   train/v1/               Train settings, diagnostics, and owner leases
   detect/v1/              Detect settings, metadata, Runs, Results, exports, and leases
+  review/v1/              Review-owned Result projections and later session metadata
 ```
 
 Train Collections remain user-owned directories. Train may publish versioned `.alpaca/` metadata,
 Datasets, Models, Runs, and staging inside a validated Collection. Detect treats source recording
 trees and Train artifacts as read-only and keeps its mutable metadata outside those trees. Detect
-Results and exports remain immutable, source-time-provenance-bearing artifacts.
+Results and exports remain immutable, source-time-provenance-bearing artifacts. Review keeps a
+digest-bound, paged eligible-candidate projection under its own root and never writes into Detect
+storage or source recording trees.
 
 Portable artifact references are normalized relative paths. Absolute paths, traversal, symlink
 escapes, platform collisions, unbounded reads, and silent relinking are rejected. Missing or

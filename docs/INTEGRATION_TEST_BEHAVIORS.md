@@ -21,6 +21,12 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-SIZE-002` | Train CNN/RF and Detect CNN/RF estimated range or unknown from real configurations/results; cancel confirmation leaves no new Worker/Run. | TD-TRAIN, TD-RUN |
 | `IT-SIZE-003` | Native Qt preflight, approved plain copy/HelpHints, compact/focus, capacity injection, stale/unknown/tight/insufficient and disk-full recovery. | TD-UI, TD-PATH, TD-FAIL |
 
+## Review Result intake (RV-01)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-REVW-001` | Real completed, receipt-verified CNN and RF Detect Result publications reopen into the isolated `review/v1` paged index with CNN-all/RF-accepted-only eligibility and unchanged source-frame/rate/channel provenance. Corrupt, missing, changed, relink-needed or unsafe Result/source states remain actionable and unavailable without changing Detect Result or recording bytes; an arbitrary test WAV is rejected as input. | TD-WAV, TD-PATH, TD-RUN, TD-FAIL |
+
 ## 1a. Studio shell (ST-02)
 
 | Case ID | Public seam / expected result | Data |
