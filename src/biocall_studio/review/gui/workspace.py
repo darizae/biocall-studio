@@ -18,14 +18,22 @@ from alp_ui.components import (
     Text,
     TextInput,
 )
-from PySide6.QtCore import QEvent, QModelIndex, QObject, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QKeySequence, QPainter, QPixmap, QResizeEvent, QShortcut
+from PySide6.QtCore import QEvent, QModelIndex, QObject, QSize, Qt, QThread, QTimer, QUrl, Signal
+from PySide6.QtGui import (
+    QDesktopServices,
+    QKeySequence,
+    QPainter,
+    QPixmap,
+    QResizeEvent,
+    QShortcut,
+)
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QAbstractSlider,
     QAbstractSpinBox,
     QApplication,
     QComboBox,
+    QFileDialog,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -73,6 +81,11 @@ from biocall_studio.review.application.view_state import (
     shortcut_action,
 )
 from biocall_studio.review.domain.cache import CachePriority
+from biocall_studio.review.domain.exports import (
+    ReviewExportMode,
+    ReviewExportPlan,
+    ReviewExportReceipt,
+)
 from biocall_studio.review.domain.intake import EligibleCandidate
 from biocall_studio.review.domain.sessions import ReviewLabel, ReviewSessionState
 from biocall_studio.review.domain.spectrograms import (
@@ -157,9 +170,7 @@ class _GalleryDelegate(QStyledItemDelegate):
             )
         text_rect = content.adjusted(0, 72, 0, 0)
         painter.setPen(
-            option.palette.highlightedText().color()
-            if selected
-            else option.palette.text().color()
+            option.palette.highlightedText().color() if selected else option.palette.text().color()
         )
         painter.drawText(
             text_rect,
@@ -180,6 +191,7 @@ class ReviewLandingPage(QScrollArea):
         self.controller = controller
         self.choices: tuple[ReviewResultChoice, ...] = ()
         self.session_rows: tuple[ReviewSession, ...] = ()
+        self.export_rows = ()
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setAccessibleName("Review result and session landing")
@@ -231,6 +243,23 @@ class ReviewLandingPage(QScrollArea):
         self.sessions.horizontalHeader().setStretchLastSection(True)
         self.sessions.setAccessibleName("Review sessions")
         outer.addWidget(self.sessions)
+
+        export_heading = QHBoxLayout()
+        export_heading.addWidget(Text("Exports", role="heading"))
+        export_heading.addStretch()
+        self.show_export_button = Button("Show in folder", variant="outline")
+        export_heading.addWidget(self.show_export_button)
+        outer.addLayout(export_heading)
+        self.exports = QTableWidget(0, 4)
+        self.exports.setObjectName("reviewExportHistoryTable")
+        self.exports.setHorizontalHeaderLabels(("Session", "Format", "Included", "Completed"))
+        self.exports.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.exports.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.exports.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.exports.verticalHeader().hide()
+        self.exports.horizontalHeader().setStretchLastSection(True)
+        self.exports.setAccessibleName("Completed Review exports")
+        outer.addWidget(self.exports)
         outer.addStretch()
         self.setWidget(content)
 
@@ -238,9 +267,10 @@ class ReviewLandingPage(QScrollArea):
         self.start_button.clicked.connect(self._start)
         self.open_session_button.clicked.connect(self._open_selected_session)
         self.sessions.doubleClicked.connect(lambda _index: self._inspect_selected_session())
-        self.sessions.currentCellChanged.connect(
-            lambda *_args: self._update_session_action()
-        )
+        self.sessions.currentCellChanged.connect(lambda *_args: self._update_session_action())
+        self.exports.currentCellChanged.connect(lambda *_args: self._update_export_action())
+        self.exports.doubleClicked.connect(lambda _index: self._show_selected_export())
+        self.show_export_button.clicked.connect(self._show_selected_export)
         self.results.currentCellChanged.connect(lambda *_args: self._update_result_action())
 
     def refresh(self, choices: tuple[ReviewResultChoice, ...]) -> None:
@@ -289,6 +319,44 @@ class ReviewLandingPage(QScrollArea):
         if self.session_rows:
             self.sessions.selectRow(0)
         self._update_session_action()
+
+        self.export_rows = self.controller.list_export_history()
+        self.exports.setRowCount(len(self.export_rows))
+        mode_names = {
+            ReviewExportMode.INDIVIDUAL: "Individual WAV files",
+            ReviewExportMode.COMBINED: "Combined WAV + Raven TSV",
+            ReviewExportMode.BOTH: "Both",
+        }
+        for row, record in enumerate(self.export_rows):
+            values = (
+                record.session_name,
+                mode_names[record.mode],
+                f"{record.included_count:,}",
+                _completed_date(record.completed_at),
+            )
+            for column, value in enumerate(values):
+                self.exports.setItem(row, column, QTableWidgetItem(value))
+        if self.export_rows:
+            self.exports.selectRow(0)
+        self._update_export_action()
+
+    def _update_export_action(self) -> None:
+        self.show_export_button.setEnabled(0 <= self.exports.currentRow() < len(self.export_rows))
+
+    def _show_selected_export(self) -> None:
+        row = self.exports.currentRow()
+        if not 0 <= row < len(self.export_rows):
+            return
+        try:
+            receipt = self.controller.verify_export_history(self.export_rows[row])
+        except (OSError, RuntimeError, ValueError):
+            QMessageBox.warning(
+                self,
+                "Export unavailable",
+                "This export no longer matches its verified receipt.",
+            )
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(receipt.final_destination))
 
     def _update_result_action(self, *, open_exists: bool | None = None) -> None:
         row = self.results.currentRow()
@@ -356,6 +424,7 @@ class ReviewSessionPage(QWidget):
     accept_all_requested = Signal()
     close_requested = Signal()
     finalize_requested = Signal()
+    export_requested = Signal()
     rename_requested = Signal(str)
     shortcuts_requested = Signal()
     clear_requested = Signal()
@@ -383,6 +452,7 @@ class ReviewSessionPage(QWidget):
         )
         self.close_button = Button("Close session", variant="outline")
         self.finalize_button = Button("Finalize", variant="primary")
+        self.export_button = Button("Export", variant="primary")
         outer.addLayout(header)
         self.progress = ProgressBar(minimum=0, maximum=1, value=0)
         self.progress.setAccessibleName("Reviewed detections")
@@ -536,9 +606,7 @@ class ReviewSessionPage(QWidget):
             "Frees disk space by deleting generated images. "
             "Your labels and recordings stay unchanged."
         )
-        self.clear_selected_button.setAccessibleDescription(
-            self.clear_selected_button.toolTip()
-        )
+        self.clear_selected_button.setAccessibleDescription(self.clear_selected_button.toolTip())
         actions.addWidget(self.clear_selected_button)
         actions.addStretch()
         accept_wrap = QHBoxLayout()
@@ -560,6 +628,7 @@ class ReviewSessionPage(QWidget):
         self.undo_button.clicked.connect(self.undo_requested)
         self.close_button.clicked.connect(self.close_requested)
         self.finalize_button.clicked.connect(self.finalize_requested)
+        self.export_button.clicked.connect(self.export_requested)
         self.settings_button.clicked.connect(self.settings_requested)
         self.search.textChanged.connect(self.search_requested)
         self.sort.currentIndexChanged.connect(
@@ -611,10 +680,11 @@ class ReviewSessionPage(QWidget):
             self.undo_button,
             self.close_button,
             self.finalize_button,
+            self.export_button,
         )
         for widget in widgets:
             self.header_layout.removeWidget(widget)
-        for column in range(5):
+        for column in range(6):
             self.header_layout.setColumnStretch(column, 0)
         if compact:
             self.header_layout.addWidget(self.name_input, 0, 0, 1, 3)
@@ -623,6 +693,7 @@ class ReviewSessionPage(QWidget):
             self.header_layout.addWidget(self.undo_button, 2, 0)
             self.header_layout.addWidget(self.close_button, 2, 1)
             self.header_layout.addWidget(self.finalize_button, 2, 2)
+            self.header_layout.addWidget(self.export_button, 2, 3)
             self.header_layout.setColumnStretch(0, 1)
         else:
             self.header_layout.addWidget(self.name_input, 0, 0, 2, 1)
@@ -631,6 +702,7 @@ class ReviewSessionPage(QWidget):
             self.header_layout.addWidget(self.undo_button, 0, 2, 2, 1)
             self.header_layout.addWidget(self.close_button, 0, 3, 2, 1)
             self.header_layout.addWidget(self.finalize_button, 0, 4, 2, 1)
+            self.header_layout.addWidget(self.export_button, 0, 5, 2, 1)
             self.header_layout.setColumnStretch(0, 1)
 
     def set_compact(self, compact: bool) -> None:
@@ -684,6 +756,7 @@ class ReviewSessionPage(QWidget):
             self.finalize_button,
         ):
             button.setEnabled(editable)
+        self.export_button.setEnabled(session.state is ReviewSessionState.FINALIZED)
 
 
 class ReviewSpectrogramsPage(QScrollArea):
@@ -729,9 +802,7 @@ class ReviewSpectrogramsPage(QScrollArea):
         self.preset_select.setMinimumWidth(240)
         self.change_preset_button = Button("Change preset", variant="outline")
         preset_row.addWidget(self.preset_select)
-        preset_row.addWidget(
-            self.change_preset_button, 0, Qt.AlignmentFlag.AlignBottom
-        )
+        preset_row.addWidget(self.change_preset_button, 0, Qt.AlignmentFlag.AlignBottom)
         preset_row.addStretch()
         outer.addLayout(preset_row)
 
@@ -778,9 +849,7 @@ class ReviewSpectrogramsPage(QScrollArea):
         self.retry_button.clicked.connect(self.retry_requested)
         self.clear_button.clicked.connect(self.clear_requested)
         self.change_preset_button.clicked.connect(
-            lambda: self.preset_change_requested.emit(
-                str(self.preset_select.control.currentData())
-            )
+            lambda: self.preset_change_requested.emit(str(self.preset_select.control.currentData()))
         )
         self.set_running(False)
 
@@ -816,8 +885,7 @@ class ReviewSpectrogramsPage(QScrollArea):
             self.availability_label.setText("Checking spectrogram availability…")
         else:
             self.availability_label.setText(
-                f"{cached_count:,} of {session.eligible_candidate_count:,} "
-                "spectrograms available"
+                f"{cached_count:,} of {session.eligible_candidate_count:,} spectrograms available"
             )
         self.output_value.setText(format_output_estimate(estimate.expected_final) or "Unknown")
         self.peak_value.setText(
@@ -846,6 +914,239 @@ class ReviewSpectrogramsPage(QScrollArea):
             "Couldn't generate this spectrogram. Retry." if failed else "Generation stopped."
         )
         self.retry_button.setVisible(failed)
+
+
+class ReviewExportPage(QScrollArea):
+    back_requested = Signal()
+    prepare_requested = Signal(object, object)
+    publish_requested = Signal()
+    cancel_requested = Signal()
+    show_requested = Signal()
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.plan: ReviewExportPlan | None = None
+        self.estimate: StorageEstimate | None = None
+        self.receipt: ReviewExportReceipt | None = None
+        self.setWidgetResizable(True)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+        self.setAccessibleName("Review corpus export")
+        content = QWidget()
+        outer = QVBoxLayout(content)
+        outer.setContentsMargins(32, 28, 32, 36)
+        outer.setSpacing(18)
+
+        header = QHBoxLayout()
+        header.addWidget(Text("Export", role="title"))
+        header.addStretch()
+        self.back_button = Button("Back to Review", variant="outline")
+        header.addWidget(self.back_button)
+        outer.addLayout(header)
+        self.session_label = QLabel()
+        self.session_label.setAccessibleName("Finalized Review session")
+        outer.addWidget(self.session_label)
+
+        card = Card()
+        card.content_layout.addWidget(Text("Format", role="heading"))
+        self.mode = QComboBox()
+        self.mode.setAccessibleName("Corpus export format")
+        self.mode.addItem("Individual WAV files", ReviewExportMode.INDIVIDUAL.value)
+        self.mode.addItem("Combined WAV + Raven TSV", ReviewExportMode.COMBINED.value)
+        self.mode.addItem("Both", ReviewExportMode.BOTH.value)
+        card.content_layout.addWidget(self.mode)
+        format_help = HelpHint(
+            (
+                "Individual files preserve each included detection separately. Combined output "
+                "also creates one WAV and a Raven selection table and requires matching mono "
+                "recordings."
+            ),
+            subject="Export format",
+        )
+        card.content_layout.addWidget(format_help)
+        card.content_layout.addWidget(Text("Destination", role="heading"))
+        destination_row = QHBoxLayout()
+        self.destination = QLineEdit()
+        self.destination.setReadOnly(True)
+        self.destination.setAccessibleName("Corpus export destination")
+        self.choose_button = Button("Choose folder", variant="outline")
+        destination_row.addWidget(self.destination, 1)
+        destination_row.addWidget(self.choose_button)
+        card.content_layout.addLayout(destination_row)
+        outer.addWidget(card)
+
+        self.estimate_label = QLabel()
+        self.estimate_label.setWordWrap(True)
+        self.estimate_label.setAccessibleName("Export storage estimate")
+        outer.addWidget(self.estimate_label)
+        self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
+        self.status_label.setAccessibleName("Export status")
+        outer.addWidget(self.status_label)
+
+        actions = QHBoxLayout()
+        actions.addStretch()
+        self.prepare_button = Button("Check export", variant="primary")
+        self.publish_button = Button("Export", variant="primary")
+        self.cancel_button = Button("Cancel", variant="outline")
+        self.show_button = Button("Show in folder", variant="outline")
+        actions.addWidget(self.prepare_button)
+        actions.addWidget(self.publish_button)
+        actions.addWidget(self.cancel_button)
+        actions.addWidget(self.show_button)
+        outer.addLayout(actions)
+        outer.addStretch()
+        self.setWidget(content)
+
+        self.publish_button.hide()
+        self.cancel_button.hide()
+        self.show_button.hide()
+        self.back_button.clicked.connect(self.back_requested)
+        self.choose_button.clicked.connect(self._choose_destination)
+        self.prepare_button.clicked.connect(self._prepare)
+        self.publish_button.clicked.connect(self.publish_requested)
+        self.cancel_button.clicked.connect(self.cancel_requested)
+        self.show_button.clicked.connect(self.show_requested)
+        self.mode.currentIndexChanged.connect(self.reset_plan)
+
+    def set_session(self, session: ReviewSession) -> None:
+        self.session_label.setText(
+            f"{session.name} · {session.call_count + session.unreviewed_count:,} included · "
+            f"{session.not_call_count:,} excluded"
+        )
+        self.reset_plan()
+
+    def _choose_destination(self) -> None:
+        selected = QFileDialog.getExistingDirectory(self, "Choose export destination")
+        if selected:
+            self.destination.setText(str(Path(selected)))
+            self.reset_plan()
+
+    def _prepare(self) -> None:
+        if not self.destination.text():
+            self.status_label.setText("Choose a destination folder.")
+            return
+        self.set_running(True, "Checking source files and storage…")
+        self.prepare_requested.emit(
+            ReviewExportMode(self.mode.currentData()), Path(self.destination.text())
+        )
+
+    def reset_plan(self) -> None:
+        self.plan = None
+        self.estimate = None
+        self.receipt = None
+        self.estimate_label.clear()
+        self.status_label.clear()
+        self.prepare_button.show()
+        self.publish_button.hide()
+        self.cancel_button.hide()
+        self.show_button.hide()
+
+    def set_running(self, running: bool, message: str = "") -> None:
+        self.mode.setEnabled(not running)
+        self.choose_button.setEnabled(not running)
+        self.back_button.setEnabled(not running)
+        self.prepare_button.setVisible(not running and self.plan is None)
+        self.publish_button.setVisible(not running and self.plan is not None)
+        self.cancel_button.setVisible(running)
+        if message:
+            self.status_label.setText(message)
+
+    def set_prepared(self, plan: ReviewExportPlan, estimate: StorageEstimate) -> None:
+        self.plan = plan
+        self.estimate = estimate
+        self.receipt = None
+        self.set_running(False)
+        self.estimate_label.setText(
+            f"{plan.included_count:,} detections · "
+            f"{format_output_estimate(estimate.expected_final)} · {estimate.reason}"
+        )
+        self.status_label.setText("Ready to export." if estimate.can_start else estimate.reason)
+        self.publish_button.setEnabled(estimate.can_start)
+
+    def set_failed(self, message: str) -> None:
+        self.plan = None
+        self.estimate = None
+        self.set_running(False)
+        self.status_label.setText(message)
+
+    def set_completed(self, receipt: ReviewExportReceipt, message: str) -> None:
+        self.receipt = receipt
+        self.set_running(False)
+        self.prepare_button.hide()
+        self.publish_button.hide()
+        self.status_label.setText(message)
+        self.show_button.show()
+
+
+class _ReviewExportPrepareThread(QThread):
+    prepared = Signal(object, object)
+    failed = Signal(str)
+
+    def __init__(
+        self,
+        controller: ReviewSessionController,
+        session_id: str,
+        source_root: Path,
+        destination: Path,
+        mode: ReviewExportMode,
+    ):
+        super().__init__()
+        self.controller = controller
+        self.session_id = session_id
+        self.source_root = source_root
+        self.destination = destination
+        self.mode = mode
+        self.cancel_event = threading.Event()
+
+    def run(self) -> None:
+        try:
+            plan = self.controller.plan_export(
+                self.session_id,
+                source_root=self.source_root,
+                destination_parent=self.destination,
+                mode=self.mode,
+                cancel_requested=self.cancel_event,
+            )
+            estimate = self.controller.estimate_export_storage(plan)
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
+            self.failed.emit(str(exc) or "Couldn't prepare this export.")
+            return
+        self.prepared.emit(plan, estimate)
+
+
+class _ReviewExportPublishThread(QThread):
+    succeeded = Signal(object)
+    failed = Signal(str)
+
+    def __init__(
+        self,
+        controller: ReviewSessionController,
+        plan: ReviewExportPlan,
+        source_root: Path,
+        storage_digest: str,
+        confirm_storage: bool,
+    ):
+        super().__init__()
+        self.controller = controller
+        self.plan = plan
+        self.source_root = source_root
+        self.storage_digest = storage_digest
+        self.confirm_storage = confirm_storage
+        self.cancel_event = threading.Event()
+
+    def run(self) -> None:
+        try:
+            outcome = self.controller.publish_export(
+                self.plan,
+                source_root=self.source_root,
+                storage_input_digest=self.storage_digest,
+                confirm_storage=self.confirm_storage,
+                cancel_requested=self.cancel_event,
+            )
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
+            self.failed.emit(str(exc) or "Couldn't complete this export.")
+            return
+        self.succeeded.emit(outcome)
 
 
 class ReviewWorkspacePage(QStackedWidget):
@@ -878,9 +1179,7 @@ class ReviewWorkspacePage(QStackedWidget):
         )
         self.supervisor = SpectrogramGenerationSupervisor(
             self.cache,
-            token_is_current=lambda token: session_token_is_current(
-                self.controller, token
-            ),
+            token_is_current=lambda token: session_token_is_current(self.controller, token),
         )
         self._generation_batch_id: str | None = None
         self._generation_prepare_cancel = threading.Event()
@@ -891,25 +1190,27 @@ class ReviewWorkspacePage(QStackedWidget):
         self._generation_confirm_dialog: QMessageBox | None = None
         self._settings_change_dialog: QMessageBox | None = None
         self._settings_return_to_cache = False
+        self._export_prepare_thread: _ReviewExportPrepareThread | None = None
+        self._export_publish_thread: _ReviewExportPublishThread | None = None
         self.playback = QtMediaPlayback(self)
 
         self.landing_page = ReviewLandingPage(controller)
         self.session_page = ReviewSessionPage()
         self.cache_page = ReviewSpectrogramsPage()
         self.settings_page = SpectrogramSettingsPage(controller)
+        self.export_page = ReviewExportPage()
         self.addWidget(self.landing_page)
         self.addWidget(self.session_page)
         self.addWidget(self.cache_page)
         self.addWidget(self.settings_page)
+        self.addWidget(self.export_page)
 
         self.landing_page.start_requested.connect(self._start_session)
         self.landing_page.session_requested.connect(self._session_selected)
         self.landing_page.successor_requested.connect(self._continue_in_new_session)
         self.landing_page.settings_requested.connect(self.show_settings)
         self.settings_page.back_requested.connect(self._settings_back)
-        self.settings_page.use_in_session_requested.connect(
-            self._save_and_use_preset
-        )
+        self.settings_page.use_in_session_requested.connect(self._save_and_use_preset)
         self.cache_page.back_requested.connect(self.show_session)
         self.cache_page.settings_requested.connect(self.show_settings)
         self.cache_page.generate_requested.connect(self._prepare_generate_all)
@@ -929,13 +1230,17 @@ class ReviewWorkspacePage(QStackedWidget):
         self.session_page.accept_all_requested.connect(self._accept_all)
         self.session_page.close_requested.connect(self._close_session)
         self.session_page.finalize_requested.connect(self._finalize)
+        self.session_page.export_requested.connect(self.show_export)
         self.session_page.rename_requested.connect(self._rename)
         self.session_page.shortcuts_requested.connect(self._show_shortcuts)
         self.session_page.clear_requested.connect(self._clear_current_spectrogram)
-        self.session_page.clear_selection_requested.connect(
-            self._clear_selected_spectrograms
-        )
+        self.session_page.clear_selection_requested.connect(self._clear_selected_spectrograms)
         self.session_page.settings_requested.connect(self.show_spectrograms)
+        self.export_page.back_requested.connect(self.show_session)
+        self.export_page.prepare_requested.connect(self._prepare_export)
+        self.export_page.publish_requested.connect(self._publish_export)
+        self.export_page.cancel_requested.connect(self._cancel_export)
+        self.export_page.show_requested.connect(self._show_export_in_folder)
         self.session_page.gallery.doubleClicked.connect(self._open_gallery_index)
         self.session_page.table.doubleClicked.connect(self._open_table_index)
         self.playback.position_changed.connect(self._playback_position)
@@ -1079,6 +1384,127 @@ class ReviewWorkspacePage(QStackedWidget):
         self.setCurrentWidget(self.cache_page)
         self.cache_page.generate_button.setFocus()
 
+    def show_export(self) -> None:
+        state = self.current_state
+        if state is None or state.session.state is not ReviewSessionState.FINALIZED:
+            return
+        self.export_page.set_session(state.session)
+        self.setCurrentWidget(self.export_page)
+        self.export_page.choose_button.setFocus()
+
+    def _prepare_export(self, mode: ReviewExportMode, destination: Path) -> None:
+        state = self.current_state
+        if (
+            state is None
+            or state.session.state is not ReviewSessionState.FINALIZED
+            or self._export_prepare_thread is not None
+            or self._export_publish_thread is not None
+        ):
+            self.export_page.set_failed("Only a Finalized Review session can be exported.")
+            return
+        source_root = self.source_root_resolver(state.session)
+        if source_root is None:
+            self.export_page.set_failed(
+                "The original recordings are unavailable. Relink them before exporting."
+            )
+            return
+        thread = _ReviewExportPrepareThread(
+            self.controller,
+            state.session.session_id,
+            Path(source_root),
+            Path(destination),
+            ReviewExportMode(mode),
+        )
+        self._export_prepare_thread = thread
+        thread.prepared.connect(self._export_prepared)
+        thread.failed.connect(self._export_failed)
+
+        def finished() -> None:
+            if self._export_prepare_thread is thread:
+                self._export_prepare_thread = None
+            thread.deleteLater()
+
+        thread.finished.connect(finished)
+        thread.start()
+
+    def _export_prepared(self, plan: ReviewExportPlan, estimate: StorageEstimate) -> None:
+        state = self.current_state
+        if state is None or plan.session_id != state.session.session_id:
+            self.export_page.set_failed("The selected Review session changed. Check again.")
+            return
+        self.export_page.set_prepared(plan, estimate)
+
+    def _publish_export(self) -> None:
+        state = self.current_state
+        plan = self.export_page.plan
+        estimate = self.export_page.estimate
+        if (
+            state is None
+            or plan is None
+            or estimate is None
+            or not estimate.can_start
+            or self._export_publish_thread is not None
+        ):
+            return
+        source_root = self.source_root_resolver(state.session)
+        if source_root is None:
+            self.export_page.set_failed(
+                "The original recordings are unavailable. Relink them before exporting."
+            )
+            return
+        confirmed = False
+        if estimate.requires_confirmation:
+            answer = QMessageBox.question(
+                self,
+                "Export storage",
+                estimate.reason,
+                QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Ok,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if answer is not QMessageBox.StandardButton.Ok:
+                return
+            confirmed = True
+        thread = _ReviewExportPublishThread(
+            self.controller,
+            plan,
+            Path(source_root),
+            estimate.input_digest,
+            confirmed,
+        )
+        self._export_publish_thread = thread
+        self.export_page.set_running(True, "Writing and verifying the finalized Review session…")
+        thread.succeeded.connect(self._export_succeeded)
+        thread.failed.connect(self._export_failed)
+
+        def finished() -> None:
+            if self._export_publish_thread is thread:
+                self._export_publish_thread = None
+            thread.deleteLater()
+
+        thread.finished.connect(finished)
+        thread.start()
+
+    def _export_succeeded(self, outcome) -> None:
+        message = "Export complete." if outcome.history_saved else outcome.message
+        self.export_page.set_completed(outcome.receipt, message)
+
+    def _export_failed(self, message: str) -> None:
+        if "cancel" in message.casefold():
+            message = "Export cancelled. No new output was published."
+        self.export_page.set_failed(message or "Couldn't complete this export.")
+
+    def _cancel_export(self) -> None:
+        if self._export_prepare_thread is not None:
+            self._export_prepare_thread.cancel_event.set()
+        if self._export_publish_thread is not None:
+            self._export_publish_thread.cancel_event.set()
+        self.export_page.status_label.setText("Cancelling before publication…")
+
+    def _show_export_in_folder(self) -> None:
+        receipt = self.export_page.receipt
+        if receipt is not None:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(receipt.final_destination))
+
     def _prepare_preset_change(self, preset_id: str) -> None:
         state = self.current_state
         if state is None or state.session.state is not ReviewSessionState.OPEN:
@@ -1093,9 +1519,7 @@ class ReviewWorkspacePage(QStackedWidget):
         try:
             current = self.controller.store.load_settings(state.session.session_id)
             target = next(
-                preset
-                for preset in self.controller.list_presets()
-                if preset.preset_id == preset_id
+                preset for preset in self.controller.list_presets() if preset.preset_id == preset_id
             )
             if current == target:
                 return
@@ -1150,16 +1574,12 @@ class ReviewWorkspacePage(QStackedWidget):
                 )
                 estimate = assess_review_cache_storage(plan, cache_root=self.cache.root)
             except (OSError, RuntimeError, TypeError, ValueError):
-                self.generation_prepare_failed.emit(
-                    "Couldn't generate this spectrogram. Retry."
-                )
+                self.generation_prepare_failed.emit("Couldn't generate this spectrogram. Retry.")
                 return
             if cancel_event.is_set():
                 self.generation_prepare_failed.emit("Generation stopped.")
                 return
-            self.settings_change_prepared.emit(
-                target, plan, estimate, len(existing_sizes)
-            )
+            self.settings_change_prepared.emit(target, plan, estimate, len(existing_sizes))
 
         self._generation_prepare_thread = threading.Thread(
             target=prepare,
@@ -1188,9 +1608,7 @@ class ReviewWorkspacePage(QStackedWidget):
             self.cache_page.set_running(False)
             return
         current = self.controller.store.load_settings(state.session.session_id)
-        self.cache_page.set_estimate(
-            state.session, plan, estimate, cached_count=cached_count
-        )
+        self.cache_page.set_estimate(state.session, plan, estimate, cached_count=cached_count)
         if not estimate.can_start:
             self.cache_page.set_running(False)
             self.cache_page.progress_label.setText(
@@ -1308,9 +1726,7 @@ class ReviewWorkspacePage(QStackedWidget):
                 )
                 estimate = assess_review_cache_storage(plan, cache_root=self.cache.root)
             except (OSError, RuntimeError, TypeError, ValueError):
-                self.generation_prepare_failed.emit(
-                    "Couldn't generate this spectrogram. Retry."
-                )
+                self.generation_prepare_failed.emit("Couldn't generate this spectrogram. Retry.")
                 return
             if cancel_event.is_set():
                 self.generation_prepare_failed.emit("Generation stopped.")
@@ -1337,9 +1753,7 @@ class ReviewWorkspacePage(QStackedWidget):
             return
         self._pending_generation_plan = plan
         self._pending_generation_estimate = estimate
-        self.cache_page.set_estimate(
-            state.session, plan, estimate, cached_count=cached_count
-        )
+        self.cache_page.set_estimate(state.session, plan, estimate, cached_count=cached_count)
         if plan.missing_count == 0:
             self.cache_page.set_running(False)
             return
@@ -1637,9 +2051,7 @@ class ReviewWorkspacePage(QStackedWidget):
             if state.selected_candidate_ids
             else f"{state.row_count:,} detections"
         )
-        self.session_page.clear_selected_button.setEnabled(
-            bool(state.selected_candidate_ids)
-        )
+        self.session_page.clear_selected_button.setEnabled(bool(state.selected_candidate_ids))
         if state.view is ReviewView.ONE_BY_ONE:
             self._load_current()
 
@@ -1993,9 +2405,7 @@ class ReviewWorkspacePage(QStackedWidget):
             settings = SpectrogramSettings.from_mapping(snapshot.effective_settings)
             keys: list[str] = []
             for candidate_id in candidate_ids:
-                row = self.controller.store.candidate_by_id(
-                    state.session.session_id, candidate_id
-                )
+                row = self.controller.store.candidate_by_id(state.session.session_id, candidate_id)
                 context = plan_candidate_context(
                     self._eligible(row), context_seconds=settings.context_seconds
                 )
@@ -2060,6 +2470,8 @@ class ReviewWorkspacePage(QStackedWidget):
     def focus_initial(self) -> None:
         if self.currentWidget() is self.session_page:
             self.session_page.view_buttons[ReviewView.GALLERY].setFocus()
+        elif self.currentWidget() is self.export_page:
+            self.export_page.choose_button.setFocus()
         else:
             self.landing_page.results.setFocus()
 
@@ -2069,6 +2481,13 @@ class ReviewWorkspacePage(QStackedWidget):
 
     def shutdown(self) -> None:
         self._generation_prepare_cancel.set()
+        for export_thread in (
+            self._export_prepare_thread,
+            self._export_publish_thread,
+        ):
+            if export_thread is not None and export_thread.isRunning():
+                export_thread.cancel_event.set()
+                export_thread.wait(5_000)
         self._generation_timer.stop()
         thread = self._generation_prepare_thread
         if thread is not None and thread.is_alive():

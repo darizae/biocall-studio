@@ -6,7 +6,7 @@
 - **Detection Run** freezes Model identity/integrity, selected source inventory, resolved preprocessing/window/threshold settings, software versions and outcomes. Persist state/diagnostics separately from published, immutable result metadata. Run success requires verified publication, not only process exit.
 - **Detection Result** describes source-recording paths/identities and intervals in **original source time**, with score meaning, class mapping, provenance and non-successful-file status. Do not copy WAV data into a Result.
 - **Derived Result** references one input Result and its frozen RF Model/settings, stores accepted/rejected/unscored decisions, never overwrites its parent and remains metadata-only even though RF processing reads WAV samples.
-- **Corpus Export** freezes a chosen Result plus selection/settings, publishes materialized audio at an explicit user-visible destination, records checksums and maps exported snippets/concatenation offsets back to original source and timestamps. Present **Show in folder** after success. A result can have multiple exports.
+- **Historical Detect Corpus Export v1** freezes a chosen Result plus selection/settings and remains immutable and readable for compatibility. New reviewed-corpus publication is Review-owned: it starts only from a verified Finalized Review session, can be repeated independently, and preserves lineage to this Result without modifying it. Detect's existing new-export entry remains only until the separately gated RV-07 route migration.
 
 ## Source discovery
 
@@ -19,13 +19,13 @@ Recurse deterministically, with bounded work and no symlink following by default
 
 Ground interoperability in [Train Model export](science/MODEL_EXPORT_CONTRACT.md), [binary classification](science/BINARY_CLASSIFICATION_CONTRACT.md) and inspected `../bioacoustics-dl-toolbox` / `../alpaca-pipelines` source, not assumed APIs.
 
-## Corpus export
+## Reviewed corpus export
 
-- **Individual snippets:** origin-linked collision-safe names recording source identity and start/end in source time.
+- **Individual WAV files:** origin-linked collision-safe names recording source identity and start/end in source time.
 - **Concatenated WAV + Raven TSV:** selection rows refer to offsets in the **concatenated** waveform; a separate provenance map records original source/interval.
-- **Both:** same frozen selection, independent verified materializations.
+- **Both:** the same frozen Review inventory produces both representations without changing scientific bytes or order.
 
-Honor the implemented PCM-preserving format checks, interval/frame rounding, ordering, Raven TSV offsets, filename/collision policy and no-partial-publication behavior. Never silently resample or merge channels.
+Review includes Call and Unreviewed candidates, excludes Not a call from audio, and records individual human, bulk human, model-only and rejected status across the complete eligible decision inventory. Its v2 metadata uses bounded canonical JSONL rows plus compact digest manifests/file indexes/receipts, with streamed verification and no fixed 10,000-row ceiling. Honor the implemented PCM-preserving format checks, original Result frame/time provenance, deterministic order, Raven concatenation offsets, filename/collision policy, practical RIFF size guard and same-volume no-partial publication. Never silently resample, downmix or merge channels. **Show in folder** is available only after the receipt and every declared file verify. Historical Detect v1 readers and bytes remain unchanged.
 
 ## Cross-cutting operations
 

@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from biocall_studio.review.domain.exports import ReviewExportSourceCandidate
 from biocall_studio.review.domain.intake import EligibleCandidate, ReviewIntakeProjection
 from biocall_studio.review.domain.sessions import (
     DEFAULT_PRESET_ID,
@@ -1722,6 +1723,82 @@ class ReviewSessionStore:
             if not isinstance(raw, dict):
                 raise ReviewSessionStorageError("Review finalization document is corrupt.")
             return raw
+        finally:
+            connection.close()
+
+    def load_finalization(self, session_id: str) -> ReviewFinalizationSnapshot:
+        """Load the immutable finalized snapshot, rejecting absent or corrupt state."""
+        document = self.finalization_document(session_id)
+        if document is None:
+            raise ReviewSessionConflict("Only a Finalized Review session can be exported.")
+        try:
+            snapshot = ReviewFinalizationSnapshot.from_dict(document)
+        except (TypeError, ValueError) as exc:
+            raise ReviewSessionStorageError("Review finalization document is corrupt.") from exc
+        session = self.get_session(session_id)
+        if (
+            session.state is not ReviewSessionState.FINALIZED
+            or session.final_snapshot_digest != snapshot.snapshot_digest
+        ):
+            raise ReviewSessionConflict("Only a verified Finalized Review session can be exported.")
+        return snapshot
+
+    def iter_finalized_export_candidates(
+        self, session_id: str
+    ) -> Iterator[ReviewExportSourceCandidate]:
+        """Stream frozen candidate facts and decisions in canonical source order."""
+        validate_session_id(session_id)
+        connection = self._connect()
+        try:
+            row = self._session_row(connection, session_id)
+            if row["state"] != ReviewSessionState.FINALIZED.value:
+                raise ReviewSessionConflict("Only a Finalized Review session can be exported.")
+            rows = connection.execute(
+                """
+                SELECT c.ordinal, c.recording_ordinal, c.candidate_id, c.recording_ref,
+                       c.recording_key, c.source_sha256, c.sample_rate_hz, c.frame_count,
+                       c.channels, c.start_frame, c.end_frame, c.start_time_ns,
+                       c.end_time_ns, c.cnn_target_score, c.rf_target_score,
+                       c.contributing_windows, d.label, d.origin, d.modified_at
+                  FROM session_candidates c LEFT JOIN decisions d
+                    ON d.session_id = c.session_id AND d.candidate_id = c.candidate_id
+                 WHERE c.session_id = ? ORDER BY c.ordinal
+                """,
+                (session_id,),
+            )
+            for candidate in rows:
+                eligible = EligibleCandidate(
+                    ordinal=candidate["ordinal"],
+                    recording_ordinal=candidate["recording_ordinal"],
+                    candidate_id=candidate["candidate_id"],
+                    recording_ref=candidate["recording_ref"],
+                    recording_key=candidate["recording_key"],
+                    source_sha256=candidate["source_sha256"],
+                    sample_rate_hz=candidate["sample_rate_hz"],
+                    frame_count=candidate["frame_count"],
+                    channels=candidate["channels"],
+                    start_frame=candidate["start_frame"],
+                    end_frame=candidate["end_frame"],
+                    start_time_ns=candidate["start_time_ns"],
+                    end_time_ns=candidate["end_time_ns"],
+                    cnn_target_score=candidate["cnn_target_score"],
+                    rf_target_score=candidate["rf_target_score"],
+                    contributing_windows=candidate["contributing_windows"],
+                )
+                decision = FinalizedCandidateDecision(
+                    ordinal=candidate["ordinal"],
+                    candidate_id=candidate["candidate_id"],
+                    label=(
+                        ReviewLabel.UNREVIEWED
+                        if candidate["label"] is None
+                        else ReviewLabel(candidate["label"])
+                    ),
+                    origin=(
+                        None if candidate["origin"] is None else DecisionOrigin(candidate["origin"])
+                    ),
+                    modified_at=candidate["modified_at"],
+                )
+                yield ReviewExportSourceCandidate(eligible, decision)
         finally:
             connection.close()
 

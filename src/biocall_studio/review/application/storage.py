@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from biocall_studio.review.domain.exports import ReviewExportPlan
 from biocall_studio.review.domain.spectrograms import (
     SPECTROGRAM_RENDER_VERSION,
     SpectrogramImageTier,
@@ -298,11 +299,67 @@ def assess_review_cache_storage(
     )
 
 
+def estimate_review_export_artifacts(plan: ReviewExportPlan) -> OperationSizePlan:
+    """Return exact v2 bytes; same-volume rename does not duplicate staged output."""
+    if not isinstance(plan, ReviewExportPlan):
+        raise TypeError("Review export plan is invalid.")
+    return OperationSizePlan(
+        expected_final=ByteEstimate.exact(plan.expected_final_bytes),
+        peak_bytes=plan.expected_final_bytes,
+        confidence=EstimateConfidence.ARITHMETIC,
+        basis=(
+            "Frozen source-frame counts, PCM widths, canonical streamed inventory/file rows, "
+            "Raven rows and compact digest documents on one destination volume."
+        ),
+    )
+
+
+def review_export_input_digest(plan: ReviewExportPlan) -> str:
+    if not isinstance(plan, ReviewExportPlan):
+        raise TypeError("Review export plan is invalid.")
+    return storage_input_digest(
+        {
+            "operation": "review.export",
+            "plan_digest": plan.plan_digest,
+            "destination_parent": plan.destination_parent,
+            "mode": plan.mode.value,
+        }
+    )
+
+
+def assess_review_export_storage(
+    plan: ReviewExportPlan,
+    *,
+    capacity: CapacityObservation | None = None,
+    expected_input_digest: str | None = None,
+) -> StorageEstimate:
+    """Delegate Review export admission to the shared REV-05 storage service."""
+    size_plan = estimate_review_export_artifacts(plan)
+    label = Path(plan.destination_parent).name or "Export folder"
+    observation = capacity or query_filesystem_capacity(Path(plan.destination_parent), label)
+    if observation.target_label != label:
+        raise ValueError("Export capacity observation has the wrong target.")
+    input_digest = review_export_input_digest(plan)
+    return assess_storage(
+        operation="review.export",
+        input_digest=input_digest,
+        expected_input_digest=expected_input_digest,
+        expected_final=size_plan.expected_final,
+        target_peaks={label: size_plan.peak_bytes},
+        capacities={label: observation},
+        confidence=size_plan.confidence,
+        basis=size_plan.basis,
+    )
+
+
 __all__ = [
     "CacheSizeCalibration",
     "ReviewCacheSizePlan",
     "TimeEstimate",
     "assess_review_cache_storage",
+    "assess_review_export_storage",
+    "estimate_review_export_artifacts",
     "measured_cache_limit",
     "plan_review_cache_generation",
+    "review_export_input_digest",
 ]

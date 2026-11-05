@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import ctypes
-import errno
 import hashlib
 import json
 import os
 import shutil
 import stat
-import sys
 import uuid
 import wave
 from collections.abc import Callable, Mapping
@@ -38,6 +35,11 @@ from biocall_studio.detect.domain.exports import (
     render_raven_tsv,
 )
 from biocall_studio.detect.domain.runs import canonical_digest, utc_now
+from biocall_studio.shared.atomic_directory import (
+    atomic_publish_directory_no_replace,
+    fsync_directory,
+    fsync_directory_tree,
+)
 from biocall_studio.shared.integrity import sha256_file as _sha256_path
 
 _COPY_BYTES = 1024 * 1024
@@ -535,78 +537,6 @@ def verify_export_directory(root: Path) -> ExportReceipt:
     return _verify_export_directory(Path(root), require_destination=True)
 
 
-def _atomic_publish_no_replace(staging: Path, final: Path) -> None:
-    if sys.platform == "darwin":
-        library = ctypes.CDLL(None, use_errno=True)
-        renamex = library.renamex_np
-        renamex.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
-        renamex.restype = ctypes.c_int
-        if renamex(os.fsencode(staging), os.fsencode(final), 0x00000004) != 0:
-            code = ctypes.get_errno()
-            if code in {errno.EEXIST, errno.ENOTEMPTY}:
-                raise ExportConflictError("The export destination appeared during publication.")
-            raise OSError(code, os.strerror(code), str(final))
-        return
-    if sys.platform.startswith("linux"):
-        library = ctypes.CDLL(None, use_errno=True)
-        renameat2 = getattr(library, "renameat2", None)
-        if renameat2 is None:
-            raise ExportError("This platform lacks atomic no-overwrite directory publication.")
-        renameat2.argtypes = [
-            ctypes.c_int,
-            ctypes.c_char_p,
-            ctypes.c_int,
-            ctypes.c_char_p,
-            ctypes.c_uint,
-        ]
-        renameat2.restype = ctypes.c_int
-        if renameat2(-100, os.fsencode(staging), -100, os.fsencode(final), 1) != 0:
-            code = ctypes.get_errno()
-            if code in {errno.EEXIST, errno.ENOTEMPTY}:
-                raise ExportConflictError("The export destination appeared during publication.")
-            raise OSError(code, os.strerror(code), str(final))
-        return
-    if os.name == "nt":
-        try:
-            os.rename(staging, final)
-        except FileExistsError as exc:
-            raise ExportConflictError(
-                "The export destination appeared during publication."
-            ) from exc
-        return
-    raise ExportError("This platform lacks atomic no-overwrite directory publication.")
-
-
-def _fsync_tree(root: Path) -> None:
-    for path in sorted(root.rglob("*")):
-        if path.is_file() and not path.is_symlink():
-            with path.open("rb") as stream:
-                os.fsync(stream.fileno())
-    for directory in sorted(
-        (path for path in root.rglob("*") if path.is_dir()),
-        key=lambda path: len(path.parts),
-        reverse=True,
-    ):
-        descriptor = os.open(directory, os.O_RDONLY)
-        try:
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-    descriptor = os.open(root, os.O_RDONLY)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
-
-
-def _fsync_directory(path: Path) -> None:
-    descriptor = os.open(path, os.O_RDONLY)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)
-
-
 def publish_export(
     snapshot: ExportSnapshot,
     *,
@@ -654,12 +584,17 @@ def publish_export(
         (staging / "export-receipt.json").write_bytes(_json_bytes(receipt.to_dict()))
         (staging / "export-receipt.json").chmod(0o600)
         _verify_export_directory(staging, require_destination=False)
-        _fsync_tree(staging)
+        fsync_directory_tree(staging)
         _raise_if_cancelled(cancel_requested)
-        _atomic_publish_no_replace(staging, final)
+        try:
+            atomic_publish_directory_no_replace(staging, final)
+        except FileExistsError as exc:
+            raise ExportConflictError(
+                "The export destination appeared during publication."
+            ) from exc
         published = True
         try:
-            _fsync_directory(final.parent)
+            fsync_directory(final.parent)
         except OSError:
             # The self-contained directory is already atomically visible and fully verified.
             pass

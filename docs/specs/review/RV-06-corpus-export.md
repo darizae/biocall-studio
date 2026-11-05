@@ -1,6 +1,6 @@
 # RV-06 — Review-owned corpus export and large-scale publication
 
-> **Status:** Owner-approved planning spec, NOT implemented. Do not start implementation or infer test passes from this document. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
+> **Status:** Implemented on isolated branch `review-rv06-corpus-export` from Review source baseline `6441e76`; pending owner evidence/code acceptance. Test-index rows remain acceptance contracts rather than inferred evidence. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
 
 **Sequence:** RV-06 begins only after RV-05 has passed its owner-reviewed gate.
 

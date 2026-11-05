@@ -54,6 +54,13 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-REVW-007` | Real Qt Choose Result, Sessions, Gallery, List, One by one, Spectrograms and Settings surfaces use installed public `alp-ui`, approved copy, accessible text/status shapes/HelpHints and fixed F/D/S/J/K/L/arrow/Space/Undo shortcuts with input/modal exclusions. Successful labels persist before auto-advance; explicit navigation, view/search/filter/sort/selection/scroll restoration, Close/Resume, Finalize/successor, cache actions, preset draft/confirm/delete and independent Test WAV preview remain coherent at normal and compact widths. Missing/changed/render/play/save failures stay actionable and do not change labels or source bytes. | TD-UI, TD-WAV, TD-CACHE, TD-FAIL, TD-OS |
 | `IT-REVW-008` | A 50,000-candidate real SQLite session drives paged native Gallery/List models with indexed recording search, label filtering and deterministic sorting while bounded row caches, image requests and event-loop work remain responsive under cache churn. The UI does not create 50,000 row widgets/thumbnails or enqueue unbounded generation, and measured load/filter/sort/scroll latency and memory stay within the recorded RV-05 qualification envelope. | TD-SCALE, TD-UI, TD-CACHE, TD-RUN |
 
+## Review corpus export (RV-06)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-REVW-009` | A finalized real-WAV-backed Review session publishes and reopens more than 10,000 and at least 50,000 ordered rows through streamed v2 inventory, Raven and receipt indexes with recorded timing/memory/I/O measurements and unchanged source/session bytes. Late corruption or missing rows, cancellation, crash, disk-full, stale space/source and output collision never report false success or leave a public partial export. | TD-WAV, TD-SCALE, TD-PATH, TD-RUN, TD-FAIL |
+| `IT-REVW-010` | Individual WAV, combined WAV + Raven TSV and Both preserve exact source PCM/frame/time provenance with mixed individual/bulk/model-only status while rejected audio is absent; verification/reopen, Review history reconciliation and unchanged Detect v1 readers survive restart. Format mismatch, RIFF overflow, changed WAV and post-publication history failure preserve the finalized session, source recordings and verified recoverable output. | TD-WAV, TD-PATH, TD-RUN, TD-FAIL |
+
 ## 1a. Studio shell (ST-02)
 
 | Case ID | Public seam / expected result | Data |

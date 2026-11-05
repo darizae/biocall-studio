@@ -2,8 +2,10 @@
 
 BioCall Studio is a native desktop application for bioacoustics research. Its Train workflow
 builds reproducible Datasets and CNN or Random Forest Models from labeled recordings. Detect
-validates those Models, inventories unseen WAV files, finds and refines candidate calls, and
-exports selected source-time audio and Raven tables. Review remains an honest shell placeholder.
+validates those Models, inventories unseen WAV files, and finds and refines candidate calls.
+Review opens verified Detect Results, records reproducible Call/Not a call decisions, renders
+source-linked audio and spectrograms, and publishes finalized reviewed corpora as individual WAVs,
+a combined WAV with Raven TSV, or both.
 
 BioCall Studio supports Python **3.11–3.13**. Source development requires Git and adjacent,
 owner-reviewed checkouts of:

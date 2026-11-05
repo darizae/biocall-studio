@@ -42,6 +42,9 @@ from biocall_studio.detect.workflows.exports import (
     publish_export,
     verify_export_directory,
 )
+from biocall_studio.review.workflows.exports import (
+    verify_export_directory as verify_compatible_export_directory,
+)
 from biocall_studio.shared.storage import (
     CapacityObservation,
     EstimateConfidence,
@@ -217,7 +220,7 @@ def test_real_snippet_pcm_headers_checksums_and_source_frames_are_exact(tmp_path
 
 
 def test_both_mode_concat_pcm_raven_offsets_and_receipt_reopen_are_exact(tmp_path, wav_factory):
-    """Cases: IT-DET-020, IT-SIZE-001."""
+    """Cases: IT-DET-020, IT-SIZE-001, IT-REVW-010."""
     source = tmp_path / "source"
     first = wav_factory(source / "recordings" / "alpha.wav", frames=80, rate=8_000)
     second = wav_factory(source / "recordings" / "beta.wav", frames=90, rate=8_000)
@@ -272,6 +275,7 @@ def test_both_mode_concat_pcm_raven_offsets_and_receipt_reopen_are_exact(tmp_pat
     }
     reopened = verify_export_directory(final)
     assert reopened == receipt
+    assert verify_compatible_export_directory(final) == receipt
     assert {
         path.relative_to(final): path.read_bytes() for path in final.rglob("*") if path.is_file()
     } == published_bytes

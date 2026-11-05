@@ -36,6 +36,7 @@ def test_unified_package_has_strict_workflow_ownership_and_no_removed_namespace(
     }
     assert {path.name for path in (package / "shared").glob("*.py")} <= {
         "__init__.py",
+        "atomic_directory.py",
         "integrity.py",
         "owner_lifetime.py",
         "paths.py",
