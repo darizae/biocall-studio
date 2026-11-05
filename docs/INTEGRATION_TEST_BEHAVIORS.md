@@ -47,6 +47,13 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 |---|---|---|
 | `IT-REVW-006` | Real supervised asynchronous WAV→spectrogram→PNG generation publishes only checksum-validated contained cache objects, reuses identical objects across sessions, bounds 50,000-item bulk scheduling, rechecks REV-05 admission and supports cancel/retry, LRU eviction, selected clearing and regeneration. Low/unknown/disk-full capacity, permission failure, interrupted staging, stale session epoch, symlink escape and corrupted PNG recover without changing labels, source Results or WAV bytes or leaving an orphan Worker. | TD-WAV, TD-CACHE, TD-SCALE, TD-PATH, TD-RUN, TD-FAIL |
 
+## Native Review workspace (RV-05)
+
+| Case ID | Public seam / expected result | Data |
+|---|---|---|
+| `IT-REVW-007` | Real Qt Choose Result, Sessions, Gallery, List, One by one, Spectrograms and Settings surfaces use installed public `alp-ui`, approved copy, accessible text/status shapes/HelpHints and fixed F/D/S/J/K/L/arrow/Space/Undo shortcuts with input/modal exclusions. Successful labels persist before auto-advance; explicit navigation, view/search/filter/sort/selection/scroll restoration, Close/Resume, Finalize/successor, cache actions, preset draft/confirm/delete and independent Test WAV preview remain coherent at normal and compact widths. Missing/changed/render/play/save failures stay actionable and do not change labels or source bytes. | TD-UI, TD-WAV, TD-CACHE, TD-FAIL, TD-OS |
+| `IT-REVW-008` | A 50,000-candidate real SQLite session drives paged native Gallery/List models with indexed recording search, label filtering and deterministic sorting while bounded row caches, image requests and event-loop work remain responsive under cache churn. The UI does not create 50,000 row widgets/thumbnails or enqueue unbounded generation, and measured load/filter/sort/scroll latency and memory stay within the recorded RV-05 qualification envelope. | TD-SCALE, TD-UI, TD-CACHE, TD-RUN |
+
 ## 1a. Studio shell (ST-02)
 
 | Case ID | Public seam / expected result | Data |

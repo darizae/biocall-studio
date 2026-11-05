@@ -128,12 +128,15 @@ class QtMediaPlayback(PlaybackBackend):
 class SpectrogramView(QWidget):
     """Paint a data-only raster, axes, and detection from one metadata transform."""
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent: QWidget | None = None, *, show_detection: bool = True):
         super().__init__(parent)
+        self._show_detection = bool(show_detection)
         self._raster: SpectrogramRaster | None = None
         self._image = QImage()
         self.setMinimumSize(280, 170)
-        self.setAccessibleName("Spectrogram with detected interval")
+        self.setAccessibleName(
+            "Spectrogram with detected interval" if self._show_detection else "Spectrogram preview"
+        )
 
     def sizeHint(self) -> QSize:
         return QSize(720, 300)
@@ -153,6 +156,11 @@ class SpectrogramView(QWidget):
             raster.width * 3,
             QImage.Format.Format_RGB888,
         ).copy()
+        self.update()
+
+    def clear_spectrogram(self) -> None:
+        self._raster = None
+        self._image = QImage()
         self.update()
 
     def image_rect(self) -> QRectF:
@@ -191,18 +199,19 @@ class SpectrogramView(QWidget):
         image_rect = self.image_rect()
         painter.drawImage(image_rect, self._image)
 
-        detected_left = self.frame_x(metadata.candidate_start_frame)
-        detected_right = self.frame_x(metadata.candidate_end_frame)
-        detected = QRectF(
-            detected_left,
-            image_rect.top(),
-            max(0.0, detected_right - detected_left),
-            image_rect.height(),
-        )
-        painter.fillRect(detected, QColor(255, 193, 7, 52))
-        painter.setPen(QPen(QColor(167, 92, 0), 2))
-        painter.drawLine(detected.topLeft(), detected.bottomLeft())
-        painter.drawLine(detected.topRight(), detected.bottomRight())
+        if self._show_detection:
+            detected_left = self.frame_x(metadata.candidate_start_frame)
+            detected_right = self.frame_x(metadata.candidate_end_frame)
+            detected = QRectF(
+                detected_left,
+                image_rect.top(),
+                max(0.0, detected_right - detected_left),
+                image_rect.height(),
+            )
+            painter.fillRect(detected, QColor(255, 193, 7, 52))
+            painter.setPen(QPen(QColor(167, 92, 0), 2))
+            painter.drawLine(detected.topLeft(), detected.bottomLeft())
+            painter.drawLine(detected.topRight(), detected.bottomRight())
 
         painter.setPen(QPen(QColor(52, 58, 64), 1))
         painter.drawLine(image_rect.bottomLeft(), image_rect.bottomRight())

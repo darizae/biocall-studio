@@ -31,7 +31,7 @@ from biocall_studio.review.domain.sessions import (
     validate_timestamp,
 )
 
-_DATABASE_SCHEMA_VERSION = 1
+_DATABASE_SCHEMA_VERSION = 2
 _OWNER_ID = re.compile(r"review_owner_[0-9a-f]{32}")
 _MAX_PAGE_SIZE = 1_000
 _MAX_SELECTION = 1_000
@@ -95,6 +95,43 @@ class ReviewPosition:
     filter_name: str
     scroll_offset: int
     selected_candidate_ids: tuple[str, ...]
+    sort_name: str = "source_time"
+    search_text: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class ReviewCandidateView:
+    ordinal: int
+    recording_ordinal: int
+    candidate_id: str
+    recording_ref: str
+    recording_key: str
+    source_sha256: str
+    sample_rate_hz: int
+    frame_count: int
+    channels: int
+    start_frame: int
+    end_frame: int
+    start_time_ns: int
+    end_time_ns: int
+    cnn_target_score: float
+    rf_target_score: float | None
+    contributing_windows: int
+    label: ReviewLabel
+    origin: DecisionOrigin | None
+    modified_at: str | None
+
+    @property
+    def recording_name(self) -> str:
+        return self.recording_key.rsplit("/", 1)[-1]
+
+    @property
+    def duration_ns(self) -> int:
+        return self.end_time_ns - self.start_time_ns
+
+    @property
+    def display_score(self) -> float:
+        return self.cnn_target_score if self.rf_target_score is None else self.rf_target_score
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,6 +212,12 @@ CREATE TABLE session_candidates (
     UNIQUE (session_id, candidate_id),
     FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE RESTRICT
 ) STRICT;
+CREATE INDEX session_candidates_source_time
+    ON session_candidates(session_id, recording_ordinal, start_frame, ordinal);
+CREATE INDEX session_candidates_recording
+    ON session_candidates(session_id, recording_key, start_frame, ordinal);
+CREATE INDEX session_candidates_score
+    ON session_candidates(session_id, rf_target_score, cnn_target_score, ordinal);
 
 CREATE TABLE operations (
     operation_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -228,6 +271,8 @@ CREATE TABLE session_views (
     current_candidate_id TEXT,
     view_name TEXT NOT NULL,
     filter_name TEXT NOT NULL,
+    sort_name TEXT NOT NULL,
+    search_text TEXT NOT NULL,
     scroll_offset INTEGER NOT NULL CHECK (scroll_offset >= 0),
     selection_json TEXT NOT NULL,
     FOREIGN KEY (session_id) REFERENCES sessions(session_id) ON DELETE RESTRICT
@@ -542,6 +587,26 @@ class ReviewSessionStore:
         finally:
             connection.close()
 
+    def list_presets(self) -> tuple[SpectrogramSettingsSnapshot, ...]:
+        """Return active preset heads without exposing internal identifiers as UI copy."""
+        connection = self._connect()
+        try:
+            rows = connection.execute(
+                """
+                SELECT r.snapshot_json
+                  FROM presets p JOIN preset_revisions r
+                    ON r.preset_id = p.preset_id AND r.revision = p.current_revision
+                 WHERE p.deleted_at IS NULL
+                 ORDER BY p.protected DESC, p.name_key, p.preset_id
+                """
+            )
+            return tuple(
+                SpectrogramSettingsSnapshot.from_dict(json.loads(row["snapshot_json"]))
+                for row in rows
+            )
+        finally:
+            connection.close()
+
     @staticmethod
     def _session_from_row(row: sqlite3.Row) -> ReviewSession:
         return ReviewSession(
@@ -597,6 +662,17 @@ class ReviewSessionStore:
         try:
             row = connection.execute(self._session_select() + " WHERE s.state = 'open'").fetchone()
             return None if row is None else self._session_from_row(row)
+        finally:
+            connection.close()
+
+    def list_sessions(self) -> tuple[ReviewSession, ...]:
+        connection = self._connect()
+        try:
+            rows = connection.execute(
+                self._session_select()
+                + " ORDER BY s.updated_at DESC, s.created_at DESC, s.session_id"
+            )
+            return tuple(self._session_from_row(row) for row in rows)
         finally:
             connection.close()
 
@@ -693,7 +769,9 @@ class ReviewSessionStore:
             )
             first_id = None if not candidates else candidates[0].candidate_id
             connection.execute(
-                "INSERT INTO session_views VALUES (?, 0, ?, 'gallery', 'all', 0, '[]')",
+                """INSERT INTO session_views VALUES (
+                    ?, 0, ?, 'gallery', 'all', 'source_time', '', 0, '[]'
+                )""",
                 (session_id, first_id),
             )
         return self.get_session(session_id)
@@ -869,9 +947,7 @@ class ReviewSessionStore:
         if label is None:
             return row is None
         operation_id = (
-            change["before_operation_id"]
-            if prefix == "before"
-            else change["operation_id"]
+            change["before_operation_id"] if prefix == "before" else change["operation_id"]
         )
         return bool(
             row is not None
@@ -911,11 +987,7 @@ class ReviewSessionStore:
                 label,
                 change[f"{prefix}_origin"],
                 change[f"{prefix}_modified_at"],
-                (
-                    change["before_operation_id"]
-                    if prefix == "before"
-                    else change["operation_id"]
-                ),
+                (change["before_operation_id"] if prefix == "before" else change["operation_id"]),
             ),
         )
 
@@ -1115,6 +1187,213 @@ class ReviewSessionStore:
                 )
                 for row in rows
             )
+        finally:
+            connection.close()
+
+    @staticmethod
+    def _candidate_order(sort_name: str) -> str:
+        orders = {
+            "source_time": "c.recording_ordinal, c.start_frame, c.ordinal",
+            "recording": "lower(c.recording_key), c.start_frame, c.ordinal",
+            "prediction_descending": (
+                "COALESCE(c.rf_target_score, c.cnn_target_score) DESC, "
+                "c.recording_ordinal, c.start_frame, c.ordinal"
+            ),
+        }
+        try:
+            return orders[sort_name]
+        except KeyError as exc:
+            raise ValueError("Review candidate sort is invalid.") from exc
+
+    @staticmethod
+    def _candidate_conditions(filter_name: str, search_text: str) -> tuple[str, list[object]]:
+        filters = {
+            "all": "",
+            "unreviewed": "d.label IS NULL",
+            "call": "d.label = 'call'",
+            "not_call": "d.label = 'not_call'",
+        }
+        try:
+            label_condition = filters[filter_name]
+        except KeyError as exc:
+            raise ValueError("Review candidate filter is invalid.") from exc
+        if (
+            not isinstance(search_text, str)
+            or len(search_text) > 200
+            or any(ord(character) < 32 for character in search_text)
+        ):
+            raise ValueError("Review recording search is invalid.")
+        normalized = " ".join(search_text.split()).casefold()
+        conditions: list[str] = []
+        parameters: list[object] = []
+        if label_condition:
+            conditions.append(label_condition)
+        if normalized:
+            conditions.append("instr(lower(c.recording_key), ?) > 0")
+            parameters.append(normalized)
+        return (" AND ".join(conditions), parameters)
+
+    @staticmethod
+    def _candidate_from_row(row: sqlite3.Row) -> ReviewCandidateView:
+        return ReviewCandidateView(
+            ordinal=row["ordinal"],
+            recording_ordinal=row["recording_ordinal"],
+            candidate_id=row["candidate_id"],
+            recording_ref=row["recording_ref"],
+            recording_key=row["recording_key"],
+            source_sha256=row["source_sha256"],
+            sample_rate_hz=row["sample_rate_hz"],
+            frame_count=row["frame_count"],
+            channels=row["channels"],
+            start_frame=row["start_frame"],
+            end_frame=row["end_frame"],
+            start_time_ns=row["start_time_ns"],
+            end_time_ns=row["end_time_ns"],
+            cnn_target_score=row["cnn_target_score"],
+            rf_target_score=row["rf_target_score"],
+            contributing_windows=row["contributing_windows"],
+            label=(ReviewLabel.UNREVIEWED if row["label"] is None else ReviewLabel(row["label"])),
+            origin=(None if row["origin"] is None else DecisionOrigin(row["origin"])),
+            modified_at=row["modified_at"],
+        )
+
+    @staticmethod
+    def _candidate_select() -> str:
+        return """
+        SELECT c.ordinal, c.recording_ordinal, c.candidate_id, c.recording_ref, c.recording_key,
+               c.source_sha256, c.sample_rate_hz, c.frame_count, c.channels,
+               c.start_frame, c.end_frame, c.start_time_ns, c.end_time_ns,
+               c.cnn_target_score, c.rf_target_score, c.contributing_windows,
+               d.label, d.origin, d.modified_at
+          FROM session_candidates c LEFT JOIN decisions d
+            ON d.session_id = c.session_id AND d.candidate_id = c.candidate_id
+        """
+
+    def candidate_count(
+        self,
+        session_id: str,
+        *,
+        filter_name: str = "all",
+        search_text: str = "",
+    ) -> int:
+        validate_session_id(session_id)
+        condition, parameters = self._candidate_conditions(filter_name, search_text)
+        suffix = "" if not condition else f" AND {condition}"
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                """
+                SELECT COUNT(*) FROM session_candidates c LEFT JOIN decisions d
+                  ON d.session_id = c.session_id AND d.candidate_id = c.candidate_id
+                 WHERE c.session_id = ?
+                """
+                + suffix,
+                (session_id, *parameters),
+            ).fetchone()
+            return int(row[0])
+        finally:
+            connection.close()
+
+    def candidate_page(
+        self,
+        session_id: str,
+        *,
+        offset: int,
+        limit: int,
+        filter_name: str = "all",
+        search_text: str = "",
+        sort_name: str = "source_time",
+    ) -> tuple[ReviewCandidateView, ...]:
+        validate_session_id(session_id)
+        if type(offset) is not int or offset < 0:
+            raise ValueError("Review page offset is invalid.")
+        if type(limit) is not int or not 1 <= limit <= _MAX_PAGE_SIZE:
+            raise ValueError("Review page size is invalid.")
+        condition, parameters = self._candidate_conditions(filter_name, search_text)
+        order = self._candidate_order(sort_name)
+        suffix = "" if not condition else f" AND {condition}"
+        connection = self._connect()
+        try:
+            rows = connection.execute(
+                self._candidate_select()
+                + " WHERE c.session_id = ?"
+                + suffix
+                + f" ORDER BY {order} LIMIT ? OFFSET ?",
+                (session_id, *parameters, limit, offset),
+            )
+            return tuple(self._candidate_from_row(row) for row in rows)
+        finally:
+            connection.close()
+
+    def candidate_by_id(self, session_id: str, candidate_id: str) -> ReviewCandidateView:
+        validate_session_id(session_id)
+        validate_candidate_id(candidate_id)
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                self._candidate_select() + " WHERE c.session_id = ? AND c.candidate_id = ?",
+                (session_id, candidate_id),
+            ).fetchone()
+            if row is None:
+                raise KeyError("Candidate is not eligible for this Review session.")
+            return self._candidate_from_row(row)
+        finally:
+            connection.close()
+
+    def candidate_position(
+        self, session_id: str, candidate_id: str, *, sort_name: str = "source_time"
+    ) -> int:
+        validate_session_id(session_id)
+        validate_candidate_id(candidate_id)
+        order = self._candidate_order(sort_name)
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                f"""
+                WITH ordered AS (
+                    SELECT c.candidate_id,
+                           ROW_NUMBER() OVER (ORDER BY {order}) - 1 AS position
+                      FROM session_candidates c
+                     WHERE c.session_id = ?
+                )
+                SELECT position FROM ordered WHERE candidate_id = ?
+                """,
+                (session_id, candidate_id),
+            ).fetchone()
+            if row is None:
+                raise KeyError("Candidate is not eligible for this Review session.")
+            return int(row["position"])
+        finally:
+            connection.close()
+
+    def next_unreviewed_candidate(
+        self, session_id: str, candidate_id: str, *, sort_name: str = "source_time"
+    ) -> ReviewCandidateView | None:
+        current_position = self.candidate_position(session_id, candidate_id, sort_name=sort_name)
+        order = self._candidate_order(sort_name)
+        connection = self._connect()
+        try:
+            row = connection.execute(
+                f"""
+                WITH ordered AS (
+                    SELECT c.ordinal, c.recording_ordinal, c.candidate_id,
+                           c.recording_ref, c.recording_key,
+                           c.source_sha256, c.sample_rate_hz, c.frame_count, c.channels,
+                           c.start_frame, c.end_frame, c.start_time_ns, c.end_time_ns,
+                           c.cnn_target_score, c.rf_target_score, c.contributing_windows,
+                           d.label, d.origin, d.modified_at,
+                           ROW_NUMBER() OVER (ORDER BY {order}) - 1 AS position
+                      FROM session_candidates c LEFT JOIN decisions d
+                        ON d.session_id = c.session_id AND d.candidate_id = c.candidate_id
+                     WHERE c.session_id = ?
+                )
+                SELECT * FROM ordered
+                 WHERE position > ? AND label IS NULL
+                 ORDER BY position LIMIT 1
+                """,
+                (session_id, current_position),
+            ).fetchone()
+            return None if row is None else self._candidate_from_row(row)
         finally:
             connection.close()
 
@@ -1551,7 +1830,9 @@ class ReviewSessionStore:
                 (session_id,),
             ).fetchone()
             connection.execute(
-                "INSERT INTO session_views VALUES (?, 0, ?, 'gallery', 'all', 0, '[]')",
+                """INSERT INTO session_views VALUES (
+                    ?, 0, ?, 'gallery', 'all', 'source_time', '', 0, '[]'
+                )""",
                 (session_id, None if first is None else first["candidate_id"]),
             )
         return self.get_session(session_id)
@@ -1567,6 +1848,8 @@ class ReviewSessionStore:
         selected_candidate_ids: tuple[str, ...],
         owner_id: str,
         expected_view_revision: int,
+        sort_name: str = "source_time",
+        search_text: str = "",
     ) -> ReviewPosition:
         validate_session_id(session_id)
         owner_id = _owner(owner_id)
@@ -1576,6 +1859,8 @@ class ReviewSessionStore:
             raise ValueError("Review view is invalid.")
         if filter_name not in {"all", "unreviewed", "call", "not_call"}:
             raise ValueError("Review filter is invalid.")
+        self._candidate_order(sort_name)
+        self._candidate_conditions("all", search_text)
         if type(scroll_offset) is not int or scroll_offset < 0:
             raise ValueError("Review scroll position is invalid.")
         if len(selected_candidate_ids) > _MAX_SELECTION:
@@ -1608,13 +1893,15 @@ class ReviewSessionStore:
             connection.execute(
                 """
                 UPDATE session_views SET view_revision = view_revision + 1,
-                    current_candidate_id = ?, view_name = ?, filter_name = ?,
-                    scroll_offset = ?, selection_json = ? WHERE session_id = ?
+                    current_candidate_id = ?, view_name = ?, filter_name = ?, sort_name = ?,
+                    search_text = ?, scroll_offset = ?, selection_json = ? WHERE session_id = ?
                 """,
                 (
                     candidate_id,
                     view,
                     filter_name,
+                    sort_name,
+                    search_text,
                     scroll_offset,
                     _canonical(list(selected_candidate_ids)),
                     session_id,
@@ -1644,6 +1931,8 @@ class ReviewSessionStore:
                 filter_name=row["filter_name"],
                 scroll_offset=row["scroll_offset"],
                 selected_candidate_ids=tuple(selected),
+                sort_name=row["sort_name"],
+                search_text=row["search_text"],
             )
         finally:
             connection.close()
@@ -1652,6 +1941,7 @@ class ReviewSessionStore:
 __all__ = [
     "CandidateDecisionView",
     "PresetImpact",
+    "ReviewCandidateView",
     "ReviewPosition",
     "ReviewSession",
     "ReviewSessionConflict",

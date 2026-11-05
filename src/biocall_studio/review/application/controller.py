@@ -9,9 +9,15 @@ from biocall_studio.review.application.owner_lifetime import (
     review_owner_alive,
 )
 from biocall_studio.review.domain.sessions import (
+    DEFAULT_PRESET_ID,
     ReviewLabel,
     SpectrogramSettingsSnapshot,
     propose_session_name,
+)
+from biocall_studio.review.domain.spectrograms import (
+    SPECTROGRAM_ALGORITHM_VERSION,
+    SPECTROGRAM_RENDER_VERSION,
+    SpectrogramSettings,
 )
 from biocall_studio.review.persistence.intake import (
     IntakeAvailability,
@@ -54,6 +60,55 @@ class ReviewSessionController:
         self, settings: SpectrogramSettingsSnapshot, *, saved_at: str
     ) -> SpectrogramSettingsSnapshot:
         return self.store.ensure_default_preset(settings, saved_at=saved_at)
+
+    def list_presets(self) -> tuple[SpectrogramSettingsSnapshot, ...]:
+        return self.store.list_presets()
+
+    def create_preset(
+        self,
+        *,
+        name: str,
+        effective_settings: object,
+        saved_at: str,
+    ) -> SpectrogramSettingsSnapshot:
+        return self.store.create_preset(
+            name=name,
+            algorithm_version=SPECTROGRAM_ALGORITHM_VERSION,
+            render_version=SPECTROGRAM_RENDER_VERSION,
+            effective_settings=effective_settings,
+            saved_at=saved_at,
+        )
+
+    def update_preset(
+        self,
+        preset_id: str,
+        *,
+        expected_revision: int,
+        name: str,
+        effective_settings: object,
+        saved_at: str,
+    ) -> SpectrogramSettingsSnapshot:
+        return self.store.update_preset(
+            preset_id,
+            expected_revision=expected_revision,
+            name=name,
+            algorithm_version=SPECTROGRAM_ALGORITHM_VERSION,
+            render_version=SPECTROGRAM_RENDER_VERSION,
+            effective_settings=effective_settings,
+            saved_at=saved_at,
+        )
+
+    def delete_preset(
+        self, preset_id: str, *, expected_revision: int, deleted_at: str
+    ) -> None:
+        self.store.delete_preset(
+            preset_id,
+            expected_revision=expected_revision,
+            deleted_at=deleted_at,
+        )
+
+    def list_sessions(self) -> tuple[ReviewSession, ...]:
+        return self.store.list_sessions()
 
     def start_session(
         self,
@@ -228,6 +283,8 @@ class ReviewSessionController:
         scroll_offset: int,
         selected_candidate_ids: tuple[str, ...],
         expected_view_revision: int,
+        sort_name: str = "source_time",
+        search_text: str = "",
     ) -> ReviewPosition:
         return self.store.save_position(
             session_id,
@@ -238,6 +295,8 @@ class ReviewSessionController:
             selected_candidate_ids=selected_candidate_ids,
             owner_id=self.owner_id,
             expected_view_revision=expected_view_revision,
+            sort_name=sort_name,
+            search_text=search_text,
         )
 
     def continue_in_new_session(
@@ -266,4 +325,15 @@ class ReviewSessionController:
         self._owner_lease.close()
 
 
-__all__ = ["ReviewSessionController"]
+def default_spectrogram_snapshot() -> SpectrogramSettingsSnapshot:
+    return SpectrogramSettingsSnapshot.create(
+        preset_id=DEFAULT_PRESET_ID,
+        preset_name="Default",
+        preset_revision=1,
+        algorithm_version=SPECTROGRAM_ALGORITHM_VERSION,
+        render_version=SPECTROGRAM_RENDER_VERSION,
+        effective_settings=SpectrogramSettings().to_mapping(),
+    )
+
+
+__all__ = ["ReviewSessionController", "default_spectrogram_snapshot"]

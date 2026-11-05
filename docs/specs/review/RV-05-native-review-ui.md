@@ -1,6 +1,6 @@
 # RV-05 — Native researcher-facing Review workspace
 
-> **Status:** Owner-approved planning spec, NOT implemented. Do not start implementation or infer test passes from this document. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
+> **Status:** Implementation handoff prepared on `review-rv05-native-review-ui` from owner-approved RV-04 source commit `f652aa8`; owner code, copy and evidence review remains pending. Test results must come from the current handoff, never from this contract. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
 
 **Sequence:** RV-05 begins only after RV-04 has passed its owner-reviewed gate.
 

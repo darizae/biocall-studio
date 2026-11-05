@@ -21,6 +21,7 @@ from biocall_studio.review.domain.spectrograms import CandidateContext, plan_can
 _READ_CHUNK_BYTES = 256 * 1024
 _MAX_DISPLAY_SECONDS = 30
 _MAX_CONTEXT_BYTES = 64 * 1024 * 1024
+_MAX_PREVIEW_FILE_BYTES = 64 * 1024 * 1024
 
 
 class AudioSourceProblem(StrEnum):
@@ -373,10 +374,98 @@ def read_candidate_audio(
     )
 
 
+def read_preview_wav(path: Path, *, max_seconds: int = 30) -> CandidateAudio:
+    """Read a bounded transient WAV preview without creating Review intake state.
+
+    The returned object contains no filesystem path. Callers may explicitly save
+    a rendered derivative, but this function never persists the selected WAV.
+    """
+    source = Path(path).expanduser()
+    if (
+        source.is_symlink()
+        or not source.is_file()
+        or source.suffix.casefold() != ".wav"
+        or type(max_seconds) is not int
+        or not 1 <= max_seconds <= 30
+    ):
+        raise AudioSourceError(
+            AudioSourceProblem.UNSUPPORTED,
+            "Choose an uncompressed PCM WAV file.",
+        )
+    facts = source.stat()
+    if facts.st_size <= 0 or facts.st_size > _MAX_PREVIEW_FILE_BYTES:
+        raise AudioSourceError(
+            AudioSourceProblem.UNSUPPORTED,
+            "This WAV is too large for the bounded settings preview.",
+        )
+    payload = source.read_bytes()
+    source_sha256 = hashlib.sha256(payload).hexdigest()
+    try:
+        with wave.open(io.BytesIO(payload), "rb") as reader:
+            if reader.getcomptype() != "NONE":
+                raise AudioSourceError(
+                    AudioSourceProblem.UNSUPPORTED,
+                    "Choose an uncompressed PCM WAV file.",
+                )
+            channels = reader.getnchannels()
+            sample_width = reader.getsampwidth()
+            sample_rate = reader.getframerate()
+            source_frames = reader.getnframes()
+            if not 1 <= channels <= 8 or sample_width not in (1, 2, 3, 4):
+                raise AudioSourceError(
+                    AudioSourceProblem.UNSUPPORTED,
+                    "This WAV format cannot be previewed.",
+                )
+            preview_frames = min(source_frames, sample_rate * max_seconds)
+            if preview_frames <= 0:
+                raise AudioSourceError(
+                    AudioSourceProblem.UNSUPPORTED,
+                    "This WAV does not contain audio frames.",
+                )
+            raw_frames = reader.readframes(preview_frames)
+    except AudioSourceError:
+        raise
+    except (EOFError, wave.Error, OSError) as exc:
+        raise AudioSourceError(
+            AudioSourceProblem.UNSUPPORTED,
+            "Choose an uncompressed PCM WAV file.",
+        ) from exc
+    expected = preview_frames * channels * sample_width
+    if len(raw_frames) != expected:
+        raise AudioSourceError(
+            AudioSourceProblem.TRUNCATED,
+            "The WAV ended before the preview could be read.",
+        )
+    context = CandidateContext(
+        candidate_id="preview-" + source_sha256[:24],
+        recording_key="preview.wav",
+        source_sha256=source_sha256,
+        sample_rate_hz=sample_rate,
+        channels=channels,
+        source_frame_count=preview_frames,
+        context_start_frame=0,
+        context_end_frame=preview_frames,
+        candidate_start_frame=0,
+        candidate_end_frame=preview_frames,
+    )
+    return CandidateAudio(
+        context=context,
+        sample_width_bytes=sample_width,
+        samples=_decode_pcm(raw_frames, sample_width=sample_width, channels=channels),
+        wav_bytes=_playback_wav(
+            raw_frames,
+            channels=channels,
+            sample_width=sample_width,
+            sample_rate=sample_rate,
+        ),
+    )
+
+
 __all__ = [
     "AudioSourceError",
     "AudioSourceProblem",
     "CandidateAudio",
     "SourceIdentityCache",
     "read_candidate_audio",
+    "read_preview_wav",
 ]

@@ -534,6 +534,20 @@ class SpectrogramCache:
         finally:
             connection.close()
 
+    def valid_content_keys(self, *, limit: int = 100_000) -> tuple[str, ...]:
+        if type(limit) is not int or not 1 <= limit <= 100_000:
+            raise ValueError("Cache key query limit is invalid.")
+        connection = self._connect()
+        try:
+            rows = connection.execute(
+                """SELECT content_key FROM cache_entries
+                     WHERE state = 'valid' ORDER BY content_key LIMIT ?""",
+                (limit,),
+            )
+            return tuple(row["content_key"] for row in rows)
+        finally:
+            connection.close()
+
     @property
     def manifest_bytes(self) -> int:
         """Return actual SQLite bytes without scanning cached objects."""
