@@ -15,7 +15,7 @@ If no repository exists, initialize Git **once**, after installing Git LFS and v
 
 ## Deliver
 
-Run owning `UT-*`, actual `IT-*`, relevant static audits and native visual evidence checks. Document genuine failures/blockers, not inferred green status. Before committing:
+Run owning `UT-*`, actual `IT-*`, relevant static audits and native visual evidence checks. **RV-09/RV-10 correction exception:** run only short targeted tests with a strict 120-second per-invocation maximum (including setup); do not run full ordinary suites, 50k stress, broad Train/RF or ≥600-second soak without separate owner authorization. Record all deferred cases and never invent full-suite passes. Required visible Qt approval must be scheduled with the owner; headless screenshots are not sign-off. Document genuine failures/blockers, not inferred green status. Before committing:
 
 ```bash
 git status --short --ignored

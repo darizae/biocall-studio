@@ -139,3 +139,9 @@ data. Launch with:
 The pack's README gives the Review labels/spectrogram/finalize/export/exit walkthrough. Its source
 checksum verification passes. It is local manual evidence material, not a tracked test fixture or
 field-data claim.
+
+## Additive owner-raised correction gate — 2026-11-06
+
+After the tests above, the owner inspected the actual Review UI and **did not approve its appearance**. Source review identified a missing persistent prototype sidebar, a mismatched Open Review button/header, non-parity Gallery/One-by-one presentation, synchronous detail WAV/FFT on the Qt path, no empty-cache Gallery generation wiring, repeated source hashing, uncalibrated cache preflight and potential fixed-quota eviction churn. The owner additionally requires **Delete session** (including safe finalized/successor/export handling) and an **in-application Review data-folder picker/migration**. These were not qualified by the historical tests.
+
+The corrective route is [RV-09](specs/review/RV-09-native-visual-parity-and-data-management.md) then [RV-10](specs/review/RV-10-spectrogram-interactivity-and-qualification.md). The [committed prototype target PNGs and native-before captures](design/evidence/review-correction/README.md) must be paired with **real visible native-after screenshots** and explicit owner visual approval; offscreen captures are insufficient. Reusable generic UI primitives are to be committed independently in `alp-ui`, then the latest approved local revision reinstalled/verified in Studio before use. **No new tests or visible app screenshots have been executed for this docs-only corrective handoff.** Owner forbids long test runs during these corrections; only short targeted commands up to 120 seconds each are authorized without further agreement. Prior evidence remains historically accurate, but RV-08 sign-off and merge into `main` stay **blocked**.

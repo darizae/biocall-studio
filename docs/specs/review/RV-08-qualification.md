@@ -6,6 +6,8 @@
 
 **Series:** [Locked scope, prerequisites and coverage](README.md) · [Status](../../IMPLEMENTATION_SEQUENCE.md)
 
+> **Reopened corrective gate:** [RV-09](RV-09-native-visual-parity-and-data-management.md) and [RV-10](RV-10-spectrogram-interactivity-and-qualification.md) must be completed and visually owner-approved before RV-08 can be signed off or Review merged into main. The historic 2026-11-06 feasible test passes did not validate prototype parity, native Gallery generation, session deletion or in-app Review data-folder selection. No long-running tests are authorized for those corrections.
+
 ## Strict ownership and exclusions
 
 **Owner:** final scientific and whole-application integration under existing **ST-11** qualification/test ownership, plus evidence review and final documentation. **Entry:** approved RV-07, with RV-01–06 gates already reviewed. **No new duplicate E2E test index**, no macOS/Windows packaging/signing/release work.

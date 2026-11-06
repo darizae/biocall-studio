@@ -1,6 +1,6 @@
 # Agent routing — minimum task context
 
-Read [`AGENTS.md`](../../AGENTS.md), then **only the owning current contract and code/tests** for the request. Verify real paths, Git state and installed source. Completed ST-01–ST-10 and REV-01–REV-04 implementation specs/handoffs have been removed; do not look for or reconstruct them. Do not preload all documentation or sibling repositories.
+Use **only the owning current contract and code/tests** for the request. Verify real paths, Git state and installed source. Completed ST-01–ST-10 and REV-01–REV-04 implementation specs/handoffs have been removed; do not look for or reconstruct them. Do not preload all documentation or sibling repositories.
 
 | Task | Start here; open further material only for a concrete dependency |
 |---|---|
@@ -8,7 +8,7 @@ Read [`AGENTS.md`](../../AGENTS.md), then **only the owning current contract and
 | Train behavior | Owning Train module/tests; [training catalog](../science/TRAINING_CONFIGURATION_CATALOG.md) only for configuration changes. Preserve existing Train scientific behavior. |
 | Native UI/copy | [owner UI feedback](../specs/manual_revision_specs/UI-pass-revision-spec.md) and [native UI evidence](../design/evidence/st-11-native/README.md), actual native screens, accepted [prototype](../design/prototypes/studio-detect/index.html), [public alp-ui contract](../design/ALP_UI_CONSUMER_CONTRACT.md) only when controls are involved |
 | REV-05 storage preflight (implemented) | [REV-05](../specs/manual_revision_specs/REV-05-output-size-preflight.md), shared storage contract, and owning Train/Detect adapters/tests. No full-Studio E2E. |
-| Review (RV-01→RV-08 source implemented; RV-08 owner gate pending) | [Review index and locked decisions](../specs/review/README.md) → **only the active stage**. The local `review` baseline contains RV-01–RV-07 at `570adc7`; RV-08 has an isolated qualification handoff on `review-rv08-qualification` with [actual evidence](../RV-08_QUALIFICATION.md). Do not infer visible-native or release sign-off from background source-app passes. |
+| Review corrective work (current active route) | [Review index](../specs/review/README.md) → **RV-09 visual/sidebar/session deletion/data folder + upstream `alp-ui`** → **RV-10 async spectrogram/cache**, only the currently authorized stage. Compare actual [prototype PNG targets and offscreen native-before images](../design/evidence/review-correction/README.md) to **real visible native-after screenshots**. RV-08 is **blocked** until both corrections and owner visual approval; do not reread all old RV specs. [Historical qualification](../RV-08_QUALIFICATION.md) is not approval. |
 | Scientific/toolbox or UI-library change | [Source map](SOURCE_MAP.md) and [upstream workflow](UPSTREAM_TOOLBOX_WORKFLOW.md); inspect only the actual owning API/fixtures |
 | Documentation or qualification | Exact affected files, [status](../IMPLEMENTATION_SEQUENCE.md), existing [test indexes](../UNIT_TESTING.md), [ST-11 evidence](../ST-11_QUALIFICATION.md) where relevant |
 | Deferred installed release | Only after separate authorization: [macOS](../specs/06-macos-release-and-installer.md), [Windows](../specs/07-windows-release-and-installer.md), [release process](../RELEASE_PROCESS.md) |
