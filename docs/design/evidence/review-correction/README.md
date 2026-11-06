@@ -1,34 +1,63 @@
-# Review correction — committed screenshot baseline
+# Review correction — visual baseline and visible native evidence
 
-These files are **unchanged PNG byte-for-byte copies** of existing tracked HTML prototype screenshots and existing RV-05 offscreen Qt screenshots, from the `review` branch at `38fd5c5746d52cfcc722cc155c2ee412f2eac9db` (2026-11-06). They were copied by their exact Git blob SHA; **not freshly generated**, and no actual visible/native screenshot has been captured in this documentation commit.
+The `targets/` files are unchanged, byte-for-byte copies of the tracked HTML prototype screenshots from the `review` branch. The `native-before/` files are the earlier RV-05 offscreen Qt captures. The `native-after/` files are the final RV-09 screenshots captured from the **visible PySide6 application on Cocoa** after screenshot-driven corrections.
 
-**Purpose:** next agents must compare genuine design targets **as images**, not infer fidelity from CSS or a button inventory, then commit the real PySide6 screenshots under a future `native-after/` folder after authorized visible testing and owner review.
+## Final capture provenance
 
-| Screen | Prototype target | Existing offscreen native-before (if available) | Required visible Qt-after |
-|---|---|---|---|
-| Launchpad | `targets/00-studio.png` | none | `native-after/00-studio.png` |
-| Choose Result | `targets/01-choose-result.png` | none | `native-after/01-choose-result.png` |
-| Sessions | `targets/02-sessions.png` | none | `native-after/02-sessions.png` |
-| Gallery | `targets/03-gallery.png` | `native-before/gallery.png` | `native-after/03-gallery.png` |
-| List | `targets/04-list.png` | `native-before/list-compact.png` | `native-after/04-list.png` |
-| One by one | `targets/05-one-by-one.png` | `native-before/one-by-one.png` | `native-after/05-one-by-one.png` |
-| Spectrograms | `targets/06-spectrograms.png` | none | `native-after/06-spectrograms.png` |
-| Finalize warning | `targets/07-finalize.png` | none | `native-after/07-finalize.png` |
-| Export | `targets/08-export.png` | none | `native-after/08-export.png` |
-| Compact Gallery | `targets/09-compact-gallery.png` | none | `native-after/09-compact-gallery.png` |
-| Compact One by one | `targets/10-compact-one-by-one.png` | none | `native-after/10-compact-one-by-one.png` |
-| Narrow One by one | `targets/11-narrow-one-by-one.png` | none | `native-after/11-narrow-one-by-one.png` |
-| Settings/presets | Historical prototype screenshot not in image set (inspect HTML source) | `native-before/settings.png` | `native-after/12-settings.png` |
-| New deletion and directory controls | **Owner-required additions not present in old prototype** | none | `native-after/13-delete-session.png` and `14-review-data-folder.png` |
+- Capture: 2026-11-06 15:02:41 UTC, deliberately authorized visible desktop session.
+- Application revision: `48d9ba92dd1c0f0b90065090d12570b3dc4814a3` on `review-rv09-native-visual-parity`.
+- `alp-ui`: sibling revision `8cdc91f56005fcd0f3c4004b66016b3d237a10c3`; installed distribution `0.1.0a0` imported from `.venv/lib/python3.12/site-packages/alp_ui/__init__.py`.
+- Platform: macOS 26.6.2 (25G83), arm64; Qt 6.11.2 using the Cocoa platform plugin.
+- Display: Built-in Retina Display, scale 2.0; 1470×956 total and 1470×835 available logical pixels.
+- Capture method: `QScreen.grabWindow` over the visible, focused Studio client area. This is composited Cocoa output, including native modal dialogs—not `QWidget.grab()` or offscreen Qt.
+- Viewports: normal 1280×807 logical / 2560×1614 pixels (the maximum 1280-wide client height available below the macOS menu bar); compact 700×790 / 1400×1580; narrow 520×790 / 1040×1580.
+- Fixture: generated 10-second, mono 8 kHz PCM WAV `woodland-dawn-2026-11-05.wav`, SHA-256 `d8911051699554d746a44c4b90d839529e85fb6d0b8147d6fc9efa5ed25fdafa`; 12 deterministic eligible candidates and Open, Closed and Finalized sessions. The fixture exercises real intake/session/cache/rendering UI boundaries but is not scientific qualification data.
+- Machine-readable dimensions and fixture details: [`native-after/capture-metadata.json`](native-after/capture-metadata.json).
 
-**Fidelity rules:** reproduce the **left sidebar** (Sessions, Choose Result, Review, Spectrograms, Exports), hierarchy, spacing, cards, navigation and spectrogram emphasis. The latest owner instruction demands consistent Open Train/Detect/Review button variants, even though the old prototype emphasized Review; document this deliberate exception. Do not copy prototype's illustrative banner, fictitious WAVs as scientific proof, or demo-only controls.
+The capture command was bounded by the RV-09 120-second limit and passed:
 
-**Required later capture:** run the *actual* PySide6 application in visible mode **only when the owner authorizes interruption of their desktop**. Capture matching windows at appropriate dimensions and available screen scale, record OS/Qt version, Git SHAs and fixture provenance, add PNGs under `native-after/` and a screen-by-screen target-versus-native comparison with deviations/fixes. Headless/offscreen screenshots are historical regression evidence, **not final visual approval**. New Settings data-directory and Delete session screens require separate owner approval as sensible minimal extensions to the prototype.
+```text
+BIOCALL_RV09_EVIDENCE_DIR=.../native-after \
+  perl -e '$t=shift; alarm $t; exec @ARGV' 120 \
+  .venv/bin/python scripts/run_tests.py native --allow-visible \
+  tests/integration/test_review_rv09_native_evidence.py -q
+1 passed
+```
 
-## RV-09 implementation evidence pending the visible gate
+## Paired evidence and comparison
 
-The `review-rv09-native-visual-parity` branch starts from reviewed `review` commit `0281f11` and implements the persistent native sidebar, dedicated routes, equal outline/large launchpad actions, safe session deletion, and movable Review data storage. The equal launchpad actions deliberately differ from `targets/00-studio.png`, where Review alone is highlighted; the later owner instruction in RV-09 is authoritative.
+| Screen | Prototype target | Earlier native | Visible Cocoa after | Comparison and deliberate deviations |
+|---|---|---|---|---|
+| Launchpad | [`targets/00-studio.png`](targets/00-studio.png) | none | [`native-after/00-studio.png`](native-after/00-studio.png) | Three equal cards retain the target hierarchy. All Open actions are identical outline/large buttons; this deliberately replaces the target's uniquely filled Review button per the later owner requirement. |
+| Choose Result | [`targets/01-choose-result.png`](targets/01-choose-result.png) | none | [`native-after/01-choose-result.png`](native-after/01-choose-result.png) | Persistent sidebar, page title, preset, result selection and Start session hierarchy match. Native table selection replaces web-demo radio decoration. |
+| Sessions | [`targets/02-sessions.png`](targets/02-sessions.png) | none | [`native-after/02-sessions.png`](native-after/02-sessions.png) | Dedicated Sessions route shows Open, Closed and Finalized state, counts, selection and contextual action. Required Delete session is visible. |
+| Gallery | [`targets/03-gallery.png`](targets/03-gallery.png) | [`native-before/gallery.png`](native-before/gallery.png) | [`native-after/03-gallery.png`](native-after/03-gallery.png) | Three-column normal gallery, filters, controls and progress follow the target. Real renderer thumbnails now preserve aspect ratio; prototype-only illustrative calls and checkboxes were not copied. |
+| List | [`targets/04-list.png`](targets/04-list.png) | [`native-before/list-compact.png`](native-before/list-compact.png) | [`native-after/04-list.png`](native-after/04-list.png) | Readable source time, duration, prediction and label columns sit under the same Review controls and persistent sidebar. |
+| One by one | [`targets/05-one-by-one.png`](targets/05-one-by-one.png) | [`native-before/one-by-one.png`](native-before/one-by-one.png) | [`native-after/05-one-by-one.png`](native-after/05-one-by-one.png) | Large real spectrogram/audio card and grouped labeling actions match the target emphasis. Axis labels and detected interval come from renderer metadata. Irrelevant bulk footer actions are hidden in this view. |
+| Spectrograms | [`targets/06-spectrograms.png`](targets/06-spectrograms.png) | none | [`native-after/06-spectrograms.png`](native-after/06-spectrograms.png) | Dedicated route shows preset, storage, generation actions and verified 12-of-12 cache availability. Native storage estimation retains the existing scientific/storage contract. |
+| Finalize | [`targets/07-finalize.png`](targets/07-finalize.png) | none | [`native-after/07-finalize.png`](native-after/07-finalize.png) | Native Cocoa modal states the seven unreviewed detections and model-detection consequence; Cancel is the default and Finalize remains explicit. |
+| Export | [`targets/08-export.png`](targets/08-export.png) | none | [`native-after/08-export.png`](native-after/08-export.png) | Finalized-decision summary and previous exports restore the target's information balance beside real format/destination and preflight controls. |
+| Compact Gallery | [`targets/09-compact-gallery.png`](targets/09-compact-gallery.png) | none | [`native-after/09-compact-gallery.png`](native-after/09-compact-gallery.png) | Exact 700×790 logical viewport, compact sidebar and a readable two-column gallery with essential controls visible. |
+| Compact One by one | [`targets/10-compact-one-by-one.png`](targets/10-compact-one-by-one.png) | none | [`native-after/10-compact-one-by-one.png`](native-after/10-compact-one-by-one.png) | Exact 700×790 viewport stacks the large spectrogram above the label card without the unrelated bulk footer. |
+| Narrow One by one | [`targets/11-narrow-one-by-one.png`](targets/11-narrow-one-by-one.png) | none | [`native-after/11-narrow-one-by-one.png`](native-after/11-narrow-one-by-one.png) | Exact 520×790 viewport uses icon-only persistent navigation and keeps session state, core actions, plot, audio and labeling legible. |
+| Spectrogram settings | Historical prototype HTML only | [`native-before/settings.png`](native-before/settings.png) | [`native-after/12-settings.png`](native-after/12-settings.png) | Existing preset/settings contract is retained as a dedicated Spectrograms child page with accessible help and Test WAV controls. |
+| Delete session | Owner-required addition | none | [`native-after/13-delete-session.png`](native-after/13-delete-session.png) | Native destructive confirmation uses the approved copy, names the selected Closed session, preserves exports, and defaults to Cancel. Open and Finalized behavior are covered by indexed tests. |
+| Review data folder | Owner-required addition | none | [`native-after/14-review-data-folder.png`](native-after/14-review-data-folder.png) | Subtle Settings route exposes the current Review-owned location and Change folder action without conflating it with spectrogram presets. Migration/failure/restart behavior is covered separately. |
 
-No reusable `alp-ui` gap was found. RV-09 composes the documented ordinary-Qt sidebar pattern with the installed public `Button`, `FolderPicker`, `Text`, theme-token and icon APIs. The inspected clean sibling revision is `8cdc91f56005fcd0f3c4004b66016b3d237a10c3`, matching `pyproject.toml`; the installed `0.1.0a0` wheel source tree is byte-equivalent to that checkout (excluding generated bytecode). No upstream branch or ceremonial commit was created.
+## Corrections driven by the visible capture
 
-Automated offscreen Qt checks are regression evidence only and are intentionally not stored under `native-after/`. Those files remain absent until an explicitly authorized visible Cocoa session can capture the real application at the required viewports and the owner can review the paired deviations. RV-09 and RV-08 therefore remain visually unqualified until that gate is completed.
+The first visible pass was inspected rather than accepted as decoration. It exposed and led to these final changes:
+
+- lowered the Studio shell minimum width from 640 to 520 so the required narrow native viewport is real;
+- reserved right-axis paint space so the last spectrogram time label no longer clips;
+- hid Gallery/List bulk actions while in One by one, recovering compact vertical space;
+- tightened the compact sidebar and gallery grid to restore two columns at 700 px;
+- hid the redundant session chip in compact mode;
+- added Finalized decisions and Previous exports to the native Export screen;
+- waited for cache availability before capturing Spectrograms, so the evidence records actual state rather than a transient check.
+
+## `alp-ui` decision
+
+No reusable `alp-ui` gap was found. RV-09 composes the documented ordinary-Qt sidebar pattern with installed public `Button`, `FolderPicker`, `Text`, theme-token and icon APIs. The sibling checkout was clean at the revision above and the installed package source was verified against it. No ceremonial upstream branch or commit was created.
+
+The PNG set establishes real visible Cocoa evidence. Automated tests and this agent's pixel inspection do not substitute for the owner's final visual approval; the committed pairs above are the exact artifacts presented for that decision.
