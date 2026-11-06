@@ -4,6 +4,9 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
+import threading
+import time
+from dataclasses import replace
 from pathlib import Path
 from textwrap import dedent
 
@@ -21,6 +24,28 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from biocall_studio.review.application.controller import default_spectrogram_snapshot
+from biocall_studio.review.application.generation import (
+    GenerationCancelled,
+    GenerationJob,
+    GenerationToken,
+)
+from biocall_studio.review.application.storage import (
+    assess_review_cache_storage,
+    plan_review_cache_generation,
+)
+from biocall_studio.review.domain.cache import CachePriority
+from biocall_studio.review.domain.intake import (
+    REVIEW_INTAKE_SCHEMA_VERSION,
+    EligibleCandidate,
+    ReviewIntakeManifest,
+    ReviewIntakeProjection,
+    ReviewRecording,
+    ReviewResultKind,
+    projection_digest,
+)
+from biocall_studio.review.domain.sessions import ReviewSessionSource, ReviewSessionState
+from biocall_studio.review.domain.spectrograms import SpectrogramImageTier
 from biocall_studio.studio.application.app import (
     create_application as create_studio_application,
 )
@@ -73,6 +98,129 @@ def _finish(qtbot, coordinator: StudioCoordinator) -> None:
         qtbot.waitUntil(lambda: coordinator.controller._shutdown_finished, timeout=10_000)
 
 
+def _create_open_review_session(coordinator: StudioCoordinator) -> str:
+    candidate = EligibleCandidate(
+        ordinal=0,
+        recording_ordinal=0,
+        candidate_id="cand_" + "1" * 32,
+        recording_ref="rec_" + "2" * 32,
+        recording_key="recordings/call.wav",
+        source_sha256="3" * 64,
+        sample_rate_hz=8_000,
+        frame_count=8_000,
+        channels=1,
+        start_frame=1_000,
+        end_frame=2_000,
+        start_time_ns=125_000_000,
+        end_time_ns=250_000_000,
+        cnn_target_score=0.9,
+        rf_target_score=None,
+        contributing_windows=1,
+    )
+    recording = ReviewRecording(
+        ordinal=0,
+        recording_ref=candidate.recording_ref,
+        recording_key=candidate.recording_key,
+        source_sha256=candidate.source_sha256,
+        sample_rate_hz=candidate.sample_rate_hz,
+        frame_count=candidate.frame_count,
+        channels=candidate.channels,
+        failed=False,
+        error_code="",
+        eligible_candidate_count=1,
+    )
+    manifest = ReviewIntakeManifest(
+        schema_version=REVIEW_INTAKE_SCHEMA_VERSION,
+        projection_digest="0" * 64,
+        result_kind=ReviewResultKind.CNN,
+        collection_id="det_" + "4" * 32,
+        result_id="pub_" + "5" * 32,
+        result_digest="6" * 64,
+        publication_digest="7" * 64,
+        parent_result_id=None,
+        parent_result_digest=None,
+        binding_revision=1,
+        inventory_id="inv_" + "8" * 32,
+        inventory_digest="9" * 64,
+        source_time_semantics=(
+            "zero_based_half_open_source_frames_with_integer_nanosecond_projection"
+        ),
+        recording_count=1,
+        failed_recording_count=0,
+        eligible_candidate_count=1,
+    )
+    manifest = replace(
+        manifest,
+        projection_digest=projection_digest(manifest, (recording,), (candidate,)),
+    )
+    projection = ReviewIntakeProjection(manifest, (recording,), (candidate,))
+    settings = default_spectrogram_snapshot()
+    coordinator.review_controller.ensure_default_preset(
+        settings, saved_at="2026-11-06T09:00:00.000Z"
+    )
+    session = coordinator.review_controller.store.create_session(
+        name="Retained migration review",
+        source=ReviewSessionSource.from_projection(
+            projection,
+            score_semantics="binary_softmax_target_output_index_1; not_a_calibrated_probability",
+            eligibility_threshold=0.5,
+        ),
+        candidates=(candidate,),
+        settings=settings,
+        owner_id=coordinator.review_controller.owner_id,
+        created_at="2026-11-06T09:01:00.000Z",
+        session_id="rsn_" + "a" * 32,
+    )
+    coordinator.shell_window.review_page.open_session(session.session_id)
+    return session.session_id
+
+
+def _start_blocked_review_generation(coordinator: StudioCoordinator) -> str:
+    page = coordinator.review_page
+    state = page.current_state
+    assert state is not None
+    snapshot = coordinator.review_controller.store.load_settings(state.session.session_id)
+    plan = plan_review_cache_generation(
+        missing_count=1,
+        existing_file_sizes=(),
+        tier=SpectrogramImageTier.THUMBNAIL,
+        settings_digest=snapshot.settings_digest,
+        calibration=None,
+    )
+    estimate = assess_review_cache_storage(plan, cache_root=page.cache.root)
+    assert estimate.can_start
+    started = threading.Event()
+
+    def render(cancelled):
+        started.set()
+        while not cancelled():
+            time.sleep(0.005)
+        raise GenerationCancelled("cancelled by application exit")
+
+    job = GenerationJob(
+        content_key="spec_" + "f" * 64,
+        tier=SpectrogramImageTier.THUMBNAIL,
+        priority=CachePriority.GENERATE_ALL,
+        token=GenerationToken(
+            session_id=state.session.session_id,
+            settings_epoch=state.session.settings_epoch,
+            settings_digest=snapshot.settings_digest,
+            source_sha256="3" * 64,
+        ),
+        render=render,
+    )
+    batch_id = page.supervisor.submit_bulk(
+        (job,),
+        storage_estimate=estimate,
+        confirmed=estimate.requires_confirmation,
+    )
+    page._generation_batch_id = batch_id
+    page._begin_owned_operation("Spectrogram generation")
+    page._generation_timer.start()
+    assert started.wait(5)
+    return batch_id
+
+
 def _ready_collection(tmp_path: Path, collection_factory, *, source_count: int = 3):
     root = collection_factory(tmp_path / "collection", source_count=source_count)
     scan = publish_collection_metadata(root, scan_collection(root))
@@ -105,7 +253,7 @@ def test_studio_launchpad_uses_one_themed_application_and_accessible_native_card
     assert [card.action_button.text() for card in cards] == [
         "Open Train",
         "Open Detect",
-        "Coming later",
+        "Open Review",
     ]
     shell.launchpad.train_card.action_button.setFocus()
     qtbot.keyClick(shell.launchpad.train_card.action_button, Qt.Key.Key_Space)
@@ -355,7 +503,7 @@ def test_canonical_worker_protocol_and_train_binding_share_one_suite_identity(
     assert "canonical Studio entry retained Train settings" in result.stdout
 
 
-def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(qtbot, tmp_path):
+def test_detect_collection_setup_and_review_workspace_are_keyboard_reachable(qtbot, tmp_path):
     """Case: IT-STU-005."""
     coordinator = _coordinator(qtbot, WorkspaceController(tmp_path / "settings"))
     shell = coordinator.shell_window
@@ -366,7 +514,7 @@ def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(q
     assert not shell.global_header.isVisible()
     assert isinstance(shell.detect_page.focusWidget(), QPushButton)
     assert shell.detect_page.focusWidget().accessibleName() == "Choose Train Model folder"
-    assert len(shell.detect_page.findChildren(FolderPicker)) == 5
+    assert len(shell.detect_page.findChildren(FolderPicker)) == 4
     assert {
         "More about Detection Model",
         "More about Recordings folder",
@@ -374,7 +522,6 @@ def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(q
         "More about Minimum detection score",
         "More about Window overlap",
         "More about Combine nearby candidates",
-        "More about Corpus export formats",
     } <= {hint.accessibleName() for hint in shell.detect_page.findChildren(HelpHint)}
     assert len(shell.detect_page.findChildren(QComboBox)) == 3
     assert not shell.detect_page.result_explorer.history_select.isEnabled()
@@ -394,17 +541,221 @@ def test_detect_collection_setup_and_review_placeholder_are_keyboard_reachable(q
     shell.launchpad.review_card.action_button.setFocus()
     qtbot.keyClick(shell.launchpad.review_card.action_button, Qt.Key.Key_Space)
     assert shell.current_workspace is WorkspaceRoute.REVIEW
-    qtbot.waitUntil(lambda: shell.focusWidget() is shell.review_page.back_button)
-    assert shell.review_page.findChildren(QComboBox) == []
+    qtbot.waitUntil(lambda: shell.focusWidget() is shell.review_page.landing_page.results)
+    assert shell.back_to_studio_button.isVisible()
     review_text = " ".join(label.text() for label in shell.review_page.findChildren(QLabel))
-    assert "Review is coming later" in review_text
+    assert "Choose Result" in review_text
+    assert "Review is coming later" not in review_text
     assert all(
         forbidden not in (detect_text + review_text).lower()
         for forbidden in ("simulated", "demo", "prototype")
     )
-    qtbot.keyClick(shell.review_page.back_button, Qt.Key.Key_Space)
+    shell.back_to_studio_button.setFocus()
+    qtbot.keyClick(shell.back_to_studio_button, Qt.Key.Key_Space)
     assert shell.current_workspace is WorkspaceRoute.STUDIO
     assert not coordinator.controller.settings_file.exists()
+
+    _finish(qtbot, coordinator)
+
+
+def test_open_review_survives_navigation_and_one_exit_policy_fails_closed(
+    qapp, qtbot, tmp_path, monkeypatch
+):
+    """Case: IT-REVW-011."""
+    coordinator = _coordinator(qtbot, WorkspaceController(tmp_path / "settings"))
+    session_id = _create_open_review_session(coordinator)
+    page = coordinator.shell_window.review_page
+    assert page.current_state is not None
+    page.current_state.scroll_offset = 17
+
+    coordinator.open_workspace(WorkspaceRoute.REVIEW)
+    assert coordinator.shell_window.current_workspace is WorkspaceRoute.REVIEW
+    assert page.current_state.session.session_id == session_id
+    coordinator.open_workspace(WorkspaceRoute.DETECT)
+    assert coordinator.review_controller.store.open_session().session_id == session_id
+    assert coordinator.review_controller.store.load_position(session_id).scroll_offset == 17
+    coordinator.open_workspace(WorkspaceRoute.REVIEW)
+    assert page.current_state.session.session_id == session_id
+    assert page.current_state.scroll_offset == 17
+
+    for route in (WorkspaceRoute.REVIEW, WorkspaceRoute.DETECT, WorkspaceRoute.STUDIO):
+        coordinator.open_workspace(route)
+        coordinator.shell_window.close()
+        route_dialog = coordinator.exit_dialog
+        assert route_dialog is not None and route_dialog.isVisible()
+        assert route_dialog.text() == "A Review session is still open. Save and exit?"
+        route_dialog.defaultButton().click()
+        qtbot.waitUntil(lambda: coordinator.exit_dialog is None)
+        assert coordinator.review_controller.store.open_session().session_id == session_id
+
+    batch_id = _start_blocked_review_generation(coordinator)
+
+    coordinator.open_workspace(WorkspaceRoute.TRAIN)
+    coordinator.train_window.close()
+    dialog = coordinator.exit_dialog
+    assert dialog is not None and dialog.isVisible()
+    assert dialog.text() == "A Review session is still open. Save and exit?"
+    assert {button.text() for button in dialog.buttons()} == {
+        "Keep app open",
+        "Save and Exit",
+    }
+    assert dialog.defaultButton().text() == "Keep app open"
+    assert dialog.escapeButton().text() == "Keep app open"
+    assert dialog.informativeText().count("Spectrogram generation in Review") == 1
+    coordinator.request_application_exit()
+    assert coordinator.exit_dialog is dialog
+    assert len(
+        [
+            widget
+            for widget in qapp.topLevelWidgets()
+            if widget.objectName() == "studioExitDialog" and widget.isVisible()
+        ]
+    ) == 1
+    qtbot.keyClick(dialog, Qt.Key.Key_Escape)
+    qtbot.waitUntil(lambda: coordinator.exit_dialog is None)
+    assert coordinator.review_controller.store.open_session().session_id == session_id
+    assert coordinator.train_window.isVisible()
+    assert page.active_operation is not None
+    assert not page.supervisor.progress(batch_id).done
+
+    original_cancel = page.supervisor.cancel
+    monkeypatch.setattr(
+        page.supervisor,
+        "cancel",
+        lambda _batch_id: (_ for _ in ()).throw(RuntimeError("injected stop failure")),
+    )
+    coordinator.request_application_exit()
+    dialog = coordinator.exit_dialog
+    assert dialog is not None
+    next(button for button in dialog.buttons() if button.text() == "Save and Exit").click()
+    qtbot.waitUntil(
+        lambda: coordinator.exit_failure_dialog is not None
+        and coordinator.exit_failure_dialog.isVisible()
+    )
+    failure = coordinator.exit_failure_dialog
+    assert failure is not None
+    assert "Review work couldn't be stopped" in failure.text()
+    assert coordinator.review_controller.store.open_session().session_id == session_id
+    assert page.active_operation is not None
+    assert not coordinator._application_exit_complete
+    coordinator.request_application_exit()
+    assert coordinator.exit_failure_dialog is failure
+    assert coordinator.exit_dialog is None
+    failure.defaultButton().click()
+    monkeypatch.setattr(page.supervisor, "cancel", original_cancel)
+
+    original_checkpoint = page.checkpoint_open_session_for_exit
+    monkeypatch.setattr(
+        page,
+        "checkpoint_open_session_for_exit",
+        lambda: (_ for _ in ()).throw(OSError("injected checkpoint failure")),
+    )
+    coordinator.request_application_exit()
+    dialog = coordinator.exit_dialog
+    assert dialog is not None
+    next(button for button in dialog.buttons() if button.text() == "Save and Exit").click()
+    qtbot.waitUntil(
+        lambda: coordinator.exit_failure_dialog is not None
+        and coordinator.exit_failure_dialog.isVisible()
+    )
+    failure = coordinator.exit_failure_dialog
+    assert failure is not None
+    assert "Review session couldn't be saved" in failure.text()
+    assert coordinator.review_controller.store.open_session().session_id == session_id
+    assert page.supervisor.progress(batch_id).done
+    assert page.active_operation is None
+    assert not coordinator._application_exit_complete
+    failure.defaultButton().click()
+
+    monkeypatch.setattr(page, "checkpoint_open_session_for_exit", original_checkpoint)
+    coordinator.request_application_exit()
+    dialog = coordinator.exit_dialog
+    assert dialog is not None
+    next(button for button in dialog.buttons() if button.text() == "Save and Exit").click()
+    qtbot.waitUntil(lambda: coordinator._application_exit_complete, timeout=15_000)
+    assert coordinator.review_controller.store.get_session(session_id).state is ReviewSessionState.CLOSED
+    assert not coordinator.shell_window.isVisible()
+    assert not coordinator.train_window.isVisible()
+
+
+def test_restart_recovers_the_same_open_review_session_after_owner_loss(qtbot, tmp_path):
+    """Case: IT-REVW-011 (restart and orphan-owner safety)."""
+    create_studio_application()
+    suite_data = tmp_path / "suite-data"
+    first = StudioCoordinator(
+        WorkspaceController(tmp_path / "first-settings"),
+        detect_data_dir=suite_data,
+    )
+    qtbot.addWidget(first.shell_window)
+    qtbot.addWidget(first.train_window)
+    first.start()
+    session_id = _create_open_review_session(first)
+    assert first.review_page.current_state is not None
+    first.review_page.current_state.scroll_offset = 29
+    first.review_page.leave_workspace()
+    previous_owner = first.review_controller.owner_id
+
+    # Model abrupt owner loss without invoking the orderly Save-and-Exit closure.
+    first.review_page.shutdown()
+    first.review_controller.shutdown()
+    first.detect_controller.shutdown()
+    first.controller.shutdown()
+    first.shell_window.hide()
+    first.train_window.hide()
+
+    second = StudioCoordinator(
+        WorkspaceController(tmp_path / "second-settings"),
+        detect_data_dir=suite_data,
+    )
+    qtbot.addWidget(second.shell_window)
+    qtbot.addWidget(second.train_window)
+    assert second.review_page.current_state is not None
+    assert second.review_page.current_state.session.session_id == session_id
+    assert second.review_page.current_state.scroll_offset == 29
+    recovered = second.review_controller.store.open_session()
+    assert recovered is not None
+    assert recovered.session_id == session_id
+    assert recovered.owner_id == second.review_controller.owner_id
+    assert recovered.owner_id != previous_owner
+
+    second.start()
+    second.request_application_exit()
+    dialog = second.exit_dialog
+    assert dialog is not None
+    next(button for button in dialog.buttons() if button.text() == "Save and Exit").click()
+    qtbot.waitUntil(lambda: second._application_exit_complete, timeout=15_000)
+    assert second.review_controller.store.get_session(session_id).state is ReviewSessionState.CLOSED
+
+
+def test_detect_new_export_entry_is_gone_while_history_reader_and_review_export_remain(
+    qtbot, tmp_path
+):
+    """Case: IT-REVW-012."""
+    coordinator = _coordinator(qtbot, WorkspaceController(tmp_path / "settings"))
+    detect = coordinator.detect_controller
+    page = coordinator.shell_window.detect_page
+
+    before = tuple(sorted(path for path in tmp_path.rglob("exp_*.json") if path.is_file()))
+    with pytest.raises(ValueError, match="Unknown Detect route"):
+        page._set_route("export-new")
+    assert tuple(sorted(path for path in tmp_path.rglob("exp_*.json") if path.is_file())) == before
+
+    assert not hasattr(page, "export_page")
+    assert not hasattr(page.result_explorer, "export_button")
+    assert not hasattr(page.export_history_page, "new_button")
+    assert not hasattr(detect, "prepare_export_plan")
+    assert not hasattr(detect, "start_export")
+    assert not hasattr(detect, "retry_save_export_history")
+    assert callable(detect.select_export)
+    assert hasattr(coordinator.shell_window.review_page, "export_page")
+    assert all(
+        button.text() not in {"New export", "Plan corpus export", "Export corpus"}
+        for button in page.findChildren(QPushButton)
+    )
+    coordinator.open_workspace(WorkspaceRoute.DETECT)
+    page._set_route("exports")
+    qtbot.waitUntil(lambda: page.focusWidget() is page.export_history_page.empty)
+    assert not page.export_history_page.open_button.isEnabled()
 
     _finish(qtbot, coordinator)
 
@@ -420,9 +771,7 @@ def test_detect_routes_use_approved_help_plain_language_and_compact_result_state
         "Detection Model": "A model trained in BioCall Studio that searches your recordings for possible calls.",
         "Recordings folder": "The folder of WAV files you want to search. BioCall Studio remembers it so you can relink the folder if it moves.",
         "Recording inclusion": "Included recordings are searched. Excluded and undecided recordings are skipped.",
-        "Corpus export formats": "Individual snippets creates one WAV per selected call. Concatenated creates one WAV and a Raven table, and requires matching audio formats.",
         "RF refinement": "Optionally use a Random Forest model to check the calls found by the detection model. The original results stay unchanged.",
-        "Result selection": "Selections are saved separately for each result.",
         "Estimated output": "Approximate space the finished files will use.",
         "Space while running": "Includes temporary files. Some are removed when the task finishes.",
     }
@@ -430,7 +779,7 @@ def test_detect_routes_use_approved_help_plain_language_and_compact_result_state
         hint.accessibleName().removeprefix("More about "): hint.toolTip()
         for hint in page.findChildren(HelpHint)
     }
-    assert len(page.findChildren(HelpHint)) == 15
+    assert len(page.findChildren(HelpHint)) == 11
     assert actual_help == approved_help
     approved_ids = {
         "CTX-01": "Minimum detection score",
@@ -439,10 +788,8 @@ def test_detect_routes_use_approved_help_plain_language_and_compact_result_state
         "CTX-04": "Detection Model",
         "CTX-05": "Recordings folder",
         "CTX-06": "Recording inclusion",
-        "CTX-07": "Corpus export formats",
         "CTX-08": None,
         "CTX-09": "RF refinement",
-        "CTX-10": "Result selection",
         "REV05-ESTIMATED-OUTPUT": "Estimated output",
         "REV05-SPACE-WHILE-RUNNING": "Space while running",
     }

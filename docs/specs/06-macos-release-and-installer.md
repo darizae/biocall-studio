@@ -65,9 +65,9 @@ immutable export only to the destination explicitly chosen by the user.
   recover without orphans, use per-user writable state, and preserve safe shared quit.
 - `IT-MAC-003`: reproduce the candidate from the recorded tag and dependency wheels, validate the
   manifest/digests and withhold promotion when credentials, legal clearance or evidence is absent.
-- `IT-MAC-004`: on the installed app, exercise Studio/Train/Detect normal and compact layouts,
+- `IT-MAC-004`: on the installed app, exercise Studio/Train/Detect/Review normal and compact layouts,
   navigation, focus, keyboard HelpHints, copy, tables, plots, empty/error/busy/success states and
-  Review placeholder. Save actual installed-app screenshots under
+  Review session/export behavior. Save actual installed-app screenshots under
   `docs/design/evidence/spec-06-installed/`; offscreen Qt grabs are not native Cocoa evidence.
 
 Installed configuration coverage must include representative basic and advanced CNN/RF fields,

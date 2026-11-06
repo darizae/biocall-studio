@@ -5,26 +5,24 @@ import json
 import os
 import shutil
 import wave
-from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from alp_ui.components import FolderPicker, HelpHint
-from PySide6.QtCore import QObject, Signal
-from PySide6.QtGui import QDesktopServices
 
 from biocall_studio.detect.application.controller import DetectWorkspaceController
 from biocall_studio.detect.application.navigation import DetectRoute
 from biocall_studio.detect.application.storage import estimate_export_artifacts
 from biocall_studio.detect.domain.detection import DetectionSettings
-from biocall_studio.detect.domain.export_history import ExportAvailability
+from biocall_studio.detect.domain.export_history import (
+    ExportAvailability,
+    ExportHistoryRecord,
+)
 from biocall_studio.detect.domain.exports import (
     ExportCancelledError,
     ExportConflictError,
     ExportError,
     ExportMode,
     ExportStaleSourceError,
-    ExportState,
 )
 from biocall_studio.detect.domain.result_views import ResultSelection, freeze_result_selection
 from biocall_studio.detect.domain.results import (
@@ -35,7 +33,6 @@ from biocall_studio.detect.domain.results import (
     recording_identity,
 )
 from biocall_studio.detect.domain.runs import canonical_digest
-from biocall_studio.detect.gui.export import ExportPage
 from biocall_studio.detect.gui.workspace import DetectWorkspacePage
 from biocall_studio.detect.workflows.exports import (
     freeze_export_snapshot,
@@ -44,12 +41,6 @@ from biocall_studio.detect.workflows.exports import (
 )
 from biocall_studio.review.workflows.exports import (
     verify_export_directory as verify_compatible_export_directory,
-)
-from biocall_studio.shared.storage import (
-    CapacityObservation,
-    EstimateConfidence,
-    assess_storage,
-    storage_input_digest,
 )
 
 pytestmark = [pytest.mark.integration]
@@ -359,8 +350,8 @@ def test_stale_permission_collision_disk_error_and_cancel_publish_nothing(
 
 
 @pytest.mark.qt
-def test_export_history_restart_verification_isolation_and_save_retry(
-    qapp, qtbot, tmp_path, wav_factory, monkeypatch
+def test_export_history_restart_verification_and_corrupt_record_isolation(
+    qapp, qtbot, tmp_path, wav_factory
 ):
     """Case: IT-DET-026."""
     source = tmp_path / "history-source"
@@ -370,18 +361,25 @@ def test_export_history_restart_verification_isolation_and_save_retry(
     destination = tmp_path / "history-exports"
     destination.mkdir()
     controller = DetectWorkspaceController(tmp_path / "application-data")
-    controller.choose_source_root(str(source))
-    qtbot.waitUntil(lambda: controller.snapshot is not None, timeout=10_000)
-    controller.export_result = result
-    controller.export_selection = _frozen(result)
-
+    controller.store.create_collection("History source", source)
+    controller.refresh()
     snapshots = [
         _freeze(result, source, destination, ExportMode.SNIPPETS, token=token)
-        for token in ("a", "b", "c", "d")
+        for token in ("a", "b", "c")
     ]
     receipts = [publish_export(snapshot, source_root=source) for snapshot in snapshots]
-    controller._export_succeeded(snapshots[0], receipts[0])
-    controller._export_succeeded(snapshots[1], receipts[1])
+    store = controller._export_history_store
+    collection = controller.active_collection
+    assert store is not None and collection is not None
+    for receipt in receipts[:2]:
+        store.save(
+            ExportHistoryRecord.from_receipt(
+                collection.ref.collection_id,
+                receipt,
+                selected_call_count=len(receipt.snippets or receipt.concat_mappings),
+            )
+        )
+    controller.refresh()
     assert len(controller.export_history) == 2
     assert {item.result_id for item in controller.export_history} == {result.result_id}
 
@@ -418,7 +416,14 @@ def test_export_history_restart_verification_isolation_and_save_retry(
     )
     qtbot.waitUntil(lambda: reopened._export_verification_thread is None, timeout=10_000)
 
-    controller._export_succeeded(snapshots[2], receipts[2])
+    store.save(
+        ExportHistoryRecord.from_receipt(
+            collection.ref.collection_id,
+            receipts[2],
+            selected_call_count=len(receipts[2].snippets or receipts[2].concat_mappings),
+        )
+    )
+    controller.refresh()
     inaccessible = Path(receipts[2].final_destination)
     inaccessible.chmod(0)
     try:
@@ -448,21 +453,6 @@ def test_export_history_restart_verification_isolation_and_save_retry(
         unsafe.name,
     }
 
-    store = controller._export_history_store
-    assert store is not None
-    original_save = store.save
-    monkeypatch.setattr(store, "save", lambda _record: (_ for _ in ()).throw(OSError("full")))
-    controller.export_result = result
-    controller.export_selection = _frozen(result)
-    controller._export_succeeded(snapshots[3], receipts[3])
-    assert controller.export_state is ExportState.SUCCESS
-    assert Path(receipts[3].final_destination).is_dir()
-    assert "history could not be saved" in controller.export_history_warning
-    monkeypatch.setattr(store, "save", original_save)
-    controller.retry_save_export_history()
-    assert not controller.export_history_warning
-    assert receipts[3].export_id in {item.export_id for item in controller.export_history}
-
     cancelled = _freeze(result, source, destination, ExportMode.BOTH, token="9")
     with pytest.raises(ExportCancelledError):
         publish_export(cancelled, source_root=source, cancel_requested=lambda: True)
@@ -475,10 +465,7 @@ def test_export_history_restart_verification_isolation_and_save_retry(
         page = DetectWorkspacePage(controller)
         qtbot.addWidget(page)
         page.show()
-        page._set_route(DetectRoute.EXPORT_NEW)
-        assert page.export_page.show_button.isVisible()
-        assert page.export_page.view_exports_button.isVisible()
-        controller.select_export(receipts[3].export_id)
+        controller.select_export(receipts[2].export_id)
         qtbot.waitUntil(
             lambda: controller._export_verification_thread is None,
             timeout=10_000,
@@ -501,159 +488,3 @@ def test_export_history_restart_verification_isolation_and_save_retry(
                 assert path.stat().st_size > 10_000
     reopened.shutdown()
     controller.shutdown()
-
-
-class _ExportUiController(QObject):
-    state_changed = Signal()
-
-    def __init__(self, result, frozen, receipt, snapshot):
-        super().__init__()
-        self.export_result = result
-        self.export_selection = frozen
-        self.export_state = "ready"
-        self.export_message = "Review the frozen selection and destination."
-        self.export_receipt = receipt
-        self.selected_export_id = receipt.export_id
-        self.export_history_warning = ""
-        self.is_export_active = False
-        self.started: tuple[ExportMode, Path] | None = None
-        self.cancelled = False
-        self.plan = estimate_export_artifacts(snapshot)
-        self.storage_input_digest = storage_input_digest(snapshot.to_dict())
-        self.free_bytes: int | None = 2 * 1024**3
-        self.storage_calls: list[Path] = []
-
-    def estimate_export_storage(self, _mode, destination, **_kwargs):
-        destination = Path(destination)
-        self.storage_calls.append(destination)
-        label = destination.name or "Export folder"
-        return assess_storage(
-            operation="detect.export",
-            input_digest=self.storage_input_digest,
-            expected_final=self.plan.expected_final,
-            target_peaks={label: self.plan.peak_bytes},
-            capacities={
-                label: CapacityObservation(
-                    label,
-                    "test-volume",
-                    self.free_bytes,
-                    datetime(2026, 11, 3, tzinfo=UTC),
-                    "PermissionError" if self.free_bytes is None else "",
-                )
-            },
-            confidence=EstimateConfidence.ARITHMETIC,
-            basis=self.plan.basis,
-        )
-
-    def start_export(self, mode: ExportMode, destination: Path, **_kwargs) -> None:
-        self.started = (mode, destination)
-
-    def cancel_export(self) -> None:
-        self.cancelled = True
-
-    def verify_export_receipt(self):
-        return self.export_receipt
-
-    def retry_save_export_history(self) -> None:
-        self.export_history_warning = ""
-
-
-@pytest.mark.qt
-def test_native_export_controls_freeze_destination_compact_status_and_show_folder(
-    qapp, qtbot, tmp_path, wav_factory, monkeypatch
-):
-    """Cases: IT-DET-021, IT-SIZE-003."""
-    source = tmp_path / "source"
-    wav_factory(source / "recordings" / "bird.wav", frames=80, rate=8_000)
-    result = _result_for_sources(source, (("recordings/bird.wav", ((2, 10),)),))
-    destination = tmp_path / "exports"
-    destination.mkdir()
-    snapshot = _freeze(result, source, destination, ExportMode.BOTH, token="8")
-    receipt = publish_export(snapshot, source_root=source)
-    controller = _ExportUiController(result, _frozen(result), receipt, snapshot)
-    page = ExportPage(controller)  # type: ignore[arg-type]
-    qtbot.addWidget(page)
-    page.show()
-
-    assert isinstance(page.destination_picker, FolderPicker)
-    assert isinstance(page.format_help, HelpHint)
-    assert page.frozen_count.text() == "1 interval"
-    assert page.start_button.accessibleName() == "Export selected calls"
-    assert not page.start_button.isEnabled()
-    page.destination_picker.setFolderPath(str(destination))
-    page.render()
-    assert page.start_button.isEnabled()
-    assert controller.storage_calls[-1] == destination
-    assert page.storage_section.isVisible()
-    assert page.storage_section.output.text().startswith("Estimated output: about ")
-    assert page.storage_section.peak.text().startswith(
-        "Space needed while running: about "
-    )
-    assert {
-        hint.accessibleName(): hint.accessibleDescription()
-        for hint in page.storage_section.findChildren(HelpHint)
-    } == {
-        "More about Estimated output": "Approximate space the finished files will use.",
-        "More about Space while running": (
-            "Includes temporary files. Some are removed when the task finishes."
-        ),
-    }
-
-    controller.free_bytes = 1
-    page.render()
-    assert not page.start_button.isEnabled()
-    assert page.storage_section.note.text() == (
-        "Not enough free space for this operation. Choose another destination or free up space."
-    )
-    controller.free_bytes = None
-    page.render()
-    assert page.start_button.isEnabled()
-    assert page.storage_section.free.text() == "Can't check free space on this destination."
-    monkeypatch.setattr("biocall_studio.detect.gui.export.confirm_storage", lambda *_args: False)
-    page.start_button.click()
-    assert controller.started is None
-
-    controller.free_bytes = 2 * 1024**3
-    second_destination = tmp_path / "second-exports"
-    second_destination.mkdir()
-    page.destination_picker.setFolderPath(str(second_destination))
-    page.render()
-    assert controller.storage_calls[-1] == second_destination
-    page.destination_picker.setFolderPath(str(destination))
-    monkeypatch.setattr("biocall_studio.detect.gui.export.confirm_storage", lambda *_args: True)
-    page.start_button.click()
-    assert controller.started == (ExportMode.BOTH, destination)
-
-    page.set_compact(True)
-    assert page.is_compact
-    controller.export_state = "running"
-    controller.is_export_active = True
-    controller.state_changed.emit()
-    assert page.cancel_button.isVisible()
-    page.cancel_button.click()
-    assert controller.cancelled
-    controller.is_export_active = False
-    controller.export_state = "cancelled"
-    controller.export_message = "No new output was published."
-    controller.state_changed.emit()
-    assert "cancelled" in page.status_title.text().lower()
-    assert not page.show_button.isVisible()
-
-    opened = []
-    monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url) or True)
-    controller.export_state = "success"
-    controller.export_message = receipt.final_destination
-    controller.state_changed.emit()
-    assert page.show_button.isVisible()
-    assert page.view_exports_button.isVisible()
-    page.show_button.click()
-    assert opened and opened[0].toLocalFile() == receipt.final_destination
-    controller.export_history_warning = (
-        "The corpus was created, but its local history could not be saved. "
-        "Retry saving to history."
-    )
-    controller.state_changed.emit()
-    assert page.history_warning.isVisible()
-    assert page.retry_history_button.isVisible()
-    assert not page.view_exports_button.isVisible()
-    assert all(path.read_bytes() for path in source.rglob("*.wav"))

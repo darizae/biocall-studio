@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -1161,6 +1162,7 @@ class ReviewWorkspacePage(QStackedWidget):
         *,
         result_provider: Callable[[], tuple[ReviewResultChoice, ...]] | None = None,
         source_root_resolver: Callable[[ReviewSession], Path | None] | None = None,
+        operation_admission: Callable[[str, str], None] | None = None,
         parent: QWidget | None = None,
     ):
         super().__init__(parent)
@@ -1168,6 +1170,7 @@ class ReviewWorkspacePage(QStackedWidget):
         self.controller = controller
         self.result_provider = result_provider or (lambda: ())
         self.source_root_resolver = source_root_resolver or (lambda _session: None)
+        self.operation_admission = operation_admission
         self.current_state: ReviewViewState | None = None
         self.compact = False
         self._shortcuts: list[QShortcut] = []
@@ -1192,6 +1195,8 @@ class ReviewWorkspacePage(QStackedWidget):
         self._settings_return_to_cache = False
         self._export_prepare_thread: _ReviewExportPrepareThread | None = None
         self._export_publish_thread: _ReviewExportPublishThread | None = None
+        self._owned_operation: tuple[str, str] | None = None
+        self._shutdown_complete = False
         self.playback = QtMediaPlayback(self)
 
         self.landing_page = ReviewLandingPage(controller)
@@ -1464,6 +1469,11 @@ class ReviewWorkspacePage(QStackedWidget):
             if answer is not QMessageBox.StandardButton.Ok:
                 return
             confirmed = True
+        try:
+            operation_id = self._begin_owned_operation("Review corpus export")
+        except (RuntimeError, ValueError) as exc:
+            self.export_page.set_failed(str(exc))
+            return
         thread = _ReviewExportPublishThread(
             self.controller,
             plan,
@@ -1479,6 +1489,7 @@ class ReviewWorkspacePage(QStackedWidget):
         def finished() -> None:
             if self._export_publish_thread is thread:
                 self._export_publish_thread = None
+            self._release_owned_operation(operation_id)
             thread.deleteLater()
 
         thread.finished.connect(finished)
@@ -1873,6 +1884,7 @@ class ReviewWorkspacePage(QStackedWidget):
             self.cache_page.set_running(False)
             return
         try:
+            operation_id = self._begin_owned_operation("Spectrogram generation")
             session = self.controller.store.get_session(state.session.session_id)
             snapshot = self.controller.store.load_settings(session.session_id)
             source_root = self.source_root_resolver(session)
@@ -1894,6 +1906,8 @@ class ReviewWorkspacePage(QStackedWidget):
                 confirmed=confirmed,
             )
         except (OSError, RuntimeError, TypeError, ValueError):
+            if "operation_id" in locals():
+                self._release_owned_operation(operation_id)
             self.cache_page.set_stopped(failed=True)
             return
         self._generation_batch_id = batch_id
@@ -1911,6 +1925,7 @@ class ReviewWorkspacePage(QStackedWidget):
             progress = self.supervisor.progress(batch_id)
         except KeyError:
             self._generation_batch_id = None
+            self._release_owned_operation()
             self._generation_timer.stop()
             self.cache_page.set_stopped(failed=True)
             return
@@ -1920,6 +1935,7 @@ class ReviewWorkspacePage(QStackedWidget):
         if not progress.done:
             return
         self._generation_batch_id = None
+        self._release_owned_operation()
         self._generation_timer.stop()
         if progress.failed:
             self.cache_page.set_stopped(failed=True)
@@ -2475,11 +2491,80 @@ class ReviewWorkspacePage(QStackedWidget):
         else:
             self.landing_page.results.setFocus()
 
+    @property
+    def has_open_session(self) -> bool:
+        return self.controller.store.open_session() is not None
+
+    @property
+    def active_operation(self) -> tuple[str, str] | None:
+        return self._owned_operation
+
+    def _begin_owned_operation(self, label: str) -> str:
+        if self._owned_operation is not None:
+            raise RuntimeError("Review work is already active.")
+        operation_id = f"review_{uuid.uuid4().hex}"
+        if self.operation_admission is not None:
+            self.operation_admission(operation_id, label)
+        self._owned_operation = (operation_id, label)
+        return operation_id
+
+    def _release_owned_operation(self, operation_id: str | None = None) -> None:
+        active = self._owned_operation
+        if active is None or (operation_id is not None and active[0] != operation_id):
+            return
+        self._owned_operation = None
+
+    def request_exit_stop(self) -> None:
+        """Request cancellation without closing or mutating the Open session."""
+        self._generation_prepare_cancel.set()
+        self._cancel_generation()
+        self._cancel_export()
+
+    @property
+    def exit_stop_ready(self) -> bool:
+        preparation_running = (
+            self._generation_prepare_thread is not None
+            and self._generation_prepare_thread.is_alive()
+        )
+        export_running = any(
+            thread is not None and thread.isRunning()
+            for thread in (self._export_prepare_thread, self._export_publish_thread)
+        )
+        generation_running = (
+            self._generation_batch_id is not None
+            or self.supervisor.pending_count > 0
+            or self.supervisor.active_count > 0
+        )
+        ready = not preparation_running and not export_running and not generation_running
+        if ready:
+            self._release_owned_operation()
+        return ready
+
+    def checkpoint_open_session_for_exit(self) -> ReviewSession | None:
+        """Persist the current view and durably Close the one Open session."""
+        opened = self.controller.store.open_session()
+        if opened is None:
+            return None
+        state = self.current_state
+        if state is not None and state.session.session_id == opened.session_id:
+            state.save_position()
+        latest = self.controller.store.get_session(opened.session_id)
+        closed = self.controller.close_session(
+            latest.session_id,
+            expected_revision=latest.revision,
+            closed_at=_now(),
+        )
+        if state is not None and state.session.session_id == closed.session_id:
+            state.session = closed
+        return closed
+
     def leave_workspace(self) -> None:
         self._persist_view()
         self.playback.stop()
 
     def shutdown(self) -> None:
+        if self._shutdown_complete:
+            return
         self._generation_prepare_cancel.set()
         for export_thread in (
             self._export_prepare_thread,
@@ -2494,6 +2579,7 @@ class ReviewWorkspacePage(QStackedWidget):
             thread.join(timeout=5)
         self.supervisor.shutdown(wait=True)
         self.playback.close()
+        self._shutdown_complete = True
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         super().resizeEvent(event)

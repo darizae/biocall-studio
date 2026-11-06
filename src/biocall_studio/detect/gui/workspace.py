@@ -58,7 +58,6 @@ from biocall_studio.detect.domain.inventory import (
     RecordingStatus,
 )
 from biocall_studio.detect.domain.runs import DetectRunStatus
-from biocall_studio.detect.gui.export import ExportPage
 from biocall_studio.detect.gui.history import (
     ExportDetailPage,
     ExportHistoryPage,
@@ -361,20 +360,12 @@ class DetectWorkspacePage(QWidget):
         self.result_explorer.models_requested.connect(
             lambda: self._set_route(DetectRoute.MODELS)
         )
-        self.result_explorer.export_requested.connect(self._open_export)
         self.export_history_page = ExportHistoryPage(self.controller)
         self.export_history_page.export_requested.connect(self._open_export_detail)
-        self.export_history_page.new_export_requested.connect(self._open_export)
         self.export_detail_page = ExportDetailPage(self.controller, self._show_in_folder)
         self.export_detail_page.back_requested.connect(
             lambda: self._set_route(DetectRoute.EXPORTS)
         )
-        self.export_page = ExportPage(self.controller)
-        self.export_page.results_requested.connect(
-            lambda: self._set_route(DetectRoute.RESULTS)
-        )
-        self.export_page.exports_requested.connect(self._view_completed_export)
-
         self._route_pages = {
             DetectRoute.NEW_DETECTION: self.new_detection_view,
             DetectRoute.RECORDINGS: self.recordings_view,
@@ -384,7 +375,6 @@ class DetectWorkspacePage(QWidget):
             DetectRoute.RESULTS: self.result_explorer,
             DetectRoute.EXPORTS: self.export_history_page,
             DetectRoute.EXPORT_DETAIL: self.export_detail_page,
-            DetectRoute.EXPORT_NEW: self.export_page,
         }
         for page in self._route_pages.values():
             self.route_stack.addWidget(page)
@@ -761,14 +751,6 @@ class DetectWorkspacePage(QWidget):
         card.content_layout.addLayout(actions)
         return card
 
-    def _open_export(self) -> None:
-        try:
-            self.controller.prepare_export_plan()
-        except (RuntimeError, ValueError) as exc:
-            self.selection_error.setText(str(exc))
-            self.selection_error.setVisible(True)
-        self._set_route(DetectRoute.EXPORT_NEW)
-
     def _open_run(self, run_id: str) -> None:
         self.controller.select_run(run_id)
         self._set_route(DetectRoute.RUN_DETAIL)
@@ -807,11 +789,6 @@ class DetectWorkspacePage(QWidget):
             self.selection_error.show()
             return
         self._set_route(DetectRoute.EXPORT_DETAIL)
-
-    def _view_completed_export(self) -> None:
-        receipt = self.controller.export_receipt
-        if receipt is not None:
-            self._open_export_detail(receipt.export_id)
 
     def _show_in_folder(self, path: str) -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(path))
@@ -1769,7 +1746,6 @@ class DetectWorkspacePage(QWidget):
         self.result_explorer.render()
         self.export_history_page.render()
         self.export_detail_page.render()
-        self.export_page.render()
         self._update_route_heading()
         collection = self.controller.active_collection
         proposal = self.controller.proposal
@@ -1880,10 +1856,6 @@ class DetectWorkspacePage(QWidget):
                 "Export details",
                 "Check the saved files against their receipt.",
             ),
-            DetectRoute.EXPORT_NEW: (
-                "New export",
-                "Choose a format and destination for the selected calls.",
-            ),
         }
         title, description = titles[self.current_route]
         self.page_title.setText(title)
@@ -1959,8 +1931,6 @@ class DetectWorkspacePage(QWidget):
             self.export_history_page.focus_initial()
         elif self.current_route is DetectRoute.EXPORT_DETAIL:
             self.export_detail_page.focus_initial()
-        else:
-            self.export_page.focus_initial()
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         super().resizeEvent(event)
@@ -2068,7 +2038,6 @@ class DetectWorkspacePage(QWidget):
             self.run_layout.addWidget(self.run_progress_card, 0, 0)
             self.run_layout.addWidget(self.run_activity_card, 0, 1)
         self.result_explorer.set_compact(compact)
-        self.export_page.set_compact(compact)
         for layout in (
             self._root_layout,
             self.sidebar_layout,

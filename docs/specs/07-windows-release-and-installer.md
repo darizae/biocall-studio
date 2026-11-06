@@ -47,13 +47,13 @@ outside source folders, while exports go only to the user-selected destination.
 - `IT-WIN-002`: native Qt/`alp-ui` folder pickers, keyboard HelpHints, bundled Train/Detect
   QProcess launch, global admission, cancel/crash recovery and shared safe quit.
 - `IT-WIN-003`: installed Studio builds/reopens a real Dataset and CNN/RF Models, structurally
-  reloads both, runs Detect CNN→RF, exports/reopens WAV+TSV, restarts/relinks and preserves exact
-  provenance with byte-identical inputs.
+  reloads both, runs Detect CNN→RF, reviews candidates, exports/reopens WAV+TSV from Review,
+  restarts/relinks and preserves exact provenance with byte-identical inputs.
 - `IT-WIN-004`: clean install/upgrade/uninstall, BioCall Studio ICO/identity, per-user data,
   manifest/digest/security/signing evidence and preservation of user-owned Collections/exports.
 - `IT-WIN-005`: installed Studio/Train/Detect normal and compact UI at 100%/150% DPI, keyboard and
   focus order, accessible HelpHints, plots and numeric alternatives, empty/error/busy/success
-  states, Review placeholder and owner-reviewed native differences. Save native screenshots under
+  states, the Review workspace and owner-reviewed native differences. Save native screenshots under
   `docs/design/evidence/spec-07-installed/`.
 
 Installed configuration coverage must include representative basic and advanced CNN/RF fields,

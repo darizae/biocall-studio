@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -12,7 +11,6 @@ from alp_ui.components import (
     Card,
     DataTable,
     EmptyState,
-    HelpHint,
     SelectInput,
     Text,
 )
@@ -74,12 +72,6 @@ def _completed_label(value: str) -> str:
     return parsed.strftime("%Y-%m-%d %H:%M UTC")
 
 
-def _context_help(copy_id: str, help_text: str, subject: str) -> HelpHint:
-    hint = HelpHint(help_text, subject=subject)
-    hint.setObjectName(copy_id)
-    return hint
-
-
 class RecordingResultModel(QAbstractTableModel):
     HEADERS = ("RECORDING", "OUTCOME", "CANDIDATES", "DURATION")
 
@@ -135,21 +127,13 @@ class RecordingResultModel(QAbstractTableModel):
 
 
 class CandidateResultModel(QAbstractTableModel):
-    ORIGINAL_HEADERS = ("SELECT", "START", "END", "DETECTION SCORE")
+    ORIGINAL_HEADERS = ("START", "END", "DETECTION SCORE")
     REFINED_HEADERS = (*ORIGINAL_HEADERS, "REFINEMENT")
 
-    def __init__(
-        self,
-        parent=None,
-        *,
-        page_size: int = 200,
-        selection_changed: Callable[[str, bool], None],
-    ):
+    def __init__(self, parent=None, *, page_size: int = 200):
         super().__init__(parent)
         self._page_size = page_size
-        self._selection_changed = selection_changed
         self._candidates: tuple[CandidateViewRow, ...] = ()
-        self._selected_ids: frozenset[str] = frozenset()
         self._visible = 0
         self.refinement_visible = False
 
@@ -164,7 +148,6 @@ class CandidateResultModel(QAbstractTableModel):
     def set_recording(
         self,
         recording: RecordingViewRow | None,
-        selected_ids: tuple[str, ...],
         *,
         refined: bool | None = None,
     ) -> None:
@@ -175,21 +158,8 @@ class CandidateResultModel(QAbstractTableModel):
             if refined is None
             else refined
         )
-        self._selected_ids = frozenset(selected_ids)
         self._visible = min(self._page_size, len(self._candidates))
         self.endResetModel()
-
-    def set_selected_ids(self, selected_ids: tuple[str, ...]) -> None:
-        next_ids = frozenset(selected_ids)
-        if next_ids == self._selected_ids:
-            return
-        self._selected_ids = next_ids
-        if self._visible:
-            self.dataChanged.emit(
-                self.index(0, 0),
-                self.index(self._visible - 1, 0),
-                [Qt.ItemDataRole.CheckStateRole],
-            )
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: N802
         return 0 if parent.isValid() else self._visible
@@ -203,16 +173,9 @@ class CandidateResultModel(QAbstractTableModel):
         candidate = self._candidates[index.row()]
         if role == Qt.ItemDataRole.UserRole:
             return candidate.candidate_id
-        if role == Qt.ItemDataRole.CheckStateRole and index.column() == 0:
-            return (
-                Qt.CheckState.Checked
-                if candidate.candidate_id in self._selected_ids
-                else Qt.CheckState.Unchecked
-            )
         if role != Qt.ItemDataRole.DisplayRole:
             return None
         values = (
-            "",
             _source_time(candidate.start_time_ns),
             _source_time(candidate.end_time_ns),
             f"{candidate.max_target_score:.3f}",
@@ -229,31 +192,6 @@ class CandidateResultModel(QAbstractTableModel):
         if candidate.refinement_status is RefinementStatus.UNSCORED:
             return "Could not assess"
         return ""
-
-    def setData(self, index, value, role=Qt.ItemDataRole.EditRole):  # noqa: N802
-        if (
-            not index.isValid()
-            or index.row() >= self._visible
-            or index.column() != 0
-            or role != Qt.ItemDataRole.CheckStateRole
-        ):
-            return False
-        candidate = self._candidates[index.row()]
-        selected = Qt.CheckState(value) is Qt.CheckState.Checked
-        self._selection_changed(candidate.candidate_id, selected)
-        self._selected_ids = (
-            self._selected_ids | {candidate.candidate_id}
-            if selected
-            else self._selected_ids - {candidate.candidate_id}
-        )
-        self.dataChanged.emit(index, index, [Qt.ItemDataRole.CheckStateRole])
-        return True
-
-    def flags(self, index: QModelIndex):
-        flags = super().flags(index)
-        if index.isValid() and index.column() == 0:
-            flags |= Qt.ItemFlag.ItemIsUserCheckable
-        return flags
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):  # noqa: N802
         if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
@@ -287,7 +225,6 @@ class ResultExplorer(QWidget):
     run_requested = Signal()
     recordings_requested = Signal()
     models_requested = Signal()
-    export_requested = Signal()
 
     def __init__(self, controller: DetectWorkspaceController):
         super().__init__()
@@ -323,7 +260,7 @@ class ResultExplorer(QWidget):
 
         self.no_results_state = EmptyState(
             "No Results yet",
-            text="Run detection to create results. Export planning remains available.",
+            text="Run detection to create results for Review.",
         )
         self.no_results_state.layout().setAlignment(
             Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter
@@ -349,10 +286,6 @@ class ResultExplorer(QWidget):
         self.run_details_button.clicked.connect(self.run_requested)
         footer.addWidget(self.run_details_button)
         footer.addStretch()
-        self.export_button = Button("Plan corpus export", variant="primary")
-        self.export_button.setAccessibleName("Continue from Results to Export")
-        self.export_button.clicked.connect(self.export_requested)
-        footer.addWidget(self.export_button)
         outer.addLayout(footer)
 
         self.render()
@@ -520,29 +453,14 @@ class ResultExplorer(QWidget):
         self.show_source_button.clicked.connect(self._show_source)
         heading.addWidget(self.show_source_button, 0, Qt.AlignmentFlag.AlignTop)
         card.content_layout.addLayout(heading)
+        self.source_message = QLabel()
+        self.source_message.setWordWrap(True)
+        self.source_message.setAccessibleName("Recording source status")
+        self.source_message.setStyleSheet("color: #92400E; font-weight: 600;")
+        self.source_message.hide()
+        card.content_layout.addWidget(self.source_message)
 
-        selection_row = QHBoxLayout()
-        self.selection_summary = Text("0 selected in this Result", role="body")
-        selection_row.addWidget(self.selection_summary)
-        selection_row.addWidget(
-            _context_help(
-                "CTX-10",
-                "Selections are saved separately for each result.",
-                "Result selection",
-            )
-        )
-        selection_row.addStretch()
-        card.content_layout.addLayout(selection_row)
-        self.selection_message = QLabel()
-        self.selection_message.setWordWrap(True)
-        self.selection_message.setAccessibleName("Result selection status")
-        self.selection_message.setStyleSheet("color: #92400E; font-weight: 600;")
-        card.content_layout.addWidget(self.selection_message)
-
-        self.candidate_model = CandidateResultModel(
-            self,
-            selection_changed=self.controller.set_candidate_selected,
-        )
+        self.candidate_model = CandidateResultModel(self)
         self.candidate_table = DataTable(model=self.candidate_model)
         self.candidate_table.setAccessibleName("Calls at their original recording times")
         self.candidate_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -685,17 +603,16 @@ class ResultExplorer(QWidget):
             )
 
     def _render_recording(self, recording: RecordingViewRow | None) -> None:
-        selection = self.controller.result_selection
-        selected_ids = () if selection is None else selection.candidate_ids
+        self.source_message.clear()
+        self.source_message.hide()
         projection = self.controller.selected_result_projection
         self.candidate_model.set_recording(
             recording,
-            selected_ids,
             refined=projection is not None and projection.result_kind == "derived",
         )
         if self.candidate_model.refinement_visible:
             self.candidate_table.horizontalHeader().setSectionResizeMode(
-                4, QHeaderView.ResizeMode.ResizeToContents
+                3, QHeaderView.ResizeMode.ResizeToContents
             )
         if recording is None:
             self.recording_title.setText("Choose a recording")
@@ -743,7 +660,8 @@ class ResultExplorer(QWidget):
         try:
             path = self.controller.selected_source_path(self.selected_recording_id)
         except (OSError, ValueError) as exc:
-            self.selection_message.setText(str(exc))
+            self.source_message.setText(str(exc))
+            self.source_message.show()
             self.show_source_button.setEnabled(False)
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(Path(path).parent)))
@@ -880,7 +798,6 @@ class ResultExplorer(QWidget):
             self.state_title = self.no_results_state.title_widget
 
     def render(self) -> None:
-        self.export_button.setEnabled(not self.controller.is_export_active)
         self._render_history()
         item = self.controller.selected_result_item
         projection = self.controller.selected_result_projection
@@ -930,14 +847,6 @@ class ResultExplorer(QWidget):
             f"{projection.successful_files:,} completed · {projection.failed_files:,} file "
             f"error{'s' if projection.failed_files != 1 else ''}"
         )
-        selection = self.controller.result_selection
-        selected_ids = () if selection is None else selection.candidate_ids
-        self.selection_summary.setText(f"{len(selected_ids):,} selected in this result")
-        self.export_button.setEnabled(not self.controller.is_export_active)
-        self.selection_message.setText(
-            self.controller.selection_error or self.controller.selection_notice
-        )
-        self.selection_message.setVisible(bool(self.selection_message.text()))
         self.recording_model.set_projection(projection)
         result_id = projection.result_id
         recording_id = self._recording_by_result.get(result_id)
@@ -987,7 +896,7 @@ class ResultExplorer(QWidget):
         if self.controller.result_history:
             self.history_select.control.setFocus()
         else:
-            self.export_button.setFocus()
+            self.run_details_button.setFocus()
 
 
 __all__ = ["CandidateResultModel", "RecordingResultModel", "ResultExplorer"]

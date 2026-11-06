@@ -61,6 +61,11 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-REVW-009` | A finalized real-WAV-backed Review session publishes and reopens more than 10,000 and at least 50,000 ordered rows through streamed v2 inventory, Raven and receipt indexes with recorded timing/memory/I/O measurements and unchanged source/session bytes. Late corruption or missing rows, cancellation, crash, disk-full, stale space/source and output collision never report false success or leave a public partial export. | TD-WAV, TD-SCALE, TD-PATH, TD-RUN, TD-FAIL |
 | `IT-REVW-010` | Individual WAV, combined WAV + Raven TSV and Both preserve exact source PCM/frame/time provenance with mixed individual/bulk/model-only status while rejected audio is absent; verification/reopen, Review history reconciliation and unchanged Detect v1 readers survive restart. Format mismatch, RIFF overflow, changed WAV and post-publication history failure preserve the finalized session, source recordings and verified recoverable output. | TD-WAV, TD-PATH, TD-RUN, TD-FAIL |
 
+## Studio and Detect migration (RV-07)
+
+| `IT-REVW-011` | Real native Studio/Train/Detect/Review navigation retains an Open Review session and its view state while hidden; quit from every visible workspace shows one combined Review/active-work prompt, Save and Exit closes durably after supervised work stops, and restart can reopen the same saved session. Keep-open, save failure and stop failure remain in the suite without orphaning work or reporting a false exit. | TD-UI, TD-RUN, TD-FAIL |
+| `IT-REVW-012` | Detect has no new-export action, route, callback or controller write entry; Review is the only new corpus-export surface, while existing Detect export history and verified receipt reopening remain readable without changing historical artifacts. Removed route values and stale callbacks fail closed and create no Detect export-history writes. | TD-UI, TD-EXPORT, TD-PATH, TD-FAIL |
+
 ## 1a. Studio shell (ST-02)
 
 | Case ID | Public seam / expected result | Data |
@@ -69,7 +74,7 @@ All rows are **target acceptance criteria**, not claims of implementation or a p
 | `IT-STU-002` | Studio → real Train → Studio → Train reuses controller/window, preserves current Train route and live training draft, and leaves Collection bindings and input WAV unchanged. Return control works at compact widths. | TD-UI, TD-COL |
 | `IT-STU-003` | Real Train QProcess Run and scan remain active while visiting Studio; application Quit from either visible/hidden workspace preserves Train's single safe close/cancel/keep-open policy and releases Worker/lease/resources only after confirmed stop. | TD-RUN, TD-FAIL, TD-UI |
 | `IT-STU-004` | Canonical Studio entry retains a validated Train binding under isolated suite data while supervised Train work launches through the canonical private Worker protocol. | TD-UI, TD-CACHE |
-| `IT-STU-005` | Detect Collection setup and Review placeholder have reachable, keyboard-operable returns; Detect adds no invented Model, inventory, prediction, result, simulated value or enabled detection action. | TD-UI |
+| `IT-STU-005` | Detect Collection setup and the retained Review workspace have reachable, keyboard-operable returns; Review restores its own route/session state and Detect adds no invented Model, inventory, prediction, result or simulated value. | TD-UI |
 | `IT-STU-006` | Real native Studio/Train/Detect/Review screenshots at normal and compact widths show checked-in branding, focus and contrast; no Train layout regression or inaccessible switch; report unavailable native platforms separately. | TD-UI, TD-OS |
 
 **Reported status:** ST-02 implements `IT-STU-001`–`006` in
@@ -99,13 +104,13 @@ gaps separately. The whole-Studio E2E appears exclusively in ST-11.
 | `IT-DET-012` | real-WAV CPU CNN inference compared numerically to verified upstream reference output, class order and frame intervals | TD-WAV, TD-EXPORT, TD-TRAIN | ST-07 |
 | `IT-DET-013` | real Run→checksum-valid metadata Result reopen; source non-mutation, zero candidates vs failed-file contrast, worker/GUI progress | TD-WAV, TD-RUN, TD-UI | ST-07 |
 | `IT-DET-014` | stale/replaced WAV/Model, unsupported shape, cancelled Worker, crash, invalid receipt, atomic failure | TD-FAIL, TD-CACHE, TD-RUN | ST-07 |
-| `IT-DET-015` | real Qt Result selection, recording switch, interval IDs, history and keyboard navigation on genuine ST-07 Result | TD-UI, TD-RUN, TD-SCALE | ST-08 |
-| `IT-DET-016` | corrupted/unavailable source, empty/error/partial Result, persisted selection and actual normal/compact native screenshots without artifact mutation | TD-UI, TD-CACHE, TD-FAIL | ST-08 |
-| `IT-DET-017` | genuine WAV segments and trusted RF Model, reference feature-vector/probability parity; original/derived persisted independently and native selection works | TD-TRAIN, TD-EXPORT, TD-WAV, TD-UI | ST-09 |
+| `IT-DET-015` | real Qt Result browsing, recording switch, interval IDs, history and keyboard navigation on genuine ST-07 Result | TD-UI, TD-RUN, TD-SCALE | ST-08 |
+| `IT-DET-016` | corrupted/unavailable source, empty/error/partial Result and actual normal/compact native screenshots without artifact mutation | TD-UI, TD-CACHE, TD-FAIL | ST-08 |
+| `IT-DET-017` | genuine WAV segments and trusted RF Model, reference feature-vector/probability parity; original/derived Results persist independently and remain natively inspectable | TD-TRAIN, TD-EXPORT, TD-WAV, TD-UI | ST-09 |
 | `IT-DET-018` | wrong feature order/Model, missing/short/stale recording, cancelled/crashed Worker and atomic failure; original Result bytes unchanged | TD-FAIL, TD-RUN, TD-WAV | ST-09 |
 | `IT-DET-019` | compare real snippet PCM samples, headers, checksums and original timestamps byte-by-byte/frame-by-frame | TD-WAV, TD-PATH | ST-10 |
 | `IT-DET-020` | real concatenated WAV plus Raven TSV offsets and both-mode receipt on distinct sources; reopen all outputs | TD-WAV, TD-FAIL | ST-10 |
-| `IT-DET-021` | real stale/permission/collision/disk error/cancel and destination Show in folder in native Qt; no partial visible success or source mutation | TD-UI, TD-PATH, TD-FAIL, TD-RUN | ST-10 |
+| `IT-DET-021` | retained Detect v1 writer regression rejects real stale/permission/collision/disk error/cancel without partial output or source mutation; no current Detect UI invokes this writer | TD-PATH, TD-FAIL, TD-RUN | ST-10 |
 
 ## 1c. Planned post-ST-10 revision integration (REV-01–REV-03)
 
@@ -121,14 +126,14 @@ reserved for ST-11.
 | `IT-TRAIN-015` | Every Train page and all 67 configuration fields expose the owner-approved contextual/configuration/disabled-choice tooltip decisions through real keyboard-accessible Qt HelpHints and descriptions; removed hints and rejected visible copy are absent. | TD-CONFIG, TD-UI | REV-03 |
 | `IT-DET-024` | Every final Detect route/state uses approved HelpHints and recordings-folder terminology, removes duplicate prompts/alerts and renders concise actionable Model/Result states while preserving missing/empty/stale/partial distinctions. | TD-UI, TD-FAIL, TD-CACHE | REV-03 |
 | `IT-DET-025` | Real Qt persistent Detect sidebar navigation, Models→Recordings→New detection flow, newest-first Runs list/detail, active-Run indicator, keyboard focus, and normal/compact layouts without page-level horizontal scrolling. | TD-UI, TD-WAV, TD-RUN | REV-04 |
-| `IT-DET-026` | Multiple exports from one Result, restart persistence, background verification of available/missing/inaccessible/changed destinations, corrupt/symlink history isolation, cancellation, and post-publication history-write failure without source mutation. | TD-UI, TD-WAV, TD-EXPORT, TD-PATH, TD-FAIL | REV-04 |
+| `IT-DET-026` | Historical Detect exports seeded through the retained v1 engine survive restart and background verification of available/missing/inaccessible/changed destinations; corrupt/symlink history entries remain isolated and sources remain unchanged. | TD-UI, TD-WAV, TD-EXPORT, TD-PATH, TD-FAIL | REV-04 |
 
 ## 1d. Planned whole-Studio integration (ST-11 ONLY)
 
 | Case ID | Public seam / expected result | Data | Spec |
 |---|---|---|---|
-| `IT-DET-022` | end-to-end **scientific round trip** cross-checking source CNN→RF→export frame times, class/feature parity, checksums and TSV rows against reference numeric outputs | TD-WAV, TD-EXPORT, TD-TRAIN | [ST-11](specs/ST-11-unified-qualification.md) |
-| `IT-STU-007` | **one genuine whole-Studio scenario**: retained Train and trusted Model, Detect Collection/scan/CNN/Results/RF/export, restart/relink/provenance, unchanged originals, native navigation and user-visible success | TD-UI, TD-RUN, TD-WAV, TD-TRAIN, TD-EXPORT | [ST-11](specs/ST-11-unified-qualification.md) |
+| `IT-DET-022` | scientific source round trip cross-checking CNN→RF frame times, class/feature parity, checksums and immutable Result provenance against reference numeric outputs | TD-WAV, TD-TRAIN | [ST-11](specs/ST-11-unified-qualification.md) |
+| `IT-STU-007` | genuine pre-Review regression: retained Train and trusted Model, Detect Collection/scan/CNN/Results/RF, restart/relink/provenance, unchanged originals, native navigation and no restored Detect export action. The current Train→Detect→Review→Export E2E belongs to RV-08. | TD-UI, TD-RUN, TD-WAV, TD-TRAIN | [ST-11](specs/ST-11-unified-qualification.md) |
 | `IT-STU-008` | real Qt/QProcess cross-workspace active operation/exit contention, keep-open/confirm, crash recovery and no orphaned workers without altering Train's existing behavior | TD-RUN, TD-FAIL, TD-UI | [ST-11](specs/ST-11-unified-qualification.md) |
 
 ## 2. Collection Scan and metadata (spec 02)

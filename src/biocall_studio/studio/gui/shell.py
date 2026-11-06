@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from alp_ui.components import Badge, Button, Card, Text
+from alp_ui.components import Button, Card, Text
 from alp_ui.theme import ALPACA_LIGHT, make_icon
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QCloseEvent, QResizeEvent
@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from biocall_studio.detect.application.controller import DetectWorkspaceController
 from biocall_studio.detect.gui.workspace import DetectWorkspacePage
+from biocall_studio.review.gui.workspace import ReviewWorkspacePage
 from biocall_studio.studio.application.navigation import WorkspaceRoute
 from biocall_studio.studio.gui.branding import application_icon
 
@@ -104,7 +105,7 @@ class LaunchpadPage(QScrollArea):
         )
         self.detect_card = WorkspaceCard(
             workspace="Detect",
-            description="Find candidate calls, refine results, and prepare audio for review.",
+            description="Find candidate calls and refine detection results.",
             action_text="Open Detect",
             icon_name="search",
             accent="#4C1D95",
@@ -114,7 +115,7 @@ class LaunchpadPage(QScrollArea):
         self.review_card = WorkspaceCard(
             workspace="Review",
             description="Inspect and confirm detected calls.",
-            action_text="Coming later",
+            action_text="Open Review",
             icon_name="check",
             accent="#92400E",
             action=lambda: self.workspace_requested.emit(WorkspaceRoute.REVIEW.value),
@@ -148,57 +149,15 @@ class LaunchpadPage(QScrollArea):
             self._place_cards(compact=compact)
 
 
-class LandingPage(QWidget):
-    return_requested = Signal()
-
-    def __init__(
-        self,
-        *,
-        workspace: str,
-        title: str,
-        description: str,
-        status: str,
-        icon_name: str,
-        accent: str,
-    ) -> None:
-        super().__init__()
-        self.setAccessibleName(f"{workspace} workspace landing")
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(48, 42, 48, 48)
-        outer.setSpacing(18)
-        outer.addStretch()
-
-        card = Card()
-        card.setMaximumWidth(720)
-        card.setMinimumHeight(330)
-        card.setAccessibleName(f"{workspace} status")
-        icon = QLabel()
-        icon.setFixedSize(72, 72)
-        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon.setPixmap(make_icon(icon_name, color="#FFFFFF", size=38).pixmap(38, 38))
-        icon.setStyleSheet(f"background: {accent}; border-radius: 16px;")
-        card.content_layout.addWidget(icon, 0, Qt.AlignmentFlag.AlignHCenter)
-        heading = Text(title, role="title")
-        heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        card.content_layout.addWidget(heading)
-        body = Text(description, role="body", word_wrap=True)
-        body.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        card.content_layout.addWidget(body)
-        badge = Badge(status, intent="neutral")
-        badge.setAccessibleName(f"{workspace} status: {status}")
-        card.content_layout.addWidget(badge, 0, Qt.AlignmentFlag.AlignHCenter)
-        self.back_button = Button("Back to Studio", variant="outline", size="large")
-        self.back_button.clicked.connect(self.return_requested)
-        card.content_layout.addWidget(self.back_button)
-        outer.addWidget(card, 0, Qt.AlignmentFlag.AlignHCenter)
-        outer.addStretch()
-
-
 class StudioWindow(QMainWindow):
     workspace_requested = Signal(str)
     application_exit_requested = Signal()
 
-    def __init__(self, detect_controller: DetectWorkspaceController) -> None:
+    def __init__(
+        self,
+        detect_controller: DetectWorkspaceController,
+        review_page: ReviewWorkspacePage,
+    ) -> None:
         super().__init__()
         self.setObjectName("bioCallStudioWindow")
         self.setWindowTitle("BioCall Studio")
@@ -217,14 +176,7 @@ class StudioWindow(QMainWindow):
         self.pages = QStackedWidget()
         self.launchpad = LaunchpadPage()
         self.detect_page = DetectWorkspacePage(detect_controller)
-        self.review_page = LandingPage(
-            workspace="Review",
-            title="Review is coming later",
-            description="Inspect and confirm detected calls in a future workspace.",
-            status="Coming later",
-            icon_name="check",
-            accent="#92400E",
-        )
+        self.review_page = review_page
         self._pages = {
             WorkspaceRoute.STUDIO: self.launchpad,
             WorkspaceRoute.DETECT: self.detect_page,
@@ -240,6 +192,9 @@ class StudioWindow(QMainWindow):
             lambda: self.workspace_requested.emit(WorkspaceRoute.STUDIO.value)
         )
         self.review_page.return_requested.connect(
+            lambda: self.workspace_requested.emit(WorkspaceRoute.STUDIO.value)
+        )
+        self.back_to_studio_button.clicked.connect(
             lambda: self.workspace_requested.emit(WorkspaceRoute.STUDIO.value)
         )
         self.show_workspace(WorkspaceRoute.STUDIO)
@@ -262,6 +217,9 @@ class StudioWindow(QMainWindow):
         text.addWidget(Text("BioCall Studio", role="subheading"))
         layout.addLayout(text)
         layout.addStretch()
+        self.back_to_studio_button = Button("Back to Studio", variant="outline", size="small")
+        self.back_to_studio_button.setAccessibleName("Back to Studio launchpad")
+        layout.addWidget(self.back_to_studio_button)
         return header
 
     def show_workspace(self, route: WorkspaceRoute) -> None:
@@ -270,6 +228,7 @@ class StudioWindow(QMainWindow):
         self.current_workspace = route
         self.pages.setCurrentWidget(self._pages[route])
         self.global_header.setVisible(route is not WorkspaceRoute.DETECT)
+        self.back_to_studio_button.setVisible(route is WorkspaceRoute.REVIEW)
         self.setWindowTitle(
             "BioCall Studio"
             if route is WorkspaceRoute.STUDIO
@@ -280,7 +239,7 @@ class StudioWindow(QMainWindow):
         elif route is WorkspaceRoute.DETECT:
             self.detect_page.focus_initial()
         else:
-            self.review_page.back_button.setFocus()
+            self.review_page.focus_initial()
 
     def allow_application_close(self) -> None:
         self._allow_close = True

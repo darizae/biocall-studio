@@ -188,7 +188,6 @@ class ExportHistoryModel(QAbstractTableModel):
 
 class ExportHistoryPage(QWidget):
     export_requested = Signal(str)
-    new_export_requested = Signal()
 
     def __init__(self, controller: DetectWorkspaceController):
         super().__init__()
@@ -209,8 +208,10 @@ class ExportHistoryPage(QWidget):
         self.table.doubleClicked.connect(lambda index: self._open_row(index.row()))
         self.empty = EmptyState(
             "No exports yet",
-            text="Select calls in Results to plan an export.",
+            text="Historical Detect exports will appear here.",
         )
+        self.empty.setAccessibleName("No historical Detect exports")
+        self.empty.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.stack = QStackedWidget()
         self.stack.addWidget(self.empty)
         self.stack.addWidget(self.table)
@@ -220,9 +221,6 @@ class ExportHistoryPage(QWidget):
         self.notice.setStyleSheet("color: #B91C1C; font-weight: 600;")
         outer.addWidget(self.notice)
         actions = QHBoxLayout()
-        self.new_button = Button("New export", variant="outline")
-        self.new_button.clicked.connect(self.new_export_requested)
-        actions.addWidget(self.new_button)
         actions.addStretch()
         self.open_button = Button("Open export", variant="primary")
         self.open_button.clicked.connect(self._open_selected)
@@ -261,7 +259,7 @@ class ExportHistoryPage(QWidget):
         self.notice.setVisible(bool(rejected))
 
     def focus_initial(self) -> None:
-        (self.table if self.model.rowCount() else self.new_button).setFocus()
+        (self.table if self.model.rowCount() else self.empty).setFocus()
 
 
 class ExportDetailPage(QWidget):

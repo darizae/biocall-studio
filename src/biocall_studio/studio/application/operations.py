@@ -9,6 +9,7 @@ from enum import StrEnum
 class WorkflowOwner(StrEnum):
     TRAIN = "Train"
     DETECT = "Detect"
+    REVIEW = "Review"
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +35,7 @@ class AdmissionDecision:
 class ExitAction(StrEnum):
     EXIT_NOW = "exit_now"
     CONFIRM_STOP = "confirm_stop"
+    CONFIRM_SAVE_REVIEW = "confirm_save_review"
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,9 +70,17 @@ def decide_scientific_admission(
 
 def decide_application_exit(
     active_operations: tuple[OwnedOperation, ...],
+    *,
+    review_session_open: bool = False,
 ) -> ExitDecision:
     """Require one confirmation for all explicitly owned active scientific work."""
     operations = tuple(active_operations)
+    if review_session_open:
+        return ExitDecision(
+            ExitAction.CONFIRM_SAVE_REVIEW,
+            operations,
+            "A Review session is still open. Save and exit?",
+        )
     if not operations:
         return ExitDecision(ExitAction.EXIT_NOW, (), "")
     summary = "Active work: " + "; ".join(

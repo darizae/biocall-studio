@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import shutil
-import wave
 from pathlib import Path
 
 import joblib
@@ -22,7 +21,6 @@ from biocall_studio.detect.domain.detection import (
     merge_candidate_windows,
     predict_recording_windows,
 )
-from biocall_studio.detect.domain.exports import ExportMode, ExportState, frame_seconds
 from biocall_studio.detect.domain.result_views import ResultSourceState
 from biocall_studio.detect.domain.rf_refinement import (
     RefinementStatus,
@@ -30,7 +28,6 @@ from biocall_studio.detect.domain.rf_refinement import (
 )
 from biocall_studio.detect.domain.runs import DetectRunRequest, DetectRunStatus
 from biocall_studio.detect.persistence.runs import DetectRunRepository
-from biocall_studio.detect.workflows.exports import verify_export_directory
 from biocall_studio.studio.application.coordinator import StudioCoordinator
 from biocall_studio.studio.application.navigation import WorkspaceRoute
 from biocall_studio.train.application.collection_scan import scan_collection
@@ -488,58 +485,9 @@ def test_genuine_studio_train_detect_rf_export_restart_relink_round_trip(
     assert scored.rf_target_score == pytest.approx(reference_score, rel=0, abs=1e-12)
 
     detect.select_result(child.result_id)
-    detect.set_candidate_selected(scored.candidate_id, True)
-    frozen = detect.prepare_export_plan()
-    assert frozen is not None and frozen.candidate_ids == (scored.candidate_id,)
-    destination = tmp_path / "qualification-export"
-    destination.mkdir()
-    detect.start_export(ExportMode.BOTH, destination)
-    qtbot.waitUntil(
-        lambda: not detect.is_export_active and detect.export_state is ExportState.SUCCESS,
-        timeout=30_000,
-    )
-    snapshot = detect.export_snapshot
-    receipt = detect.export_receipt
-    assert snapshot is not None and receipt is not None
-    assert receipt == verify_export_directory(Path(receipt.final_destination))
-    assert receipt.result_id == child.result_id
-    assert receipt.parent_result_id == parent.result_id
-    assert receipt.snapshot_digest == snapshot.snapshot_digest
-    mapping = receipt.snippets[0]
-    concat = receipt.concat_mappings[0]
-    raven = receipt.raven_rows[0]
-    assert (mapping.source_start_frame, mapping.source_end_frame) == (
-        scored.start_frame,
-        scored.end_frame,
-    )
-    assert (concat.source_start_frame, concat.source_end_frame) == (
-        scored.start_frame,
-        scored.end_frame,
-    )
-    assert (raven.source_start_frame, raven.source_end_frame) == (
-        scored.start_frame,
-        scored.end_frame,
-    )
-    assert raven.begin_seconds == frame_seconds(raven.begin_frame, mapping.sample_rate_hz)
-    assert raven.end_seconds == frame_seconds(raven.end_frame, mapping.sample_rate_hz)
-    final = Path(receipt.final_destination)
-    with wave.open(str(source_path), "rb") as source_stream:
-        source_stream.setpos(scored.start_frame)
-        expected_pcm = source_stream.readframes(scored.end_frame - scored.start_frame)
-    with wave.open(str(final / mapping.output_relative_path), "rb") as output_stream:
-        assert output_stream.readframes(output_stream.getnframes()) == expected_pcm
-    assert mapping.pcm_sha256 == hashlib.sha256(expected_pcm).hexdigest()
-    for file_record in receipt.files:
-        assert _sha256(final / file_record.relative_path) == file_record.sha256
-    tsv = (final / "corpus.Table.1.selections.txt").read_text().splitlines()
-    assert len(tsv) == 2
-    assert tsv[1].split("\t")[3:5] == [raven.begin_seconds, raven.end_seconds]
-    assert tsv[1].split("\t")[7:] == [
-        scored.candidate_id,
-        source_recording.recording_key,
-        str(scored.start_frame),
-        str(scored.end_frame),
-    ]
+    assert not hasattr(detect, "prepare_export_plan")
+    assert not hasattr(detect, "start_export")
+    assert not hasattr(detect, "set_candidate_selected")
     assert _source_bytes(train_root) == train_source_bytes
     assert _source_bytes(detect_root) == detect_source_bytes
     assert len(
@@ -551,13 +499,12 @@ def test_genuine_studio_train_detect_rf_export_restart_relink_round_trip(
             refinement_run_id,
             parent.result_id,
             child.result_id,
-            receipt.export_id,
         }
-    ) == 8
+    ) == 7
 
     page = coordinator.shell_window.detect_page
-    page._set_route(DetectRoute.EXPORT_NEW)
-    assert page.export_page.status_title.text() == "Export completed"
+    page._set_route(DetectRoute.RESULTS)
+    assert not hasattr(page.result_explorer, "export_button")
     for width in (1180, 700):
         coordinator.shell_window.resize(width, 790)
         qtbot.waitUntil(lambda width=width: page.is_compact == (width < 820))
@@ -600,8 +547,7 @@ def test_genuine_studio_train_detect_rf_export_restart_relink_round_trip(
     assert child_path.read_bytes() == child_bytes
     assert _source_bytes(relocated) == detect_source_bytes
     assert _source_bytes(train_root) == train_source_bytes
-    assert verify_export_directory(final) == receipt
-    assert any(item.export_id == receipt.export_id for item in reopened_detect.export_history)
+    assert not hasattr(reopened_detect, "start_export")
     reopened.request_application_exit()
     qtbot.waitUntil(lambda: reopened_train._shutdown_finished, timeout=10_000)
     qtbot.waitUntil(lambda: reopened_detect._shutdown_finished, timeout=10_000)

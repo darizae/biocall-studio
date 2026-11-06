@@ -36,10 +36,11 @@ def test_typed_routes_adaptive_entry_and_nested_highlighting_fail_closed():
 
     assert active_sidebar_route(DetectRoute.RUN_DETAIL) is DetectRoute.RUNS
     assert active_sidebar_route(DetectRoute.EXPORT_DETAIL) is DetectRoute.EXPORTS
-    assert active_sidebar_route(DetectRoute.EXPORT_NEW) is DetectRoute.EXPORTS
     assert active_sidebar_route(DetectRoute.RESULTS) is DetectRoute.RESULTS
 
     with pytest.raises(ValueError, match="Unknown Detect route"):
         parse_detect_route("setup")
+    with pytest.raises(ValueError, match="Unknown Detect route"):
+        parse_detect_route("export-new")
     with pytest.raises(TypeError, match="text or DetectRoute"):
         parse_detect_route(None)

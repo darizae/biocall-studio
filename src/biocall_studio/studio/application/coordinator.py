@@ -2,10 +2,22 @@
 
 from __future__ import annotations
 
+import time
+from datetime import UTC, datetime
+
 from PySide6.QtCore import QObject, Qt, QTimer
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from biocall_studio.detect.application.controller import DetectWorkspaceController
+from biocall_studio.detect.domain import RootBindingDecision
+from biocall_studio.review.application.controller import (
+    ReviewSessionController,
+    default_spectrogram_snapshot,
+)
+from biocall_studio.review.domain.intake import ReviewResultKind
+from biocall_studio.review.gui.workspace import ReviewResultChoice, ReviewWorkspacePage
+from biocall_studio.review.persistence.intake import IntakeAvailability
+from biocall_studio.review.persistence.sessions import ReviewSession
 from biocall_studio.studio.application.navigation import WorkspaceNavigation, WorkspaceRoute
 from biocall_studio.studio.application.operations import (
     ExitAction,
@@ -40,7 +52,23 @@ class StudioCoordinator(QObject):
                 else train_root.parent
             )
         self.detect_controller = DetectWorkspaceController(detect_data_dir)
-        self.shell_window = StudioWindow(self.detect_controller)
+        self.review_controller = ReviewSessionController(detect_data_dir)
+        now = datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        self.review_controller.ensure_default_preset(
+            default_spectrogram_snapshot(), saved_at=now
+        )
+        self.review_page = ReviewWorkspacePage(
+            self.review_controller,
+            result_provider=self._review_result_choices,
+            source_root_resolver=self._review_source_root,
+            operation_admission=lambda run_id, label: self._assert_run_admitted(
+                WorkflowOwner.REVIEW, run_id, label
+            ),
+        )
+        recovered = self.review_controller.recover_open_session(recovered_at=now)
+        if recovered is not None:
+            self.review_page.open_session(recovered.session_id)
+        self.shell_window = StudioWindow(self.detect_controller, self.review_page)
         self.train_window = MainWindow(
             controller,
             back_to_studio=self.show_studio,
@@ -49,9 +77,13 @@ class StudioCoordinator(QObject):
         self.exit_dialog: QMessageBox | None = None
         self._exit_keep_button = None
         self._exit_stop_button = None
+        self._exit_dialog_action: ExitAction | None = None
+        self.exit_failure_dialog: QMessageBox | None = None
         self._application_exit_finishing = False
         self._application_exit_complete = False
         self._train_exit_finished = False
+        self._review_exit_save = False
+        self._review_stop_deadline = 0.0
 
         self.controller.set_run_admission(
             lambda run_id, label: self._assert_run_admitted(
@@ -75,8 +107,11 @@ class StudioCoordinator(QObject):
         self.shell_window.activateWindow()
 
     def open_workspace(self, route: str | WorkspaceRoute) -> None:
+        previous = self.navigation.current
         decision = self.navigation.navigate(route)
         self.navigation = decision
+        if previous is WorkspaceRoute.REVIEW and decision.current is not WorkspaceRoute.REVIEW:
+            self.review_page.leave_workspace()
         if decision.current is WorkspaceRoute.TRAIN:
             self.shell_window.hide()
             self.train_window.show()
@@ -90,6 +125,60 @@ class StudioCoordinator(QObject):
         self.shell_window.show()
         self.shell_window.raise_()
         self.shell_window.activateWindow()
+
+    def _review_result_choices(self) -> tuple[ReviewResultChoice, ...]:
+        choices: list[ReviewResultChoice] = []
+        for item in self.detect_controller.result_history:
+            result = item.result
+            if not item.available or result is None:
+                continue
+            inspection = self.review_controller.intake.intake(
+                result.collection_id, result.result_id
+            )
+            if (
+                inspection.availability is not IntakeAvailability.READY
+                or inspection.manifest is None
+            ):
+                continue
+            choices.append(
+                ReviewResultChoice(
+                    collection_id=result.collection_id,
+                    result_id=result.result_id,
+                    name=(
+                        next(
+                            (
+                                record.title
+                                for record in self.detect_controller.runs
+                                if record.run_id == item.run_id
+                            ),
+                            result.result_id,
+                        )
+                    ),
+                    kind=(
+                        "RF refined"
+                        if inspection.manifest.result_kind is ReviewResultKind.RF
+                        else "Original"
+                    ),
+                    completed_at=result.completed_at,
+                    eligible_count=inspection.manifest.eligible_candidate_count,
+                )
+            )
+        return tuple(choices)
+
+    def _review_source_root(self, session: ReviewSession):
+        try:
+            source = self.review_controller.store.load_source(session.session_id)
+            collection = self.detect_controller.store.load_collection(
+                source.manifest.collection_id
+            )
+            if (
+                self.detect_controller.store.root_decision(collection)
+                is not RootBindingDecision.VALID
+            ):
+                return None
+            return collection.source_root
+        except (OSError, RuntimeError, ValueError):
+            return None
 
     def show_studio(self) -> None:
         self.open_workspace(WorkspaceRoute.STUDIO)
@@ -114,6 +203,10 @@ class StudioCoordinator(QObject):
                     detect_run.title,
                 )
             )
+        review_operation = self.review_page.active_operation
+        if review_operation is not None:
+            run_id, label = review_operation
+            operations.append(OwnedOperation(WorkflowOwner.REVIEW, run_id, label))
         return tuple(operations)
 
     def _assert_run_admitted(
@@ -132,37 +225,71 @@ class StudioCoordinator(QObject):
     def request_application_exit(self) -> None:
         if self._application_exit_finishing:
             return
+        if self.exit_failure_dialog is not None and self.exit_failure_dialog.isVisible():
+            self.exit_failure_dialog.raise_()
+            self.exit_failure_dialog.activateWindow()
+            return
         if self.exit_dialog is not None and self.exit_dialog.isVisible():
             self.exit_dialog.raise_()
             self.exit_dialog.activateWindow()
             return
-        decision = decide_application_exit(self._active_scientific_operations())
-        if decision.action is ExitAction.CONFIRM_STOP:
-            self._show_exit_dialog(decision.summary)
+        decision = decide_application_exit(
+            self._active_scientific_operations(),
+            review_session_open=self.review_page.has_open_session,
+        )
+        if decision.action in {
+            ExitAction.CONFIRM_STOP,
+            ExitAction.CONFIRM_SAVE_REVIEW,
+        }:
+            self._show_exit_dialog(decision)
             return
         self._begin_coordinated_shutdown()
 
-    def _show_exit_dialog(self, summary: str) -> None:
+    def _show_exit_dialog(self, decision) -> None:
         parent = self.train_window if self.train_window.isVisible() else self.shell_window
         dialog = QMessageBox(parent)
         dialog.setObjectName("studioExitDialog")
-        dialog.setAccessibleName("Stop active BioCall Studio work before exit")
-        dialog.setIcon(QMessageBox.Icon.Warning)
-        dialog.setWindowTitle("Active work")
-        dialog.setText(summary)
-        dialog.setInformativeText(
-            "If you exit, BioCall Studio will stop each active operation and wait for its "
-            "worker to finish. Completed Models, Results, and exports remain unchanged."
+        review_exit = decision.action is ExitAction.CONFIRM_SAVE_REVIEW
+        dialog.setAccessibleName(
+            "Save the Open Review session before exit"
+            if review_exit
+            else "Stop active BioCall Studio work before exit"
         )
+        dialog.setIcon(QMessageBox.Icon.Warning)
+        dialog.setWindowTitle("Open Review session" if review_exit else "Active work")
+        dialog.setText(decision.summary)
+        if review_exit:
+            active = "; ".join(
+                f"{operation.label} in {operation.owner.value}"
+                for operation in decision.operations
+            )
+            dialog.setInformativeText(
+                "BioCall Studio will save and close the Review session, stop active work "
+                "safely, and then exit."
+                + (f" Active work: {active}." if active else "")
+            )
+        else:
+            dialog.setInformativeText(
+                "If you exit, BioCall Studio will stop each active operation and wait for its "
+                "worker to finish. Completed Models, Results, and exports remain unchanged."
+            )
         keep = dialog.addButton("Keep app open", QMessageBox.ButtonRole.RejectRole)
-        stop = dialog.addButton("Stop work and Exit", QMessageBox.ButtonRole.DestructiveRole)
+        stop = dialog.addButton(
+            "Save and Exit" if review_exit else "Stop work and Exit",
+            QMessageBox.ButtonRole.DestructiveRole,
+        )
         keep.setAccessibleDescription("Leave all active work running and keep the app open.")
-        stop.setAccessibleDescription("Stop all active work safely, then exit BioCall Studio.")
+        stop.setAccessibleDescription(
+            "Save and close the Review session, stop active work safely, then exit BioCall Studio."
+            if review_exit
+            else "Stop all active work safely, then exit BioCall Studio."
+        )
         dialog.setDefaultButton(keep)
         dialog.setEscapeButton(keep)
         self.exit_dialog = dialog
         self._exit_keep_button = keep
         self._exit_stop_button = stop
+        self._exit_dialog_action = decision.action
         dialog.finished.connect(self._exit_dialog_finished)
         dialog.open()
         keep.setFocus(Qt.FocusReason.ActiveWindowFocusReason)
@@ -172,20 +299,77 @@ class StudioCoordinator(QObject):
         if dialog is None:
             return
         stop_requested = dialog.clickedButton() is self._exit_stop_button
+        action = self._exit_dialog_action
         self.exit_dialog = None
         self._exit_keep_button = None
         self._exit_stop_button = None
+        self._exit_dialog_action = None
         dialog.deleteLater()
         if stop_requested:
-            self._begin_coordinated_shutdown()
+            self._begin_coordinated_shutdown(
+                save_review_session=action is ExitAction.CONFIRM_SAVE_REVIEW
+            )
 
-    def _begin_coordinated_shutdown(self) -> None:
+    def _begin_coordinated_shutdown(self, *, save_review_session: bool = False) -> None:
         if self._application_exit_finishing:
             return
         self._application_exit_finishing = True
+        self._review_exit_save = save_review_session
+        self._review_stop_deadline = time.monotonic() + 15.0
+        try:
+            self.review_page.request_exit_stop()
+        except (OSError, RuntimeError, ValueError):
+            self._abort_application_exit("Review work couldn't be stopped. Try again.")
+            return
+        QTimer.singleShot(0, self._continue_after_review_stop)
+
+    def _continue_after_review_stop(self) -> None:
+        if not self._application_exit_finishing or self._application_exit_complete:
+            return
+        if not self.review_page.exit_stop_ready:
+            if time.monotonic() >= self._review_stop_deadline:
+                self._abort_application_exit(
+                    "Review work couldn't be stopped. Wait for it to finish, then try again."
+                )
+                return
+            QTimer.singleShot(25, self._continue_after_review_stop)
+            return
+        if self._review_exit_save:
+            try:
+                self.review_page.checkpoint_open_session_for_exit()
+            except (OSError, RuntimeError, ValueError):
+                self._abort_application_exit(
+                    "The Review session couldn't be saved. Check storage access and try again."
+                )
+                return
+        self._review_exit_save = False
         self.detect_controller.request_shutdown()
         self.train_window.begin_application_exit()
         QTimer.singleShot(25, self._finish_application_exit)
+
+    def _abort_application_exit(self, message: str) -> None:
+        self._application_exit_finishing = False
+        self._review_exit_save = False
+        parent = self.train_window if self.train_window.isVisible() else self.shell_window
+        dialog = QMessageBox(parent)
+        dialog.setObjectName("studioExitFailureDialog")
+        dialog.setAccessibleName("BioCall Studio exit blocked")
+        dialog.setIcon(QMessageBox.Icon.Critical)
+        dialog.setWindowTitle("Couldn't exit")
+        dialog.setText(message)
+        keep = dialog.addButton("Keep app open", QMessageBox.ButtonRole.RejectRole)
+        dialog.setDefaultButton(keep)
+        dialog.setEscapeButton(keep)
+        self.exit_failure_dialog = dialog
+
+        def finished(_result: int) -> None:
+            if self.exit_failure_dialog is dialog:
+                self.exit_failure_dialog = None
+            dialog.deleteLater()
+
+        dialog.finished.connect(finished)
+        dialog.open()
+        keep.setFocus(Qt.FocusReason.ActiveWindowFocusReason)
 
     def _train_exit_completed(self) -> None:
         self._train_exit_finished = True
@@ -203,6 +387,13 @@ class StudioCoordinator(QObject):
         if not self._train_exit_finished:
             QTimer.singleShot(25, self._finish_application_exit)
             return
+        if self.review_page.has_open_session:
+            self._abort_application_exit(
+                "The Review session is still open. Save and close it before exiting."
+            )
+            return
+        self.review_page.shutdown()
+        self.review_controller.shutdown()
         self._application_exit_complete = True
         self.shell_window.allow_application_close()
         self.shell_window.close()

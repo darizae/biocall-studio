@@ -272,24 +272,11 @@ def test_guided_detect_routes_bulk_badges_run_and_selection_free_export(
     exports_button.setFocus()
     qtbot.keyClick(exports_button, Qt.Key.Key_Space)
     assert page.current_route is DetectRoute.EXPORTS
-    page.export_history_page.new_button.click()
-    assert page.current_route is DetectRoute.EXPORT_NEW
-    assert page.export_page.mode_both.isEnabled()
-    assert page.export_page.destination_picker.isEnabled()
-    assert not page.export_page.start_button.isEnabled()
-    assert controller.export_selection is None
-    assert controller.export_snapshot is None
-    assert controller.export_receipt is None
-    page.export_page.mode_snippets.setChecked(True)
-    destination = tmp_path / "presentation-choice"
-    destination.mkdir()
-    page.export_page.destination_picker.setFolderPath(str(destination))
-    page.export_page.results_button.click()
+    assert not hasattr(page.export_history_page, "new_button")
+    assert not page.export_history_page.open_button.isEnabled()
+    page._navigation[DetectRoute.RESULTS].click()
     assert page.current_route is DetectRoute.RESULTS
-    page.result_explorer.export_button.click()
-    assert page.current_route is DetectRoute.EXPORT_NEW
-    assert page.export_page.mode_snippets.isChecked()
-    assert page.export_page.destination_picker.folderPath() == str(destination)
+    assert not hasattr(page.result_explorer, "export_button")
 
     page._navigation[DetectRoute.MODELS].click()
     assert page.current_route is DetectRoute.MODELS
@@ -415,12 +402,7 @@ def test_guided_detect_routes_bulk_badges_run_and_selection_free_export(
     assert page.refinement_model_status_badge.intent == "success"
     page._navigation[DetectRoute.RESULTS].click()
     assert explorer.refinement_status_badge.intent == "success"
-    assert explorer.export_button.isEnabled()
-    explorer.export_button.click()
-    assert page.current_route is DetectRoute.EXPORT_NEW
-    assert controller.export_selection is None
-    assert controller.export_snapshot is None
-    assert not page.export_page.start_button.isEnabled()
+    assert not hasattr(explorer, "export_button")
 
     for width in (1180, 700):
         page.resize(width, 790)
@@ -665,7 +647,6 @@ def test_native_result_history_recording_candidates_selection_and_keyboard_navig
     page.focus_initial()
     qtbot.waitUntil(lambda: page.focusWidget() is explorer.history_select.control)
     assert {hint.accessibleName() for hint in explorer.findChildren(HelpHint)} == {
-        "More about Result selection",
         "More about Estimated output",
         "More about Space while running",
     }
@@ -693,17 +674,7 @@ def test_native_result_history_recording_candidates_selection_and_keyboard_navig
     assert Path(opened_urls[0].toLocalFile()) == source / "recordings"
     first_candidate_id = explorer.candidate_model.candidate_at(0).candidate_id
     explorer.candidate_table.setCurrentIndex(explorer.candidate_model.index(0, 0))
-    explorer.candidate_table.setFocus()
-    qtbot.keyClick(explorer.candidate_table, Qt.Key.Key_Space)
-    assert controller.result_selection.candidate_ids == (first_candidate_id,)
     assert explorer.candidate_detail_id.text() == first_candidate_id
-    prepared = controller.prepare_export_plan()
-    assert prepared is not None
-    assert controller.export_selection == prepared
-    controller.set_candidate_selected(first_candidate_id, False)
-    assert controller.export_selection is None
-    assert controller.export_snapshot is None
-    controller.set_candidate_selected(first_candidate_id, True)
 
     explorer.recording_table.setFocus()
     assert second_recording_row == first_recording_row + 1
@@ -715,12 +686,9 @@ def test_native_result_history_recording_candidates_selection_and_keyboard_navig
         for candidate in explorer.candidate_model.visible_candidates
     )
     explorer.recording_table.setCurrentIndex(explorer.recording_model.index(first_recording_row, 0))
-    assert (
-        explorer.candidate_model.data(
-            explorer.candidate_model.index(0, 0), Qt.ItemDataRole.CheckStateRole
-        )
-        == Qt.CheckState.Checked
-    )
+    first_index = explorer.candidate_model.index(0, 0)
+    assert explorer.candidate_model.data(first_index, Qt.ItemDataRole.CheckStateRole) is None
+    assert not explorer.candidate_model.flags(first_index) & Qt.ItemFlag.ItemIsUserCheckable
 
     controller.start_detection(DetectionSettings(1.0, 50, 0, 4))
     second_run = _wait_terminal(qtbot, controller)
@@ -728,13 +696,8 @@ def test_native_result_history_recording_candidates_selection_and_keyboard_navig
     assert controller.current_result.candidate_count == 0
     assert len(controller.result_history) == 2
     assert explorer.history_select.count() == 2
-    assert controller.result_selection.candidate_ids == ()
     controller.select_result(first_result.result_id)
-    assert controller.result_selection.candidate_ids == (first_candidate_id,)
     assert result_path.read_bytes() == immutable_bytes
-    frozen = controller.freeze_selected_result_selection()
-    assert frozen.result_id == first_result.result_id
-    assert frozen.candidate_ids == (first_candidate_id,)
     controller.shutdown()
 
 
@@ -766,16 +729,14 @@ def test_large_candidate_model_is_paged_without_source_audio_access(qapp):
         error_code="",
         candidates=candidates,
     )
-    changed: list[tuple[str, bool]] = []
-    model = CandidateResultModel(selection_changed=lambda *value: changed.append(value))
-    model.set_recording(recording, ())
+    model = CandidateResultModel()
+    model.set_recording(recording)
     assert model.rowCount() == 200
     assert len(model.visible_candidates) == 200
     assert model.canFetchMore()
     model.fetchMore()
     assert model.rowCount() == 400
     assert model.candidate_at(399).candidate_id == candidates[399].candidate_id
-    assert not changed
 
 
 @pytest.mark.qt
@@ -794,11 +755,6 @@ def test_result_empty_partial_missing_corrupt_persistence_and_native_screenshots
     partial_result = controller.current_result
     assert partial_result.failed_files == 1
     assert controller.selected_result_projection.content_state is ResultContentState.PARTIAL
-    first_candidate = next(
-        candidate for recording in partial_result.recordings for candidate in recording.candidates
-    )
-    controller.set_candidate_selected(first_candidate.candidate_id, True)
-    selection_revision = controller.result_selection.selection_revision
     partial_path = (
         DetectRunRepository(app_data, controller.active_collection.ref.collection_id).result_path(
             partial_run.artifact_id
@@ -821,8 +777,6 @@ def test_result_empty_partial_missing_corrupt_persistence_and_native_screenshots
     assert controller.selected_result_projection.content_state is ResultContentState.EMPTY
 
     controller.select_result(partial_result.result_id)
-    assert controller.result_selection.selection_revision == selection_revision
-    assert controller.result_selection.candidate_ids == (first_candidate.candidate_id,)
     controller.shutdown()
 
     missing = tmp_path / "source-offline"
@@ -830,7 +784,6 @@ def test_result_empty_partial_missing_corrupt_persistence_and_native_screenshots
     reopened = DetectWorkspaceController(app_data)
     assert reopened.selected_result_projection.source_state is ResultSourceState.UNAVAILABLE
     reopened.select_result(partial_result.result_id)
-    assert reopened.result_selection.candidate_ids == (first_candidate.candidate_id,)
     page = DetectWorkspacePage(reopened)
     qtbot.addWidget(page)
     page.resize(1180, 790)
@@ -1226,21 +1179,6 @@ def test_real_rf_reference_probability_persists_independent_native_derived_resul
     controller.select_result(parent.result_id)
     assert not explorer.candidate_model.refinement_visible
     controller.select_result(child.result_id)
-    first_id = next(
-        candidate.candidate_id
-        for recording in child.recordings
-        for candidate in recording.candidates
-    )
-    controller.set_candidate_selected(first_id, True)
-    assert controller.result_selection.candidate_ids == (first_id,)
-    controller.select_result(parent.result_id)
-    assert controller.result_selection.candidate_ids == ()
-    controller.select_result(child.result_id)
-    frozen = controller.freeze_selected_result_selection()
-    assert frozen.result_kind == "derived"
-    assert frozen.parent_result_id == parent.result_id
-    assert frozen.parent_result_digest == parent.result_digest
-    assert frozen.candidate_ids == (first_id,)
     evidence_value = os.environ.get("BIOCALL_ST09_EVIDENCE_DIR")
     if evidence_value:
         evidence = Path(evidence_value)
@@ -1389,7 +1327,7 @@ def test_rf_wrong_model_unscored_cancel_crash_stale_and_publication_are_atomic(
         if candidate.refinement_status is RefinementStatus.UNSCORED
     )
     assert (
-        explorer.candidate_model.data(explorer.candidate_model.index(unscored_candidate_row, 4))
+        explorer.candidate_model.data(explorer.candidate_model.index(unscored_candidate_row, 3))
         == "Could not assess"
     )
     explorer.candidate_table.setCurrentIndex(

@@ -6,7 +6,7 @@
 - **Detection Run** freezes Model identity/integrity, selected source inventory, resolved preprocessing/window/threshold settings, software versions and outcomes. Persist state/diagnostics separately from published, immutable result metadata. Run success requires verified publication, not only process exit.
 - **Detection Result** describes source-recording paths/identities and intervals in **original source time**, with score meaning, class mapping, provenance and non-successful-file status. Do not copy WAV data into a Result.
 - **Derived Result** references one input Result and its frozen RF Model/settings, stores accepted/rejected/unscored decisions, never overwrites its parent and remains metadata-only even though RF processing reads WAV samples.
-- **Historical Detect Corpus Export v1** freezes a chosen Result plus selection/settings and remains immutable and readable for compatibility. New reviewed-corpus publication is Review-owned: it starts only from a verified Finalized Review session, can be repeated independently, and preserves lineage to this Result without modifying it. Detect's existing new-export entry remains only until the separately gated RV-07 route migration.
+- **Historical Detect Corpus Export v1** freezes a chosen Result plus selection/settings and remains immutable and readable for compatibility. Detect retains only its history, receipt verification and reopen reader for these artifacts; it has no new-export action, route or controller writer. New reviewed-corpus publication is Review-owned: it starts only from a verified Finalized Review session, can be repeated independently, and preserves lineage to this Result without modifying it.
 
 ## Source discovery
 
@@ -29,6 +29,6 @@ Review includes Call and Unreviewed candidates, excludes Not a call from audio, 
 
 ## Cross-cutting operations
 
-Use explicit unavailable/incompatible Model states; plain-language errors; background scanning and workers; cancellable Runs; per-file failure reporting; privacy-safe, bounded application/Worker JSONL logs consistent with Train diagnostics, without creating shared Run identity. Real inference and export acceptance is recorded in [ST-11 source qualification](ST-11_QUALIFICATION.md); it does not qualify installed releases.
+Use explicit unavailable/incompatible Model states; plain-language errors; background scanning and workers; cancellable Runs; per-file failure reporting; privacy-safe, bounded application/Worker JSONL logs consistent with Train diagnostics, without creating shared Run identity. Historical Detect v1 export acceptance is recorded in [ST-11 source qualification](ST-11_QUALIFICATION.md); current Train→Detect→Review→Export qualification belongs to RV-08 and no source result qualifies installed releases.
 
 **Implementation authority:** the current [status and work policy](IMPLEMENTATION_SEQUENCE.md), owning source code and indexed tests; this page records stable scientific/domain invariants without duplicating completed implementation specs.

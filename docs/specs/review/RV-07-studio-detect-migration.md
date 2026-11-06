@@ -1,6 +1,6 @@
 # RV-07 — Studio integration, application exit and Detect export retirement
 
-> **Status:** Owner-approved planning spec, NOT implemented. Do not start implementation or infer test passes from this document. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
+> **Status:** Implemented on isolated branch `review-rv07-studio-detect-migration` from reviewed RV-06 source baseline `54bd690`; awaiting the owner's evidence/code gate. Do not infer acceptance or platform qualification from this document. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
 
 **Sequence:** RV-07 begins only after RV-06 has passed its owner-reviewed gate.
 

@@ -14,7 +14,6 @@ class DetectRoute(StrEnum):
     RESULTS = "results"
     EXPORTS = "exports"
     EXPORT_DETAIL = "export-detail"
-    EXPORT_NEW = "export-new"
 
 
 SIDEBAR_ROUTES = (
@@ -35,7 +34,6 @@ _ACTIVE_SIDEBAR_ROUTE = {
     DetectRoute.RESULTS: DetectRoute.RESULTS,
     DetectRoute.EXPORTS: DetectRoute.EXPORTS,
     DetectRoute.EXPORT_DETAIL: DetectRoute.EXPORTS,
-    DetectRoute.EXPORT_NEW: DetectRoute.EXPORTS,
 }
 
 
