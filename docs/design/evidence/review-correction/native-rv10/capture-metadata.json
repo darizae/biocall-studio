@@ -1,0 +1,228 @@
+{
+  "capture_mode": "visible Cocoa QScreen desktop capture of the live Studio client area",
+  "captured_at": "2026-11-06T20:57:07+00:00",
+  "captures": [
+    {
+      "file": "00-studio.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "modal": false,
+      "pixmap_device_pixel_ratio": 2.0,
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "file": "01-choose-result.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "modal": false,
+      "pixmap_device_pixel_ratio": 2.0,
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "file": "02-sessions.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "modal": false,
+      "pixmap_device_pixel_ratio": 2.0,
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "file": "03-gallery.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "modal": false,
+      "pixmap_device_pixel_ratio": 2.0,
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "file": "04-list.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "modal": false,
+      "pixmap_device_pixel_ratio": 2.0,
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "file": "05-one-by-one.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "modal": false,
+      "pixmap_device_pixel_ratio": 2.0,
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "file": "06-spectrograms.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "modal": false,
+      "pixmap_device_pixel_ratio": 2.0,
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "file": "07-finalize.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "modal": true,
+      "pixmap_device_pixel_ratio": 2.0,
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "file": "08-export.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "modal": false,
+      "pixmap_device_pixel_ratio": 2.0,
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "file": "09-compact-gallery.png",
+      "logical_viewport": [
+        700,
+        790
+      ],
+      "modal": false,
+      "pixmap_device_pixel_ratio": 2.0,
+      "png_pixels": [
+        1400,
+        1580
+      ]
+    },
+    {
+      "file": "10-compact-one-by-one.png",
+      "logical_viewport": [
+        700,
+        790
+      ],
+      "modal": false,
+      "pixmap_device_pixel_ratio": 2.0,
+      "png_pixels": [
+        1400,
+        1580
+      ]
+    },
+    {
+      "file": "11-narrow-one-by-one.png",
+      "logical_viewport": [
+        520,
+        790
+      ],
+      "modal": false,
+      "pixmap_device_pixel_ratio": 2.0,
+      "png_pixels": [
+        1040,
+        1580
+      ]
+    },
+    {
+      "file": "12-settings.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "modal": false,
+      "pixmap_device_pixel_ratio": 2.0,
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "file": "13-delete-session.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "modal": true,
+      "pixmap_device_pixel_ratio": 2.0,
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "file": "14-review-data-folder.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "modal": false,
+      "pixmap_device_pixel_ratio": 2.0,
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    }
+  ],
+  "fixture": {
+    "duration_seconds": 10,
+    "eligible_candidates": 12,
+    "recording": "woodland-dawn-2026-11-05.wav",
+    "sample_rate_hz": 8000,
+    "sessions": [
+      "Morning woodland review (Open)",
+      "Ridge recorder \u2014 paused (Closed)",
+      "Woodland dawn \u2014 finalized (Finalized)"
+    ],
+    "wav_sha256": "d8911051699554d746a44c4b90d839529e85fb6d0b8147d6fc9efa5ed25fdafa"
+  },
+  "os": "macOS-26.6.2-arm64-arm-64bit",
+  "qt_platform": "cocoa",
+  "qt_version": "6.11.2",
+  "screen": {
+    "available_geometry": [
+      1470,
+      835
+    ],
+    "device_pixel_ratio": 2.0,
+    "geometry": [
+      1470,
+      956
+    ],
+    "name": "Built-in Retina Display"
+  }
+}

@@ -1,6 +1,6 @@
 # RV-10 — Responsive spectrograms, truthful cache and short qualification
 
-**Corrective specification; not implemented.** **Entry:** owner-approved RV-09 visual/sidebar, deletion, data-folder and upstream dependency handoff. **Owns:** asynchronous candidate/visible/nearby spectrogram work, normal-speed audio responsiveness, verified cache reuse, quota/eviction, calibrated REV-05 preflight, short user-journey tests and an additive RV-08 qualification update. No redesign of verified CNN/RF Results, source-frame arithmetic, annotations, immutable export publication or existing RV-01–RV-08 contracts.
+**Corrective source implemented at `27d94b870bb62e7accfdf6a68865934347b716ad`; owner visual approval remains outstanding.** **Entry:** owner-approved RV-09 visual/sidebar, deletion, data-folder and upstream dependency handoff. **Owns:** asynchronous candidate/visible/nearby spectrogram work, normal-speed audio responsiveness, verified cache reuse, quota/eviction, calibrated REV-05 preflight, short user-journey tests and an additive RV-08 qualification update. No redesign of verified CNN/RF Results, source-frame arithmetic, annotations, immutable export publication or existing RV-01–RV-08 contracts.
 
 ## Concrete native integration defects
 

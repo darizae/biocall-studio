@@ -61,3 +61,27 @@ The first visible pass was inspected rather than accepted as decoration. It expo
 No reusable `alp-ui` gap was found. RV-09 composes the documented ordinary-Qt sidebar pattern with installed public `Button`, `FolderPicker`, `Text`, theme-token and icon APIs. The sibling checkout was clean at the revision above and the installed package source was verified against it. No ceremonial upstream branch or commit was created.
 
 The PNG set establishes real visible Cocoa evidence. Automated tests and this agent's pixel inspection do not substitute for the owner's final visual approval; the committed pairs above are the exact artifacts presented for that decision.
+
+## RV-10 responsive spectrogram evidence — 2026-11-06
+
+RV-10 was recaptured after the asynchronous Gallery/detail, cache-retention and local-calibration implementation was committed. The additive [`native-rv10/`](native-rv10/) set contains the same 15-screen normal, compact and narrow journey as RV-09; the target, native-before and RV-09 evidence above remain unchanged.
+
+- Capture: 2026-11-06 20:57:07 UTC from committed application revision `27d94b870bb62e7accfdf6a68865934347b716ad` on `review-rv10-spectrogram-interactivity`.
+- `alp-ui`: unchanged clean sibling revision `8cdc91f56005fcd0f3c4004b66016b3d237a10c3`; installed distribution `0.1.0a0` imported from `.venv/lib/python3.12/site-packages/alp_ui/__init__.py`.
+- Platform and display: macOS 26.6.2 arm64, Qt 6.11.2 Cocoa, Built-in Retina Display at device-pixel ratio 2.0. Normal 1280×807, compact 700×790 and narrow 520×790 logical viewports were captured through `QScreen.grabWindow`.
+- Fixture: the same generated 10-second mono 8 kHz PCM WAV and 12-candidate session set described above. It exercises the real WAV, cache, worker and native presentation boundaries but is not a representative natural field-call cohort.
+- Machine-readable capture details: [`native-rv10/capture-metadata.json`](native-rv10/capture-metadata.json).
+
+The bounded visible command closed all native windows and passed:
+
+```text
+BIOCALL_RV09_EVIDENCE_DIR=docs/design/evidence/review-correction/native-rv10 \
+  perl -e 'alarm 120; exec @ARGV' \
+  .venv/bin/python scripts/run_tests.py native --allow-visible \
+  tests/integration/test_review_rv09_native_evidence.py -q
+1 passed in 12.36s
+```
+
+The recaptured [`Gallery`](native-rv10/03-gallery.png) and [`compact Gallery`](native-rv10/09-compact-gallery.png) visibly contain populated, aspect-preserved thumbnails with source-interval overlays; no Generate all prerequisite is used. The [`One by one`](native-rv10/05-one-by-one.png), [`compact`](native-rv10/10-compact-one-by-one.png) and [`narrow`](native-rv10/11-narrow-one-by-one.png) screens show the full-size data plot with renderer-derived time/frequency axes and the detected interval. The [`Spectrograms`](native-rv10/06-spectrograms.png) screen records the truthful completed state, “Retained 12 of 12 thumbnails.” Persistent navigation and the RV-09 deletion/data-folder screens remain present throughout the additive set.
+
+No reusable presentation-library defect emerged, so RV-10 made no upstream `alp-ui` change. Visual inspection of these artifacts found no aspect-ratio, clipping or hierarchy regression. Physical playback, hover/focus behavior, assistive-technology use, natural field-call readability and the owner's visual approval are not established by the screenshot automation and remain explicit gates.

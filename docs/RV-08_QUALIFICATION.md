@@ -145,3 +145,70 @@ field-data claim.
 After the tests above, the owner inspected the actual Review UI and **did not approve its appearance**. Source review identified a missing persistent prototype sidebar, a mismatched Open Review button/header, non-parity Gallery/One-by-one presentation, synchronous detail WAV/FFT on the Qt path, no empty-cache Gallery generation wiring, repeated source hashing, uncalibrated cache preflight and potential fixed-quota eviction churn. The owner additionally requires **Delete session** (including safe finalized/successor/export handling) and an **in-application Review data-folder picker/migration**. These were not qualified by the historical tests.
 
 The corrective route is [RV-09](specs/review/RV-09-native-visual-parity-and-data-management.md) then [RV-10](specs/review/RV-10-spectrogram-interactivity-and-qualification.md). The [committed prototype target PNGs and native-before captures](design/evidence/review-correction/README.md) must be paired with **real visible native-after screenshots** and explicit owner visual approval; offscreen captures are insufficient. Reusable generic UI primitives are to be committed independently in `alp-ui`, then the latest approved local revision reinstalled/verified in Studio before use. **No new tests or visible app screenshots have been executed for this docs-only corrective handoff.** Owner forbids long test runs during these corrections; only short targeted commands up to 120 seconds each are authorized without further agreement. Prior evidence remains historically accurate, but RV-08 sign-off and merge into `main` stay **blocked**.
+
+## Additive RV-10 corrective implementation record — 2026-11-06
+
+RV-10 source is implemented on `review-rv10-spectrogram-interactivity` at `27d94b870bb62e7accfdf6a68865934347b716ad`. No merge, push, package, release or upstream repository mutation was performed. The installed public `alp-ui` distribution remains `0.1.0a0` at `.venv/lib/python3.12/site-packages/alp_ui/__init__.py`, sourced from the clean sibling revision `8cdc91f56005fcd0f3c4004b66016b3d237a10c3`; no reusable upstream gap was found.
+
+The corrective implementation moves source verification, bounded WAV reads, cache integrity/decode, STFT, PNG publication and access writes off the Qt presentation path. Current detail, visible thumbnails, nearby prefetch and Generate all have explicit priorities and deduplicated bounded work. Gallery paints from a bounded decoded-image cache with row-local updates and preserved aspect ratio. Detail cache hits are verified before render while still validating the source before playback, and request epochs prevent stale paint/audio after navigation. Stable initial source hashes are reused only while kernel file facts remain unchanged. Manual clears cancel matching work; current/visible/in-flight entries are pinned. Generate all requires a ten-output local renderer/tier cohort before deriving a retention quota, preserves honest Unknown otherwise, and reports attempted/generated/cached/retained/failed/cancelled states. The visible 1,000-row selection limit now exactly matches stored and cleared IDs.
+
+### Short focused evidence
+
+Every invocation below had an enforced 120-second alarm. Commands were run on macOS 26.6.2 arm64 with Python 3.12.7 and PySide6/Qt 6.11.2.
+
+```text
+perl -e 'alarm 120; exec @ARGV' \
+  .venv/bin/python scripts/run_tests.py background \
+  tests/unit/test_review_cache.py::test_rv10_priority_identity_calibration_retention_and_selection_truth -q
+1 passed in 1.67s
+
+perl -e 'alarm 120; exec @ARGV' \
+  .venv/bin/python scripts/run_tests.py background \
+  tests/integration/test_review_workspace.py::test_empty_cache_gallery_generates_visible_and_nearby_rows_without_bulk \
+  tests/integration/test_review_workspace.py::test_rapid_detail_navigation_labels_and_play_do_not_block_or_paint_stale \
+  tests/integration/test_review_workspace.py::test_measured_retention_pressure_clear_disk_full_restart_and_delete -q
+3 passed in 2.68s
+
+perl -e 'alarm 120; exec @ARGV' dx test \
+  .venv/bin/python scripts/run_tests.py background \
+  tests/unit/test_review_cache.py tests/unit/test_review_spectrograms.py \
+  tests/integration/test_review_cache_generation.py \
+  tests/integration/test_review_audio_spectrogram.py \
+  tests/integration/test_review_workspace.py -q
+PASS (9.87s wall)
+
+perl -e 'alarm 120; exec @ARGV' \
+  .venv/bin/python scripts/run_tests.py background \
+  tests/integration/test_studio_shell.py::test_open_review_survives_navigation_and_one_exit_policy_fails_closed -q
+1 passed in 0.92s
+
+BIOCALL_RV09_EVIDENCE_DIR=docs/design/evidence/review-correction/native-rv10 \
+  perl -e 'alarm 120; exec @ARGV' \
+  .venv/bin/python scripts/run_tests.py native --allow-visible \
+  tests/integration/test_review_rv09_native_evidence.py -q
+1 passed in 12.36s
+
+perl -e 'alarm 120; exec @ARGV' dx lint \
+  .venv/bin/python -m ruff check src/biocall_studio/review \
+  tests/unit/test_review_cache.py tests/integration/test_review_cache_generation.py \
+  tests/integration/test_review_workspace.py tests/integration/test_review_audio_spectrogram.py \
+  tests/integration/test_review_rv09_native_evidence.py tests/integration/test_studio_shell.py
+PASS (0.48s wall)
+
+perl -e 'alarm 120; exec @ARGV' dx check .venv/bin/python scripts/audit_test_ids.py
+PASS (0.38s wall)
+
+perl -e 'alarm 120; exec @ARGV' dx check .venv/bin/python scripts/check_fixtures.py
+PASS (0.22s wall)
+
+git diff --check
+PASS
+```
+
+`UT-REVW-015` and `IT-REVW-015`–`017` are registered and pass. The journeys use actual generated PCM WAVs, controlled worker delay, source-hash/render/paint counters, event-loop heartbeat, cache pressure, injected disk-full publication failure, restart, selection clearing and session deletion. Source WAV bytes remain unchanged. Existing RV-09 migration coverage remains the owning proof that Review-root movement is blocked during Open/active work, switches only after verified copy, and does not move Detect data.
+
+### Visible comparison and remaining gates
+
+The fresh additive [RV-10 visible evidence](design/evidence/review-correction/README.md#rv-10-responsive-spectrogram-evidence--2026-11-06) contains all 15 RV-09 journey screens at normal, compact and narrow geometry. Gallery thumbnails are populated without bulk generation, preserve image geometry and show the detection interval; One by one retains readable time/frequency axes and the full plot; Spectrograms reports “Retained 12 of 12 thumbnails.” The automation and agent inspection found no clipping or hierarchy regression, but they do not constitute owner approval.
+
+RV-08 therefore remains **blocked** on the owner's visual/playback/hover/focus decision and on a consented natural field-call readability and production-calibration cohort. Installed `.app`/DMG/signing/notarization and native Windows execution remain deferred. Per the explicit RV-10 limit, the full ordinary suites, 50,000-candidate rerun and ≥600-second soak were not run and no pass is claimed for them.
