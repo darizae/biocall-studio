@@ -305,6 +305,9 @@ def test_review_sidebar_routes_active_state_and_responsive_accessibility(qtbot, 
     qtbot.waitUntil(lambda: page.navigation.narrow)
     assert all(not button.text() for button in page.navigation.buttons.values())
     assert all(button.accessibleName() for button in page.navigation.buttons.values())
+    coordinator.shell_window.resize(520, 720)
+    qtbot.waitUntil(lambda: coordinator.shell_window.width() == 520)
+    assert page.navigation.narrow
     _finish(qtbot, coordinator)
 
 

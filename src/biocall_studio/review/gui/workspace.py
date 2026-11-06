@@ -297,7 +297,7 @@ class ReviewNavigationRail(QFrame):
         compact = width < 900
         self.compact = compact
         self.narrow = narrow
-        self.setFixedWidth(52 if narrow else 170 if compact else 210)
+        self.setFixedWidth(52 if narrow else 154 if compact else 210)
         self.brand_text.setVisible(not narrow)
         self.back_button.setText("" if narrow else "Back to Studio")
         self.back_button.setToolTip("Back to Studio" if narrow else "")
@@ -679,6 +679,7 @@ class ReviewSessionPage(QWidget):
         self._narrow = False
         self._tooltip_filter = _FocusTooltipFilter(self)
         outer = QVBoxLayout(self)
+        self.outer_layout = outer
         outer.setContentsMargins(30, 24, 30, 30)
         outer.setSpacing(14)
 
@@ -866,12 +867,12 @@ class ReviewSessionPage(QWidget):
         actions.addStretch()
         accept_wrap = QHBoxLayout()
         self.accept_all_button = Button("Accept all", variant="outline")
-        accept_help = HelpHint(
+        self.accept_help = HelpHint(
             "Marks all unreviewed detections as calls. Existing labels won't change.",
             subject="Accept all",
         )
         accept_wrap.addWidget(self.accept_all_button)
-        accept_wrap.addWidget(accept_help)
+        accept_wrap.addWidget(self.accept_help)
         actions.addLayout(accept_wrap)
         outer.addLayout(actions)
 
@@ -1010,8 +1011,15 @@ class ReviewSessionPage(QWidget):
         if layout_changed:
             self._place_header(compact)
             self._place_one(compact)
-            self.gallery.setGridSize(QSize(248, 150) if compact else QSize(310, 164))
-            self.gallery.setIconSize(QSize(232, 108) if compact else QSize(294, 120))
+            self.gallery.setGridSize(QSize(232, 146) if compact else QSize(310, 164))
+            self.gallery.setIconSize(QSize(220, 102) if compact else QSize(294, 120))
+            self.outer_layout.setContentsMargins(
+                14 if compact else 30,
+                14 if compact else 24,
+                14 if compact else 30,
+                18 if compact else 30,
+            )
+            self.outer_layout.setSpacing(10 if compact else 14)
             self.updateGeometry()
         if query_changed:
             self._place_query(compact, narrow)
@@ -1071,6 +1079,13 @@ class ReviewSessionPage(QWidget):
             self.search,
             self.sort_label,
             self.sort,
+        ):
+            widget.setVisible(query_visible)
+        for widget in (
+            self.selection_label,
+            self.clear_selected_button,
+            self.accept_all_button,
+            self.accept_help,
         ):
             widget.setVisible(query_visible)
         editable = session.state is ReviewSessionState.OPEN
@@ -1251,8 +1266,13 @@ class ReviewExportPage(QScrollArea):
     cancel_requested = Signal()
     show_requested = Signal()
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(
+        self,
+        controller: ReviewSessionController,
+        parent: QWidget | None = None,
+    ):
         super().__init__(parent)
+        self.controller = controller
         self.plan: ReviewExportPlan | None = None
         self.estimate: StorageEstimate | None = None
         self.receipt: ReviewExportReceipt | None = None
@@ -1274,14 +1294,16 @@ class ReviewExportPage(QScrollArea):
         self.session_label.setAccessibleName("Finalized Review session")
         outer.addWidget(self.session_label)
 
-        card = Card()
-        card.content_layout.addWidget(Text("Format", role="heading"))
+        cards = QGridLayout()
+        cards.setSpacing(18)
+        self.format_card = Card()
+        self.format_card.content_layout.addWidget(Text("Format", role="heading"))
         self.mode = QComboBox()
         self.mode.setAccessibleName("Corpus export format")
         self.mode.addItem("Individual WAV files", ReviewExportMode.INDIVIDUAL.value)
         self.mode.addItem("Combined WAV + Raven TSV", ReviewExportMode.COMBINED.value)
         self.mode.addItem("Both", ReviewExportMode.BOTH.value)
-        card.content_layout.addWidget(self.mode)
+        self.format_card.content_layout.addWidget(self.mode)
         format_help = HelpHint(
             (
                 "Individual files preserve each included detection separately. Combined output "
@@ -1290,8 +1312,8 @@ class ReviewExportPage(QScrollArea):
             ),
             subject="Export format",
         )
-        card.content_layout.addWidget(format_help)
-        card.content_layout.addWidget(Text("Destination", role="heading"))
+        self.format_card.content_layout.addWidget(format_help)
+        self.format_card.content_layout.addWidget(Text("Destination", role="heading"))
         destination_row = QHBoxLayout()
         self.destination = QLineEdit()
         self.destination.setReadOnly(True)
@@ -1299,8 +1321,36 @@ class ReviewExportPage(QScrollArea):
         self.choose_button = Button("Choose folder", variant="outline")
         destination_row.addWidget(self.destination, 1)
         destination_row.addWidget(self.choose_button)
-        card.content_layout.addLayout(destination_row)
-        outer.addWidget(card)
+        self.format_card.content_layout.addLayout(destination_row)
+        cards.addWidget(self.format_card, 0, 0)
+
+        self.decisions_card = Card()
+        self.decisions_card.content_layout.addWidget(
+            Text("Finalized decisions", role="heading")
+        )
+        self.decisions_total = QLabel()
+        self.decisions_total.setAccessibleName("Finalized included and excluded counts")
+        self.decisions_card.content_layout.addWidget(self.decisions_total)
+        self.call_summary = QLabel()
+        self.unreviewed_summary = QLabel()
+        self.not_call_summary = QLabel()
+        for summary in (
+            self.call_summary,
+            self.unreviewed_summary,
+            self.not_call_summary,
+        ):
+            summary.setWordWrap(True)
+            self.decisions_card.content_layout.addWidget(summary)
+        self.decisions_card.content_layout.addWidget(Text("Previous exports", role="heading"))
+        self.previous_exports = QLabel()
+        self.previous_exports.setWordWrap(True)
+        self.previous_exports.setAccessibleName("Previous exports for this Review session")
+        self.decisions_card.content_layout.addWidget(self.previous_exports)
+        self.decisions_card.content_layout.addStretch()
+        cards.addWidget(self.decisions_card, 0, 1)
+        cards.setColumnStretch(0, 3)
+        cards.setColumnStretch(1, 2)
+        outer.addLayout(cards)
 
         self.estimate_label = QLabel()
         self.estimate_label.setWordWrap(True)
@@ -1337,9 +1387,30 @@ class ReviewExportPage(QScrollArea):
         self.mode.currentIndexChanged.connect(self.reset_plan)
 
     def set_session(self, session: ReviewSession) -> None:
+        included = session.call_count + session.unreviewed_count
         self.session_label.setText(
-            f"{session.name} · {session.call_count + session.unreviewed_count:,} included · "
+            f"{session.name} · {included:,} included · "
             f"{session.not_call_count:,} excluded"
+        )
+        self.decisions_total.setText(
+            f"{included:,} included · {session.not_call_count:,} excluded"
+        )
+        self.call_summary.setText(f"✓ Call  {session.call_count:,} · human accepted")
+        self.unreviewed_summary.setText(
+            f"○ Unreviewed  {session.unreviewed_count:,} · model detections"
+        )
+        self.not_call_summary.setText(
+            f"× Not a call  {session.not_call_count:,} · excluded"
+        )
+        previous = tuple(
+            record
+            for record in self.controller.list_export_history()
+            if record.session_id == session.session_id
+        )
+        self.previous_exports.setText(
+            "No exports yet."
+            if not previous
+            else f"{len(previous):,} completed export{'s' if len(previous) != 1 else ''}."
         )
         self.reset_plan()
 
@@ -1592,7 +1663,7 @@ class ReviewWorkspacePage(QWidget):
         self.session_page = ReviewSessionPage()
         self.cache_page = ReviewSpectrogramsPage()
         self.settings_page = SpectrogramSettingsPage(controller)
-        self.export_page = ReviewExportPage()
+        self.export_page = ReviewExportPage(controller)
         self.exports_page = ReviewExportsHistoryPage(controller)
         self.data_settings_page = ReviewDataSettingsPage(controller.store.root)
         self.addWidget(self.landing_page)
@@ -3174,6 +3245,7 @@ class ReviewWorkspacePage(QWidget):
         super().resizeEvent(event)
         self.navigation.set_responsive(event.size().width())
         compact = event.size().width() < 900
+        self.session_chip.setVisible(not compact and bool(self.session_chip.text()))
         if compact != self.compact:
             self.compact = compact
         self.session_page.set_responsive(event.size().width())

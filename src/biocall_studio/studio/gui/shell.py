@@ -161,7 +161,7 @@ class StudioWindow(QMainWindow):
         self.setWindowTitle("BioCall Studio")
         self.setWindowIcon(application_icon())
         self.resize(1180, 790)
-        self.setMinimumSize(640, 620)
+        self.setMinimumSize(520, 620)
         self._allow_close = False
         self.current_workspace = WorkspaceRoute.STUDIO
 

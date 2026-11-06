@@ -166,7 +166,7 @@ class SpectrogramView(QWidget):
     def image_rect(self) -> QRectF:
         left = 54.0
         top = 12.0
-        right = 12.0
+        right = 36.0
         bottom = 34.0
         return QRectF(
             left,
