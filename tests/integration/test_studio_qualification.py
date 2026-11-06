@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import shutil
+from dataclasses import replace
 from pathlib import Path
 
 import joblib
@@ -10,7 +11,8 @@ import numpy as np
 import pytest
 from bioacoustics_dl_toolbox.audio import load_audio_file
 from bioacoustics_dl_toolbox.rf import compute_rf_features
-from PySide6.QtCore import QProcess
+from PySide6.QtCore import QProcess, QTimer
+from PySide6.QtWidgets import QApplication, QMessageBox, QPushButton
 
 from biocall_studio.detect.application.controller import ModelIntakeState
 from biocall_studio.detect.application.model_intake import inspect_model_directory
@@ -28,6 +30,22 @@ from biocall_studio.detect.domain.rf_refinement import (
 )
 from biocall_studio.detect.domain.runs import DetectRunRequest, DetectRunStatus
 from biocall_studio.detect.persistence.runs import DetectRunRepository
+from biocall_studio.review.application.controller import default_spectrogram_snapshot
+from biocall_studio.review.domain.exports import ReviewExportMode
+from biocall_studio.review.domain.intake import (
+    REVIEW_INTAKE_SCHEMA_VERSION,
+    EligibleCandidate,
+    ReviewIntakeManifest,
+    ReviewIntakeProjection,
+    ReviewRecording,
+    ReviewResultKind,
+    projection_digest,
+)
+from biocall_studio.review.domain.sessions import (
+    ReviewLabel,
+    ReviewSessionSource,
+    ReviewSessionState,
+)
 from biocall_studio.studio.application.coordinator import StudioCoordinator
 from biocall_studio.studio.application.navigation import WorkspaceRoute
 from biocall_studio.train.application.collection_scan import scan_collection
@@ -168,6 +186,90 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _button(widget, text: str) -> QPushButton:
+    return next(button for button in widget.findChildren(QPushButton) if button.text() == text)
+
+
+def _click_active_message_button(text: str) -> None:
+    dialog = QApplication.activeModalWidget()
+    assert isinstance(dialog, QMessageBox)
+    _button(dialog, text).click()
+
+
+def _open_retained_review_session(coordinator: StudioCoordinator, *, source_sha256: str) -> str:
+    candidate = EligibleCandidate(
+        ordinal=0,
+        recording_ordinal=0,
+        candidate_id="cand_" + "1" * 32,
+        recording_ref="rec_" + "2" * 32,
+        recording_key="recordings/dawn.wav",
+        source_sha256=source_sha256,
+        sample_rate_hz=8_000,
+        frame_count=8_000,
+        channels=1,
+        start_frame=1_000,
+        end_frame=2_000,
+        start_time_ns=125_000_000,
+        end_time_ns=250_000_000,
+        cnn_target_score=0.9,
+        rf_target_score=None,
+        contributing_windows=1,
+    )
+    recording = ReviewRecording(
+        ordinal=0,
+        recording_ref=candidate.recording_ref,
+        recording_key=candidate.recording_key,
+        source_sha256=candidate.source_sha256,
+        sample_rate_hz=candidate.sample_rate_hz,
+        frame_count=candidate.frame_count,
+        channels=candidate.channels,
+        failed=False,
+        error_code="",
+        eligible_candidate_count=1,
+    )
+    manifest = ReviewIntakeManifest(
+        schema_version=REVIEW_INTAKE_SCHEMA_VERSION,
+        projection_digest="0" * 64,
+        result_kind=ReviewResultKind.CNN,
+        collection_id="det_" + "3" * 32,
+        result_id="pub_" + "4" * 32,
+        result_digest="5" * 64,
+        publication_digest="6" * 64,
+        parent_result_id=None,
+        parent_result_digest=None,
+        binding_revision=1,
+        inventory_id="inv_" + "7" * 32,
+        inventory_digest="8" * 64,
+        source_time_semantics=(
+            "zero_based_half_open_source_frames_with_integer_nanosecond_projection"
+        ),
+        recording_count=1,
+        failed_recording_count=0,
+        eligible_candidate_count=1,
+    )
+    manifest = replace(
+        manifest,
+        projection_digest=projection_digest(manifest, (recording,), (candidate,)),
+    )
+    projection = ReviewIntakeProjection(manifest, (recording,), (candidate,))
+    settings = default_spectrogram_snapshot()
+    session = coordinator.review_controller.store.create_session(
+        name="Retained qualification review",
+        source=ReviewSessionSource.from_projection(
+            projection,
+            score_semantics="binary_softmax_target_output_index_1; not_a_calibrated_probability",
+            eligibility_threshold=0.5,
+        ),
+        candidates=(candidate,),
+        settings=settings,
+        owner_id=coordinator.review_controller.owner_id,
+        created_at="2026-11-06T09:00:00.000Z",
+        session_id="rsn_" + "a" * 32,
+    )
+    coordinator.review_page.open_session(session.session_id)
+    return session.session_id
+
+
 def test_cross_workspace_admission_crash_recovery_and_one_safe_exit_dialog(
     qapp, qtbot, tmp_path: Path, collection_factory, wav_factory
 ):
@@ -196,6 +298,11 @@ def test_cross_workspace_admission_crash_recovery_and_one_safe_exit_dialog(
     detect._kill_grace_ms = 600
     detect.choose_source_root(str(detect_root))
     qtbot.waitUntil(lambda: detect.snapshot is not None, timeout=10_000)
+    review_session_id = _open_retained_review_session(
+        coordinator,
+        source_sha256=_sha256(source),
+    )
+    coordinator.open_workspace(WorkspaceRoute.DETECT)
 
     first = _detect_request(detect, "1" * 32)
     detect.start_lifecycle_fixture(first, behavior="stubborn")
@@ -217,6 +324,8 @@ def test_cross_workspace_admission_crash_recovery_and_one_safe_exit_dialog(
     dialog = coordinator.exit_dialog
     assert dialog is not None and dialog.isVisible()
     assert coordinator.train_window.close_dialog is None
+    assert dialog.text() == "A Review session is still open. Save and exit?"
+    assert "Lifecycle boundary check in Detect" in dialog.informativeText()
     assert dialog.defaultButton().text() == "Keep app open"
     assert len(
         [widget for widget in qapp.topLevelWidgets() if widget.objectName() == "studioExitDialog"]
@@ -246,7 +355,8 @@ def test_cross_workspace_admission_crash_recovery_and_one_safe_exit_dialog(
     coordinator.shell_window.close()
     dialog = coordinator.exit_dialog
     assert dialog is not None and dialog.isVisible()
-    stop = next(button for button in dialog.buttons() if button.text() == "Stop work and Exit")
+    assert dialog.text() == "A Review session is still open. Save and exit?"
+    stop = next(button for button in dialog.buttons() if button.text() == "Save and Exit")
     stop.click()
 
     qtbot.waitUntil(lambda: detect._shutdown_finished, timeout=15_000)
@@ -254,6 +364,10 @@ def test_cross_workspace_admission_crash_recovery_and_one_safe_exit_dialog(
     assert detect.run_process is None
     assert detect.current_run is not None
     assert detect.current_run.status is DetectRunStatus.CANCELLED
+    assert (
+        coordinator.review_controller.store.get_session(review_session_id).state
+        is ReviewSessionState.CLOSED
+    )
     assert source.read_bytes() == source_bytes
     qtbot.waitUntil(
         lambda: not coordinator.shell_window.isVisible()
@@ -512,6 +626,105 @@ def test_genuine_studio_train_detect_rf_export_restart_relink_round_trip(
 
     child_path = repository.result_path(child.result_id) / "result.json"
     child_bytes = child_path.read_bytes()
+    coordinator.open_workspace(WorkspaceRoute.REVIEW)
+    review_page = coordinator.review_page
+    review_page.show_landing()
+    choices = coordinator._review_result_choices()
+    assert {choice.result_id for choice in choices} == {parent.result_id, child.result_id}
+    parent_choice = next(choice for choice in choices if choice.result_id == parent.result_id)
+    child_choice = next(choice for choice in choices if choice.result_id == child.result_id)
+    assert parent_choice.eligible_count == parent.candidate_count
+    assert child_choice.eligible_count == sum(
+        candidate.status is RefinementStatus.ACCEPTED
+        for recording in child.recordings
+        for candidate in recording.candidates
+    )
+    settings = coordinator.review_controller.list_presets()[0]
+    review_page._start_session(parent_choice, settings)
+    assert review_page.current_state is not None
+    session_id = review_page.current_state.session.session_id
+    assert review_page.current_state.session.eligible_candidate_count >= 3
+
+    review_page._set_view("one_by_one")
+    assert review_page.session_page.spectrogram.metadata is not None
+    assert review_page.session_page.play_button.isEnabled()
+    detail_keys = set(review_page.cache.valid_content_keys())
+    assert len(detail_keys) == 1
+
+    review_page.show_spectrograms()
+    _button(review_page.cache_page, "Generate all").click()
+    qtbot.waitUntil(
+        lambda: isinstance(QApplication.activeModalWidget(), QMessageBox),
+        timeout=10_000,
+    )
+    _button(QApplication.activeModalWidget(), "Continue").click()
+    qtbot.waitUntil(
+        lambda: len(review_page.cache.valid_content_keys())
+        >= review_page.current_state.session.eligible_candidate_count + 1,
+        timeout=30_000,
+    )
+    qtbot.waitUntil(lambda: review_page.active_operation is None, timeout=10_000)
+
+    review_page.show_session()
+    review_page._set_view("one_by_one")
+    first_candidate_id = review_page.current_state.current_candidate_id
+    review_page._set_label(ReviewLabel.CALL.value)
+    second_candidate_id = review_page.current_state.current_candidate_id
+    assert second_candidate_id != first_candidate_id
+    review_page._set_label(ReviewLabel.NOT_CALL.value)
+    assert review_page.current_state.current_candidate_id not in {
+        first_candidate_id,
+        second_candidate_id,
+    }
+    QTimer.singleShot(0, lambda: _click_active_message_button("Accept all"))
+    review_page._accept_all()
+    assert review_page.current_state.session.unreviewed_count == 0
+    review_page._undo()
+    assert review_page.current_state.session.unreviewed_count > 0
+    assert review_page.current_state.session.call_count >= 1
+    assert review_page.current_state.session.not_call_count == 1
+
+    QTimer.singleShot(0, lambda: _click_active_message_button("Finalize"))
+    review_page._finalize()
+    finalized = review_page.current_state.session
+    assert finalized.state is ReviewSessionState.FINALIZED
+    assert finalized.final_snapshot_digest is not None
+    finalization_document = coordinator.review_controller.store.finalization_document(session_id)
+
+    export_parent = tmp_path / "review-exports"
+    export_parent.mkdir()
+    plan = coordinator.review_controller.plan_export(
+        session_id,
+        source_root=detect_root,
+        destination_parent=export_parent,
+        mode=ReviewExportMode.BOTH,
+        export_id="rexp_" + "8" * 32,
+        created_at="2026-11-06T12:00:00.000Z",
+    )
+    estimate = coordinator.review_controller.estimate_export_storage(plan)
+    outcome = coordinator.review_controller.publish_export(
+        plan,
+        source_root=detect_root,
+        storage_input_digest=estimate.input_digest,
+        confirm_storage=estimate.requires_confirmation,
+        completed_at="2026-11-06T12:01:00.000Z",
+    )
+    assert outcome.history_saved
+    export_directory = Path(outcome.receipt.final_destination)
+    assert (export_directory / "corpus.wav").is_file()
+    assert (export_directory / "corpus.Table.1.selections.txt").is_file()
+    assert tuple(export_directory.glob("snippets/*.wav"))
+    history = coordinator.review_controller.list_export_history()
+    assert len(history) == 1
+    assert coordinator.review_controller.verify_export_history(history[0]) == outcome.receipt
+    assert (
+        coordinator.review_controller.store.finalization_document(session_id)
+        == finalization_document
+    )
+    assert parent_path.read_bytes() == parent_bytes
+    assert child_path.read_bytes() == child_bytes
+    assert _source_bytes(detect_root) == detect_source_bytes
+
     coordinator.request_application_exit()
     qtbot.waitUntil(lambda: train._shutdown_finished, timeout=10_000)
     qtbot.waitUntil(lambda: detect._shutdown_finished, timeout=10_000)
@@ -548,6 +761,12 @@ def test_genuine_studio_train_detect_rf_export_restart_relink_round_trip(
     assert _source_bytes(relocated) == detect_source_bytes
     assert _source_bytes(train_root) == train_source_bytes
     assert not hasattr(reopened_detect, "start_export")
+    reopened_review = reopened.review_controller.store.get_session(session_id)
+    assert reopened_review.state is ReviewSessionState.FINALIZED
+    assert reopened_review.final_snapshot_digest == finalized.final_snapshot_digest
+    reopened_history = reopened.review_controller.list_export_history()
+    assert len(reopened_history) == 1
+    assert reopened.review_controller.verify_export_history(reopened_history[0]) == outcome.receipt
     reopened.request_application_exit()
     qtbot.waitUntil(lambda: reopened_train._shutdown_finished, timeout=10_000)
     qtbot.waitUntil(lambda: reopened_detect._shutdown_finished, timeout=10_000)

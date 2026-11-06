@@ -132,9 +132,9 @@ reserved for ST-11.
 
 | Case ID | Public seam / expected result | Data | Spec |
 |---|---|---|---|
-| `IT-DET-022` | scientific source round trip cross-checking CNN→RF frame times, class/feature parity, checksums and immutable Result provenance against reference numeric outputs | TD-WAV, TD-TRAIN | [ST-11](specs/ST-11-unified-qualification.md) |
-| `IT-STU-007` | genuine pre-Review regression: retained Train and trusted Model, Detect Collection/scan/CNN/Results/RF, restart/relink/provenance, unchanged originals, native navigation and no restored Detect export action. The current Train→Detect→Review→Export E2E belongs to RV-08. | TD-UI, TD-RUN, TD-WAV, TD-TRAIN | [ST-11](specs/ST-11-unified-qualification.md) |
-| `IT-STU-008` | real Qt/QProcess cross-workspace active operation/exit contention, keep-open/confirm, crash recovery and no orphaned workers without altering Train's existing behavior | TD-RUN, TD-FAIL, TD-UI | [ST-11](specs/ST-11-unified-qualification.md) |
+| `IT-DET-022` | scientific source round trip cross-checking CNN→RF frame times, class/feature parity, Review CNN-all/RF-accepted-only intake, source-time export mapping, checksums and immutable Result provenance against reference numeric outputs | TD-WAV, TD-TRAIN | [ST-11](specs/ST-11-unified-qualification.md) |
+| `IT-STU-007` | genuine retained Train Dataset/CNN/RF Models → Detect Collection/CNN/RF Results → Review detail/bulk spectrograms, mixed labels, Accept all/undo, partial Finalize → Review-owned Both export/receipt/reopen, restart/relink/provenance, unchanged originals, native navigation and no restored Detect export action | TD-UI, TD-RUN, TD-WAV, TD-TRAIN | [RV-08](specs/review/RV-08-qualification.md) |
+| `IT-STU-008` | real Qt/QProcess cross-workspace active operation/exit contention with an Open Review session hidden from view, one combined keep-open/Save-and-Exit decision, durable Review close, crash recovery and no orphaned workers without altering Train's existing behavior | TD-RUN, TD-FAIL, TD-UI | [RV-08](specs/review/RV-08-qualification.md) |
 
 ## 2. Collection Scan and metadata (spec 02)
 

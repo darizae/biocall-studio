@@ -1,5 +1,9 @@
 # ST-11 unified qualification record
 
+> Review-era supplement: [RV-08 whole-Studio qualification](RV-08_QUALIFICATION.md) re-homes the
+> existing `IT-STU-007`, `IT-STU-008` and `IT-DET-022` ownership through the current
+> Train→Detect→Review→Export path. This file retains the 2026-11-01 pre-Review evidence record.
+
 Date: 2026-11-01. Branch: `detect-st11-qualification`, based on reviewed local `detect` at
 `0d129575a44a32eaefd0538e928eaf5b214a2a73`. `main` was not changed.
 

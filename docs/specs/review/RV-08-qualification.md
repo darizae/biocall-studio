@@ -1,6 +1,6 @@
 # RV-08 — Whole-Studio source-app qualification and final sign-off
 
-> **Status:** Owner-approved planning spec, NOT implemented. Do not start implementation or infer test passes from this document. Read [`AGENTS.md`](../../../AGENTS.md) and [`docs/agent/ROUTING.md`](../../agent/ROUTING.md), then this stage and only dependencies needed by its code. No push, merge, tag or release without the owner's separate authorization.
+> **Status:** Isolated implementation and source-app evidence are on `review-rv08-qualification`; final owner sign-off remains pending on the blocked visible-native/field-data/UX-document gates recorded in [RV-08 qualification](../../RV-08_QUALIFICATION.md). Do not infer release qualification from this specification. No push, merge, tag or release without the owner's separate authorization.
 
 **Sequence:** RV-08 begins only after RV-07 has passed its owner-reviewed gate.
 
