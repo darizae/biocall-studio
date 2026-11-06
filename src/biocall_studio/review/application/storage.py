@@ -10,6 +10,10 @@ from biocall_studio.review.domain.spectrograms import (
     SPECTROGRAM_RENDER_VERSION,
     SpectrogramImageTier,
 )
+from biocall_studio.review.persistence.cache import (
+    MAX_SPECTROGRAM_METADATA_BYTES,
+    MAX_SPECTROGRAM_PNG_BYTES,
+)
 from biocall_studio.shared.storage import (
     MAX_ESTIMATE_BYTES,
     ByteEstimate,
@@ -154,6 +158,72 @@ def measured_cache_limit(
     )
     outputs = _multiply(item_capacity, per_item, "Measured cache limit")
     return _add(outputs, calibration.staging_high_bytes, "Measured cache limit")
+
+
+def plan_review_ondemand_write(
+    *,
+    tier: SpectrogramImageTier,
+    settings_digest: str,
+) -> ReviewCacheSizePlan:
+    """Plan one optional cache object from enforced format bounds, without fake calibration."""
+    if not isinstance(tier, SpectrogramImageTier):
+        raise ValueError("Spectrogram sizing tier is invalid.")
+    if (
+        not isinstance(settings_digest, str)
+        or len(settings_digest) != 64
+        or any(character not in "0123456789abcdef" for character in settings_digest)
+    ):
+        raise ValueError("Spectrogram settings digest is invalid.")
+    high = _add(
+        MAX_SPECTROGRAM_PNG_BYTES,
+        MAX_SPECTROGRAM_METADATA_BYTES,
+        "Bounded cache object bytes",
+    )
+    inputs = {
+        "operation": "review.generate_spectrograms",
+        "missing_count": 1,
+        "cache_hit_count": 0,
+        "tier": tier.value,
+        "settings_digest": settings_digest,
+        "render_version": SPECTROGRAM_RENDER_VERSION,
+        "calibration_version": None,
+        "admission_basis": "format_enforced_single_object_bound",
+    }
+    return ReviewCacheSizePlan(
+        input_digest=storage_input_digest(inputs),
+        missing_count=1,
+        cache_hit_count=0,
+        existing_cache_bytes=0,
+        tier=tier,
+        settings_digest=settings_digest,
+        size_plan=OperationSizePlan(
+            expected_final=ByteEstimate.range(1, high),
+            peak_bytes=high,
+            confidence=EstimateConfidence.ARITHMETIC,
+            basis=(
+                "One regenerable image is bounded by the cache PNG and metadata format limits; "
+                "this is not a representative encoded-size calibration."
+            ),
+            user_note="Generation time is unknown until local images have been measured.",
+        ),
+        time_estimate=TimeEstimate.unavailable(),
+        calibration_version=None,
+    )
+
+
+def retained_cache_limit(
+    plan: ReviewCacheSizePlan,
+    *,
+    current_cache_bytes: int,
+) -> int | None:
+    """Return a truthful quota that can retain all verified hits plus planned images."""
+    if not isinstance(plan, ReviewCacheSizePlan):
+        raise TypeError("Review cache size plan is invalid.")
+    _bounded(current_cache_bytes, "Current cache bytes")
+    high = plan.size_plan.expected_final.high_bytes
+    if high is None or plan.calibration_version is None:
+        return None
+    return _add(current_cache_bytes, high, "Retained cache limit")
 
 
 def plan_review_cache_generation(
@@ -360,6 +430,8 @@ __all__ = [
     "assess_review_export_storage",
     "estimate_review_export_artifacts",
     "measured_cache_limit",
+    "plan_review_ondemand_write",
     "plan_review_cache_generation",
+    "retained_cache_limit",
     "review_export_input_digest",
 ]

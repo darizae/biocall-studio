@@ -1,20 +1,32 @@
 from __future__ import annotations
 
 import hashlib
+import threading
 from datetime import UTC, datetime
 
 import numpy as np
 import pytest
 
 from biocall_studio.review.application.cache import change_session_settings_with_preflight
+from biocall_studio.review.application.calibration import (
+    CacheCalibrationStore,
+    CacheMeasurement,
+)
 from biocall_studio.review.application.controller import ReviewSessionController
-from biocall_studio.review.application.generation import SpectrogramGenerationSupervisor
+from biocall_studio.review.application.generation import (
+    GenerationJob,
+    GenerationToken,
+    SpectrogramGenerationSupervisor,
+)
 from biocall_studio.review.application.storage import (
     CacheSizeCalibration,
     assess_review_cache_storage,
     measured_cache_limit,
     plan_review_cache_generation,
+    plan_review_ondemand_write,
+    retained_cache_limit,
 )
+from biocall_studio.review.application.view_state import bounded_selection
 from biocall_studio.review.domain.cache import (
     CachePriority,
     CacheQueueRequest,
@@ -30,6 +42,7 @@ from biocall_studio.review.domain.spectrograms import (
     plan_candidate_context,
 )
 from biocall_studio.review.persistence.cache import SpectrogramCache
+from biocall_studio.review.workflows.audio import SourceIdentityCache
 from biocall_studio.review.workflows.spectrograms import (
     SpectrogramRenderRequest,
     render_spectrogram,
@@ -100,8 +113,8 @@ def test_generation_queue_is_bounded_prioritized_and_deduplicated() -> None:
     assert offered.accepted
     assert offered.dropped_keys == (_key(2),)
     assert queue.pending_count == 3
-    assert queue.pop().content_key == _key(4)
     assert queue.pop().content_key == _key(5)
+    assert queue.pop().content_key == _key(4)
 
     queue.offer(CacheQueueRequest(_key(6), CachePriority.NEARBY_PREFETCH))
     queue.offer(CacheQueueRequest(_key(7), CachePriority.GENERATE_ALL))
@@ -109,6 +122,180 @@ def test_generation_queue_is_bounded_prioritized_and_deduplicated() -> None:
     assert _key(3) in dropped
     assert _key(6) not in dropped
     assert queue.pending_count <= 3
+
+
+def test_rv10_priority_identity_calibration_retention_and_selection_truth(
+    tmp_path, monkeypatch
+) -> None:
+    """Case: UT-REVW-015."""
+    current = _key(10)
+    visible = _key(11)
+    prefetch = _key(12)
+    queue = GenerationQueue(max_pending=3)
+    queue.offer(CacheQueueRequest(prefetch, CachePriority.NEARBY_PREFETCH))
+    queue.offer(CacheQueueRequest(visible, CachePriority.VISIBLE_THUMBNAIL))
+    queue.offer(CacheQueueRequest(current, CachePriority.CURRENT_DETAIL))
+    assert tuple(queue.pop().content_key for _ in range(3)) == (
+        current,
+        visible,
+        prefetch,
+    )
+
+    source = tmp_path / "source.wav"
+    source.write_bytes(b"verified source bytes")
+    expected = hashlib.sha256(source.read_bytes()).hexdigest()
+    identities = SourceIdentityCache(max_entries=2)
+    import biocall_studio.review.workflows.audio as audio_module
+
+    real_hash = audio_module._hash_stream
+    hash_calls = 0
+
+    def counted_hash(stream, cancelled):
+        nonlocal hash_calls
+        hash_calls += 1
+        return real_hash(stream, cancelled)
+
+    monkeypatch.setattr(audio_module, "_hash_stream", counted_hash)
+    for _ in range(2):
+        with source.open("rb") as stream:
+            identities.verify(stream, source, expected, None)
+    assert hash_calls == 1
+    source.write_bytes(b"changed source bytes!")
+    with source.open("rb") as stream, pytest.raises(ValueError, match="frozen Detect source"):
+        identities.verify(stream, source, expected, None)
+    assert hash_calls == 2
+
+    measurements = CacheCalibrationStore(tmp_path / "cache" / "calibration-v1.json")
+    for index in range(10):
+        measurements.record(
+            CacheMeasurement(
+                content_key=_key(index),
+                render_version=SPECTROGRAM_RENDER_VERSION,
+                tier=SpectrogramImageTier.THUMBNAIL,
+                source_sha256=hashlib.sha256(f"source-{index}".encode()).hexdigest(),
+                encoded_bytes=1_000 + index,
+                metadata_bytes=500,
+                staging_bytes=1_100 + index,
+                elapsed_milliseconds=10 + index,
+            )
+        )
+    calibration = measurements.calibration(SpectrogramImageTier.THUMBNAIL)
+    assert calibration is not None and calibration.sample_count == 10
+    plan = plan_review_cache_generation(
+        missing_count=5,
+        existing_file_sizes=(900, 950),
+        tier=SpectrogramImageTier.THUMBNAIL,
+        settings_digest="5" * 64,
+        calibration=calibration,
+    )
+    assert retained_cache_limit(plan, current_cache_bytes=2_000) == (
+        2_000 + plan.size_plan.expected_final.high_bytes
+    )
+    unknown = plan_review_cache_generation(
+        missing_count=1,
+        existing_file_sizes=(),
+        tier=SpectrogramImageTier.THUMBNAIL,
+        settings_digest="5" * 64,
+        calibration=None,
+    )
+    assert retained_cache_limit(unknown, current_cache_bytes=0) is None
+    bounded = plan_review_ondemand_write(
+        tier=SpectrogramImageTier.DETAIL,
+        settings_digest="5" * 64,
+    )
+    assert bounded.size_plan.peak_bytes is not None
+    assert bounded.calibration_version is None
+
+    cache = SpectrogramCache(tmp_path / "decoded-cache", limit_bytes=20_000_000)
+    raster = _raster()
+    cache.publish(raster, settings_digest="5" * 64)
+    cache.flush_accesses()
+    assert cache.lookup(raster.content_key) is not None
+    assert cache.lookup(raster.content_key) is not None
+    assert cache.pending_access_count == 1
+    cache.flush_accesses()
+    assert cache.pending_access_count == 0
+
+    cache.clear((raster.content_key,))
+    ready = assess_review_cache_storage(
+        plan_review_cache_generation(
+            missing_count=1,
+            existing_file_sizes=(),
+            tier=SpectrogramImageTier.THUMBNAIL,
+            settings_digest="5" * 64,
+            calibration=calibration,
+        ),
+        capacity=CapacityObservation(
+            target_label="Spectrogram cache",
+            volume_id="unit-cache-volume",
+            free_bytes=2_000_000_000,
+            observed_at=datetime(2026, 11, 6, 12, 0, tzinfo=UTC),
+        ),
+    )
+    supervisor = SpectrogramGenerationSupervisor(
+        cache,
+        token_is_current=lambda _token: True,
+        max_workers=1,
+        max_pending=4,
+    )
+    token = GenerationToken("session-a", 1, "5" * 64, raster.metadata.source_sha256)
+    started = threading.Event()
+    release = threading.Event()
+    displayed = threading.Event()
+    display_sizes: list[int] = []
+
+    def bulk_render(_prepared, _cancelled):
+        started.set()
+        release.wait(5)
+        return raster
+
+    bulk = supervisor.submit_bulk(
+        (
+            GenerationJob(
+                raster.content_key,
+                SpectrogramImageTier.THUMBNAIL,
+                CachePriority.GENERATE_ALL,
+                token,
+                bulk_render,
+            ),
+        ),
+        storage_estimate=ready,
+    )
+    assert started.wait(5)
+    visible = supervisor.submit(
+        GenerationJob(
+            raster.content_key,
+            SpectrogramImageTier.THUMBNAIL,
+            CachePriority.VISIBLE_THUMBNAIL,
+            GenerationToken(
+                "session-a",
+                1,
+                "5" * 64,
+                raster.metadata.source_sha256,
+                request_epoch=1,
+            ),
+            lambda _prepared, _cancelled: (_ for _ in ()).throw(
+                AssertionError("deduplicated work rerendered")
+            ),
+            load_display=True,
+            completed=lambda completion: (
+                display_sizes.append(len(completion.display_payload or b"")),
+                displayed.set(),
+            ),
+        ),
+        storage_estimate=ready,
+    )
+    release.set()
+    assert supervisor.wait(bulk, timeout=5).completed == 1
+    assert supervisor.wait(visible, timeout=5).completed == 1
+    assert displayed.wait(5)
+    assert display_sizes == [raster.width * raster.height * 3]
+    supervisor.shutdown(wait=True)
+
+    selected, limited = bounded_selection(tuple(f"cand_{index}" for index in range(1_005)))
+    assert limited and len(selected) == 1_000
+    exact, limited = bounded_selection(("cand_a", "cand_b"))
+    assert exact == ("cand_a", "cand_b") and not limited
 
 
 def test_cache_publish_lookup_lru_clear_and_containment(tmp_path) -> None:

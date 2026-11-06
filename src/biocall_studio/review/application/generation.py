@@ -19,7 +19,11 @@ from biocall_studio.review.domain.spectrograms import (
     SpectrogramRaster,
     validate_spectrogram_content_key,
 )
-from biocall_studio.review.persistence.cache import CacheMutation, SpectrogramCache
+from biocall_studio.review.persistence.cache import (
+    CacheEntry,
+    CacheMutation,
+    SpectrogramCache,
+)
 from biocall_studio.shared.storage import StorageEstimate, require_storage_admission
 
 _MAX_BATCH_HISTORY = 256
@@ -36,6 +40,7 @@ class GenerationToken:
     settings_epoch: int
     settings_digest: str
     source_sha256: str
+    request_epoch: int = 0
 
     def __post_init__(self) -> None:
         if (
@@ -46,6 +51,8 @@ class GenerationToken:
             or self.settings_epoch < 1
         ):
             raise ValueError("Spectrogram generation session token is invalid.")
+        if type(self.request_epoch) is not int or self.request_epoch < 0:
+            raise ValueError("Spectrogram generation request epoch is invalid.")
         for value, label in (
             (self.settings_digest, "settings"),
             (self.source_sha256, "source"),
@@ -59,12 +66,29 @@ class GenerationToken:
 
 
 @dataclass(frozen=True, slots=True)
+class GenerationCompletion:
+    content_key: str
+    outcome: str
+    token: GenerationToken
+    entry: CacheEntry | None
+    prepared: object | None
+    display_payload: object | None
+    elapsed_milliseconds: int
+    error: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class GenerationJob:
     content_key: str
     tier: SpectrogramImageTier
     priority: CachePriority
     token: GenerationToken
-    render: Callable[[Callable[[], bool]], SpectrogramRaster]
+    render: Callable[[object | None, Callable[[], bool]], SpectrogramRaster]
+    prepare: Callable[[Callable[[], bool]], object] | None = None
+    prepare_on_cache_hit: bool = False
+    admit_write: Callable[[], None] | None = None
+    load_display: bool = False
+    completed: Callable[[GenerationCompletion], None] | None = None
 
     def __post_init__(self) -> None:
         validate_spectrogram_content_key(self.content_key)
@@ -74,6 +98,13 @@ class GenerationJob:
             raise ValueError("Spectrogram generation priority is invalid.")
         if not isinstance(self.token, GenerationToken) or not callable(self.render):
             raise ValueError("Spectrogram generation job is invalid.")
+        for callback in (self.prepare, self.admit_write, self.completed):
+            if callback is not None and not callable(callback):
+                raise ValueError("Spectrogram generation callback is invalid.")
+        if not isinstance(self.prepare_on_cache_hit, bool) or not isinstance(
+            self.load_display, bool
+        ):
+            raise ValueError("Spectrogram generation cache-hit policy is invalid.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,7 +138,7 @@ class _Batch:
 @dataclass(slots=True)
 class _WorkItem:
     job: GenerationJob
-    subscribers: dict[str, GenerationToken]
+    subscribers: dict[str, GenerationJob]
     all_tokens: list[GenerationToken]
     cache_epoch: int
     cancel_event: threading.Event = field(default_factory=threading.Event)
@@ -117,6 +148,11 @@ class _WorkItem:
 class _WorkResult:
     outcome: str
     current_tokens: tuple[GenerationToken, ...]
+    entry: CacheEntry | None = None
+    prepared: object | None = None
+    display_payload: object | None = None
+    elapsed_milliseconds: int = 0
+    error: str | None = None
 
 
 class SpectrogramGenerationSupervisor:
@@ -212,7 +248,7 @@ class SpectrogramGenerationSupervisor:
                 batch.states[job.content_key] = "failed"
                 batch.failed += 1
                 return True
-            existing.subscribers[batch.batch_id] = job.token
+            existing.subscribers[batch.batch_id] = job
             if job.token not in existing.all_tokens:
                 existing.all_tokens.append(job.token)
             if job.content_key in self._active:
@@ -234,7 +270,7 @@ class SpectrogramGenerationSupervisor:
             return False
         self._items[job.content_key] = _WorkItem(
             job=job,
-            subscribers={batch.batch_id: job.token},
+            subscribers={batch.batch_id: job},
             all_tokens=[job.token],
             cache_epoch=self.cache.publication_epoch,
         )
@@ -280,9 +316,10 @@ class SpectrogramGenerationSupervisor:
     ) -> str:
         if not isinstance(job, GenerationJob):
             raise TypeError("Spectrogram generation job is invalid.")
-        if storage_estimate is None:
+        if storage_estimate is None and job.admit_write is None:
             raise ValueError("A fresh cache storage check is required before generation.")
-        require_storage_admission(storage_estimate, confirmed=confirmed)
+        if storage_estimate is not None:
+            require_storage_admission(storage_estimate, confirmed=confirmed)
         with self._condition:
             if self._shutdown:
                 raise RuntimeError("Spectrogram generation supervisor is closed.")
@@ -342,18 +379,44 @@ class SpectrogramGenerationSupervisor:
                     self._feed_bulk_locked(batch)
 
     def _run_item(self, item: _WorkItem) -> _WorkResult:
+        started = time.monotonic_ns()
         try:
             current = tuple(token for token in item.all_tokens if self.token_is_current(token))
             if not current:
                 return _WorkResult("stale", ())
-            entry = self.cache.lookup(item.job.content_key)
+            loaded = (
+                self.cache.load_rgb(item.job.content_key)
+                if item.job.load_display
+                else None
+            )
+            entry = loaded[0] if loaded is not None else self.cache.lookup(item.job.content_key)
             if (
                 entry is not None
                 and entry.source_sha256 == item.job.token.source_sha256
                 and entry.tier is item.job.tier
             ):
-                return _WorkResult("cache_hit", current)
-            raster = item.job.render(item.cancel_event.is_set)
+                prepared = (
+                    item.job.prepare(item.cancel_event.is_set)
+                    if item.job.prepare is not None and item.job.prepare_on_cache_hit
+                    else None
+                )
+                display = loaded[1] if loaded is not None else None
+                return _WorkResult(
+                    "cache_hit",
+                    current,
+                    entry,
+                    prepared,
+                    display,
+                    max(1, (time.monotonic_ns() - started) // 1_000_000),
+                )
+            if item.job.admit_write is not None:
+                item.job.admit_write()
+            prepared = (
+                item.job.prepare(item.cancel_event.is_set)
+                if item.job.prepare is not None
+                else None
+            )
+            raster = item.job.render(prepared, item.cancel_event.is_set)
             if not isinstance(raster, SpectrogramRaster):
                 raise ValueError("Spectrogram renderer returned an invalid result.")
             if (
@@ -367,23 +430,32 @@ class SpectrogramGenerationSupervisor:
                 return _WorkResult("stale", ())
             with self._condition:
                 protected = set(self._items).union(self._active)
-            self.cache.publish(
+            entry = self.cache.publish(
                 raster,
                 settings_digest=current[0].settings_digest,
                 protected_keys=protected,
                 expected_clear_epoch=item.cache_epoch,
             )
-            return _WorkResult("completed", current)
-        except GenerationCancelled:
-            return _WorkResult("cancelled", ())
-        except Exception:
-            return _WorkResult("failed", ())
+            display = raster.rgb_bytes if item.job.load_display else None
+            return _WorkResult(
+                "completed",
+                current,
+                entry,
+                prepared,
+                display,
+                max(1, (time.monotonic_ns() - started) // 1_000_000),
+            )
+        except GenerationCancelled as exc:
+            return _WorkResult("cancelled", (), error=str(exc))
+        except Exception as exc:
+            return _WorkResult("failed", (), error=f"{type(exc).__name__}: {exc}")
 
     def _complete_item(self, content_key: str, future: Future[_WorkResult]) -> None:
         try:
             result = future.result()
         except Exception:
             result = _WorkResult("failed", ())
+        callbacks: list[tuple[GenerationJob, GenerationCompletion]] = []
         with self._condition:
             active = self._active.pop(content_key, None)
             item = self._items.pop(content_key, None)
@@ -391,25 +463,75 @@ class SpectrogramGenerationSupervisor:
                 item = active[1]
             if item is not None:
                 current_tokens = set(result.current_tokens)
-                for batch_id, token in tuple(item.subscribers.items()):
+                for batch_id, subscriber in tuple(item.subscribers.items()):
+                    token = subscriber.token
+                    token_is_current = token in current_tokens or (
+                        result.outcome in {"cache_hit", "completed"}
+                        and self.token_is_current(token)
+                    )
                     batch = self._batches.get(batch_id)
                     if batch is None or batch.states.get(content_key) != "active":
                         continue
-                    if batch.cancelled_by_user:
+                    if batch.cancelled_by_user or result.outcome == "cancelled":
                         batch.states[content_key] = "cancelled"
                         batch.cancelled += 1
-                    elif result.outcome == "cache_hit" and token in current_tokens:
+                    elif result.outcome == "cache_hit" and token_is_current:
                         batch.states[content_key] = "cache_hit"
                         batch.cache_hits += 1
-                    elif result.outcome == "completed" and token in current_tokens:
+                    elif result.outcome == "completed" and token_is_current:
                         batch.states[content_key] = "completed"
                         batch.completed += 1
                     else:
                         batch.states[content_key] = "failed"
                         batch.failed += 1
+                    if subscriber.completed is not None:
+                        outcome = (
+                            result.outcome
+                            if token_is_current and not batch.cancelled_by_user
+                            else "stale"
+                        )
+                        callbacks.append(
+                            (
+                                subscriber,
+                                GenerationCompletion(
+                                    content_key=content_key,
+                                    outcome=outcome,
+                                    token=token,
+                                    entry=result.entry,
+                                    prepared=result.prepared,
+                                    display_payload=result.display_payload,
+                                    elapsed_milliseconds=result.elapsed_milliseconds,
+                                    error=result.error,
+                                ),
+                            )
+                        )
             for batch in self._batches.values():
                 self._feed_bulk_locked(batch)
             self._condition.notify_all()
+        for subscriber, completion in callbacks:
+            try:
+                if (
+                    subscriber.load_display
+                    and completion.display_payload is None
+                    and completion.entry is not None
+                    and completion.outcome in {"completed", "cache_hit"}
+                ):
+                    loaded = self.cache.load_rgb(content_key)
+                    if loaded is not None:
+                        completion = GenerationCompletion(
+                            content_key=completion.content_key,
+                            outcome=completion.outcome,
+                            token=completion.token,
+                            entry=loaded[0],
+                            prepared=completion.prepared,
+                            display_payload=loaded[1],
+                            elapsed_milliseconds=completion.elapsed_milliseconds,
+                            error=completion.error,
+                        )
+                subscriber.completed(completion)
+            except Exception:
+                # Presentation notification failure cannot corrupt cache state.
+                continue
 
     @staticmethod
     def _is_done(batch: _Batch) -> bool:
@@ -494,16 +616,18 @@ class SpectrogramGenerationSupervisor:
             for content_key, item in tuple(self._items.items()):
                 affected = tuple(
                     batch_id
-                    for batch_id, token in item.subscribers.items()
-                    if token.session_id == session_id and token.settings_epoch == settings_epoch
+                    for batch_id, job in item.subscribers.items()
+                    if job.token.session_id == session_id
+                    and job.token.settings_epoch == settings_epoch
                 )
                 if not affected:
                     continue
                 is_active = content_key in self._active
                 if is_active:
                     unaffected = any(
-                        token.session_id != session_id or token.settings_epoch != settings_epoch
-                        for token in item.subscribers.values()
+                        job.token.session_id != session_id
+                        or job.token.settings_epoch != settings_epoch
+                        for job in item.subscribers.values()
                     )
                     if not unaffected:
                         item.cancel_event.set()
@@ -552,6 +676,7 @@ class SpectrogramGenerationSupervisor:
 
 __all__ = [
     "GenerationCancelled",
+    "GenerationCompletion",
     "GenerationJob",
     "GenerationProgress",
     "GenerationToken",

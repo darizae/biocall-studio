@@ -34,6 +34,7 @@ from biocall_studio.review.domain.sessions import (
     ReviewSessionSource,
     SpectrogramSettingsSnapshot,
 )
+from biocall_studio.review.domain.spectrograms import SpectrogramImageTier
 from biocall_studio.review.gui.workspace import ReviewResultChoice, ReviewWorkspacePage
 from biocall_studio.studio.application.app import create_application as create_studio_application
 from biocall_studio.studio.application.navigation import WorkspaceRoute
@@ -395,24 +396,32 @@ def test_visible_cocoa_captures_complete_rv09_owner_review_set(qapp, qtbot, tmp_
         _capture(qtbot, window, output, "02-sessions.png", captures)
 
         page.open_session(active.session_id)
-        page.show_spectrograms()
-        _button(page.cache_page, "Generate all").click()
-        qtbot.waitUntil(lambda: _visible_message_box() is not None, timeout=15_000)
-        _button(_visible_message_box(), "Continue").click()
         qtbot.waitUntil(
             lambda: len(page.cache.valid_content_keys()) >= len(projection.candidates),
             timeout=30_000,
         )
+        qtbot.waitUntil(
+            lambda: page.calibration_store.calibration(SpectrogramImageTier.THUMBNAIL)
+            is not None,
+            timeout=15_000,
+        )
+        page.show_spectrograms()
+        _button(page.cache_page, "Generate all").click()
         qtbot.waitUntil(lambda: page._generation_batch_id is None, timeout=15_000)
 
         page.show_session()
         _button(page.session_page, "Gallery").click()
+        qtbot.waitUntil(lambda: page.gallery_model.cached_thumbnail_count >= 3, timeout=15_000)
         _capture(qtbot, window, output, "03-gallery.png", captures)
 
         _button(page.session_page, "List").click()
         _capture(qtbot, window, output, "04-list.png", captures)
 
         _button(page.session_page, "One by one").click()
+        qtbot.waitUntil(
+            lambda: page.session_page.spectrogram.metadata is not None,
+            timeout=15_000,
+        )
         _capture(qtbot, window, output, "05-one-by-one.png", captures)
 
         page.show_spectrograms()
@@ -444,6 +453,7 @@ def test_visible_cocoa_captures_complete_rv09_owner_review_set(qapp, qtbot, tmp_
         page.open_session(active.session_id)
         _set_viewport(qtbot, window, 700, 790)
         _button(page.session_page, "Gallery").click()
+        qtbot.waitUntil(lambda: page.gallery_model.cached_thumbnail_count >= 2, timeout=15_000)
         page.session_page.gallery.doItemsLayout()
         qtbot.waitUntil(
             lambda: not page.session_page.gallery.visualRect(
@@ -456,6 +466,10 @@ def test_visible_cocoa_captures_complete_rv09_owner_review_set(qapp, qtbot, tmp_
         _capture(qtbot, window, output, "09-compact-gallery.png", captures)
 
         _button(page.session_page, "One by one").click()
+        qtbot.waitUntil(
+            lambda: page.session_page.spectrogram.metadata is not None,
+            timeout=15_000,
+        )
         _capture(qtbot, window, output, "10-compact-one-by-one.png", captures)
 
         _set_viewport(qtbot, window, 520, 790)

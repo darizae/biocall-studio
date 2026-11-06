@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from collections.abc import Callable
 
 from PySide6.QtCore import QAbstractListModel, QAbstractTableModel, QModelIndex, QSize, Qt
 from PySide6.QtGui import QPixmap
 
 from biocall_studio.review.application.view_state import ReviewViewState
+from biocall_studio.review.domain.spectrograms import SpectrogramMetadata
 from biocall_studio.review.persistence.sessions import ReviewCandidateView
 
 _PAGE_SIZE = 100
@@ -125,13 +125,11 @@ class ReviewGalleryModel(QAbstractListModel):
         self,
         state: ReviewViewState,
         parent=None,
-        *,
-        thumbnail_provider: Callable[[ReviewCandidateView], QPixmap | None] | None = None,
     ):
         super().__init__(parent)
         self._paged = _PagedCandidates(state)
-        self._thumbnail_provider = thumbnail_provider
         self._thumbnails: OrderedDict[str, QPixmap] = OrderedDict()
+        self._thumbnail_metadata: dict[str, SpectrogramMetadata] = {}
 
     @property
     def state(self) -> ReviewViewState:
@@ -141,11 +139,54 @@ class ReviewGalleryModel(QAbstractListModel):
     def cached_row_count(self) -> int:
         return self._paged.cached_row_count
 
-    def refresh(self) -> None:
+    def refresh(self, *, clear_thumbnails: bool = False) -> None:
         self.beginResetModel()
         self._paged.clear()
-        self._thumbnails.clear()
+        if clear_thumbnails:
+            self._thumbnails.clear()
         self.endResetModel()
+
+    @property
+    def cached_thumbnail_count(self) -> int:
+        return len(self._thumbnails)
+
+    def put_thumbnail(
+        self,
+        candidate_id: str,
+        thumbnail: QPixmap,
+        metadata: SpectrogramMetadata,
+        *,
+        row: int,
+    ) -> None:
+        """Publish one GUI-thread pixmap and repaint only its owning row."""
+        if not isinstance(candidate_id, str) or not candidate_id:
+            raise ValueError("Review thumbnail candidate identity is invalid.")
+        if not isinstance(thumbnail, QPixmap) or thumbnail.isNull():
+            raise ValueError("Review thumbnail pixmap is invalid.")
+        if not isinstance(metadata, SpectrogramMetadata):
+            raise ValueError("Review thumbnail metadata is invalid.")
+        if type(row) is not int or not 0 <= row < self.rowCount():
+            return
+        current = self._paged.row(row)
+        if current.candidate_id != candidate_id:
+            return
+        self._thumbnails[candidate_id] = thumbnail
+        self._thumbnail_metadata[candidate_id] = metadata
+        self._thumbnails.move_to_end(candidate_id)
+        while len(self._thumbnails) > 64:
+            removed, _thumbnail = self._thumbnails.popitem(last=False)
+            self._thumbnail_metadata.pop(removed, None)
+        index = self.index(row, 0)
+        self.dataChanged.emit(index, index, [Qt.ItemDataRole.DecorationRole])
+
+    def drop_thumbnails(self, candidate_ids: tuple[str, ...] | None = None) -> None:
+        if candidate_ids is None:
+            self._thumbnails.clear()
+            self._thumbnail_metadata.clear()
+        else:
+            for candidate_id in candidate_ids:
+                self._thumbnails.pop(candidate_id, None)
+                self._thumbnail_metadata.pop(candidate_id, None)
 
     def candidate_at(self, row: int) -> ReviewCandidateView:
         return self._paged.row(row)
@@ -163,17 +204,13 @@ class ReviewGalleryModel(QAbstractListModel):
             )
         if role == Qt.ItemDataRole.UserRole:
             return row.candidate_id
-        if role == Qt.ItemDataRole.DecorationRole and self._thumbnail_provider is not None:
+        if role == Qt.ItemDataRole.DecorationRole:
             thumbnail = self._thumbnails.get(row.candidate_id)
-            if thumbnail is None:
-                thumbnail = self._thumbnail_provider(row)
-                if thumbnail is not None and not thumbnail.isNull():
-                    self._thumbnails[row.candidate_id] = thumbnail
-                    while len(self._thumbnails) > 32:
-                        self._thumbnails.popitem(last=False)
-            else:
+            if thumbnail is not None:
                 self._thumbnails.move_to_end(row.candidate_id)
             return thumbnail
+        if role == Qt.ItemDataRole.UserRole + 1:
+            return self._thumbnail_metadata.get(row.candidate_id)
         if role == Qt.ItemDataRole.AccessibleTextRole:
             return (
                 f"{row.recording_name}, {_time_text(row.start_time_ns)}, "

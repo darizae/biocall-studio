@@ -1,6 +1,7 @@
 # ruff: noqa: E501 -- approved Review interface copy is asserted verbatim.
 from __future__ import annotations
 
+import errno
 import hashlib
 import math
 import os
@@ -12,7 +13,7 @@ from pathlib import Path
 
 import pytest
 from alp_ui.components import HelpHint
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QItemSelection, QItemSelectionModel, Qt, QTimer
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -45,10 +46,10 @@ from biocall_studio.review.gui.workspace import ReviewWorkspacePage
 pytestmark = [pytest.mark.integration, pytest.mark.qt]
 
 
-def _write_wav(path: Path, *, seconds: int = 10, sample_rate: int = 8_000) -> str:
+def _write_wav(path: Path, *, seconds: int | float = 10, sample_rate: int = 8_000) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     frames = bytearray()
-    for index in range(seconds * sample_rate):
+    for index in range(round(seconds * sample_rate)):
         value = int(11_000 * math.sin(2 * math.pi * 750 * index / sample_rate))
         frames.extend(struct.pack("<h", value))
     with wave.open(str(path), "wb") as target:
@@ -369,6 +370,331 @@ def test_50k_native_models_page_without_eager_widgets_and_keep_event_loop_respon
     controller.shutdown()
 
 
+def test_empty_cache_gallery_generates_visible_and_nearby_rows_without_bulk(
+    qapp, qtbot, monkeypatch, tmp_path: Path
+) -> None:
+    """Case: IT-REVW-015."""
+    source_root = tmp_path / "source"
+    wav_path = source_root / "recordings" / "field-call.wav"
+    source_sha256 = _write_wav(wav_path, seconds=27.5)
+    source_before = wav_path.read_bytes()
+    controller, session_id = _session(
+        tmp_path / "suite", count=36, source_sha256=source_sha256
+    )
+
+    import biocall_studio.review.gui.workspace as workspace_module
+    import biocall_studio.review.workflows.audio as audio_module
+
+    real_read = workspace_module.read_candidate_audio
+    real_hash = audio_module._hash_stream
+    hash_calls = 0
+
+    def delayed_read(*args, **kwargs):
+        time.sleep(0.12)
+        return real_read(*args, **kwargs)
+
+    def counted_hash(stream, cancelled):
+        nonlocal hash_calls
+        hash_calls += 1
+        return real_hash(stream, cancelled)
+
+    monkeypatch.setattr(workspace_module, "read_candidate_audio", delayed_read)
+    monkeypatch.setattr(audio_module, "_hash_stream", counted_hash)
+    page = ReviewWorkspacePage(
+        controller,
+        source_root_resolver=lambda _session: source_root,
+    )
+    qtbot.addWidget(page)
+    painted_rows: list[int] = []
+    page.resize(920, 620)
+    page.show()
+    page.open_session(session_id)
+    page.gallery_model.dataChanged.connect(
+        lambda first, _last, _roles: painted_rows.append(first.row())
+    )
+    page.session_page.gallery.doItemsLayout()
+
+    qtbot.waitUntil(
+        lambda: page.gallery_model.cached_thumbnail_count >= 2
+        or bool(page._spectrogram_failures),
+        timeout=15_000,
+    )
+    assert page._spectrogram_failures == []
+    start, end = page._visible_gallery_rows()
+    assert end > start
+    assert painted_rows
+    assert all(0 <= row < page.gallery_model.rowCount() for row in painted_rows)
+    assert page.gallery_model.cached_thumbnail_count <= 64
+    assert page.supervisor.pending_count <= page.supervisor.max_pending
+    assert page.cache.valid_content_keys()
+    assert page._generation_batch_id is None
+
+    dropped: list[str] = []
+    real_drop = page.supervisor.drop_prefetch_except
+
+    def record_drop(retained):
+        result = real_drop(retained)
+        dropped.extend(result)
+        return result
+
+    monkeypatch.setattr(page.supervisor, "drop_prefetch_except", record_drop)
+    page.session_page.gallery.scrollTo(
+        page.gallery_model.index(page.gallery_model.rowCount() - 1, 0),
+        page.session_page.gallery.ScrollHint.PositionAtTop,
+    )
+    monkeypatch.setattr(page, "_visible_gallery_rows", lambda: (24, 30))
+    page._schedule_gallery_window()
+    qtbot.waitUntil(lambda: bool(dropped), timeout=10_000)
+    qtbot.waitUntil(lambda: page.gallery_model.cached_thumbnail_count >= 4, timeout=15_000)
+    assert hash_calls == 1
+    assert wav_path.read_bytes() == source_before
+    page.shutdown()
+    controller.shutdown()
+
+
+def test_rapid_detail_navigation_labels_and_play_do_not_block_or_paint_stale(
+    qapp, qtbot, monkeypatch, tmp_path: Path
+) -> None:
+    """Case: IT-REVW-016."""
+    source_root = tmp_path / "source"
+    wav_path = source_root / "recordings" / "field-call.wav"
+    source_sha256 = _write_wav(wav_path)
+    controller, session_id = _session(
+        tmp_path / "suite", count=6, source_sha256=source_sha256
+    )
+
+    import biocall_studio.review.gui.workspace as workspace_module
+    import biocall_studio.review.workflows.audio as audio_module
+
+    real_read = workspace_module.read_candidate_audio
+    real_render = workspace_module.render_spectrogram
+    real_hash = audio_module._hash_stream
+    hash_calls = 0
+    rendered: list[str] = []
+
+    def delayed_read(*args, **kwargs):
+        time.sleep(0.12)
+        return real_read(*args, **kwargs)
+
+    def delayed_render(samples, request):
+        time.sleep(0.08)
+        rendered.append(request.candidate_id)
+        return real_render(samples, request)
+
+    def counted_hash(stream, cancelled):
+        nonlocal hash_calls
+        hash_calls += 1
+        return real_hash(stream, cancelled)
+
+    monkeypatch.setattr(workspace_module, "read_candidate_audio", delayed_read)
+    monkeypatch.setattr(workspace_module, "render_spectrogram", delayed_render)
+    monkeypatch.setattr(audio_module, "_hash_stream", counted_hash)
+    page = ReviewWorkspacePage(
+        controller,
+        source_root_resolver=lambda _session: source_root,
+    )
+    qtbot.addWidget(page)
+    loaded_clips: list[bytes] = []
+    played: list[bool] = []
+    monkeypatch.setattr(page.playback, "load_clip", loaded_clips.append)
+    monkeypatch.setattr(page.playback, "play", lambda: played.append(True))
+    page.resize(980, 650)
+    page.show()
+    page.open_session(session_id)
+
+    beats = 0
+    heartbeat = QTimer(page)
+    heartbeat.setInterval(10)
+
+    def beat() -> None:
+        nonlocal beats
+        beats += 1
+
+    heartbeat.timeout.connect(beat)
+    heartbeat.start()
+    started = time.perf_counter()
+    page._set_view("one_by_one")
+    first = page.current_state.current_candidate_id
+    page._shortcut_triggered("F")
+    second = page.current_state.current_candidate_id
+    page._shortcut_triggered("D")
+    third = page.current_state.current_candidate_id
+    page._shortcut_triggered("S")
+    page._shortcut_triggered("K")
+    page._next()
+    action_elapsed = time.perf_counter() - started
+    current = page.current_state.current_candidate_id
+    assert len({first, second, third, current}) >= 3
+    assert action_elapsed < 0.25
+    assert played == []
+
+    qtbot.waitUntil(lambda: page.session_page.play_button.isEnabled(), timeout=20_000)
+    qtbot.waitUntil(lambda: beats >= 10, timeout=5_000)
+    assert page.session_page.spectrogram.metadata is not None
+    assert page.session_page.spectrogram.metadata.candidate_id == current
+    assert len(loaded_clips) == 1
+    assert hash_calls == 1
+
+    rendered_before_revisit = rendered.count(current)
+    page._previous()
+    qtbot.waitUntil(lambda: page.session_page.play_button.isEnabled(), timeout=15_000)
+    page._next()
+    qtbot.waitUntil(
+        lambda: page.session_page.play_button.isEnabled()
+        and page.session_page.spectrogram.metadata is not None
+        and page.session_page.spectrogram.metadata.candidate_id == current,
+        timeout=15_000,
+    )
+    assert rendered.count(current) == rendered_before_revisit
+    heartbeat.stop()
+    page.shutdown()
+    controller.shutdown()
+
+
+def test_measured_retention_pressure_clear_disk_full_restart_and_delete(
+    qapp, qtbot, monkeypatch, tmp_path: Path
+) -> None:
+    """Case: IT-REVW-017."""
+    import biocall_studio.review.gui.workspace as workspace_module
+    import biocall_studio.review.persistence.cache as cache_module
+
+    source_root = tmp_path / "source"
+    wav_path = source_root / "recordings" / "field-call.wav"
+    source_sha256 = _write_wav(wav_path, seconds=23)
+    source_before = wav_path.read_bytes()
+    suite_root = tmp_path / "suite"
+    controller, session_id = _session(
+        suite_root, count=30, source_sha256=source_sha256
+    )
+    page = ReviewWorkspacePage(
+        controller,
+        source_root_resolver=lambda _session: source_root,
+    )
+    qtbot.addWidget(page)
+    page.resize(920, 620)
+    page.show()
+    page.open_session(session_id)
+
+    # Before a ten-image local cohort exists, bulk sizing stays honestly Unknown.
+    page.show_spectrograms()
+    assert page.cache_page.output_value.text() == "Unknown"
+    page.show_session()
+    qtbot.waitUntil(
+        lambda: page.calibration_store.calibration(
+            page._request_for_row(
+                page.gallery_model.candidate_at(0),
+                controller.store.load_settings(session_id),
+                tier=workspace_module.SpectrogramImageTier.THUMBNAIL,
+            ).tier
+        )
+        is not None,
+        timeout=20_000,
+    )
+
+    calibration = page.calibration_store.calibration(
+        workspace_module.SpectrogramImageTier.THUMBNAIL
+    )
+    assert calibration is not None and calibration.sample_count >= 10
+    page.cache.set_limit_bytes(1)
+    page.show_spectrograms()
+    assert page.cache_page.output_value.text() != "Unknown"
+    _button(page.cache_page, "Generate all").click()
+    qtbot.waitUntil(
+        lambda: page._generation_batch_id is not None
+        or "Retained" in page.cache_page.progress_label.text(),
+        timeout=20_000,
+    )
+    qtbot.waitUntil(
+        lambda: page._generation_batch_id is None
+        and "Retained 30 of 30" in page.cache_page.progress_label.text(),
+        timeout=30_000,
+    )
+    assert page.cache.limit_bytes > 1
+    assert len(page.cache.valid_content_keys()) == 30
+
+    page.show_session()
+    page._set_view("list")
+    selection = QItemSelection(
+        page.table_model.index(0, 0),
+        page.table_model.index(29, page.table_model.columnCount() - 1),
+    )
+    page.session_page.table.selectionModel().select(
+        selection,
+        QItemSelectionModel.SelectionFlag.ClearAndSelect
+        | QItemSelectionModel.SelectionFlag.Rows,
+    )
+    assert len(page.current_state.selected_candidate_ids) == 30
+    assert page.session_page.selection_label.text() == "30 selected"
+    cleared: list[str] = []
+    real_clear = page.supervisor.clear_cache
+
+    def record_clear(keys):
+        cleared.extend(keys)
+        return real_clear(keys)
+
+    monkeypatch.setattr(page.supervisor, "clear_cache", record_clear)
+    page._clear_selected_spectrograms()
+    assert len(cleared) == 60
+    assert page.cache.valid_content_keys() == ()
+
+    # A failed atomic publication leaves no object or staging bytes and does not touch sources.
+    page._set_view("gallery")
+    snapshot = controller.store.load_settings(session_id)
+    row = page.gallery_model.candidate_at(0)
+    request = page._request_for_row(
+        row, snapshot, tier=workspace_module.SpectrogramImageTier.THUMBNAIL
+    )
+    failed_key = workspace_module.spectrogram_content_key(request)
+    real_replace = cache_module.os.replace
+
+    def disk_full(source_path, target_path):
+        if Path(target_path) == page.cache.object_path(failed_key):
+            raise OSError(errno.ENOSPC, "injected cache pressure")
+        return real_replace(source_path, target_path)
+
+    monkeypatch.setattr(cache_module.os, "replace", disk_full)
+    failures_before = len(page._spectrogram_failures)
+    page._queue_thumbnail(
+        0,
+        row,
+        snapshot,
+        source_root,
+        priority=workspace_module.CachePriority.VISIBLE_THUMBNAIL,
+        gallery_epoch=page._gallery_epoch,
+    )
+    qtbot.waitUntil(
+        lambda: len(page._spectrogram_failures) > failures_before,
+        timeout=15_000,
+    )
+    assert page.cache.lookup(failed_key) is None
+    assert tuple(page.cache.staging_root.iterdir()) == ()
+    monkeypatch.setattr(cache_module.os, "replace", real_replace)
+
+    # Session deletion cancels newly queued work; relocation remains blocked while it is open.
+    assert not page.data_location_change_allowed
+    page._requested_thumbnails.discard((page._gallery_epoch, failed_key))
+    page._queue_thumbnail(
+        0,
+        row,
+        snapshot,
+        source_root,
+        priority=workspace_module.CachePriority.VISIBLE_THUMBNAIL,
+        gallery_epoch=page._gallery_epoch,
+    )
+    session = controller.store.get_session(session_id)
+    QTimer.singleShot(0, lambda: _click_visible_message_button("Delete"))
+    page._confirm_delete_session(session)
+    qtbot.waitUntil(lambda: controller.list_sessions() == (), timeout=20_000)
+    assert wav_path.read_bytes() == source_before
+    page.shutdown()
+    controller.shutdown()
+
+    reopened = ReviewSessionController(suite_root)
+    assert reopened.list_sessions() == ()
+    assert wav_path.read_bytes() == source_before
+    reopened.shutdown()
+
+
 def test_native_cache_generation_preset_switch_and_saved_examples_are_bounded(
     qapp, qtbot, monkeypatch, tmp_path: Path
 ) -> None:
@@ -387,12 +713,10 @@ def test_native_cache_generation_preset_switch_and_saved_examples_are_bounded(
     page.show()
     page.open_session(session_id)
 
+    qtbot.waitUntil(lambda: len(page.cache.valid_content_keys()) == 4, timeout=20_000)
     page.show_spectrograms()
     assert page.cache_page.output_value.text() == "Unknown"
     _button(page.cache_page, "Generate all").click()
-    qtbot.waitUntil(lambda: _visible_message_box() is not None, timeout=10_000)
-    _click_visible_message_button("Continue")
-    qtbot.waitUntil(lambda: len(page.cache.valid_content_keys()) == 4, timeout=20_000)
     qtbot.waitUntil(
         lambda: page.cache_page.availability_label.text()
         == "4 of 4 spectrograms available",
@@ -401,6 +725,7 @@ def test_native_cache_generation_preset_switch_and_saved_examples_are_bounded(
 
     page.show_session()
     _button(page, "Gallery").click()
+    qtbot.waitUntil(lambda: page.gallery_model.cached_thumbnail_count > 0, timeout=10_000)
     thumbnail = page.gallery_model.data(
         page.gallery_model.index(0, 0), Qt.ItemDataRole.DecorationRole
     )

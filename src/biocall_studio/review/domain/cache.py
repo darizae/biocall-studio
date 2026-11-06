@@ -13,8 +13,8 @@ from biocall_studio.review.domain.spectrograms import validate_spectrogram_conte
 class CachePriority(IntEnum):
     """Lower values run first; prefetch and bulk are expendable under pressure."""
 
-    VISIBLE_THUMBNAIL = 0
-    CURRENT_DETAIL = 1
+    CURRENT_DETAIL = 0
+    VISIBLE_THUMBNAIL = 1
     NEARBY_PREFETCH = 2
     GENERATE_ALL = 3
 

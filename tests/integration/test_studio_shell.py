@@ -197,7 +197,7 @@ def _start_blocked_review_generation(coordinator: StudioCoordinator) -> str:
     assert estimate.can_start
     started = threading.Event()
 
-    def render(cancelled):
+    def render(_prepared, cancelled):
         started.set()
         while not cancelled():
             time.sleep(0.005)

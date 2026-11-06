@@ -132,6 +132,7 @@ class SpectrogramView(QWidget):
         super().__init__(parent)
         self._show_detection = bool(show_detection)
         self._raster: SpectrogramRaster | None = None
+        self._metadata: SpectrogramMetadata | None = None
         self._image = QImage()
         self.setMinimumSize(280, 170)
         self.setAccessibleName(
@@ -143,12 +144,13 @@ class SpectrogramView(QWidget):
 
     @property
     def metadata(self) -> SpectrogramMetadata | None:
-        return None if self._raster is None else self._raster.metadata
+        return self._metadata
 
     def set_spectrogram(self, raster: SpectrogramRaster) -> None:
         if not isinstance(raster, SpectrogramRaster):
             raise TypeError("Spectrogram view requires a verified raster.")
         self._raster = raster
+        self._metadata = raster.metadata
         self._image = QImage(
             raster.rgb_bytes,
             raster.width,
@@ -158,8 +160,31 @@ class SpectrogramView(QWidget):
         ).copy()
         self.update()
 
+    def set_cached_spectrogram(
+        self,
+        metadata: SpectrogramMetadata,
+        rgb_bytes: bytes,
+    ) -> None:
+        """Present background-decoded cache pixels without repeating STFT work."""
+        if not isinstance(metadata, SpectrogramMetadata):
+            raise TypeError("Spectrogram view requires verified metadata.")
+        expected_bytes = metadata.width * metadata.height * 3
+        if not isinstance(rgb_bytes, bytes) or len(rgb_bytes) != expected_bytes:
+            raise ValueError("Cached spectrogram pixels are incomplete.")
+        self._raster = None
+        self._metadata = metadata
+        self._image = QImage(
+            rgb_bytes,
+            metadata.width,
+            metadata.height,
+            metadata.width * 3,
+            QImage.Format.Format_RGB888,
+        ).copy()
+        self.update()
+
     def clear_spectrogram(self) -> None:
         self._raster = None
+        self._metadata = None
         self._image = QImage()
         self.update()
 
@@ -193,9 +218,9 @@ class SpectrogramView(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         painter.fillRect(self.rect(), QColor("white"))
-        if self._raster is None or self._image.isNull():
+        if self._metadata is None or self._image.isNull():
             return
-        metadata = self._raster.metadata
+        metadata = self._metadata
         image_rect = self.image_rect()
         painter.drawImage(image_rect, self._image)
 

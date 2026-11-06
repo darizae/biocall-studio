@@ -54,6 +54,17 @@ _INPUT_FOCUS_KINDS = frozenset(
         "textbox",
     }
 )
+MAX_VISIBLE_SELECTION = 1_000
+
+
+def bounded_selection(candidate_ids: tuple[str, ...]) -> tuple[tuple[str, ...], bool]:
+    """Return the explicitly displayed selection and whether the visible limit applied."""
+    values = tuple(candidate_ids)
+    if any(not isinstance(value, str) or not value for value in values):
+        raise ValueError("Review selection identity is invalid.")
+    if len(set(values)) != len(values):
+        raise ValueError("Review selection identities must be unique.")
+    return values[:MAX_VISIBLE_SELECTION], len(values) > MAX_VISIBLE_SELECTION
 
 
 def shortcut_action(
@@ -285,9 +296,11 @@ class ReviewViewState:
 
 __all__ = [
     "ReviewFilter",
+    "MAX_VISIBLE_SELECTION",
     "ReviewShortcutAction",
     "ReviewSort",
     "ReviewView",
     "ReviewViewState",
+    "bounded_selection",
     "shortcut_action",
 ]

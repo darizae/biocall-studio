@@ -160,7 +160,7 @@ def test_async_generation_reuse_stale_epoch_cancel_retry_and_50k_bound(tmp_path)
     )
     renders = 0
 
-    def generate(cancelled):
+    def generate(_prepared, cancelled):
         nonlocal renders
         if cancelled():
             raise GenerationCancelled("cancelled")
@@ -229,7 +229,7 @@ def test_async_generation_reuse_stale_epoch_cancel_retry_and_50k_bound(tmp_path)
         tier=SpectrogramImageTier.THUMBNAIL,
     )
 
-    def stale_render(cancelled):
+    def stale_render(_prepared, cancelled):
         release.wait(5)
         return render_spectrogram(audio.samples, stale_request)
 
@@ -249,7 +249,7 @@ def test_async_generation_reuse_stale_epoch_cancel_retry_and_50k_bound(tmp_path)
 
     started = threading.Event()
 
-    def cancellable(cancelled):
+    def cancellable(_prepared, cancelled):
         started.set()
         while not cancelled():
             time.sleep(0.005)
@@ -293,7 +293,7 @@ def test_async_generation_reuse_stale_epoch_cancel_retry_and_50k_bound(tmp_path)
         tier=SpectrogramImageTier.THUMBNAIL,
     )
 
-    def late_after_clear(cancelled):
+    def late_after_clear(_prepared, cancelled):
         clear_started.set()
         clear_release.wait(5)
         return render_spectrogram(audio.samples, clear_request)
@@ -325,7 +325,7 @@ def test_async_generation_reuse_stale_epoch_cancel_retry_and_50k_bound(tmp_path)
                 tier=SpectrogramImageTier.THUMBNAIL,
                 priority=CachePriority.GENERATE_ALL,
                 token=token_b,
-                render=lambda cancelled: (
+                render=lambda _prepared, cancelled: (
                     bulk_release.wait(5),
                     (_ for _ in ()).throw(GenerationCancelled("cancelled")),
                 )[1],

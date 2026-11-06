@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import threading
 import uuid
 from collections.abc import Callable
@@ -21,11 +22,25 @@ from alp_ui.components import (
     TextInput,
 )
 from alp_ui.theme import ALPACA_LIGHT, interactions, make_icon
-from PySide6.QtCore import QEvent, QModelIndex, QObject, QSize, Qt, QThread, QTimer, QUrl, Signal
+from PySide6.QtCore import (
+    QEvent,
+    QModelIndex,
+    QObject,
+    QPoint,
+    QSize,
+    Qt,
+    QThread,
+    QTimer,
+    QUrl,
+    Signal,
+)
 from PySide6.QtGui import (
+    QColor,
     QDesktopServices,
+    QImage,
     QKeySequence,
     QPainter,
+    QPen,
     QPixmap,
     QResizeEvent,
     QShortcut,
@@ -64,9 +79,14 @@ from biocall_studio.review.application.cache import (
     change_session_settings_with_preflight,
     session_token_is_current,
 )
+from biocall_studio.review.application.calibration import (
+    CacheCalibrationStore,
+    CacheMeasurement,
+)
 from biocall_studio.review.application.controller import ReviewSessionController
 from biocall_studio.review.application.generation import (
     GenerationCancelled,
+    GenerationCompletion,
     GenerationJob,
     GenerationToken,
     SpectrogramGenerationSupervisor,
@@ -75,6 +95,8 @@ from biocall_studio.review.application.storage import (
     ReviewCacheSizePlan,
     assess_review_cache_storage,
     plan_review_cache_generation,
+    plan_review_ondemand_write,
+    retained_cache_limit,
 )
 from biocall_studio.review.application.view_state import (
     ReviewFilter,
@@ -82,6 +104,7 @@ from biocall_studio.review.application.view_state import (
     ReviewSort,
     ReviewView,
     ReviewViewState,
+    bounded_selection,
     shortcut_action,
 )
 from biocall_studio.review.domain.cache import CachePriority
@@ -103,8 +126,6 @@ from biocall_studio.review.gui.settings import SpectrogramSettingsPage
 from biocall_studio.review.persistence.cache import SpectrogramCache
 from biocall_studio.review.persistence.sessions import ReviewCandidateView, ReviewSession
 from biocall_studio.review.workflows.audio import (
-    AudioSourceError,
-    AudioSourceProblem,
     SourceIdentityCache,
     read_candidate_audio,
 )
@@ -118,6 +139,7 @@ from biocall_studio.shared.storage import (
     StorageEstimate,
     format_binary_size,
     format_output_estimate,
+    require_storage_admission,
 )
 
 
@@ -185,6 +207,26 @@ class _GalleryDelegate(QStyledItemDelegate):
                 image_rect.y() + (image_rect.height() - scaled.height()) // 2,
                 scaled,
             )
+            metadata = index.data(Qt.ItemDataRole.UserRole + 1)
+            if metadata is not None:
+                left = image_rect.x() + (image_rect.width() - scaled.width()) // 2
+                top = image_rect.y() + (image_rect.height() - scaled.height()) // 2
+                start = left + metadata.frame_fraction(
+                    metadata.candidate_start_frame
+                ) * scaled.width()
+                end = left + metadata.frame_fraction(
+                    metadata.candidate_end_frame
+                ) * scaled.width()
+                painter.fillRect(
+                    int(start),
+                    top,
+                    max(1, int(end - start)),
+                    scaled.height(),
+                    QColor(255, 193, 7, 52),
+                )
+                painter.setPen(QPen(QColor(167, 92, 0), 1))
+                painter.drawLine(int(start), top, int(start), top + scaled.height())
+                painter.drawLine(int(end), top, int(end), top + scaled.height())
         text_rect = content.adjusted(0, image_height + 3, 0, 0)
         painter.setPen(
             option.palette.highlightedText().color() if selected else option.palette.text().color()
@@ -1584,6 +1626,7 @@ class ReviewWorkspacePage(QWidget):
     generation_prepared = Signal(object, object, int)
     generation_prepare_failed = Signal(str)
     settings_change_prepared = Signal(object, object, object, int)
+    spectrogram_job_completed = Signal(object)
 
     def __init__(
         self,
@@ -1605,9 +1648,18 @@ class ReviewWorkspacePage(QWidget):
         self._shortcuts: list[QShortcut] = []
         self._shortcut_dialog: QMessageBox | None = None
         self._current_content_key: str | None = None
+        self._current_request_epoch = 0
+        self._gallery_epoch = 0
+        self._requested_thumbnails: set[tuple[int, str]] = set()
+        self._spectrogram_failures: list[str] = []
+        self._visible_thumbnail_keys: set[str] = set()
+        self._source_identity_cache = SourceIdentityCache(max_entries=128)
         self.cache = SpectrogramCache(
             controller.store.root / "cache" / "spectrograms",
             limit_bytes=512 * 1024 * 1024,
+        )
+        self.calibration_store = CacheCalibrationStore(
+            self.cache.root / "calibration-v1.json"
         )
         self.supervisor = SpectrogramGenerationSupervisor(
             self.cache,
@@ -1618,6 +1670,8 @@ class ReviewWorkspacePage(QWidget):
         self._generation_prepare_thread: threading.Thread | None = None
         self._pending_generation_plan: ReviewCacheSizePlan | None = None
         self._pending_generation_estimate: StorageEstimate | None = None
+        self._pending_retained_limit: int | None = None
+        self._generation_initial_cached_count = 0
         self._pending_settings_snapshot = None
         self._generation_confirm_dialog: QMessageBox | None = None
         self._settings_change_dialog: QMessageBox | None = None
@@ -1730,9 +1784,21 @@ class ReviewWorkspacePage(QWidget):
         self.generation_prepared.connect(self._generation_ready)
         self.generation_prepare_failed.connect(self._generation_failed)
         self.settings_change_prepared.connect(self._settings_change_ready)
+        self.spectrogram_job_completed.connect(self._spectrogram_job_ready)
         self._generation_timer = QTimer(self)
         self._generation_timer.setInterval(100)
         self._generation_timer.timeout.connect(self._poll_generation)
+        self._gallery_queue_timer = QTimer(self)
+        self._gallery_queue_timer.setSingleShot(True)
+        self._gallery_queue_timer.setInterval(25)
+        self._gallery_queue_timer.timeout.connect(self._queue_gallery_window)
+        self.session_page.gallery.verticalScrollBar().valueChanged.connect(
+            lambda _value: self._schedule_gallery_window()
+        )
+        self.session_page.gallery.horizontalScrollBar().valueChanged.connect(
+            lambda _value: self._schedule_gallery_window()
+        )
+        self.session_page.gallery.viewport().installEventFilter(self)
         self.session_page.seek.sliderMoved.connect(self.playback.set_position)
         self._add_shortcuts()
         self.show_landing()
@@ -1893,6 +1959,14 @@ class ReviewWorkspacePage(QWidget):
         else:
             self.show_session()
 
+    def _cache_calibration(
+        self, tier: SpectrogramImageTier
+    ):
+        try:
+            return self.calibration_store.calibration(tier)
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            return None
+
     def show_spectrograms(self) -> None:
         state = self.current_state
         if state is None:
@@ -1905,7 +1979,7 @@ class ReviewWorkspacePage(QWidget):
                 existing_file_sizes=(),
                 tier=SpectrogramImageTier.THUMBNAIL,
                 settings_digest=snapshot.settings_digest,
-                calibration=None,
+                calibration=self._cache_calibration(SpectrogramImageTier.THUMBNAIL),
             )
             estimate = assess_review_cache_storage(plan, cache_root=self.cache.root)
         except (OSError, RuntimeError, TypeError, ValueError):
@@ -2115,7 +2189,7 @@ class ReviewWorkspacePage(QWidget):
                     existing_file_sizes=existing_sizes,
                     tier=SpectrogramImageTier.THUMBNAIL,
                     settings_digest=target.settings_digest,
-                    calibration=None,
+                    calibration=self._cache_calibration(SpectrogramImageTier.THUMBNAIL),
                 )
                 estimate = assess_review_cache_storage(plan, cache_root=self.cache.root)
             except (OSError, RuntimeError, TypeError, ValueError):
@@ -2267,7 +2341,7 @@ class ReviewWorkspacePage(QWidget):
                     existing_file_sizes=existing_sizes,
                     tier=SpectrogramImageTier.THUMBNAIL,
                     settings_digest=snapshot.settings_digest,
-                    calibration=None,
+                    calibration=self._cache_calibration(SpectrogramImageTier.THUMBNAIL),
                 )
                 estimate = assess_review_cache_storage(plan, cache_root=self.cache.root)
             except (OSError, RuntimeError, TypeError, ValueError):
@@ -2298,9 +2372,24 @@ class ReviewWorkspacePage(QWidget):
             return
         self._pending_generation_plan = plan
         self._pending_generation_estimate = estimate
+        self._generation_initial_cached_count = cached_count
+        self._pending_retained_limit = retained_cache_limit(
+            plan,
+            current_cache_bytes=self.cache.actual_bytes,
+        )
         self.cache_page.set_estimate(state.session, plan, estimate, cached_count=cached_count)
         if plan.missing_count == 0:
             self.cache_page.set_running(False)
+            self.cache_page.progress_label.setText(
+                f"Retained {cached_count:,} of "
+                f"{state.session.eligible_candidate_count:,} thumbnails."
+            )
+            return
+        if self._pending_retained_limit is None:
+            self.cache_page.set_running(False)
+            self.cache_page.progress_label.setText(
+                "Open Gallery first to measure local images, then check Generate all again."
+            )
             return
         if not estimate.can_start:
             self.cache_page.set_running(False)
@@ -2357,7 +2446,6 @@ class ReviewWorkspacePage(QWidget):
             "settings_epoch": session.settings_epoch,
             "settings_digest": snapshot.settings_digest,
         }
-        identity_cache = SourceIdentityCache()
         offset = 0
         while offset < session.eligible_candidate_count:
             rows = self.controller.store.candidate_page(
@@ -2378,25 +2466,28 @@ class ReviewWorkspacePage(QWidget):
                     tier=SpectrogramImageTier.THUMBNAIL,
                 )
 
-                def render(
+                def prepare(
                     cancelled,
                     *,
                     candidate=candidate,
-                    request=request,
                     context_seconds=settings.context_seconds,
                 ):
                     if cancelled():
                         raise GenerationCancelled("Spectrogram generation was cancelled.")
-                    audio = read_candidate_audio(
+                    return read_candidate_audio(
                         source_root,
                         candidate,
                         context_seconds=context_seconds,
                         cancelled=cancelled,
-                        identity_cache=identity_cache,
+                        identity_cache=self._source_identity_cache,
                     )
+
+                def render(prepared, cancelled, *, request=request):
                     if cancelled():
                         raise GenerationCancelled("Spectrogram generation was cancelled.")
-                    return render_spectrogram(audio.samples, request)
+                    if prepared is None:
+                        raise ValueError("Spectrogram audio preparation is missing.")
+                    return render_spectrogram(prepared.samples, request)
 
                 yield GenerationJob(
                     content_key=spectrogram_content_key(request),
@@ -2406,7 +2497,9 @@ class ReviewWorkspacePage(QWidget):
                         source_sha256=row.source_sha256,
                         **token_base,
                     ),
+                    prepare=prepare,
                     render=render,
+                    completed=self._record_cache_measurement,
                 )
             offset += len(rows)
 
@@ -2433,6 +2526,11 @@ class ReviewWorkspacePage(QWidget):
                 plan,
                 cache_root=self.cache.root,
                 expected_input_digest=plan.input_digest,
+            )
+            if self._pending_retained_limit is None:
+                raise ValueError("Complete thumbnail retention is not measurable.")
+            self.cache.set_limit_bytes(
+                max(self.cache.limit_bytes, self._pending_retained_limit)
             )
             batch_id = self.supervisor.submit_bulk(
                 self._generation_jobs(session, snapshot, Path(source_root)),
@@ -2463,9 +2561,19 @@ class ReviewWorkspacePage(QWidget):
             self._generation_timer.stop()
             self.cache_page.set_stopped(failed=True)
             return
-        completed = progress.completed + progress.cache_hits + progress.failed + progress.cancelled
+        completed_jobs = (
+            progress.completed + progress.cache_hits + progress.failed + progress.cancelled
+        )
+        completed = self._generation_initial_cached_count + completed_jobs
         total = state.session.eligible_candidate_count if state is not None else progress.requested
-        self.cache_page.set_progress(completed, total)
+        self.cache_page.progress.setRange(0, max(1, total))
+        self.cache_page.progress.setValue(completed)
+        self.cache_page.progress_label.setText(
+            f"Attempted {completed:,} of {total:,} · generated {progress.completed:,} · "
+            f"cached {self._generation_initial_cached_count + progress.cache_hits:,} · "
+            f"failed {progress.failed:,} · "
+            f"cancelled {progress.cancelled:,}"
+        )
         if not progress.done:
             return
         self._generation_batch_id = None
@@ -2490,6 +2598,9 @@ class ReviewWorkspacePage(QWidget):
                 pass
 
     def _clear_all_spectrograms(self) -> None:
+        self._current_request_epoch += 1
+        self._gallery_epoch += 1
+        self._requested_thumbnails.clear()
         try:
             keys = self.cache.valid_content_keys()
             self.supervisor.clear_cache(keys)
@@ -2498,6 +2609,8 @@ class ReviewWorkspacePage(QWidget):
             return
         self._current_content_key = None
         self.session_page.spectrogram.clear_spectrogram()
+        if hasattr(self, "gallery_model"):
+            self.gallery_model.drop_thumbnails()
         if self.current_state is not None:
             self.show_spectrograms()
 
@@ -2587,6 +2700,9 @@ class ReviewWorkspacePage(QWidget):
         thread.start()
 
     def _session_deleted(self, session: ReviewSession) -> None:
+        self._current_request_epoch += 1
+        self._gallery_epoch += 1
+        self._requested_thumbnails.clear()
         if (
             self.current_state is not None
             and self.current_state.session.session_id == session.session_id
@@ -2655,6 +2771,11 @@ class ReviewWorkspacePage(QWidget):
         self.open_session(child.session_id)
 
     def open_session(self, session_id: str) -> None:
+        self._current_request_epoch += 1
+        self._gallery_epoch += 1
+        self._requested_thumbnails.clear()
+        self._visible_thumbnail_keys.clear()
+        self.supervisor.drop_prefetch_except(set())
         self.current_state = ReviewViewState(self.controller, session_id)
         if (
             self.current_state.current_candidate_id is None
@@ -2672,9 +2793,7 @@ class ReviewWorkspacePage(QWidget):
             return
         if not hasattr(self, "table_model"):
             self.table_model = ReviewCandidateTableModel(state, self)
-            self.gallery_model = ReviewGalleryModel(
-                state, self, thumbnail_provider=self._gallery_thumbnail
-            )
+            self.gallery_model = ReviewGalleryModel(state, self)
             self.session_page.table.setModel(self.table_model)
             self.session_page.gallery.setModel(self.gallery_model)
             self.session_page.table.selectionModel().selectionChanged.connect(
@@ -2687,7 +2806,7 @@ class ReviewWorkspacePage(QWidget):
             self.table_model._paged.state = state
             self.gallery_model._paged.state = state
             self.table_model.refresh()
-            self.gallery_model.refresh()
+            self.gallery_model.refresh(clear_thumbnails=True)
 
     def _render(self) -> None:
         state = self.current_state
@@ -2705,12 +2824,19 @@ class ReviewWorkspacePage(QWidget):
         self.session_page.clear_selected_button.setEnabled(bool(state.selected_candidate_ids))
         if state.view is ReviewView.ONE_BY_ONE:
             self._load_current()
+        elif state.view is ReviewView.GALLERY:
+            self._schedule_gallery_window()
 
     def _set_view(self, value: str) -> None:
         state = self.current_state
         if state is None:
             return
-        state.set_query(view=ReviewView(value))
+        target = ReviewView(value)
+        if target is not state.view:
+            self._gallery_epoch += 1
+            self._requested_thumbnails.clear()
+            self.supervisor.drop_prefetch_except(set())
+        state.set_query(view=target)
         self._persist_view()
         self._render()
 
@@ -2718,6 +2844,9 @@ class ReviewWorkspacePage(QWidget):
         state = self.current_state
         if state is None:
             return
+        self._gallery_epoch += 1
+        self._requested_thumbnails.clear()
+        self.supervisor.drop_prefetch_except(set())
         state.set_query(filter_name=ReviewFilter(value))
         self._persist_view()
         self._render()
@@ -2726,6 +2855,9 @@ class ReviewWorkspacePage(QWidget):
         state = self.current_state
         if state is None or value is None:
             return
+        self._gallery_epoch += 1
+        self._requested_thumbnails.clear()
+        self.supervisor.drop_prefetch_except(set())
         state.set_query(sort=ReviewSort(value))
         self._persist_view()
         self._render()
@@ -2734,26 +2866,47 @@ class ReviewWorkspacePage(QWidget):
         state = self.current_state
         if state is None:
             return
+        self._gallery_epoch += 1
+        self._requested_thumbnails.clear()
+        self.supervisor.drop_prefetch_except(set())
         state.set_query(search=value)
         self._persist_view()
         self.table_model.refresh()
-        self.gallery_model.refresh()
+        self.gallery_model.refresh(clear_thumbnails=True)
+        self._schedule_gallery_window()
 
     def _selection_changed(self, view: QAbstractItemView) -> None:
         state = self.current_state
         model = view.model()
         if state is None or model is None:
             return
+        selected_rows = tuple(view.selectionModel().selectedRows())
         candidate_ids = tuple(
             dict.fromkeys(
                 index.data(Qt.ItemDataRole.UserRole)
-                for index in view.selectionModel().selectedRows()
+                for index in selected_rows
                 if index.data(Qt.ItemDataRole.UserRole)
             )
         )
-        state.set_selection(candidate_ids[:1_000])
-        self.session_page.selection_label.setText(f"{len(candidate_ids):,} selected")
-        self.session_page.clear_selected_button.setEnabled(bool(candidate_ids))
+        retained, limited = bounded_selection(candidate_ids)
+        if limited:
+            selection_model = view.selectionModel()
+            selection_model.blockSignals(True)
+            selection_model.clearSelection()
+            for index in selected_rows[: len(retained)]:
+                selection_model.select(
+                    index,
+                    selection_model.SelectionFlag.Select
+                    | selection_model.SelectionFlag.Rows,
+                )
+            selection_model.blockSignals(False)
+        state.set_selection(retained)
+        self.session_page.selection_label.setText(
+            f"{len(retained):,} selected (limit)"
+            if limited
+            else f"{len(retained):,} selected"
+        )
+        self.session_page.clear_selected_button.setEnabled(bool(retained))
 
     def _open_gallery_index(self, index: QModelIndex) -> None:
         self._open_candidate(index.data(Qt.ItemDataRole.UserRole))
@@ -2790,30 +2943,184 @@ class ReviewWorkspacePage(QWidget):
             contributing_windows=row.contributing_windows,
         )
 
-    def _gallery_thumbnail(self, row: ReviewCandidateView) -> QPixmap | None:
+    def _schedule_gallery_window(self) -> None:
         state = self.current_state
-        if state is None:
-            return None
+        if state is None or state.view is not ReviewView.GALLERY:
+            return
+        self._gallery_queue_timer.start()
+
+    def _visible_gallery_rows(self) -> tuple[int, int]:
+        count = self.gallery_model.rowCount()
+        if count == 0:
+            return (0, 0)
+        viewport = self.session_page.gallery.viewport()
+        first = self.session_page.gallery.indexAt(QPoint(2, 2))
+        last = self.session_page.gallery.indexAt(
+            QPoint(max(2, viewport.width() - 2), max(2, viewport.height() - 2))
+        )
+        first_row = first.row() if first.isValid() else 0
+        last_row = last.row() if last.isValid() else min(count - 1, first_row + 11)
+        if last_row < first_row:
+            last_row = min(count - 1, first_row + 11)
+        return first_row, min(count, last_row + 1)
+
+    def _request_for_row(
+        self,
+        row: ReviewCandidateView,
+        snapshot,
+        *,
+        tier: SpectrogramImageTier,
+    ) -> SpectrogramRenderRequest:
+        settings = SpectrogramSettings.from_mapping(snapshot.effective_settings)
+        context = plan_candidate_context(
+            self._eligible(row), context_seconds=settings.context_seconds
+        )
+        return SpectrogramRenderRequest.from_snapshot(
+            candidate_id=row.candidate_id,
+            source_sha256=row.source_sha256,
+            context=context,
+            snapshot=snapshot,
+            tier=tier,
+        )
+
+    def _admit_ondemand_write(self, tier: SpectrogramImageTier, settings_digest: str) -> None:
+        plan = plan_review_ondemand_write(tier=tier, settings_digest=settings_digest)
+        estimate = assess_review_cache_storage(plan, cache_root=self.cache.root)
+        require_storage_admission(estimate)
+
+    def _record_cache_measurement(self, completion: GenerationCompletion) -> None:
+        entry = completion.entry
+        if completion.outcome != "completed" or entry is None:
+            return
+        metadata_bytes = len(
+            json.dumps(
+                entry.metadata.to_dict(),
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        )
+        try:
+            self.calibration_store.record(
+                CacheMeasurement(
+                    content_key=completion.content_key,
+                    render_version=entry.metadata.render_version,
+                    tier=entry.tier,
+                    source_sha256=entry.source_sha256,
+                    encoded_bytes=entry.size_bytes,
+                    metadata_bytes=metadata_bytes,
+                    staging_bytes=entry.size_bytes,
+                    elapsed_milliseconds=completion.elapsed_milliseconds,
+                )
+            )
+        except (OSError, TypeError, ValueError):
+            # Calibration is optional evidence; the valid cache object remains usable.
+            pass
+
+    def _queue_thumbnail(
+        self,
+        row_index: int,
+        row: ReviewCandidateView,
+        snapshot,
+        source_root: Path,
+        *,
+        priority: CachePriority,
+        gallery_epoch: int,
+    ) -> str:
+        request = self._request_for_row(row, snapshot, tier=SpectrogramImageTier.THUMBNAIL)
+        key = spectrogram_content_key(request)
+        request_identity = (gallery_epoch, key)
+        if request_identity in self._requested_thumbnails:
+            return key
+        self._requested_thumbnails.add(request_identity)
+        candidate = self._eligible(row)
+        settings = SpectrogramSettings.from_mapping(snapshot.effective_settings)
+
+        def prepare(cancelled):
+            return read_candidate_audio(
+                source_root,
+                candidate,
+                context_seconds=settings.context_seconds,
+                cancelled=cancelled,
+                identity_cache=self._source_identity_cache,
+            )
+
+        def render(prepared, cancelled):
+            if cancelled() or prepared is None:
+                raise GenerationCancelled("Spectrogram generation was cancelled.")
+            return render_spectrogram(prepared.samples, request)
+
+        def completed(completion: GenerationCompletion) -> None:
+            self._record_cache_measurement(completion)
+            self.spectrogram_job_completed.emit(
+                ("thumbnail", row_index, row.candidate_id, gallery_epoch, completion)
+            )
+
+        job = GenerationJob(
+            content_key=key,
+            tier=SpectrogramImageTier.THUMBNAIL,
+            priority=priority,
+            token=GenerationToken(
+                session_id=self.current_state.session.session_id,
+                settings_epoch=self.current_state.session.settings_epoch,
+                settings_digest=snapshot.settings_digest,
+                source_sha256=row.source_sha256,
+                request_epoch=gallery_epoch,
+            ),
+            prepare=prepare,
+            render=render,
+            admit_write=lambda: self._admit_ondemand_write(
+                SpectrogramImageTier.THUMBNAIL, snapshot.settings_digest
+            ),
+            load_display=True,
+            completed=completed,
+        )
+        try:
+            self.supervisor.submit(job)
+        except (OSError, RuntimeError, TypeError, ValueError):
+            self._requested_thumbnails.discard(request_identity)
+        return key
+
+    def _queue_gallery_window(self) -> None:
+        state = self.current_state
+        if state is None or state.view is not ReviewView.GALLERY:
+            return
+        source_root = self.source_root_resolver(state.session)
+        if source_root is None:
+            return
         try:
             snapshot = self.controller.store.load_settings(state.session.session_id)
-            settings = SpectrogramSettings.from_mapping(snapshot.effective_settings)
-            context = plan_candidate_context(
-                self._eligible(row), context_seconds=settings.context_seconds
-            )
-            request = SpectrogramRenderRequest.from_snapshot(
-                candidate_id=row.candidate_id,
-                source_sha256=row.source_sha256,
-                context=context,
-                snapshot=snapshot,
-                tier=SpectrogramImageTier.THUMBNAIL,
-            )
-            entry = self.cache.lookup(spectrogram_content_key(request))
-            if entry is None:
-                return None
-            thumbnail = QPixmap(str(entry.path))
-        except (OSError, RuntimeError, TypeError, ValueError):
-            return None
-        return thumbnail if not thumbnail.isNull() else None
+            start, end = self._visible_gallery_rows()
+            nearby_start = max(0, start - 8)
+            nearby_end = min(state.row_count, end + 8)
+            visible_keys: set[str] = set()
+            retained_prefetch: set[str] = set()
+            for row_index in range(nearby_start, nearby_end):
+                row = self.gallery_model.candidate_at(row_index)
+                visible = start <= row_index < end
+                key = self._queue_thumbnail(
+                    row_index,
+                    row,
+                    snapshot,
+                    Path(source_root),
+                    priority=(
+                        CachePriority.VISIBLE_THUMBNAIL
+                        if visible
+                        else CachePriority.NEARBY_PREFETCH
+                    ),
+                    gallery_epoch=self._gallery_epoch,
+                )
+                if visible:
+                    visible_keys.add(key)
+                else:
+                    retained_prefetch.add(key)
+            self._visible_thumbnail_keys = visible_keys
+            self.supervisor.drop_prefetch_except(retained_prefetch)
+            pins = set(visible_keys)
+            if self._current_content_key is not None:
+                pins.add(self._current_content_key)
+            self.cache.set_automatic_pins(pins)
+        except (OSError, RuntimeError, TypeError, ValueError, IndexError):
+            return
 
     def _load_current(self) -> None:
         state = self.current_state
@@ -2825,6 +3132,8 @@ class ReviewWorkspacePage(QWidget):
             self.session_page.spectrogram.clear_spectrogram()
             return
         self.playback.stop()
+        self._current_request_epoch += 1
+        request_epoch = self._current_request_epoch
         self.session_page.play_button.setEnabled(False)
         self._current_content_key = None
         position = self.controller.store.candidate_position(
@@ -2842,41 +3151,146 @@ class ReviewWorkspacePage(QWidget):
         if source_root is None:
             self._set_detail_error("Recording not found. Relink the recordings folder to continue.")
             return
+        self.session_page.detail_status.setText("Loading recording and spectrogram…")
         try:
             snapshot = self.controller.store.load_settings(state.session.session_id)
             settings = SpectrogramSettings.from_mapping(snapshot.effective_settings)
-            audio = read_candidate_audio(
-                Path(source_root),
-                self._eligible(row),
-                context_seconds=settings.context_seconds,
+            candidate = self._eligible(row)
+            request = self._request_for_row(row, snapshot, tier=SpectrogramImageTier.DETAIL)
+            key = spectrogram_content_key(request)
+
+            def prepare(cancelled):
+                return read_candidate_audio(
+                    Path(source_root),
+                    candidate,
+                    context_seconds=settings.context_seconds,
+                    cancelled=cancelled,
+                    identity_cache=self._source_identity_cache,
+                )
+
+            def render(prepared, cancelled):
+                if cancelled() or prepared is None:
+                    raise GenerationCancelled("Spectrogram generation was cancelled.")
+                return render_spectrogram(prepared.samples, request)
+
+            def completed(completion: GenerationCompletion) -> None:
+                self._record_cache_measurement(completion)
+                self.spectrogram_job_completed.emit(
+                    ("detail", -1, row.candidate_id, request_epoch, completion)
+                )
+
+            self.supervisor.submit(
+                GenerationJob(
+                    content_key=key,
+                    tier=SpectrogramImageTier.DETAIL,
+                    priority=CachePriority.CURRENT_DETAIL,
+                    token=GenerationToken(
+                        session_id=state.session.session_id,
+                        settings_epoch=state.session.settings_epoch,
+                        settings_digest=snapshot.settings_digest,
+                        source_sha256=row.source_sha256,
+                        request_epoch=request_epoch,
+                    ),
+                    prepare=prepare,
+                    prepare_on_cache_hit=True,
+                    render=render,
+                    admit_write=lambda: self._admit_ondemand_write(
+                        SpectrogramImageTier.DETAIL, snapshot.settings_digest
+                    ),
+                    load_display=True,
+                    completed=completed,
+                )
             )
-            request = SpectrogramRenderRequest.from_snapshot(
-                candidate_id=row.candidate_id,
-                source_sha256=row.source_sha256,
-                context=audio.context,
-                snapshot=snapshot,
-                tier=SpectrogramImageTier.DETAIL,
+            self._current_content_key = key
+            self.cache.set_automatic_pins({key, *self._visible_thumbnail_keys})
+        except (OSError, RuntimeError, TypeError, ValueError):
+            self._set_detail_error("Couldn't generate this spectrogram. Retry.")
+
+    def _spectrogram_job_ready(self, payload: object) -> None:
+        try:
+            kind, row_index, candidate_id, request_epoch, completion = payload
+        except (TypeError, ValueError):
+            return
+        if not isinstance(completion, GenerationCompletion):
+            return
+        if completion.error:
+            self._spectrogram_failures.append(completion.error)
+        if kind == "thumbnail":
+            self._requested_thumbnails.discard((request_epoch, completion.content_key))
+            state = self.current_state
+            if (
+                state is None
+                or request_epoch != self._gallery_epoch
+                or state.view is not ReviewView.GALLERY
+                or completion.outcome not in {"completed", "cache_hit"}
+                or completion.entry is None
+                or not isinstance(completion.display_payload, bytes)
+            ):
+                return
+            image = QImage(
+                completion.display_payload,
+                completion.entry.width,
+                completion.entry.height,
+                completion.entry.width * 3,
+                QImage.Format.Format_RGB888,
+            ).copy()
+            if image.isNull():
+                return
+            self.gallery_model.put_thumbnail(
+                candidate_id,
+                QPixmap.fromImage(image),
+                completion.entry.metadata,
+                row=row_index,
             )
-            raster = render_spectrogram(audio.samples, request)
-            self.cache.publish(raster, settings_digest=snapshot.settings_digest)
-            self._current_content_key = raster.content_key
-            self.session_page.spectrogram.set_spectrogram(raster)
-            self.playback.load_clip(audio.wav_bytes)
-            self.session_page.play_button.setEnabled(True)
-            self.session_page.detail_status.clear()
-        except AudioSourceError as exc:
-            message = {
-                AudioSourceProblem.MISSING: (
-                    "Recording not found. Relink the recordings folder to continue."
-                ),
-                AudioSourceProblem.CHANGED: (
+            return
+
+        state = self.current_state
+        if (
+            kind != "detail"
+            or state is None
+            or request_epoch != self._current_request_epoch
+            or state.current_candidate_id != candidate_id
+        ):
+            return
+        if completion.outcome not in {"completed", "cache_hit"}:
+            detail = completion.error or ""
+            if any(
+                marker in detail.casefold()
+                for marker in ("changed", "frozen detect", "frame or sample-rate")
+            ):
+                self._set_detail_error(
                     "This recording has changed since detection. "
                     "Restore the original file to continue."
-                ),
-            }.get(exc.problem, "Couldn't play this recording.")
-            self._set_detail_error(message)
-        except (OSError, TypeError, ValueError):
+                )
+            elif any(
+                marker in detail.casefold()
+                for marker in ("not found", "unavailable", "disappeared")
+            ):
+                self._set_detail_error(
+                    "Recording not found. Relink the recordings folder to continue."
+                )
+            else:
+                self._set_detail_error("Couldn't generate this spectrogram. Retry.")
+            return
+        if (
+            completion.entry is None
+            or not isinstance(completion.display_payload, bytes)
+            or completion.prepared is None
+        ):
             self._set_detail_error("Couldn't generate this spectrogram. Retry.")
+            return
+        audio = completion.prepared
+        try:
+            self.session_page.spectrogram.set_cached_spectrogram(
+                completion.entry.metadata,
+                completion.display_payload,
+            )
+            self.playback.load_clip(audio.wav_bytes)
+        except (RuntimeError, TypeError, ValueError):
+            self._set_detail_error("Couldn't play this recording.")
+            return
+        self.session_page.play_button.setEnabled(True)
+        self.session_page.detail_status.clear()
 
     def _set_detail_error(self, message: str) -> None:
         self.session_page.detail_status.setText(message)
@@ -3039,6 +3453,7 @@ class ReviewWorkspacePage(QWidget):
 
     def _clear_current_spectrogram(self) -> None:
         state = self.current_state
+        self._current_request_epoch += 1
         if state is not None and state.current_candidate_id is not None:
             self._clear_candidate_spectrograms((state.current_candidate_id,))
         self.session_page.spectrogram.clear_spectrogram()
@@ -3079,7 +3494,9 @@ class ReviewWorkspacePage(QWidget):
             self._set_detail_error("Couldn't generate this spectrogram. Retry.")
             return
         self._current_content_key = None
+        self.gallery_model.drop_thumbnails(candidate_ids)
         self.gallery_model.refresh()
+        self._schedule_gallery_window()
 
     def _show_shortcuts(self) -> None:
         if self._shortcut_dialog is not None:
@@ -3173,6 +3590,15 @@ class ReviewWorkspacePage(QWidget):
 
     def request_exit_stop(self) -> None:
         """Request cancellation without closing or mutating the Open session."""
+        state = self.current_state
+        if state is not None:
+            self.supervisor.invalidate_session_epoch(
+                state.session.session_id,
+                state.session.settings_epoch,
+            )
+        self._current_request_epoch += 1
+        self._gallery_epoch += 1
+        self._requested_thumbnails.clear()
         self._generation_prepare_cancel.set()
         self._cancel_generation()
         self._cancel_export()
@@ -3218,6 +3644,9 @@ class ReviewWorkspacePage(QWidget):
     def leave_workspace(self) -> None:
         self._persist_view()
         self.playback.stop()
+        self._current_request_epoch += 1
+        self._gallery_epoch += 1
+        self.supervisor.drop_prefetch_except(set())
 
     def shutdown(self) -> None:
         if self._shutdown_complete:
@@ -3234,12 +3663,24 @@ class ReviewWorkspacePage(QWidget):
             self._delete_thread.cancel_event.set()
             self._delete_thread.wait(5_000)
         self._generation_timer.stop()
+        self._gallery_queue_timer.stop()
+        self._current_request_epoch += 1
+        self._gallery_epoch += 1
         thread = self._generation_prepare_thread
         if thread is not None and thread.is_alive():
             thread.join(timeout=5)
         self.supervisor.shutdown(wait=True)
+        self.cache.flush_accesses()
         self.playback.close()
         self._shutdown_complete = True
+
+    def eventFilter(self, watched, event):  # noqa: N802
+        if watched is self.session_page.gallery.viewport() and event.type() in {
+            QEvent.Type.Resize,
+            QEvent.Type.Show,
+        }:
+            self._schedule_gallery_window()
+        return super().eventFilter(watched, event)
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         super().resizeEvent(event)
@@ -3249,6 +3690,7 @@ class ReviewWorkspacePage(QWidget):
         if compact != self.compact:
             self.compact = compact
         self.session_page.set_responsive(event.size().width())
+        self._schedule_gallery_window()
 
     def closeEvent(self, event) -> None:  # noqa: N802
         self.shutdown()

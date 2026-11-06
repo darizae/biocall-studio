@@ -25,8 +25,8 @@ from biocall_studio.review.domain.spectrograms import (
 
 _SCHEMA_VERSION = 1
 _DIGEST = re.compile(r"[0-9a-f]{64}")
-_MAX_PNG_BYTES = 8 * 1_024 * 1_024
-_MAX_METADATA_BYTES = 512 * 1_024
+MAX_SPECTROGRAM_PNG_BYTES = 8 * 1_024 * 1_024
+MAX_SPECTROGRAM_METADATA_BYTES = 512 * 1_024
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _FAILURE_CODES = frozenset(
     {
@@ -92,16 +92,16 @@ def encode_rgb_png(raster: SpectrogramRaster) -> bytes:
         + _chunk(b"IDAT", zlib.compress(scanlines, level=6))
         + _chunk(b"IEND", b"")
     )
-    if len(encoded) > _MAX_PNG_BYTES:
+    if len(encoded) > MAX_SPECTROGRAM_PNG_BYTES:
         raise ValueError("Encoded spectrogram exceeds the cache file limit.")
     return encoded
 
 
-def inspect_rgb_png(payload: bytes, *, expected_width: int, expected_height: int) -> None:
-    """Validate CRCs, fixed RGB format, dimensions, and complete decompression."""
+def inspect_rgb_png(payload: bytes, *, expected_width: int, expected_height: int) -> bytes:
+    """Validate the fixed PNG and return its decoded RGB bytes."""
     if not isinstance(payload, bytes) or not payload.startswith(_PNG_SIGNATURE):
         raise ValueError("Cached spectrogram is not a PNG image.")
-    if len(payload) > _MAX_PNG_BYTES:
+    if len(payload) > MAX_SPECTROGRAM_PNG_BYTES:
         raise ValueError("Cached spectrogram exceeds the file limit.")
     offset = len(_PNG_SIGNATURE)
     chunks: list[tuple[bytes, bytes]] = []
@@ -109,7 +109,7 @@ def inspect_rgb_png(payload: bytes, *, expected_width: int, expected_height: int
         if offset + 12 > len(payload):
             raise ValueError("Cached PNG is truncated.")
         size = struct.unpack(">I", payload[offset : offset + 4])[0]
-        if size > _MAX_PNG_BYTES or offset + 12 + size > len(payload):
+        if size > MAX_SPECTROGRAM_PNG_BYTES or offset + 12 + size > len(payload):
             raise ValueError("Cached PNG chunk is invalid.")
         kind = payload[offset + 4 : offset + 8]
         value = payload[offset + 8 : offset + 8 + size]
@@ -146,6 +146,20 @@ def inspect_rgb_png(payload: bytes, *, expected_width: int, expected_height: int
     row_bytes = 1 + width * 3
     if any(decoded[offset] != 0 for offset in range(0, len(decoded), row_bytes)):
         raise ValueError("Cached PNG uses an unsupported pixel filter.")
+    pixel_bytes = width * 3
+    return b"".join(
+        decoded[offset + 1 : offset + 1 + pixel_bytes]
+        for offset in range(0, len(decoded), pixel_bytes + 1)
+    )
+
+
+def decode_rgb_png(payload: bytes, *, expected_width: int, expected_height: int) -> bytes:
+    """Return verified RGB bytes for the cache's deliberately simple PNG encoding."""
+    return inspect_rgb_png(
+        payload,
+        expected_width=expected_width,
+        expected_height=expected_height,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -199,6 +213,8 @@ class SpectrogramCache:
         self._lock = threading.RLock()
         self._automatic_pins: frozenset[str] = frozenset()
         self._clear_epoch = 0
+        self._pending_accesses: dict[str, int] = {}
+        self._last_access_flush_ns = time.monotonic_ns()
         self._ensure_layout()
         self._initialize_database()
 
@@ -329,7 +345,7 @@ class SpectrogramCache:
         metadata_json = json.dumps(
             raster.metadata.to_dict(), sort_keys=True, separators=(",", ":"), allow_nan=False
         )
-        if len(metadata_json.encode("utf-8")) > _MAX_METADATA_BYTES:
+        if len(metadata_json.encode("utf-8")) > MAX_SPECTROGRAM_METADATA_BYTES:
             raise ValueError("Spectrogram metadata exceeds the cache manifest limit.")
         metadata_checksum = hashlib.sha256(metadata_json.encode("utf-8")).hexdigest()
         payload = encode_rgb_png(raster)
@@ -424,6 +440,42 @@ class SpectrogramCache:
         with self._lock:
             self._automatic_pins = pins
 
+    def set_limit_bytes(self, limit_bytes: int) -> None:
+        """Apply an explicitly admitted measured quota without rebuilding the cache."""
+        if type(limit_bytes) is not int or limit_bytes < 1:
+            raise ValueError("Spectrogram cache limit must be a positive byte count.")
+        with self._lock:
+            self.limit_bytes = limit_bytes
+
+    def _record_access(self, content_key: str, now: int) -> None:
+        self._pending_accesses[content_key] = now
+        elapsed = time.monotonic_ns() - self._last_access_flush_ns
+        if len(self._pending_accesses) >= 64 or elapsed >= 1_000_000_000:
+            self.flush_accesses()
+
+    def flush_accesses(self) -> None:
+        """Coalesce LRU metadata writes instead of committing once per paint/read."""
+        with self._lock:
+            pending = tuple(self._pending_accesses.items())
+            self._pending_accesses.clear()
+            self._last_access_flush_ns = time.monotonic_ns()
+            if not pending:
+                return
+            connection = self._connect()
+            try:
+                connection.executemany(
+                    "UPDATE cache_entries SET last_access_ns = ? WHERE content_key = ?",
+                    ((accessed, key) for key, accessed in pending),
+                )
+                connection.commit()
+            finally:
+                connection.close()
+
+    @property
+    def pending_access_count(self) -> int:
+        with self._lock:
+            return len(self._pending_accesses)
+
     @property
     def publication_epoch(self) -> int:
         with self._lock:
@@ -447,7 +499,7 @@ class SpectrogramCache:
                 pass
         self.mark_failed(content_key, "corrupt")
 
-    def lookup(self, content_key: str) -> CacheEntry | None:
+    def _lookup_loaded(self, content_key: str) -> tuple[CacheEntry, bytes] | None:
         key = validate_spectrogram_content_key(content_key)
         with self._lock:
             row = self._row(key)
@@ -463,7 +515,7 @@ class SpectrogramCache:
                     raise ValueError("Cached spectrogram file is unavailable or unsafe.")
                 if (
                     type(row["size_bytes"]) is not int
-                    or not 1 <= row["size_bytes"] <= _MAX_PNG_BYTES
+                    or not 1 <= row["size_bytes"] <= MAX_SPECTROGRAM_PNG_BYTES
                 ):
                     raise ValueError("Cached spectrogram size is invalid.")
                 if path.stat().st_size != row["size_bytes"]:
@@ -471,7 +523,7 @@ class SpectrogramCache:
                 payload = path.read_bytes()
                 if hashlib.sha256(payload).hexdigest() != row["checksum"]:
                     raise ValueError("Cached spectrogram checksum changed.")
-                inspect_rgb_png(
+                rgb = decode_rgb_png(
                     payload,
                     expected_width=row["width"],
                     expected_height=row["height"],
@@ -479,7 +531,7 @@ class SpectrogramCache:
                 metadata_json = row["metadata_json"]
                 if (
                     not isinstance(metadata_json, str)
-                    or len(metadata_json.encode()) > _MAX_METADATA_BYTES
+                    or len(metadata_json.encode()) > MAX_SPECTROGRAM_METADATA_BYTES
                 ):
                     raise ValueError("Cached spectrogram metadata is invalid.")
                 if hashlib.sha256(metadata_json.encode()).hexdigest() != row["metadata_checksum"]:
@@ -500,28 +552,31 @@ class SpectrogramCache:
                 self._invalidate(key, path)
                 return None
             now = time.time_ns()
-            connection = self._connect()
-            try:
-                connection.execute(
-                    "UPDATE cache_entries SET last_access_ns = ? WHERE content_key = ?",
-                    (now, key),
-                )
-                connection.commit()
-            finally:
-                connection.close()
-            return CacheEntry(
-                content_key=key,
-                path=path,
-                checksum=row["checksum"],
-                size_bytes=row["size_bytes"],
-                tier=tier,
-                width=row["width"],
-                height=row["height"],
-                source_sha256=row["source_sha256"],
-                settings_digest=row["settings_digest"],
-                metadata=metadata,
-                last_access_ns=now,
+            self._record_access(key, now)
+            return (
+                CacheEntry(
+                    content_key=key,
+                    path=path,
+                    checksum=row["checksum"],
+                    size_bytes=row["size_bytes"],
+                    tier=tier,
+                    width=row["width"],
+                    height=row["height"],
+                    source_sha256=row["source_sha256"],
+                    settings_digest=row["settings_digest"],
+                    metadata=metadata,
+                    last_access_ns=now,
+                ),
+                rgb,
             )
+
+    def lookup(self, content_key: str) -> CacheEntry | None:
+        loaded = self._lookup_loaded(content_key)
+        return None if loaded is None else loaded[0]
+
+    def load_rgb(self, content_key: str) -> tuple[CacheEntry, bytes] | None:
+        """Verify and decode one cached image; callers keep this off the GUI thread."""
+        return self._lookup_loaded(content_key)
 
     @property
     def actual_bytes(self) -> int:
@@ -724,6 +779,9 @@ __all__ = [
     "CachePublicationStale",
     "CacheReconciliation",
     "SpectrogramCache",
+    "MAX_SPECTROGRAM_METADATA_BYTES",
+    "MAX_SPECTROGRAM_PNG_BYTES",
+    "decode_rgb_png",
     "encode_rgb_png",
     "inspect_rgb_png",
 ]
