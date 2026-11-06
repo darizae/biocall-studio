@@ -13,11 +13,12 @@ from textwrap import dedent
 import pytest
 from alp_ui.components import Badge, FolderPicker, HelpHint, Text
 from alp_ui.theme import ALPACA_LIGHT
-from PySide6.QtCore import QProcess, Qt
+from PySide6.QtCore import QProcess, Qt, QTimer
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
     QLabel,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QTableView,
@@ -25,6 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from biocall_studio.review.application.controller import default_spectrogram_snapshot
+from biocall_studio.review.application.data_location import ReviewDataLocationManager
 from biocall_studio.review.application.generation import (
     GenerationCancelled,
     GenerationJob,
@@ -44,7 +46,11 @@ from biocall_studio.review.domain.intake import (
     ReviewResultKind,
     projection_digest,
 )
-from biocall_studio.review.domain.sessions import ReviewSessionSource, ReviewSessionState
+from biocall_studio.review.domain.sessions import (
+    ReviewLabel,
+    ReviewSessionSource,
+    ReviewSessionState,
+)
 from biocall_studio.review.domain.spectrograms import SpectrogramImageTier
 from biocall_studio.studio.application.app import (
     create_application as create_studio_application,
@@ -255,12 +261,120 @@ def test_studio_launchpad_uses_one_themed_application_and_accessible_native_card
         "Open Detect",
         "Open Review",
     ]
+    assert {card.action_button.variant for card in cards} == {"outline"}
+    assert {card.action_button.component_size for card in cards} == {"large"}
     shell.launchpad.train_card.action_button.setFocus()
     qtbot.keyClick(shell.launchpad.train_card.action_button, Qt.Key.Key_Space)
     assert coordinator.train_window.isVisible()
     assert not shell.isVisible()
 
     coordinator.show_studio()
+    _finish(qtbot, coordinator)
+
+
+def test_review_sidebar_routes_active_state_and_responsive_accessibility(qtbot, tmp_path):
+    """Case: IT-REVW-013."""
+    coordinator = _coordinator(qtbot, WorkspaceController(tmp_path / "settings"))
+    coordinator.open_workspace(WorkspaceRoute.REVIEW)
+    page = coordinator.review_page
+    assert not coordinator.shell_window.global_header.isVisible()
+    assert tuple(page.navigation.buttons) == (
+        "sessions",
+        "choose_result",
+        "review",
+        "spectrograms",
+        "exports",
+        "settings",
+    )
+    assert page.navigation.active_route == "choose_result"
+
+    for route, expected_page in (
+        ("sessions", page.sessions_page),
+        ("choose_result", page.landing_page),
+        ("exports", page.exports_page),
+        ("settings", page.data_settings_page),
+    ):
+        page.navigation.buttons[route].click()
+        assert page.navigation.active_route == route
+        assert page.currentWidget() is expected_page
+
+    page.resize(700, 720)
+    qtbot.waitUntil(lambda: page.navigation.compact)
+    assert all(button.text() for button in page.navigation.buttons.values())
+    page.resize(520, 720)
+    qtbot.waitUntil(lambda: page.navigation.narrow)
+    assert all(not button.text() for button in page.navigation.buttons.values())
+    assert all(button.accessibleName() for button in page.navigation.buttons.values())
+    _finish(qtbot, coordinator)
+
+
+def test_review_data_folder_moves_in_app_and_reopens_without_touching_detect(
+    qtbot, tmp_path
+):
+    """Case: IT-REVW-014."""
+    create_studio_application()
+    suite_root = tmp_path / "application-data"
+    train = WorkspaceController(suite_root / "train" / "v1")
+    coordinator = StudioCoordinator(train, detect_data_dir=suite_root)
+    qtbot.addWidget(coordinator.shell_window)
+    qtbot.addWidget(coordinator.train_window)
+    coordinator.start()
+
+    session_id = _create_open_review_session(coordinator)
+    session = coordinator.review_controller.store.get_session(session_id)
+    session = coordinator.review_controller.set_label(
+        session_id,
+        "cand_" + "1" * 32,
+        ReviewLabel.CALL,
+        expected_revision=session.revision,
+        modified_at="2026-11-06T09:02:00.000Z",
+    ).session
+    blocked_target = tmp_path / "blocked-while-open"
+    coordinator.review_page.show_data_settings()
+    coordinator.request_review_data_folder_change(blocked_target)
+    assert coordinator.review_controller.store.root == suite_root / "review" / "v1"
+    assert coordinator.review_page.data_settings_page.status_label.text() == (
+        "Close the open Review session before changing the folder."
+    )
+    coordinator.review_controller.close_session(
+        session_id,
+        expected_revision=session.revision,
+        closed_at="2026-11-06T09:03:00.000Z",
+    )
+
+    detect_marker = suite_root / "detect" / "v1" / "rv09-marker"
+    detect_marker.parent.mkdir(parents=True, exist_ok=True)
+    detect_marker.write_bytes(b"detect-owned")
+    target = tmp_path / "selected-review-data"
+    coordinator.open_workspace(WorkspaceRoute.REVIEW)
+    coordinator.review_page.show_data_settings()
+
+    def accept_move() -> None:
+        dialog = QApplication.activeModalWidget()
+        assert dialog is not None
+        assert isinstance(dialog, QMessageBox)
+        assert dialog.defaultButton().text() == "Cancel"
+        next(
+            button
+            for button in dialog.findChildren(QPushButton)
+            if button.text() == "Move existing data"
+        ).click()
+
+    QTimer.singleShot(0, accept_move)
+    coordinator.review_page.data_settings_page.folder_picker.setFolderPath(str(target))
+    qtbot.waitUntil(
+        lambda: coordinator.review_controller.store.root == target,
+        timeout=20_000,
+    )
+
+    assert ReviewDataLocationManager(suite_root).current_root() == target
+    assert (target / "sessions.sqlite3").is_file()
+    migrated = coordinator.review_controller.store.get_session(session_id)
+    assert migrated.state is ReviewSessionState.CLOSED
+    assert migrated.call_count == 1
+    assert detect_marker.read_bytes() == b"detect-owned"
+    assert coordinator.review_page.currentWidget() is coordinator.review_page.data_settings_page
+    assert "moved" in coordinator.review_page.data_settings_page.status_label.text().casefold()
     _finish(qtbot, coordinator)
 
 
@@ -542,7 +656,8 @@ def test_detect_collection_setup_and_review_workspace_are_keyboard_reachable(qtb
     qtbot.keyClick(shell.launchpad.review_card.action_button, Qt.Key.Key_Space)
     assert shell.current_workspace is WorkspaceRoute.REVIEW
     qtbot.waitUntil(lambda: shell.focusWidget() is shell.review_page.landing_page.results)
-    assert shell.back_to_studio_button.isVisible()
+    assert not shell.global_header.isVisible()
+    assert shell.review_page.navigation.back_button.isVisible()
     review_text = " ".join(label.text() for label in shell.review_page.findChildren(QLabel))
     assert "Choose Result" in review_text
     assert "Review is coming later" not in review_text
@@ -550,8 +665,8 @@ def test_detect_collection_setup_and_review_workspace_are_keyboard_reachable(qtb
         forbidden not in (detect_text + review_text).lower()
         for forbidden in ("simulated", "demo", "prototype")
     )
-    shell.back_to_studio_button.setFocus()
-    qtbot.keyClick(shell.back_to_studio_button, Qt.Key.Key_Space)
+    shell.review_page.navigation.back_button.setFocus()
+    qtbot.keyClick(shell.review_page.navigation.back_button, Qt.Key.Key_Space)
     assert shell.current_workspace is WorkspaceRoute.STUDIO
     assert not coordinator.controller.settings_file.exists()
 

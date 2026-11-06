@@ -63,6 +63,7 @@ class ReviewSessionController:
         self,
         suite_data_root: Path,
         *,
+        review_data_root: Path | None = None,
         intake: ReviewResultIntake | None = None,
         store: ReviewSessionStore | None = None,
         owner_lease: ReviewOwnerLease | None = None,
@@ -73,9 +74,17 @@ class ReviewSessionController:
             raise ValueError("Suite application-data root cannot be a symlink.")
         self.suite_data_root = requested.resolve(strict=False)
         self.intake = intake or ReviewResultIntake(self.suite_data_root)
-        self.store = store or ReviewSessionStore(self.suite_data_root / "review" / "v1")
+        selected_root = (
+            self.suite_data_root / "review" / "v1"
+            if review_data_root is None
+            else Path(review_data_root).expanduser()
+        )
+        if selected_root.is_symlink():
+            raise ValueError("Review application-data root cannot be a symlink.")
+        self.review_data_root = selected_root.resolve(strict=False)
+        self.store = store or ReviewSessionStore(self.review_data_root)
         self.export_history = export_history or ReviewExportHistoryStore(self.store.root)
-        self._owner_lease = owner_lease or ReviewOwnerLease.create(self.suite_data_root)
+        self._owner_lease = owner_lease or ReviewOwnerLease.create(self.store.root)
         self._closed = False
 
     @property
@@ -134,6 +143,20 @@ class ReviewSessionController:
     def list_sessions(self) -> tuple[ReviewSession, ...]:
         return self.store.list_sessions()
 
+    def delete_session(
+        self,
+        session_id: str,
+        *,
+        expected_revision: int,
+        cancel_requested=None,
+    ) -> ReviewSession:
+        return self.store.delete_session(
+            session_id,
+            expected_revision=expected_revision,
+            owner_id=self.owner_id,
+            cancel_requested=cancel_requested,
+        )
+
     def start_session(
         self,
         collection_id: str,
@@ -161,7 +184,7 @@ class ReviewSessionController:
             return session
         if session.owner_id is None:
             raise ReviewSessionConflict("Open Review session has invalid ownership.")
-        if review_owner_alive(self.suite_data_root, session.owner_id):
+        if review_owner_alive(self.store.root, session.owner_id):
             raise ReviewSessionConflict(
                 "The Open Review session belongs to another running Studio instance."
             )

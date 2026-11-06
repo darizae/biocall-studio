@@ -4,6 +4,7 @@ import hashlib
 import sqlite3
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import replace
 from pathlib import Path
@@ -521,3 +522,129 @@ connection.rollback()
     connection.close()
     corrupt = ReviewSessionStore(corrupt_root)
     assert not corrupt.verify_finalization(session.session_id)
+
+
+def test_transactional_session_delete_blocks_descendants_and_preserves_external_state(
+    tmp_path: Path,
+) -> None:
+    """Case: UT-REVW-013."""
+    source_result = tmp_path / "detect-result.json"
+    source_wav = tmp_path / "recordings" / "source.wav"
+    source_wav.parent.mkdir()
+    source_result.write_bytes(b'{"result":"immutable"}\n')
+    source_wav.write_bytes(b"RIFF-immutable-source")
+    source_bytes = (source_result.read_bytes(), source_wav.read_bytes())
+
+    root = tmp_path / "review" / "v1"
+    store = ReviewSessionStore(root)
+    projection = _projection(3)
+    settings = _settings()
+    owner = "review_owner_" + "d" * 32
+    store.ensure_default_preset(settings, saved_at="2026-11-06T09:00:00.000Z")
+
+    closed = store.create_session(
+        name="Closed review",
+        source=_source(projection),
+        candidates=projection.candidates,
+        settings=settings,
+        owner_id=owner,
+        created_at="2026-11-06T09:01:00.000Z",
+        session_id="rsn_" + "d" * 32,
+    )
+    closed = store.set_label(
+        closed.session_id,
+        projection.candidates[0].candidate_id,
+        ReviewLabel.CALL,
+        owner_id=owner,
+        expected_revision=closed.revision,
+        modified_at="2026-11-06T09:02:00.000Z",
+    ).session
+    closed = store.close_session(
+        closed.session_id,
+        owner_id=owner,
+        expected_revision=closed.revision,
+        closed_at="2026-11-06T09:03:00.000Z",
+    )
+
+    parent = store.create_session(
+        name="Final review",
+        source=_source(projection),
+        candidates=projection.candidates,
+        settings=settings,
+        owner_id=owner,
+        created_at="2026-11-06T09:04:00.000Z",
+        session_id="rsn_" + "e" * 32,
+    )
+    parent = store.finalize_session(
+        parent.session_id,
+        owner_id=owner,
+        expected_revision=parent.revision,
+        finalized_at="2026-11-06T09:05:00.000Z",
+    )
+    child = store.continue_in_new_session(
+        parent.session_id,
+        name="Follow-up",
+        owner_id=owner,
+        created_at="2026-11-06T09:06:00.000Z",
+        session_id="rsn_" + "f" * 32,
+    )
+    child = store.close_session(
+        child.session_id,
+        owner_id=owner,
+        expected_revision=child.revision,
+        closed_at="2026-11-06T09:07:00.000Z",
+    )
+
+    cache_marker = root / "cache" / "spectrograms" / "objects" / "shared.png"
+    export_marker = root / "export-history" / "published-receipt.json"
+    cache_marker.parent.mkdir(parents=True)
+    export_marker.parent.mkdir(parents=True)
+    cache_marker.write_bytes(b"shared-cache-object")
+    export_marker.write_bytes(b"independent-export-history")
+
+    with pytest.raises(ReviewSessionConflict, match="successor"):
+        store.delete_session(parent.session_id, expected_revision=parent.revision)
+    assert store.get_session(parent.session_id) == parent
+    assert store.get_session(child.session_id) == child
+
+    store.delete_session(child.session_id, expected_revision=child.revision)
+    with pytest.raises(KeyError):
+        store.get_session(child.session_id)
+    store.delete_session(parent.session_id, expected_revision=parent.revision)
+    with pytest.raises(KeyError):
+        store.get_session(parent.session_id)
+
+    cancelled = threading.Event()
+    cancelled.set()
+    with pytest.raises(ReviewSessionConflict, match="cancelled"):
+        store.delete_session(
+            closed.session_id,
+            expected_revision=closed.revision,
+            cancel_requested=cancelled,
+        )
+    assert store.get_session(closed.session_id) == closed
+    store.delete_session(closed.session_id, expected_revision=closed.revision)
+    with pytest.raises(KeyError):
+        store.get_session(closed.session_id)
+
+    opened = store.create_session(
+        name="Open review",
+        source=_source(projection),
+        candidates=projection.candidates,
+        settings=settings,
+        owner_id=owner,
+        created_at="2026-11-06T09:08:00.000Z",
+        session_id="rsn_" + "1" * 32,
+    )
+    store.delete_session(
+        opened.session_id,
+        expected_revision=opened.revision,
+        owner_id=owner,
+    )
+    with pytest.raises(KeyError):
+        store.get_session(opened.session_id)
+
+    assert store.list_presets() == (settings,)
+    assert cache_marker.read_bytes() == b"shared-cache-object"
+    assert export_marker.read_bytes() == b"independent-export-history"
+    assert (source_result.read_bytes(), source_wav.read_bytes()) == source_bytes

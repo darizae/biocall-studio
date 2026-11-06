@@ -12,15 +12,15 @@ _OWNER_ID = re.compile(r"review_owner_[0-9a-f]{32}")
 
 class ReviewOwnerLease(OwnerLease):
     @classmethod
-    def create(cls, application_data_root: Path) -> ReviewOwnerLease:
-        leases = Path(application_data_root) / "review" / "v1" / "leases"
+    def create(cls, review_data_root: Path) -> ReviewOwnerLease:
+        leases = Path(review_data_root) / "leases"
         return super().create(leases, prefix="review_owner")
 
 
-def review_owner_alive(application_data_root: Path, owner_id: str) -> bool:
+def review_owner_alive(review_data_root: Path, owner_id: str) -> bool:
     if not isinstance(owner_id, str) or _OWNER_ID.fullmatch(owner_id) is None:
         raise ValueError("Review session owner ID is invalid.")
-    path = Path(application_data_root) / "review" / "v1" / "leases" / f"{owner_id}.lease"
+    path = Path(review_data_root) / "leases" / f"{owner_id}.lease"
     if path.is_symlink() or not path.is_file():
         return False
     try:

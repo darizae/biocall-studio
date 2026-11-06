@@ -377,6 +377,8 @@ class ReviewSessionStore:
             ) from exc
         except sqlite3.OperationalError as exc:
             connection.rollback()
+            if "interrupt" in str(exc).casefold():
+                raise ReviewSessionConflict("Review session deletion was cancelled.") from exc
             if "locked" in str(exc).casefold() or "busy" in str(exc).casefold():
                 raise ReviewSessionConflict("Review session database is busy or locked.") from exc
             raise ReviewSessionStorageError("Review session transaction failed.") from exc
@@ -676,6 +678,59 @@ class ReviewSessionStore:
             return tuple(self._session_from_row(row) for row in rows)
         finally:
             connection.close()
+
+    def delete_session(
+        self,
+        session_id: str,
+        *,
+        expected_revision: int,
+        owner_id: str | None = None,
+        cancel_requested=None,
+    ) -> ReviewSession:
+        """Delete one leaf session and all of its owned rows in one checked transaction."""
+        validate_session_id(session_id)
+        if type(expected_revision) is not int or expected_revision < 0:
+            raise ValueError("Review session revision is invalid.")
+        with self._transaction() as connection:
+            row = self._session_row(connection, session_id)
+            session = self._session_from_row(
+                connection.execute(
+                    self._session_select() + " WHERE s.session_id = ?", (session_id,)
+                ).fetchone()
+            )
+            if row["revision"] != expected_revision:
+                raise ReviewSessionConflict("Review session revision changed.")
+            if row["state"] == ReviewSessionState.OPEN.value:
+                if owner_id is None or row["owner_id"] != _owner(owner_id):
+                    raise ReviewSessionConflict("Review session belongs to another live owner.")
+            dependent = connection.execute(
+                "SELECT name FROM sessions WHERE parent_session_id = ? ORDER BY created_at LIMIT 1",
+                (session_id,),
+            ).fetchone()
+            if dependent is not None:
+                raise ReviewSessionConflict(
+                    "Delete its linked successor sessions first."
+                )
+            if cancel_requested is not None:
+                if cancel_requested.is_set():
+                    raise ReviewSessionConflict("Review session deletion was cancelled.")
+                connection.set_progress_handler(
+                    lambda: 1 if cancel_requested.is_set() else 0,
+                    2_000,
+                )
+            connection.execute(
+                "DELETE FROM operation_changes WHERE operation_id IN "
+                "(SELECT operation_id FROM operations WHERE session_id = ?)",
+                (session_id,),
+            )
+            connection.execute("DELETE FROM decisions WHERE session_id = ?", (session_id,))
+            connection.execute("DELETE FROM operations WHERE session_id = ?", (session_id,))
+            connection.execute("DELETE FROM session_views WHERE session_id = ?", (session_id,))
+            connection.execute("DELETE FROM finalizations WHERE session_id = ?", (session_id,))
+            connection.execute("DELETE FROM session_candidates WHERE session_id = ?", (session_id,))
+            connection.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+            connection.set_progress_handler(None, 0)
+        return session
 
     def _session_row(self, connection: sqlite3.Connection, session_id: str) -> sqlite3.Row:
         row = connection.execute(

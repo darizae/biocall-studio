@@ -306,6 +306,21 @@ def test_native_review_views_shortcuts_settings_and_compact_state(
     assert page.session_page.isVisible()
     assert page.current_state.search == "field-call"
     _capture_if_requested(page, "review-list-compact.png")
+    page.resize(520, 720)
+    _button(page, "One by one").click()
+    qtbot.waitUntil(lambda: page.navigation.narrow)
+    assert page.session_page.detail_card.isVisibleTo(page)
+    assert page.session_page.action_card.isVisibleTo(page)
+    assert all(
+        button.isVisibleTo(page)
+        for button in (
+            page.session_page.call_button,
+            page.session_page.not_call_button,
+            page.session_page.previous_button,
+            page.session_page.next_button,
+        )
+    )
+    _capture_if_requested(page, "review-one-by-one-narrow.png")
     assert wav_path.read_bytes() == before
     controller.shutdown()
 
@@ -474,5 +489,52 @@ def test_native_cache_generation_preset_switch_and_saved_examples_are_bounded(
         controller.store.candidate_by_id(session_id, f"cand_{index:032x}").label
         for index in range(4)
     ) == labels_before
+    page.shutdown()
+    controller.shutdown()
+
+
+def test_sessions_delete_is_confirmed_background_safe_and_returns_to_sessions(
+    qapp, qtbot, tmp_path: Path
+) -> None:
+    """Case: IT-REVW-014."""
+    controller, session_id = _session(
+        tmp_path / "suite", count=4, source_sha256="2" * 64
+    )
+    opened = controller.store.get_session(session_id)
+    closed = controller.close_session(
+        session_id,
+        expected_revision=opened.revision,
+        closed_at="2026-11-06T11:00:00.000Z",
+    )
+    page = ReviewWorkspacePage(controller)
+    qtbot.addWidget(page)
+    page.resize(700, 720)
+    page.show()
+    page.show_sessions()
+    assert page.currentWidget() is page.sessions_page
+    assert page.navigation.active_route == "sessions"
+    assert page.sessions_page.sessions.rowCount() == 1
+
+    delete_button = _button(page.sessions_page, "Delete session")
+
+    def cancel_delete() -> None:
+        dialog = _visible_message_box()
+        assert dialog is not None
+        assert dialog.defaultButton().text() == "Cancel"
+        _button(dialog, "Cancel").click()
+
+    QTimer.singleShot(0, cancel_delete)
+    delete_button.click()
+    assert controller.store.get_session(session_id) == closed
+
+    QTimer.singleShot(0, lambda: _click_visible_message_button("Delete"))
+    delete_button.click()
+    qtbot.waitUntil(
+        lambda: not controller.list_sessions(),
+        timeout=10_000,
+    )
+    assert page.currentWidget() is page.sessions_page
+    assert page.navigation.active_route == "sessions"
+    assert page.sessions_page.sessions.rowCount() == 0
     page.shutdown()
     controller.shutdown()

@@ -13,12 +13,14 @@ from alp_ui.components import (
     Badge,
     Button,
     Card,
+    FolderPicker,
     HelpHint,
     ProgressBar,
     SelectInput,
     Text,
     TextInput,
 )
+from alp_ui.theme import ALPACA_LIGHT, interactions, make_icon
 from PySide6.QtCore import QEvent, QModelIndex, QObject, QSize, Qt, QThread, QTimer, QUrl, Signal
 from PySide6.QtGui import (
     QDesktopServices,
@@ -43,6 +45,7 @@ from PySide6.QtWidgets import (
     QListView,
     QMessageBox,
     QPlainTextEdit,
+    QPushButton,
     QScrollArea,
     QSlider,
     QStackedWidget,
@@ -129,6 +132,16 @@ def _completed_date(timestamp: str) -> str:
         return timestamp
 
 
+def _style_selected_button(button: Button) -> None:
+    state = interactions(ALPACA_LIGHT)
+    button.setStyleSheet(
+        button.styleSheet()
+        + f"QPushButton:checked {{ background-color: {state.selected_surface}; "
+        f"color: {ALPACA_LIGHT.colors.primary_hover}; "
+        f"border-color: {ALPACA_LIGHT.colors.primary}; }}"
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class ReviewResultChoice:
     collection_id: str
@@ -150,7 +163,7 @@ class _FocusTooltipFilter(QObject):
 
 class _GalleryDelegate(QStyledItemDelegate):
     def sizeHint(self, _option, _index):  # noqa: N802
-        return QSize(284, 108)
+        return QSize(284, 148)
 
     def paint(self, painter: QPainter, option, index) -> None:
         painter.save()
@@ -158,18 +171,21 @@ class _GalleryDelegate(QStyledItemDelegate):
         if selected:
             painter.fillRect(option.rect, option.palette.highlight())
         content = option.rect.adjusted(4, 4, -4, -4)
-        image_rect = content.adjusted(0, 0, 0, -(content.height() - 70))
+        image_height = min(content.height() - 34, max(70, round(content.width() * 120 / 320)))
+        image_rect = content.adjusted(0, 0, 0, -(content.height() - image_height))
         thumbnail = index.data(Qt.ItemDataRole.DecorationRole)
         if isinstance(thumbnail, QPixmap) and not thumbnail.isNull():
-            painter.drawPixmap(
-                image_rect,
-                thumbnail.scaled(
-                    image_rect.size(),
-                    Qt.AspectRatioMode.IgnoreAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                ),
+            scaled = thumbnail.scaled(
+                image_rect.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
             )
-        text_rect = content.adjusted(0, 72, 0, 0)
+            painter.drawPixmap(
+                image_rect.x() + (image_rect.width() - scaled.width()) // 2,
+                image_rect.y() + (image_rect.height() - scaled.height()) // 2,
+                scaled,
+            )
+        text_rect = content.adjusted(0, image_height + 3, 0, 0)
         painter.setPen(
             option.palette.highlightedText().color() if selected else option.palette.text().color()
         )
@@ -181,18 +197,127 @@ class _GalleryDelegate(QStyledItemDelegate):
         painter.restore()
 
 
+class ReviewNavigationRail(QFrame):
+    route_requested = Signal(str)
+    back_requested = Signal()
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setObjectName("reviewNavigationRail")
+        self.compact = False
+        self.narrow = False
+        self.active_route = ""
+        self._session_count = 0
+        self._labels = {
+            "sessions": "Sessions",
+            "choose_result": "Choose Result",
+            "review": "Review",
+            "spectrograms": "Spectrograms",
+            "exports": "Exports",
+            "settings": "Settings",
+        }
+        icons = {
+            "sessions": "list",
+            "choose_result": "grid",
+            "review": "check",
+            "spectrograms": "grid",
+            "exports": "folder",
+            "settings": "settings",
+        }
+        self.setStyleSheet(
+            f"QFrame#reviewNavigationRail {{ background: {ALPACA_LIGHT.colors.surface}; "
+            f"border-right: 1px solid {ALPACA_LIGHT.colors.border}; }}"
+        )
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(14, 22, 14, 14)
+        layout.setSpacing(7)
+        brand = QHBoxLayout()
+        self.brand_icon = QLabel()
+        self.brand_icon.setPixmap(
+            make_icon("check", color=ALPACA_LIGHT.colors.primary, size=24).pixmap(24, 24)
+        )
+        self.brand_text = Text("REVIEW", role="subheading")
+        brand.addWidget(self.brand_icon)
+        brand.addWidget(self.brand_text)
+        brand.addStretch()
+        layout.addLayout(brand)
+        layout.addSpacing(24)
+        self.buttons: dict[str, QPushButton] = {}
+        for route in ("sessions", "choose_result", "review", "spectrograms", "exports"):
+            button = self._button(route, icons[route])
+            layout.addWidget(button)
+            self.buttons[route] = button
+        layout.addStretch()
+        settings = self._button("settings", icons["settings"])
+        self.buttons["settings"] = settings
+        layout.addWidget(settings)
+        self.back_button = QPushButton("Back to Studio")
+        self.back_button.setIcon(make_icon("list", color=ALPACA_LIGHT.colors.text_muted))
+        self.back_button.setAccessibleName("Back to Studio")
+        self.back_button.setMinimumHeight(38)
+        self.back_button.clicked.connect(self.back_requested)
+        layout.addWidget(self.back_button)
+        self.set_responsive(1180)
+
+    def _button(self, route: str, icon_name: str) -> QPushButton:
+        button = QPushButton(self._labels[route])
+        button.setCheckable(True)
+        button.setAutoExclusive(True)
+        button.setIcon(make_icon(icon_name, color=ALPACA_LIGHT.colors.text_muted))
+        button.setAccessibleName(self._labels[route])
+        button.setToolTip(self._labels[route])
+        button.setMinimumHeight(40)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        state = interactions(ALPACA_LIGHT)
+        button.setStyleSheet(
+            f"QPushButton {{ text-align: left; border: 0; border-radius: 8px; "
+            f"padding: 0 12px; color: {ALPACA_LIGHT.colors.text_muted}; background: transparent; }}"
+            f"QPushButton:hover {{ background: {state.hover_surface}; }}"
+            f"QPushButton:checked {{ background: {state.selected_surface}; "
+            f"color: {ALPACA_LIGHT.colors.primary_hover}; font-weight: 600; }}"
+            f"QPushButton:focus {{ border: 1px solid {state.focus}; }}"
+        )
+        button.clicked.connect(lambda _checked=False, value=route: self.route_requested.emit(value))
+        return button
+
+    def set_active(self, route: str) -> None:
+        if route not in self.buttons:
+            raise ValueError("Review navigation route is invalid.")
+        self.active_route = route
+        self.buttons[route].setChecked(True)
+
+    def set_session_count(self, count: int) -> None:
+        self._session_count = count
+        self.buttons["sessions"].setAccessibleDescription(f"{count:,} saved Review sessions")
+        if not self.narrow:
+            self.buttons["sessions"].setText(f"Sessions  ·  {count:,}")
+
+    def set_responsive(self, width: int) -> None:
+        narrow = width < 600
+        compact = width < 900
+        self.compact = compact
+        self.narrow = narrow
+        self.setFixedWidth(52 if narrow else 170 if compact else 210)
+        self.brand_text.setVisible(not narrow)
+        self.back_button.setText("" if narrow else "Back to Studio")
+        self.back_button.setToolTip("Back to Studio" if narrow else "")
+        for route, button in self.buttons.items():
+            label = (
+                f"Sessions  ·  {self._session_count:,}"
+                if route == "sessions"
+                else self._labels[route]
+            )
+            button.setText("" if narrow else label)
+
+
 class ReviewLandingPage(QScrollArea):
     start_requested = Signal(object, object)
-    session_requested = Signal(str)
-    successor_requested = Signal(str)
     settings_requested = Signal()
 
     def __init__(self, controller: ReviewSessionController, parent: QWidget | None = None):
         super().__init__(parent)
         self.controller = controller
         self.choices: tuple[ReviewResultChoice, ...] = ()
-        self.session_rows: tuple[ReviewSession, ...] = ()
-        self.export_rows = ()
         self.setWidgetResizable(True)
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setAccessibleName("Review result and session landing")
@@ -228,50 +353,11 @@ class ReviewLandingPage(QScrollArea):
         self.empty_label.setAccessibleName("No Review detections")
         outer.addWidget(self.empty_label)
 
-        session_heading = QHBoxLayout()
-        session_heading.addWidget(Text("Sessions", role="heading"))
-        session_heading.addStretch()
-        self.open_session_button = Button("Open", variant="outline")
-        session_heading.addWidget(self.open_session_button)
-        outer.addLayout(session_heading)
-        self.sessions = QTableWidget(0, 4)
-        self.sessions.setObjectName("reviewSessionTable")
-        self.sessions.setHorizontalHeaderLabels(("Session", "Status", "Reviewed", "Updated"))
-        self.sessions.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.sessions.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.sessions.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.sessions.verticalHeader().hide()
-        self.sessions.horizontalHeader().setStretchLastSection(True)
-        self.sessions.setAccessibleName("Review sessions")
-        outer.addWidget(self.sessions)
-
-        export_heading = QHBoxLayout()
-        export_heading.addWidget(Text("Exports", role="heading"))
-        export_heading.addStretch()
-        self.show_export_button = Button("Show in folder", variant="outline")
-        export_heading.addWidget(self.show_export_button)
-        outer.addLayout(export_heading)
-        self.exports = QTableWidget(0, 4)
-        self.exports.setObjectName("reviewExportHistoryTable")
-        self.exports.setHorizontalHeaderLabels(("Session", "Format", "Included", "Completed"))
-        self.exports.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.exports.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.exports.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.exports.verticalHeader().hide()
-        self.exports.horizontalHeader().setStretchLastSection(True)
-        self.exports.setAccessibleName("Completed Review exports")
-        outer.addWidget(self.exports)
         outer.addStretch()
         self.setWidget(content)
 
         self.settings_button.clicked.connect(self.settings_requested)
         self.start_button.clicked.connect(self._start)
-        self.open_session_button.clicked.connect(self._open_selected_session)
-        self.sessions.doubleClicked.connect(lambda _index: self._inspect_selected_session())
-        self.sessions.currentCellChanged.connect(lambda *_args: self._update_session_action())
-        self.exports.currentCellChanged.connect(lambda *_args: self._update_export_action())
-        self.exports.doubleClicked.connect(lambda _index: self._show_selected_export())
-        self.show_export_button.clicked.connect(self._show_selected_export)
         self.results.currentCellChanged.connect(lambda *_args: self._update_result_action())
 
     def refresh(self, choices: tuple[ReviewResultChoice, ...]) -> None:
@@ -301,9 +387,75 @@ class ReviewLandingPage(QScrollArea):
         if selected_preset in preset_names:
             self.preset_select.setCurrentIndex(preset_names.index(selected_preset))
 
+    def _update_result_action(self, *, open_exists: bool | None = None) -> None:
+        row = self.results.currentRow()
+        selected = self.choices[row] if 0 <= row < len(self.choices) else None
+        if open_exists is None:
+            open_exists = self.controller.store.open_session() is not None
+        has_detections = selected is not None and selected.eligible_count > 0
+        self.start_button.setEnabled(has_detections and not open_exists)
+        self.empty_label.setVisible(selected is None or not has_detections)
+
+    def _start(self) -> None:
+        row = self.results.currentRow()
+        preset_index = self.preset_select.currentIndex()
+        presets = self.controller.list_presets()
+        if 0 <= row < len(self.choices) and 0 <= preset_index < len(presets):
+            self.start_requested.emit(self.choices[row], presets[preset_index])
+
+class ReviewSessionsPage(QScrollArea):
+    session_requested = Signal(str)
+    successor_requested = Signal(str)
+    delete_requested = Signal(object)
+    choose_result_requested = Signal()
+
+    def __init__(self, controller: ReviewSessionController, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.controller = controller
+        self.session_rows: tuple[ReviewSession, ...] = ()
+        self.setWidgetResizable(True)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+        content = QWidget()
+        outer = QVBoxLayout(content)
+        outer.setContentsMargins(32, 28, 32, 36)
+        outer.setSpacing(18)
+        header = QHBoxLayout()
+        header.addWidget(Text("Sessions", role="title"))
+        header.addStretch()
+        self.choose_button = Button("Choose Result", variant="primary")
+        header.addWidget(self.choose_button)
+        outer.addLayout(header)
+        self.sessions = QTableWidget(0, 4)
+        self.sessions.setObjectName("reviewSessionTable")
+        self.sessions.setHorizontalHeaderLabels(("Session", "Status", "Reviewed", "Updated"))
+        self.sessions.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.sessions.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.sessions.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.sessions.verticalHeader().hide()
+        self.sessions.horizontalHeader().setStretchLastSection(True)
+        self.sessions.setAccessibleName("Review sessions")
+        outer.addWidget(self.sessions, 1)
+        actions = QHBoxLayout()
+        actions.addStretch()
+        self.delete_button = Button("Delete session", variant="danger")
+        self.open_button = Button("Open", variant="outline")
+        actions.addWidget(self.delete_button)
+        actions.addWidget(self.open_button)
+        outer.addLayout(actions)
+        self.setWidget(content)
+        self.choose_button.clicked.connect(self.choose_result_requested)
+        self.open_button.clicked.connect(self._open_selected)
+        self.delete_button.clicked.connect(self._delete_selected)
+        self.sessions.doubleClicked.connect(lambda _index: self._inspect_selected())
+        self.sessions.currentCellChanged.connect(lambda *_args: self._update_actions())
+
+    def refresh(self, *, select_session_id: str | None = None) -> None:
         self.session_rows = self.controller.list_sessions()
         self.sessions.setRowCount(len(self.session_rows))
+        selected_row = 0
         for row, session in enumerate(self.session_rows):
+            if session.session_id == select_session_id:
+                selected_row = row
             values = (
                 session.name,
                 session.state.value.title(),
@@ -318,9 +470,88 @@ class ReviewLandingPage(QScrollArea):
                 item.setData(Qt.ItemDataRole.UserRole, session.session_id)
                 self.sessions.setItem(row, column, item)
         if self.session_rows:
-            self.sessions.selectRow(0)
-        self._update_session_action()
+            self.sessions.selectRow(selected_row)
+        self._update_actions()
 
+    def selected_session(self) -> ReviewSession | None:
+        row = self.sessions.currentRow()
+        return self.session_rows[row] if 0 <= row < len(self.session_rows) else None
+
+    def _update_actions(self) -> None:
+        session = self.selected_session()
+        self.delete_button.setEnabled(session is not None)
+        if session is None:
+            self.open_button.setEnabled(False)
+            self.open_button.setText("Open")
+            return
+        self.open_button.setText(
+            {
+                ReviewSessionState.OPEN: "Open",
+                ReviewSessionState.CLOSED: "Resume",
+                ReviewSessionState.FINALIZED: "Continue in new session",
+            }[session.state]
+        )
+        active = self.controller.store.open_session()
+        self.open_button.setEnabled(active is None or active.session_id == session.session_id)
+
+    def _open_selected(self) -> None:
+        session = self.selected_session()
+        if session is None:
+            return
+        if session.state is ReviewSessionState.FINALIZED:
+            self.successor_requested.emit(session.session_id)
+        else:
+            self.session_requested.emit(session.session_id)
+
+    def _inspect_selected(self) -> None:
+        session = self.selected_session()
+        if session is not None:
+            self.session_requested.emit(session.session_id)
+
+    def _delete_selected(self) -> None:
+        session = self.selected_session()
+        if session is not None:
+            self.delete_requested.emit(session)
+
+    def set_busy(self, busy: bool) -> None:
+        self.sessions.setEnabled(not busy)
+        self.open_button.setEnabled(not busy and self.selected_session() is not None)
+        self.delete_button.setLoading(busy)
+
+
+class ReviewExportsHistoryPage(QScrollArea):
+    def __init__(self, controller: ReviewSessionController, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.controller = controller
+        self.export_rows = ()
+        self.setWidgetResizable(True)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+        content = QWidget()
+        outer = QVBoxLayout(content)
+        outer.setContentsMargins(32, 28, 32, 36)
+        outer.setSpacing(18)
+        outer.addWidget(Text("Exports", role="title"))
+        self.exports = QTableWidget(0, 4)
+        self.exports.setObjectName("reviewExportHistoryTable")
+        self.exports.setHorizontalHeaderLabels(("Session", "Format", "Included", "Completed"))
+        self.exports.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.exports.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.exports.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.exports.verticalHeader().hide()
+        self.exports.horizontalHeader().setStretchLastSection(True)
+        self.exports.setAccessibleName("Completed Review exports")
+        outer.addWidget(self.exports, 1)
+        actions = QHBoxLayout()
+        actions.addStretch()
+        self.show_button = Button("Show in folder", variant="outline")
+        actions.addWidget(self.show_button)
+        outer.addLayout(actions)
+        self.setWidget(content)
+        self.exports.currentCellChanged.connect(lambda *_args: self._update_action())
+        self.exports.doubleClicked.connect(lambda _index: self._show_selected())
+        self.show_button.clicked.connect(self._show_selected)
+
+    def refresh(self) -> None:
         self.export_rows = self.controller.list_export_history()
         self.exports.setRowCount(len(self.export_rows))
         mode_names = {
@@ -339,12 +570,12 @@ class ReviewLandingPage(QScrollArea):
                 self.exports.setItem(row, column, QTableWidgetItem(value))
         if self.export_rows:
             self.exports.selectRow(0)
-        self._update_export_action()
+        self._update_action()
 
-    def _update_export_action(self) -> None:
-        self.show_export_button.setEnabled(0 <= self.exports.currentRow() < len(self.export_rows))
+    def _update_action(self) -> None:
+        self.show_button.setEnabled(0 <= self.exports.currentRow() < len(self.export_rows))
 
-    def _show_selected_export(self) -> None:
+    def _show_selected(self) -> None:
         row = self.exports.currentRow()
         if not 0 <= row < len(self.export_rows):
             return
@@ -352,64 +583,74 @@ class ReviewLandingPage(QScrollArea):
             receipt = self.controller.verify_export_history(self.export_rows[row])
         except (OSError, RuntimeError, ValueError):
             QMessageBox.warning(
-                self,
-                "Export unavailable",
-                "This export no longer matches its verified receipt.",
+                self, "Export unavailable", "This export no longer matches its verified receipt."
             )
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(receipt.final_destination))
 
-    def _update_result_action(self, *, open_exists: bool | None = None) -> None:
-        row = self.results.currentRow()
-        selected = self.choices[row] if 0 <= row < len(self.choices) else None
-        if open_exists is None:
-            open_exists = self.controller.store.open_session() is not None
-        has_detections = selected is not None and selected.eligible_count > 0
-        self.start_button.setEnabled(has_detections and not open_exists)
-        self.empty_label.setVisible(selected is None or not has_detections)
 
-    def _selected_session(self) -> ReviewSession | None:
-        row = self.sessions.currentRow()
-        return self.session_rows[row] if 0 <= row < len(self.session_rows) else None
+class ReviewDataSettingsPage(QScrollArea):
+    folder_change_requested = Signal(object)
 
-    def _update_session_action(self) -> None:
-        session = self._selected_session()
-        if session is None:
-            self.open_session_button.setEnabled(False)
-            self.open_session_button.setText("Open")
+    def __init__(self, current_root: Path, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.current_root = Path(current_root)
+        self.setWidgetResizable(True)
+        self.setFrameShape(QFrame.Shape.NoFrame)
+        content = QWidget()
+        outer = QVBoxLayout(content)
+        outer.setContentsMargins(32, 28, 32, 36)
+        outer.setSpacing(18)
+        outer.addWidget(Text("Settings", role="title"))
+        card = Card()
+        card.content_layout.addWidget(Text("Review data folder", role="heading"))
+        self.folder_picker = FolderPicker(label="Review data folder", show_hidden=True)
+        self.folder_picker.choose_button.setText("Change folder")
+        self.folder_picker.choose_button.setAccessibleName("Change Review data folder")
+        self.folder_picker.blockSignals(True)
+        self.folder_picker.setFolderPath(str(self.current_root))
+        self.folder_picker.blockSignals(False)
+        card.content_layout.addWidget(self.folder_picker)
+        self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
+        self.status_label.setAccessibleName("Review data folder status")
+        card.content_layout.addWidget(self.status_label)
+        outer.addWidget(card)
+        outer.addStretch()
+        self.setWidget(content)
+        self.folder_picker.folderChanged.connect(self._selected)
+
+    def _selected(self, value: str) -> None:
+        selected = Path(value)
+        if selected.resolve(strict=False) == self.current_root.resolve(strict=False):
             return
-        self.open_session_button.setText(
-            {
-                ReviewSessionState.OPEN: "Open",
-                ReviewSessionState.CLOSED: "Resume",
-                ReviewSessionState.FINALIZED: "Continue in new session",
-            }[session.state]
-        )
-        active = self.controller.store.open_session()
-        self.open_session_button.setEnabled(
-            active is None or active.session_id == session.session_id
-        )
-
-    def _start(self) -> None:
-        row = self.results.currentRow()
-        preset_index = self.preset_select.currentIndex()
-        presets = self.controller.list_presets()
-        if 0 <= row < len(self.choices) and 0 <= preset_index < len(presets):
-            self.start_requested.emit(self.choices[row], presets[preset_index])
-
-    def _open_selected_session(self) -> None:
-        session = self._selected_session()
-        if session is None:
-            return
-        if session.state is ReviewSessionState.FINALIZED:
-            self.successor_requested.emit(session.session_id)
+        dialog = QMessageBox(self)
+        dialog.setObjectName("reviewDataMoveDialog")
+        dialog.setWindowTitle("Review data folder")
+        dialog.setText("Move existing Review data to the selected folder?")
+        cancel = dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        move = dialog.addButton("Move existing data", QMessageBox.ButtonRole.AcceptRole)
+        dialog.setDefaultButton(cancel)
+        dialog.setEscapeButton(cancel)
+        dialog.exec()
+        if dialog.clickedButton() is move:
+            self.folder_change_requested.emit(selected)
         else:
-            self.session_requested.emit(session.session_id)
+            self.folder_picker.blockSignals(True)
+            self.folder_picker.setFolderPath(str(self.current_root))
+            self.folder_picker.blockSignals(False)
 
-    def _inspect_selected_session(self) -> None:
-        session = self._selected_session()
-        if session is not None:
-            self.session_requested.emit(session.session_id)
+    def set_moving(self, moving: bool) -> None:
+        self.folder_picker.setEnabled(not moving)
+        self.status_label.setText("Moving Review data…" if moving else self.status_label.text())
+
+    def set_status(self, message: str) -> None:
+        self.status_label.setText(message)
+
+    def reset_selection(self) -> None:
+        self.folder_picker.blockSignals(True)
+        self.folder_picker.setFolderPath(str(self.current_root))
+        self.folder_picker.blockSignals(False)
 
 
 class ReviewSessionPage(QWidget):
@@ -435,6 +676,7 @@ class ReviewSessionPage(QWidget):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._compact = False
+        self._narrow = False
         self._tooltip_filter = _FocusTooltipFilter(self)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(30, 24, 30, 30)
@@ -442,9 +684,17 @@ class ReviewSessionPage(QWidget):
 
         header = QGridLayout()
         self.header_layout = header
-        self.name_input = TextInput(label="Session name")
+        self.name_input = TextInput(label="")
         self.name_input.control.setObjectName("reviewSessionName")
         self.name_input.control.setMaxLength(120)
+        self.name_input.control.setAccessibleName("Review session name")
+        self.name_input.control.setStyleSheet(
+            f"QLineEdit {{ background: transparent; border: 1px solid transparent; "
+            f"border-radius: 6px; padding: 3px 6px; color: {ALPACA_LIGHT.colors.text}; "
+            "font-size: 22px; font-weight: 600; }"
+            f"QLineEdit:hover {{ border-color: {ALPACA_LIGHT.colors.border}; }}"
+            f"QLineEdit:focus {{ border-color: {interactions(ALPACA_LIGHT).focus}; }}"
+        )
         self.status_badge = Badge("Open", intent="success")
         self.counts_label = QLabel()
         self.counts_label.setAccessibleName("Review progress counts")
@@ -468,6 +718,7 @@ class ReviewSessionPage(QWidget):
         ):
             button = Button(text, variant="outline")
             button.setCheckable(True)
+            _style_selected_button(button)
             button.clicked.connect(
                 lambda _checked=False, value=view: self.view_requested.emit(value.value)
             )
@@ -478,7 +729,8 @@ class ReviewSessionPage(QWidget):
         controls.addWidget(self.settings_button)
         outer.addLayout(controls)
 
-        query = QHBoxLayout()
+        query = QGridLayout()
+        self.query_layout = query
         self.filter_buttons: dict[ReviewFilter, Button] = {}
         for filter_name, text in (
             (ReviewFilter.ALL, "All"),
@@ -488,24 +740,23 @@ class ReviewSessionPage(QWidget):
         ):
             button = Button(text, variant="outline", size="small")
             button.setCheckable(True)
+            _style_selected_button(button)
             button.clicked.connect(
                 lambda _checked=False, value=filter_name: self.filter_requested.emit(value.value)
             )
-            query.addWidget(button)
             self.filter_buttons[filter_name] = button
-        query.addStretch()
+        self.recording_label = QLabel("Recording")
         self.search = QLineEdit()
         self.search.setObjectName("reviewRecordingSearch")
         self.search.setPlaceholderText("Search recordings")
         self.search.setAccessibleName("Search recordings")
         self.search.setMaximumWidth(230)
-        query.addWidget(self.search)
+        self.sort_label = QLabel("Sort")
         self.sort = QComboBox()
         self.sort.setAccessibleName("Sort detections")
         self.sort.addItem("Time", ReviewSort.SOURCE_TIME.value)
         self.sort.addItem("Recording", ReviewSort.RECORDING.value)
         self.sort.addItem("Prediction", ReviewSort.PREDICTION_DESCENDING.value)
-        query.addWidget(self.sort)
         outer.addLayout(query)
 
         self.views = QStackedWidget()
@@ -515,8 +766,8 @@ class ReviewSessionPage(QWidget):
         self.gallery.setResizeMode(QListView.ResizeMode.Adjust)
         self.gallery.setMovement(QListView.Movement.Static)
         self.gallery.setUniformItemSizes(True)
-        self.gallery.setGridSize(QSize(300, 122))
-        self.gallery.setIconSize(QSize(284, 70))
+        self.gallery.setGridSize(QSize(310, 164))
+        self.gallery.setIconSize(QSize(294, 120))
         self.gallery.setItemDelegate(_GalleryDelegate(self.gallery))
         self.gallery.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.gallery.setAccessibleName("Review spectrogram gallery")
@@ -566,6 +817,9 @@ class ReviewSessionPage(QWidget):
         self.clear_label_button = self._shortcut_button(
             "Clear label", "Clear label · S", "Clear label"
         )
+        for button in (self.call_button, self.not_call_button, self.clear_label_button):
+            button.setCheckable(True)
+            _style_selected_button(button)
         self.action_card.content_layout.addWidget(self.call_button)
         self.action_card.content_layout.addWidget(self.not_call_button)
         self.action_card.content_layout.addWidget(self.clear_label_button)
@@ -623,6 +877,7 @@ class ReviewSessionPage(QWidget):
 
         self._place_header(False)
         self._place_one(False)
+        self._place_query(False, False)
         self.name_input.control.editingFinished.connect(
             lambda: self.rename_requested.emit(self.name_input.control.text())
         )
@@ -706,11 +961,62 @@ class ReviewSessionPage(QWidget):
             self.header_layout.addWidget(self.export_button, 0, 5, 2, 1)
             self.header_layout.setColumnStretch(0, 1)
 
+    def _place_query(self, compact: bool, narrow: bool) -> None:
+        widgets = (
+            *self.filter_buttons.values(),
+            self.recording_label,
+            self.search,
+            self.sort_label,
+            self.sort,
+        )
+        for widget in widgets:
+            self.query_layout.removeWidget(widget)
+        for column in range(8):
+            self.query_layout.setColumnStretch(column, 0)
+        if narrow:
+            filters = tuple(self.filter_buttons.values())
+            self.query_layout.addWidget(filters[0], 0, 0)
+            self.query_layout.addWidget(filters[1], 0, 1)
+            self.query_layout.addWidget(filters[2], 1, 0)
+            self.query_layout.addWidget(filters[3], 1, 1)
+            self.query_layout.addWidget(self.recording_label, 2, 0)
+            self.query_layout.addWidget(self.search, 2, 1, 1, 3)
+            self.query_layout.addWidget(self.sort_label, 3, 0)
+            self.query_layout.addWidget(self.sort, 3, 1)
+            self.query_layout.setColumnStretch(1, 1)
+        else:
+            for column, button in enumerate(self.filter_buttons.values()):
+                self.query_layout.addWidget(button, 0, column)
+        if compact and not narrow:
+            self.query_layout.addWidget(self.recording_label, 1, 0)
+            self.query_layout.addWidget(self.search, 1, 1, 1, 3)
+            self.query_layout.addWidget(self.sort_label, 1, 4)
+            self.query_layout.addWidget(self.sort, 1, 5)
+            self.query_layout.setColumnStretch(3, 1)
+        elif not compact:
+            self.query_layout.addWidget(self.recording_label, 0, 4)
+            self.query_layout.addWidget(self.search, 0, 5)
+            self.query_layout.addWidget(self.sort_label, 0, 6)
+            self.query_layout.addWidget(self.sort, 0, 7)
+            self.query_layout.setColumnStretch(4, 1)
     def set_compact(self, compact: bool) -> None:
-        if compact != self._compact:
+        self.set_responsive(700 if compact else 1180)
+
+    def set_responsive(self, width: int) -> None:
+        compact = width < 900
+        narrow = width < 600
+        layout_changed = compact != self._compact
+        query_changed = layout_changed or narrow != self._narrow
+        if layout_changed:
             self._place_header(compact)
             self._place_one(compact)
+            self.gallery.setGridSize(QSize(248, 150) if compact else QSize(310, 164))
+            self.gallery.setIconSize(QSize(232, 108) if compact else QSize(294, 120))
             self.updateGeometry()
+        if query_changed:
+            self._place_query(compact, narrow)
+        self._compact = compact
+        self._narrow = narrow
 
     def render_state(self, state: ReviewViewState) -> None:
         session = state.session
@@ -719,6 +1025,13 @@ class ReviewSessionPage(QWidget):
         self.name_input.control.blockSignals(False)
         self.name_input.control.setEnabled(session.state is ReviewSessionState.OPEN)
         self.status_badge.setText(session.state.value.title())
+        self.status_badge.setIntent(
+            {
+                ReviewSessionState.OPEN: "success",
+                ReviewSessionState.CLOSED: "warning",
+                ReviewSessionState.FINALIZED: "info",
+            }[session.state]
+        )
         reviewed = state.reviewed_count
         self.counts_label.setText(
             f"{reviewed:,} reviewed of {session.eligible_candidate_count:,} · "
@@ -732,6 +1045,11 @@ class ReviewSessionPage(QWidget):
             button.setChecked(view is state.view)
         for filter_name, button in self.filter_buttons.items():
             button.setChecked(filter_name is state.filter)
+        current = state.current()
+        current_label = ReviewLabel.UNREVIEWED if current is None else current.label
+        self.call_button.setChecked(current_label is ReviewLabel.CALL)
+        self.not_call_button.setChecked(current_label is ReviewLabel.NOT_CALL)
+        self.clear_label_button.setChecked(current_label is ReviewLabel.UNREVIEWED)
         self.search.blockSignals(True)
         self.search.setText(state.search)
         self.search.blockSignals(False)
@@ -746,6 +1064,15 @@ class ReviewSessionPage(QWidget):
                 ReviewView.ONE_BY_ONE: 2,
             }[state.view]
         )
+        query_visible = state.view is not ReviewView.ONE_BY_ONE
+        for widget in (
+            *self.filter_buttons.values(),
+            self.recording_label,
+            self.search,
+            self.sort_label,
+            self.sort,
+        ):
+            widget.setVisible(query_visible)
         editable = session.state is ReviewSessionState.OPEN
         for button in (
             self.call_button,
@@ -1150,8 +1477,39 @@ class _ReviewExportPublishThread(QThread):
         self.succeeded.emit(outcome)
 
 
-class ReviewWorkspacePage(QStackedWidget):
+class _ReviewSessionDeleteThread(QThread):
+    succeeded = Signal(object)
+    failed = Signal(str)
+
+    def __init__(
+        self,
+        controller: ReviewSessionController,
+        session_id: str,
+        expected_revision: int,
+    ):
+        super().__init__()
+        self.controller = controller
+        self.session_id = session_id
+        self.expected_revision = expected_revision
+        self.cancel_event = threading.Event()
+
+    def run(self) -> None:
+        try:
+            deleted = self.controller.delete_session(
+                self.session_id,
+                expected_revision=self.expected_revision,
+                cancel_requested=self.cancel_event,
+            )
+        except (OSError, RuntimeError, TypeError, ValueError) as exc:
+            self.failed.emit(str(exc) or "Couldn't delete this Review session.")
+            return
+        self.succeeded.emit(deleted)
+
+
+class ReviewWorkspacePage(QWidget):
     return_requested = Signal()
+    exit_requested = Signal()
+    data_folder_change_requested = Signal(object)
     generation_prepared = Signal(object, object, int)
     generation_prepare_failed = Signal(str)
     settings_change_prepared = Signal(object, object, object, int)
@@ -1195,25 +1553,69 @@ class ReviewWorkspacePage(QStackedWidget):
         self._settings_return_to_cache = False
         self._export_prepare_thread: _ReviewExportPrepareThread | None = None
         self._export_publish_thread: _ReviewExportPublishThread | None = None
+        self._delete_thread: _ReviewSessionDeleteThread | None = None
         self._owned_operation: tuple[str, str] | None = None
         self._shutdown_complete = False
         self.playback = QtMediaPlayback(self)
 
+        shell_layout = QHBoxLayout(self)
+        shell_layout.setContentsMargins(0, 0, 0, 0)
+        shell_layout.setSpacing(0)
+        self.navigation = ReviewNavigationRail()
+        shell_layout.addWidget(self.navigation)
+        body = QWidget()
+        body_layout = QVBoxLayout(body)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(0)
+        top_bar = QFrame()
+        top_bar.setObjectName("reviewTopBar")
+        top_bar.setStyleSheet(
+            f"QFrame#reviewTopBar {{ background: {ALPACA_LIGHT.colors.surface}; "
+            f"border-bottom: 1px solid {ALPACA_LIGHT.colors.border}; }}"
+        )
+        top_layout = QHBoxLayout(top_bar)
+        top_layout.setContentsMargins(28, 12, 28, 12)
+        top_layout.addWidget(Text("BioCall Studio", role="subheading"))
+        top_layout.addStretch()
+        self.session_chip = QLabel()
+        self.session_chip.setAccessibleName("Current Review session")
+        top_layout.addWidget(self.session_chip)
+        self.exit_button = Button("Exit Studio", variant="outline", size="small")
+        top_layout.addWidget(self.exit_button)
+        body_layout.addWidget(top_bar)
+        self.pages = QStackedWidget()
+        body_layout.addWidget(self.pages, 1)
+        shell_layout.addWidget(body, 1)
+
         self.landing_page = ReviewLandingPage(controller)
+        self.sessions_page = ReviewSessionsPage(controller)
         self.session_page = ReviewSessionPage()
         self.cache_page = ReviewSpectrogramsPage()
         self.settings_page = SpectrogramSettingsPage(controller)
         self.export_page = ReviewExportPage()
+        self.exports_page = ReviewExportsHistoryPage(controller)
+        self.data_settings_page = ReviewDataSettingsPage(controller.store.root)
         self.addWidget(self.landing_page)
+        self.addWidget(self.sessions_page)
         self.addWidget(self.session_page)
         self.addWidget(self.cache_page)
         self.addWidget(self.settings_page)
         self.addWidget(self.export_page)
+        self.addWidget(self.exports_page)
+        self.addWidget(self.data_settings_page)
 
         self.landing_page.start_requested.connect(self._start_session)
-        self.landing_page.session_requested.connect(self._session_selected)
-        self.landing_page.successor_requested.connect(self._continue_in_new_session)
         self.landing_page.settings_requested.connect(self.show_settings)
+        self.sessions_page.session_requested.connect(self._session_selected)
+        self.sessions_page.successor_requested.connect(self._continue_in_new_session)
+        self.sessions_page.delete_requested.connect(self._confirm_delete_session)
+        self.sessions_page.choose_result_requested.connect(self.show_landing)
+        self.data_settings_page.folder_change_requested.connect(
+            self.data_folder_change_requested
+        )
+        self.navigation.route_requested.connect(self._navigate_sidebar)
+        self.navigation.back_requested.connect(self.return_requested)
+        self.exit_button.clicked.connect(self.exit_requested)
         self.settings_page.back_requested.connect(self._settings_back)
         self.settings_page.use_in_session_requested.connect(self._save_and_use_preset)
         self.cache_page.back_requested.connect(self.show_session)
@@ -1266,6 +1668,15 @@ class ReviewWorkspacePage(QStackedWidget):
 
     def minimumSizeHint(self) -> QSize:  # noqa: N802
         return QSize(520, 480)
+
+    def addWidget(self, widget: QWidget) -> int:  # noqa: N802
+        return self.pages.addWidget(widget)
+
+    def setCurrentWidget(self, widget: QWidget) -> None:  # noqa: N802
+        self.pages.setCurrentWidget(widget)
+
+    def currentWidget(self) -> QWidget | None:  # noqa: N802
+        return self.pages.currentWidget()
 
     def _add_shortcuts(self) -> None:
         bindings = (
@@ -1337,8 +1748,57 @@ class ReviewWorkspacePage(QStackedWidget):
         if self.current_state is not None:
             self._persist_view()
         self.landing_page.refresh(tuple(self.result_provider()))
+        self.navigation.set_session_count(len(self.controller.list_sessions()))
+        self.navigation.set_active("choose_result")
         self.setCurrentWidget(self.landing_page)
         self.landing_page.results.setFocus()
+
+    def show_sessions(self, *, select_session_id: str | None = None) -> None:
+        if self.current_state is not None:
+            self._persist_view()
+        self.sessions_page.refresh(select_session_id=select_session_id)
+        self.navigation.set_session_count(len(self.sessions_page.session_rows))
+        self.navigation.set_active("sessions")
+        self.setCurrentWidget(self.sessions_page)
+        self.sessions_page.sessions.setFocus()
+
+    def show_exports(self) -> None:
+        if self.current_state is not None:
+            self._persist_view()
+        self.exports_page.refresh()
+        self.navigation.set_active("exports")
+        self.setCurrentWidget(self.exports_page)
+        self.exports_page.exports.setFocus()
+
+    def show_data_settings(self) -> None:
+        if self.current_state is not None:
+            self._persist_view()
+        self.navigation.set_active("settings")
+        self.setCurrentWidget(self.data_settings_page)
+        self.data_settings_page.folder_picker.choose_button.setFocus()
+
+    def _navigate_sidebar(self, route: str) -> None:
+        if route == "sessions":
+            self.show_sessions()
+        elif route == "choose_result":
+            self.show_landing()
+        elif route == "review":
+            if self.current_state is None:
+                opened = self.controller.store.open_session()
+                if opened is None:
+                    self.show_sessions()
+                else:
+                    self.open_session(opened.session_id)
+            else:
+                self.show_session()
+        elif route == "spectrograms":
+            self.show_spectrograms()
+        elif route == "exports":
+            self.show_exports()
+        elif route == "settings":
+            self.show_data_settings()
+        else:
+            raise ValueError("Review navigation route is invalid.")
 
     def show_settings(self) -> None:
         if self.current_state is not None:
@@ -1350,6 +1810,7 @@ class ReviewWorkspacePage(QStackedWidget):
                 self.current_state.session.session_id
             ).preset_id
         self.settings_page.reload(select_id=selected_id)
+        self.navigation.set_active("spectrograms")
         self.setCurrentWidget(self.settings_page)
         self.settings_page.back_button.setFocus()
 
@@ -1364,7 +1825,7 @@ class ReviewWorkspacePage(QStackedWidget):
     def show_spectrograms(self) -> None:
         state = self.current_state
         if state is None:
-            self.show_landing()
+            self.show_sessions()
             return
         try:
             snapshot = self.controller.store.load_settings(state.session.session_id)
@@ -1386,6 +1847,7 @@ class ReviewWorkspacePage(QStackedWidget):
             editable=state.session.state is ReviewSessionState.OPEN,
         )
         self.cache_page.set_running(self._generation_batch_id is not None)
+        self.navigation.set_active("spectrograms")
         self.setCurrentWidget(self.cache_page)
         self.cache_page.generate_button.setFocus()
 
@@ -1394,6 +1856,7 @@ class ReviewWorkspacePage(QStackedWidget):
         if state is None or state.session.state is not ReviewSessionState.FINALIZED:
             return
         self.export_page.set_session(state.session)
+        self.navigation.set_active("exports")
         self.setCurrentWidget(self.export_page)
         self.export_page.choose_button.setFocus()
 
@@ -1969,11 +2432,111 @@ class ReviewWorkspacePage(QStackedWidget):
 
     def show_session(self) -> None:
         if self.current_state is None:
-            self.show_landing()
+            self.show_sessions()
             return
+        self.navigation.set_active("review")
         self.setCurrentWidget(self.session_page)
         self._refresh_models()
         self._render()
+
+    def _confirm_delete_session(self, session: ReviewSession) -> None:
+        if self._delete_thread is not None:
+            return
+        dialog = QMessageBox(self)
+        dialog.setObjectName("reviewDeleteSessionDialog")
+        dialog.setWindowTitle("Delete session")
+        dialog.setText(
+            f"Delete ‘{session.name}’ and its saved reviews? This can't be undone. "
+            "Existing exported files won't be deleted."
+        )
+        cancel = dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        delete = dialog.addButton("Delete", QMessageBox.ButtonRole.DestructiveRole)
+        dialog.setDefaultButton(cancel)
+        dialog.setEscapeButton(cancel)
+        dialog.exec()
+        if dialog.clickedButton() is not delete:
+            return
+        self.sessions_page.set_busy(True)
+        if session.state is ReviewSessionState.OPEN:
+            self.request_exit_stop()
+            QTimer.singleShot(0, lambda: self._delete_open_when_stopped(session.session_id))
+        else:
+            self._start_delete_session(session)
+
+    def _delete_open_when_stopped(self, session_id: str) -> None:
+        if not self.exit_stop_ready:
+            QTimer.singleShot(25, lambda: self._delete_open_when_stopped(session_id))
+            return
+        try:
+            opened = self.controller.store.get_session(session_id)
+            if opened.state is ReviewSessionState.OPEN:
+                if (
+                    self.current_state is not None
+                    and self.current_state.session.session_id == session_id
+                ):
+                    self._persist_view()
+                opened = self.controller.close_session(
+                    session_id,
+                    expected_revision=opened.revision,
+                    closed_at=_now(),
+                )
+                if (
+                    self.current_state is not None
+                    and self.current_state.session.session_id == session_id
+                ):
+                    self.current_state.session = opened
+        except (OSError, RuntimeError, ValueError, KeyError):
+            self.sessions_page.set_busy(False)
+            self.show_sessions(select_session_id=session_id)
+            self._message(
+                "Couldn't delete session",
+                "The Review session couldn't be closed safely. It is still available.",
+            )
+            return
+        self._start_delete_session(opened)
+
+    def _start_delete_session(self, session: ReviewSession) -> None:
+        thread = _ReviewSessionDeleteThread(
+            self.controller, session.session_id, session.revision
+        )
+        self._delete_thread = thread
+        thread.succeeded.connect(self._session_deleted)
+        thread.failed.connect(
+            lambda message, session_id=session.session_id: self._session_delete_failed(
+                session_id, message
+            )
+        )
+
+        def finished() -> None:
+            if self._delete_thread is thread:
+                self._delete_thread = None
+            thread.deleteLater()
+
+        thread.finished.connect(finished)
+        thread.start()
+
+    def _session_deleted(self, session: ReviewSession) -> None:
+        if (
+            self.current_state is not None
+            and self.current_state.session.session_id == session.session_id
+        ):
+            self.playback.stop()
+            self.current_state = None
+            self.session_chip.clear()
+        self.sessions_page.set_busy(False)
+        self.show_sessions()
+
+    def _session_delete_failed(self, session_id: str, message: str) -> None:
+        self.sessions_page.set_busy(False)
+        if self.current_state is not None and self.current_state.session.session_id == session_id:
+            try:
+                self.current_state.session = self.controller.store.get_session(session_id)
+            except KeyError:
+                self.current_state = None
+        self.show_sessions(select_session_id=session_id)
+        if "successor" in message.casefold():
+            message = "Delete its linked successor sessions first."
+        self._message("Couldn't delete session", message or "Couldn't delete this session.")
 
     def _start_session(self, choice: ReviewResultChoice, settings) -> None:
         try:
@@ -2059,6 +2622,7 @@ class ReviewWorkspacePage(QStackedWidget):
         state = self.current_state
         if state is None:
             return
+        self.session_chip.setText(state.session.name)
         self.session_page.render_state(state)
         self.table_model.refresh()
         self.gallery_model.refresh()
@@ -2365,8 +2929,10 @@ class ReviewWorkspacePage(QStackedWidget):
         except (OSError, RuntimeError, ValueError):
             self._set_detail_error("Couldn't save your change. Try again.")
             return
+        closed_id = state.session.session_id
         self.current_state = None
-        self.show_landing()
+        self.session_chip.clear()
+        self.show_sessions(select_session_id=closed_id)
 
     def _finalize(self) -> None:
         state = self.current_state
@@ -2488,6 +3054,12 @@ class ReviewWorkspacePage(QStackedWidget):
             self.session_page.view_buttons[ReviewView.GALLERY].setFocus()
         elif self.currentWidget() is self.export_page:
             self.export_page.choose_button.setFocus()
+        elif self.currentWidget() is self.sessions_page:
+            self.sessions_page.sessions.setFocus()
+        elif self.currentWidget() is self.exports_page:
+            self.exports_page.exports.setFocus()
+        elif self.currentWidget() is self.data_settings_page:
+            self.data_settings_page.folder_picker.choose_button.setFocus()
         else:
             self.landing_page.results.setFocus()
 
@@ -2498,6 +3070,20 @@ class ReviewWorkspacePage(QStackedWidget):
     @property
     def active_operation(self) -> tuple[str, str] | None:
         return self._owned_operation
+
+    @property
+    def data_location_change_allowed(self) -> bool:
+        return (
+            not self.has_open_session
+            and self._owned_operation is None
+            and self._delete_thread is None
+            and self._generation_prepare_thread is None
+            and self._export_prepare_thread is None
+            and self._export_publish_thread is None
+            and self._generation_batch_id is None
+            and self.supervisor.pending_count == 0
+            and self.supervisor.active_count == 0
+        )
 
     def _begin_owned_operation(self, label: str) -> str:
         if self._owned_operation is not None:
@@ -2573,6 +3159,9 @@ class ReviewWorkspacePage(QStackedWidget):
             if export_thread is not None and export_thread.isRunning():
                 export_thread.cancel_event.set()
                 export_thread.wait(5_000)
+        if self._delete_thread is not None and self._delete_thread.isRunning():
+            self._delete_thread.cancel_event.set()
+            self._delete_thread.wait(5_000)
         self._generation_timer.stop()
         thread = self._generation_prepare_thread
         if thread is not None and thread.is_alive():
@@ -2583,10 +3172,11 @@ class ReviewWorkspacePage(QStackedWidget):
 
     def resizeEvent(self, event: QResizeEvent) -> None:  # noqa: N802
         super().resizeEvent(event)
+        self.navigation.set_responsive(event.size().width())
         compact = event.size().width() < 900
         if compact != self.compact:
             self.compact = compact
-            self.session_page.set_compact(compact)
+        self.session_page.set_responsive(event.size().width())
 
     def closeEvent(self, event) -> None:  # noqa: N802
         self.shutdown()

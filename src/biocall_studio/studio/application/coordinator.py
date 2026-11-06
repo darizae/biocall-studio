@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 
-from PySide6.QtCore import QObject, Qt, QTimer
+from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from biocall_studio.detect.application.controller import DetectWorkspaceController
@@ -13,6 +14,11 @@ from biocall_studio.detect.domain import RootBindingDecision
 from biocall_studio.review.application.controller import (
     ReviewSessionController,
     default_spectrogram_snapshot,
+)
+from biocall_studio.review.application.data_location import (
+    ReviewDataLocationError,
+    ReviewDataLocationManager,
+    ReviewDataMovePlan,
 )
 from biocall_studio.review.domain.intake import ReviewResultKind
 from biocall_studio.review.gui.workspace import ReviewResultChoice, ReviewWorkspacePage
@@ -29,6 +35,31 @@ from biocall_studio.studio.application.operations import (
 from biocall_studio.studio.gui.shell import StudioWindow
 from biocall_studio.train.application.workspace import WorkspaceController
 from biocall_studio.train.gui.window import MainWindow
+
+
+class _ReviewDataMoveThread(QThread):
+    succeeded = Signal(object)
+    failed = Signal(str)
+
+    def __init__(
+        self,
+        manager: ReviewDataLocationManager,
+        plan: ReviewDataMovePlan,
+        *,
+        confirm_storage: bool,
+    ):
+        super().__init__()
+        self.manager = manager
+        self.plan = plan
+        self.confirm_storage = confirm_storage
+
+    def run(self) -> None:
+        try:
+            self.manager.move(self.plan, confirm_storage=self.confirm_storage)
+        except (OSError, RuntimeError, TypeError, ValueError):
+            self.failed.emit("Couldn't move Review data. Your original folder is unchanged.")
+            return
+        self.succeeded.emit(self.plan.target_root)
 
 
 class StudioCoordinator(QObject):
@@ -52,22 +83,12 @@ class StudioCoordinator(QObject):
                 else train_root.parent
             )
         self.detect_controller = DetectWorkspaceController(detect_data_dir)
-        self.review_controller = ReviewSessionController(detect_data_dir)
-        now = datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-        self.review_controller.ensure_default_preset(
-            default_spectrogram_snapshot(), saved_at=now
+        self.review_data_locations = ReviewDataLocationManager(detect_data_dir)
+        self.review_controller, self.review_page = self._create_review_workspace(
+            self.review_data_locations.current_root()
         )
-        self.review_page = ReviewWorkspacePage(
-            self.review_controller,
-            result_provider=self._review_result_choices,
-            source_root_resolver=self._review_source_root,
-            operation_admission=lambda run_id, label: self._assert_run_admitted(
-                WorkflowOwner.REVIEW, run_id, label
-            ),
-        )
-        recovered = self.review_controller.recover_open_session(recovered_at=now)
-        if recovered is not None:
-            self.review_page.open_session(recovered.session_id)
+        self._review_move_thread: _ReviewDataMoveThread | None = None
+        self._exit_after_review_move = False
         self.shell_window = StudioWindow(self.detect_controller, self.review_page)
         self.train_window = MainWindow(
             controller,
@@ -99,6 +120,30 @@ class StudioCoordinator(QObject):
         self.shell_window.workspace_requested.connect(self.open_workspace)
         self.shell_window.application_exit_requested.connect(self.request_application_exit)
         self.train_window.application_exit_completed.connect(self._train_exit_completed)
+
+    def _create_review_workspace(
+        self, review_data_root
+    ) -> tuple[ReviewSessionController, ReviewWorkspacePage]:
+        controller = ReviewSessionController(
+            self.review_data_locations.suite_data_root,
+            review_data_root=review_data_root,
+        )
+        self.review_controller = controller
+        now = datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+        controller.ensure_default_preset(default_spectrogram_snapshot(), saved_at=now)
+        page = ReviewWorkspacePage(
+            controller,
+            result_provider=self._review_result_choices,
+            source_root_resolver=self._review_source_root,
+            operation_admission=lambda run_id, label: self._assert_run_admitted(
+                WorkflowOwner.REVIEW, run_id, label
+            ),
+        )
+        page.data_folder_change_requested.connect(self.request_review_data_folder_change)
+        recovered = controller.recover_open_session(recovered_at=now)
+        if recovered is not None:
+            page.open_session(recovered.session_id)
+        return controller, page
 
     def start(self) -> None:
         self.shell_window.show_workspace(WorkspaceRoute.STUDIO)
@@ -180,6 +225,111 @@ class StudioCoordinator(QObject):
         except (OSError, RuntimeError, ValueError):
             return None
 
+    def _review_move_forbidden_roots(self) -> tuple:
+        roots = []
+        collection_ids = {
+            item.result.collection_id
+            for item in self.detect_controller.result_history
+            if item.result is not None
+        }
+        for collection_id in collection_ids:
+            try:
+                roots.append(self.detect_controller.store.load_collection(collection_id).source_root)
+            except (OSError, RuntimeError, ValueError):
+                continue
+        for record in self.review_controller.list_export_history():
+            roots.append(record.final_destination)
+        return tuple(roots)
+
+    def request_review_data_folder_change(self, target) -> None:
+        page = self.review_page
+        page.show_data_settings()
+        if self._review_move_thread is not None:
+            page.data_settings_page.set_status("Review data is already being moved.")
+            return
+        if not page.data_location_change_allowed:
+            page.data_settings_page.reset_selection()
+            page.data_settings_page.set_status(
+                "Close the open Review session before changing the folder."
+            )
+            return
+        try:
+            plan = self.review_data_locations.plan_move(
+                target,
+                forbidden_roots=tuple(Path(root) for root in self._review_move_forbidden_roots()),
+            )
+        except (OSError, ReviewDataLocationError, ValueError) as exc:
+            page.data_settings_page.reset_selection()
+            page.data_settings_page.set_status(str(exc))
+            return
+        confirmed = False
+        if plan.storage_estimate.requires_confirmation:
+            answer = QMessageBox.question(
+                self.shell_window,
+                "Review data folder",
+                plan.storage_estimate.reason,
+                QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Ok,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if answer is not QMessageBox.StandardButton.Ok:
+                page.data_settings_page.set_status("Review data folder unchanged.")
+                return
+            confirmed = True
+        page.data_settings_page.set_moving(True)
+        page.shutdown()
+        self.review_controller.shutdown()
+        thread = _ReviewDataMoveThread(
+            self.review_data_locations,
+            plan,
+            confirm_storage=confirmed,
+        )
+        self._review_move_thread = thread
+        thread.succeeded.connect(self._review_data_move_succeeded)
+        thread.failed.connect(self._review_data_move_failed)
+
+        def finished() -> None:
+            if self._review_move_thread is thread:
+                self._review_move_thread = None
+            thread.deleteLater()
+            if self._exit_after_review_move:
+                self._exit_after_review_move = False
+                QTimer.singleShot(0, self.request_application_exit)
+
+        thread.finished.connect(finished)
+        thread.start()
+
+    def _replace_review_workspace(self, root, *, status: str) -> None:
+        controller, page = self._create_review_workspace(root)
+        self.review_controller = controller
+        self.review_page = page
+        self.shell_window.replace_review_page(page)
+        page.show_data_settings()
+        page.data_settings_page.set_status(status)
+        page.focus_initial()
+
+    def _review_data_move_succeeded(self, target) -> None:
+        self._replace_review_workspace(
+            target,
+            status="Review data moved. Existing sessions and settings are ready.",
+        )
+
+    def _review_data_move_failed(self, message: str) -> None:
+        try:
+            root = self.review_data_locations.current_root()
+            self._replace_review_workspace(
+                root,
+                status=(
+                    message
+                    or "Couldn't move Review data. Your original folder is unchanged."
+                ),
+            )
+        except (OSError, RuntimeError, ValueError):
+            QMessageBox.critical(
+                self.shell_window,
+                "Review data folder",
+                "Couldn't move Review data. Your original folder is unchanged.",
+            )
+
     def show_studio(self) -> None:
         self.open_workspace(WorkspaceRoute.STUDIO)
 
@@ -224,6 +374,14 @@ class StudioCoordinator(QObject):
 
     def request_application_exit(self) -> None:
         if self._application_exit_finishing:
+            return
+        if self._review_move_thread is not None:
+            self._exit_after_review_move = True
+            self.open_workspace(WorkspaceRoute.REVIEW)
+            self.review_page.show_data_settings()
+            self.review_page.data_settings_page.set_status(
+                "Wait for the Review data move to finish before exiting."
+            )
             return
         if self.exit_failure_dialog is not None and self.exit_failure_dialog.isVisible():
             self.exit_failure_dialog.raise_()

@@ -37,7 +37,6 @@ class WorkspaceCard(Card):
         icon_name: str,
         accent: str,
         action,
-        featured: bool = False,
     ) -> None:
         super().__init__()
         self.setObjectName(f"{workspace.lower()}WorkspaceCard")
@@ -62,7 +61,7 @@ class WorkspaceCard(Card):
         self.content_layout.addStretch()
         self.action_button = Button(
             action_text,
-            variant="primary" if featured or workspace == "Train" else "outline",
+            variant="outline",
             size="large",
         )
         self.action_button.setAccessibleName(f"{action_text} workspace")
@@ -110,7 +109,6 @@ class LaunchpadPage(QScrollArea):
             icon_name="search",
             accent="#4C1D95",
             action=lambda: self.workspace_requested.emit(WorkspaceRoute.DETECT.value),
-            featured=True,
         )
         self.review_card = WorkspaceCard(
             workspace="Review",
@@ -194,6 +192,7 @@ class StudioWindow(QMainWindow):
         self.review_page.return_requested.connect(
             lambda: self.workspace_requested.emit(WorkspaceRoute.STUDIO.value)
         )
+        self.review_page.exit_requested.connect(self.application_exit_requested)
         self.back_to_studio_button.clicked.connect(
             lambda: self.workspace_requested.emit(WorkspaceRoute.STUDIO.value)
         )
@@ -220,6 +219,10 @@ class StudioWindow(QMainWindow):
         self.back_to_studio_button = Button("Back to Studio", variant="outline", size="small")
         self.back_to_studio_button.setAccessibleName("Back to Studio launchpad")
         layout.addWidget(self.back_to_studio_button)
+        self.exit_studio_button = Button("Exit Studio", variant="outline", size="small")
+        self.exit_studio_button.setAccessibleName("Exit BioCall Studio")
+        self.exit_studio_button.clicked.connect(self.application_exit_requested)
+        layout.addWidget(self.exit_studio_button)
         return header
 
     def show_workspace(self, route: WorkspaceRoute) -> None:
@@ -227,8 +230,9 @@ class StudioWindow(QMainWindow):
             raise ValueError("Train is a retained independent window.")
         self.current_workspace = route
         self.pages.setCurrentWidget(self._pages[route])
-        self.global_header.setVisible(route is not WorkspaceRoute.DETECT)
-        self.back_to_studio_button.setVisible(route is WorkspaceRoute.REVIEW)
+        self.global_header.setVisible(route is WorkspaceRoute.STUDIO)
+        self.back_to_studio_button.setVisible(False)
+        self.exit_studio_button.setVisible(route is WorkspaceRoute.STUDIO)
         self.setWindowTitle(
             "BioCall Studio"
             if route is WorkspaceRoute.STUDIO
@@ -240,6 +244,23 @@ class StudioWindow(QMainWindow):
             self.detect_page.focus_initial()
         else:
             self.review_page.focus_initial()
+
+    def replace_review_page(self, review_page: ReviewWorkspacePage) -> None:
+        """Replace Review after an application-data move without rebuilding other workspaces."""
+        old_page = self.review_page
+        old_index = self.pages.indexOf(old_page)
+        self.pages.removeWidget(old_page)
+        self.review_page = review_page
+        self._pages[WorkspaceRoute.REVIEW] = review_page
+        self.pages.insertWidget(old_index, review_page)
+        review_page.return_requested.connect(
+            lambda: self.workspace_requested.emit(WorkspaceRoute.STUDIO.value)
+        )
+        review_page.exit_requested.connect(self.application_exit_requested)
+        if self.current_workspace is WorkspaceRoute.REVIEW:
+            self.pages.setCurrentWidget(review_page)
+        old_page.setParent(None)
+        old_page.deleteLater()
 
     def allow_application_close(self) -> None:
         self._allow_close = True
