@@ -1,6 +1,6 @@
 # BioCall Studio — Review interactive prototype
 
-**Status:** design prototype for owner review; **not owner-approved** and **not a native Review implementation**. Scientific decisions and native implementation sequencing remain governed by `docs/specs/review/README.md` and `RV-01` through `RV-08`.
+**Status:** design prototype for owner review; **not owner-approved** and **not a native Review implementation**. Its existing actual PNG screenshots are [versioned as correction targets beside existing offscreen native-before captures](../../evidence/review-correction/README.md); the RV-09/RV-10 correction requires fresh visible native-after screenshots, owner sign-off, a permanent sidebar, session deletion and an in-app Review data-folder chooser. Scientific decisions and native implementation sequencing remain governed by `docs/specs/review/README.md` and `RV-01` through `RV-08`.
 
 ## Launch
 

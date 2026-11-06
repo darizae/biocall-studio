@@ -6,6 +6,8 @@
 
 **Series:** [Locked scope, prerequisites and coverage](README.md) · [Status](../../IMPLEMENTATION_SEQUENCE.md)
 
+> **Correction warning:** Native RV-05 work has not passed visible owner design approval. Its layout, sidebar, launchpad parity and new data/session controls must be corrected under [RV-09](RV-09-native-visual-parity-and-data-management.md) using the [committed screenshot targets](../../design/evidence/review-correction/README.md); on-demand spectrogram wiring and cache fixes belong to [RV-10](RV-10-spectrogram-interactivity-and-qualification.md). No inference of sign-off from RV-05's offscreen screenshot tests.
+
 ## Strict ownership and exclusions
 
 **Owner:** `review/gui` and a narrow Review controller/view-state adapter. **Entry:** approved RV-04 (thus RV-01–03 complete). Use only public installed `alp-ui` primitives with native PySide6; no upstream UI changes without independent library branch and tests. Do not expose a second direct-export route, build an ad hoc full-recording annotator, add RF-rejected filters or move Detect exports here before RV-06/07. A Review UI may not advertise nonfunctional final-export actions before RV-06 completes.
