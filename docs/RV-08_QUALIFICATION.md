@@ -128,14 +128,16 @@ PASS
 
 ## Manual owner trial
 
-An ignored, disposable pack is prepared at `work/manual-review`. It contains fresh current-contract
-Train Models, two verified Detect Results, three immutable source WAVs and isolated application
-data. Launch with:
+An ignored, disposable pack is prepared at `work/manual-review-real-hums`. It contains 64
+human-verified positive alpaca-hum selections copied losslessly from the owner's cleaned corpus,
+with isolated application data and exact row/time/checksum provenance. Launch with:
 
 ```text
-.venv/bin/python -m biocall_studio --settings-dir work/manual-review/app-data
+.venv/bin/python -m biocall_studio --settings-dir work/manual-review-real-hums/app-data
 ```
 
-The pack's README gives the Review labels/spectrogram/finalize/export/exit walkthrough. Its source
-checksum verification passes. It is local manual evidence material, not a tracked test fixture or
-field-data claim.
+Choose `Real hum corpus · 64 human-verified selections` and `Original`. The pack's README gives the
+Review labels/spectrogram/finalize/export/exit walkthrough. All 64 candidate regions were checked
+byte-for-byte against the corresponding human-positive selection-table intervals. The packaged
+completed Detect Result was seeded from those corpus rows for direct Review testing; it is not a
+claim of fresh model inference. This remains local manual evidence material, not a tracked fixture.
