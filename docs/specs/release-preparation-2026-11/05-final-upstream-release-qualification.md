@@ -1,0 +1,65 @@
+# 05 — FINAL: BioCall Studio's one full base suite and public release gate
+
+**Last spec across all three repositories, including post-release documentation retirement.** Start only after both library releases, Studio specs 01–03 merged into `main`, and Studio spec 04's packaging-source PR merged and its **two native installer lanes verified against the same frozen SHA**. This is the **only full BioCall Studio source-suite gate**, and its full test run **must execute locally in the actual BioCall Studio development environment**, not be replaced by an AI/ChatGPT VM simulation or a remote CI-only result. Follow [VERSION_CONTROL.md](VERSION_CONTROL.md) for exact source/tag policy. Do not create a source branch merely to record passing evidence; only the separate, post-release documentation-cleanup PRs specified below may advance `main` after tagging.
+
+## Verify immutable inputs first
+
+1. Re-query **real latest approved compatible GitHub Releases** for [alp-ui](https://github.com/darizae/alp-ui) and [bioacoustics-dl-toolbox](https://github.com/darizae/bioacoustics-dl-toolbox). Expected candidate tags are `v0.1.0a1` and `v0.3.0` **if actually published**. Verify each immutable annotated tag's **target commit SHA** (not just the tag object ID), wheel/sdist URL, actual SHA-256, version and license. Use the latest *approved released* versions compatible with Studio; a newer incompatible or unreviewed release is not silently substituted.
+2. Install the **published wheel artifacts** and required `[rf]` dependencies into a fresh supported Python environment (matching the frozen Studio candidate where practicable). Toolbox uses GitHub Release assets rather than assumed PyPI. Record both distributions' `importlib.metadata.version(...)`, `module.__file__`, tag target SHAs, resolved dependency versions and wheel checksums. Neither an editable sibling checkout nor a mutable `main` import qualifies.
+3. Check `STUDIO_RELEASE_SHA` from [04](04-installer-gates.md) equals a **real reviewed commit on BioCall Studio `main`** that already contains both the proposed Studio version `0.1.0a1` and release notes. Match it to Studio's `pyproject.toml` dependency pins and `[tool.biocall-studio.science]` upstream SHA fields. Both genuine macOS and Windows installer build receipts must name **this same exact SHA**, identical upstream wheel hashes and platform test/signed artifacts. Rebuild both if source/approved upstream versions/lock changed: no mixing releases from distinct SHAs.
+
+## The single complete BioCall Studio ordinary base suite — locally only
+
+**Execution location:** a real local BioCall Studio checkout and its local Python/Qt environment (prefer the owner's macOS development machine), at **exactly `STUDIO_RELEASE_SHA`**. The agent must use the available local-development tools or provide an exact runnable handoff; **do not claim this local gate passed from GitHub Actions, the ChatGPT VM, remote snippets, or past Cocoa screenshots.** Verify a clean Git worktree, checked-out source SHA, Python/Qt versions, and installed wheel import paths. Use a new isolated local venv and pinned/wheelhouse dependencies so editable sibling checkouts, `alpaca-pipelines` shadow imports, or unverified PyPI packages cannot substitute for the published alp-ui/toolbox artifacts. Install and hash-check the released wheels *before* executing tests; verify `python -m pip check` and package versions/import origins. If the agent has no access to a local terminal, hand off the exact local commands and mark **LOCAL TEST PENDING**, rather than invent results.
+
+Run using that verified **local** environment's Python executable (e.g. `.venv-release-check/bin/python` on macOS; not an unverified system Python):
+
+```bash
+# From the clean BioCall Studio checkout at STUDIO_RELEASE_SHA,
+# after creating the isolated local .venv-release-check and installing
+# the pinned, hash-verified published upstream wheel artifacts:
+.venv-release-check/bin/python -m pip check
+.venv-release-check/bin/python scripts/run_tests.py background -q
+.venv-release-check/bin/python -m ruff check src tests scripts
+.venv-release-check/bin/python -m ruff format --check src tests scripts
+.venv-release-check/bin/python scripts/audit_test_ids.py
+.venv-release-check/bin/python scripts/verify_handoff.py
+.venv-release-check/bin/python scripts/check_fixtures.py
+```
+
+The background mode is the existing ordinary unit + integration suite using offscreen Qt while excluding `soak` and `native_cocoa`; earlier Studio specs run **only focused** regressions. Record local machine OS/architecture, `git rev-parse HEAD`, clean-tree proof, exact executable/venv, Python/Qt and imported package origins, wheel SHA-256, commands, tests passed/skipped/failed and duration. **A remote CI result can be supplementary but cannot replace the requested local run.** If the local suite or an explicitly scoped required check fails, fix on a reviewed branch, merge and repeat the freeze → **both** native installer builds → local suite process; never report a pending local test as passed. Do **not** run `-m soak`, ≥600-second tests, 50k reruns, huge real-data performance qualification, new obligatory macOS screenshot capture, or physical audio playback proof. Native installed-app evidence is the **minimal** smoke from spec 04, not another exhaustive native GUI/science suite.
+
+Audit the actual wheel/package metadata, worker/public entrypoints, brand/README image links and distribution legal notices. A test pass on the wrong library revision does **not** satisfy this spec.
+
+## Tag/release — same tested `main` commit, no post-test changes
+
+Only after **all** gates are truly green—final Studio base suite against released wheels, lint/audits, both actual native installers/signatures/worker smokes, correct GPL/Qt/application redistribution rights, complete immutable hashes, and explicit owner promotion approval—create the annotated **`v0.1.0a1`** tag **pointing to `STUDIO_RELEASE_SHA` on `main`**. **Do not** bump the version, merge another PR or change license/README/manifest source after tests/builds. Publish a GitHub Release attaching exactly the tested macOS `.dmg` and Windows installer with real SHA-256 digests, upstream versions/tag commit SHAs/wheel hashes, human release notes and supported-platform truth. Do not rewrite a tag or silently replace an installer.
+
+If anything must change after freeze, create a separate reviewed fix PR, **merge it into `main`**, choose a **new** `STUDIO_RELEASE_SHA`, rebuild and re-qualify **both** native installers and rerun this entire base suite before tagging. Store machine-specific validation evidence in CI/PR/release artifacts without creating a new source commit; if a tracked manifest must change, it triggers the same new-SHA cycle. Missing native environment, sign-off or capability is a **blocked release**, not a reason to tag incomplete code.
+
+## Final recorded handoff
+
+Provide the genuine three repository `main`/tag target SHAs, exact GitHub Release URLs, published library-wheel and Studio-installer hashes, Studio `pyproject.toml`/science pins, final test command outputs, Mac/Windows native receipts, licenses and any outstanding limitations. Check each tag commit is reachable from the respective repository's `main`. After the last action, no unmerged implementation source is required for the advertised release. **Studio 05 remains the final execution spec and also owns the post-release cleanup below.**
+
+
+## After all planned work is verified and the releases are published — retire stale specs in all THREE repositories
+
+**This cleanup is owned exclusively by this BioCall Studio spec 05.** Do not introduce a second final-spec document into `alp-ui` or the toolbox. Do not start deletions while implementation work, native installer checks, the local Studio full suite, owner sign-off, or any of the **three actual GitHub releases** remains incomplete. A failed/blocked release leaves the specs in place for agents to finish later.
+
+**Why post-tag:** the library tags were published earlier and BioCall Studio's tag must continue pointing to the *exact locally tested* `STUDIO_RELEASE_SHA` and two installer binaries. Deleting tracked Markdown **before** Studio tagging would alter that SHA and invalidate installer/test provenance. Therefore retire executed specs **after** the three immutable releases are verified. These subsequent **documentation-only** commits intentionally advance each repository's `main` beyond its release tag; do not retag, rebuild or call the docs-only `main` HEAD a new published version.
+
+Perform **three independent focused GitHub documentation PRs**, one per repository, branching from each **then-current `main`**:
+
+| Repository | Proposed cleanup branch | Deletion candidates after verification |
+|---|---|---|
+| [alp-ui](https://github.com/darizae/alp-ui) | `docs/alp-ui-post-release-spec-retirement` | Remove all five files under `docs/project/specs/2026-11-release-preparation/` (series index, 01–03, `VERSION_CONTROL.md`) **after** A1–A3 are delivered/tagged; also retire remaining completed `tasks/*.md` and duplicated historical project-spec Markdown only if the A2 link/decision audit finds them redundant. |
+| [bioacoustics-dl-toolbox](https://github.com/darizae/bioacoustics-dl-toolbox) | `docs/toolbox-post-release-spec-retirement` | Remove all five files under `docs/specs/2026-11-release-preparation/` **after** T1–T3 are delivered/tagged. The toolbox has few other Markdown files; preserve `LICENSE`, `NOTICE.md`, `AGENTS.md`, `RELEASE_NOTES.md`, `docs/RELEASING.md` and brand guidance. |
+| [biocall-studio](https://github.com/darizae/biocall-studio) | `docs/biocall-post-release-spec-retirement` | Remove all seven files under `docs/specs/release-preparation-2026-11/`, **including this B5 spec only after its final results are permanently recorded and Studio's release is verified**. Also retire implemented historic RV/ST/installer specs left after B2 only when their normative Review/scientific, safety, current packaging and maintenance rules have been incorporated into the small surviving canonical docs. |
+
+**Safety of deletion:** inventory the current tracked `*.md` files and search actual incoming links/references, scripts, package manifests and test-ID audits across each repository. Preserve or consolidate unique binding product/scientific decisions, `AGENTS.md` and agent routing, `docs/VISION.md`, `docs/ARCHITECTURE.md`, reusable API and developer guides, correct release/installer **maintenance** runbooks, GPL/MIT/Qt notices, branding assets, actual screenshot PNGs and provenance JSON, and any test-ID/fixture contract needed for scripts. A completed stage checklist is not a live specification, but a needed safety contract is not obsolete simply because a stage is implemented. **No blanket deletion based only on glob or age.** Do not create a parallel Markdown archive: the original specs remain recoverable at their immutable release tags and in Git history.
+
+Before removing this very B5 file, place a **brief factual, durable release record** in an existing canonical release/history location in BioCall Studio (prefer `docs/RELEASE_PROCESS.md` or the established release notes), linking the three GitHub Releases, their tag-target commit SHAs and artifact checksums, the actual **local** final suite result and both native installer smoke records. Keep it concise; don't invent another long project report. In each repository update `AGENTS.md`/routing/spec-index/README links to no longer point at deleted paths; where future maintenance needs a rule, relocate only that rule to an existing canonical document. No leftover broken relative links or claims that old spec files are still active.
+
+Each cleanup PR: run a **bounded Markdown-link/image/reference audit**, legal/asset preservation check, and relevant doc/test-index/static checks, inspect the deletion diff, obtain review, then **merge into that repository's `main`**. Record each cleanup PR, merge SHA, verified release tag→original tested commit, and intentionally newer docs-only `main` SHA. Do **not** rerun large/full source suites solely for post-release Markdown deletion or modify code, dependencies, release notes about shipped behavior or release assets in a cleanup PR; if a functional fix is necessary, stop and create a separately qualified new release. Do not delete unfinished specs, the only existing instructions for an unresolved gate, or non-Markdown evidence.
+
+**Final acceptance:** local full BioCall Studio suite genuinely passed on the frozen released-wheel setup; all three releases and Studio's two installers are verified; and all three **post-release docs-cleanup PRs are merged** with completed/stale specs removed, minimal permanent release evidence retained, and links/audits valid. If repository write access is missing, prepare the exact PR or deletion list and mark cleanup incomplete instead of claiming success.
