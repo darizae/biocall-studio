@@ -31,3 +31,7 @@ Update `docs/specs/README.md`, `docs/IMPLEMENTATION_SEQUENCE.md`, `AGENTS.md`, `
 **GitHub API:** inventory, changes, deletion, PR and links. **ChatGPT VM:** relative-link/assets check, badge/link rendering review, docs-to-source/metadata assertions and basic test-ID audit. **Local:** no new real Cocoa captures or physical audio playback required. Genuine existing native screenshots are sufficient for the human README.
 
 **Done:** visibly brand-specific README, recognizable real-workflow screenshots, accurate licensing/release claims, clear first-run instructions; sharply fewer live Markdown files; routing, core vision/architecture, provenance and legal duties intact; no dead links or historic plans masquerading as current implementation.
+
+## Branch and `main` merge gate
+
+Follow [VERSION_CONTROL.md](VERSION_CONTROL.md). Only after spec 01 has merged, branch `docs/biocall-02-human-readme` from that reviewed Studio `main`. Make the brand/screenshots/legal/Markdown consolidation one focused PR, including removal or correction of stale stage and Review-placeholder links. Run image path/link/docs and relevant test-ID audit checks, review and **merge to `main` before spec 03**. Record the resulting main SHA. Do not silently delete required screenshot evidence or run the full Studio source suite in this editorial stage.
