@@ -15,12 +15,16 @@
 Run using that verified **local** environment's Python executable (e.g. `.venv-release-check/bin/python` on macOS; not an unverified system Python):
 
 ```bash
-python scripts/run_tests.py background -q
-python -m ruff check src tests scripts
-python -m ruff format --check src tests scripts
-python scripts/audit_test_ids.py
-python scripts/verify_handoff.py
-python scripts/check_fixtures.py
+# From the clean BioCall Studio checkout at STUDIO_RELEASE_SHA,
+# after creating the isolated local .venv-release-check and installing
+# the pinned, hash-verified published upstream wheel artifacts:
+.venv-release-check/bin/python -m pip check
+.venv-release-check/bin/python scripts/run_tests.py background -q
+.venv-release-check/bin/python -m ruff check src tests scripts
+.venv-release-check/bin/python -m ruff format --check src tests scripts
+.venv-release-check/bin/python scripts/audit_test_ids.py
+.venv-release-check/bin/python scripts/verify_handoff.py
+.venv-release-check/bin/python scripts/check_fixtures.py
 ```
 
 The background mode is the existing ordinary unit + integration suite using offscreen Qt while excluding `soak` and `native_cocoa`; earlier Studio specs run **only focused** regressions. Record local machine OS/architecture, `git rev-parse HEAD`, clean-tree proof, exact executable/venv, Python/Qt and imported package origins, wheel SHA-256, commands, tests passed/skipped/failed and duration. **A remote CI result can be supplementary but cannot replace the requested local run.** If the local suite or an explicitly scoped required check fails, fix on a reviewed branch, merge and repeat the freeze → **both** native installer builds → local suite process; never report a pending local test as passed. Do **not** run `-m soak`, ≥600-second tests, 50k reruns, huge real-data performance qualification, new obligatory macOS screenshot capture, or physical audio playback proof. Native installed-app evidence is the **minimal** smoke from spec 04, not another exhaustive native GUI/science suite.
