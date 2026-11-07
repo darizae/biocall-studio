@@ -1,6 +1,6 @@
 # 01 — Adopt the released upstream spectrogram renderer and trim Studio
 
-**Start gate:** toolbox [01 headless spectrogram](https://github.com/darizae/bioacoustics-dl-toolbox/blob/spec/2026-11-release-preparation/docs/specs/2026-11-release-preparation/01-headless-spectrogram.md) must have been implemented, reviewed, **released** per [toolbox 03](https://github.com/darizae/bioacoustics-dl-toolbox/blob/spec/2026-11-release-preparation/docs/specs/2026-11-release-preparation/03-release.md), and its wheel SHA-256 and tag commit recorded. Any new `alp-ui` code must similarly have passed [its release spec](https://github.com/darizae/alp-ui/blob/spec/2026-11-release-preparation/docs/project/specs/2026-11-release-preparation/03-release-candidate.md). Do not implement or merge library features within a BioCall Studio branch.
+**Start gate:** toolbox [01 headless spectrogram](https://github.com/darizae/bioacoustics-dl-toolbox/blob/main/docs/specs/2026-11-release-preparation/01-headless-spectrogram.md) must have been implemented, reviewed, **released** per [toolbox 03](https://github.com/darizae/bioacoustics-dl-toolbox/blob/main/docs/specs/2026-11-release-preparation/03-release.md), and its wheel SHA-256 and tag commit recorded. Any new `alp-ui` code must similarly have passed [its release spec](https://github.com/darizae/alp-ui/blob/main/docs/project/specs/2026-11-release-preparation/03-release-candidate.md). Do not implement or merge library features within a BioCall Studio branch.
 
 ## Existing ownership (verified against original baseline)
 
@@ -17,3 +17,7 @@
 **Checks here:** only focused deterministic renderer/unit/import/affected integration regressions, as suitable to a bounded VM. **Do not run Studio's complete suite in this spec.** It runs exactly once as the final downstream qualification, in [Studio 05](05-final-upstream-release-qualification.md), after both upstream releases, README trim and native installers.
 
 **Acceptance:** less duplicated DSP, verified installed release origins, same scientific pixel/axis semantics or explicit migration, unchanged app state ownership and no unexpected new dependencies. If the toolbox deliberately did not ship a reusable API, stop and reconcile the release decision rather than import nonexistent code.
+
+## Branch and `main` merge gate
+
+Follow [VERSION_CONTROL.md](VERSION_CONTROL.md). First confirm **all three planning PRs are merged to their own `main`** and both upstream library releases are **published**. Branch `feat/biocall-01-released-spectrogram` from the current reviewed BioCall Studio `main`, import only verified released wheel APIs, run focused affected checks and update both pinned versions and science SHAs. Create/review the implementation PR; **merge into Studio `main` before spec 02**. Record both released tag target commit SHAs, wheel hashes and the new Studio merged-`main` SHA. Do not run the full Studio suite or create a Studio tag in this step.
