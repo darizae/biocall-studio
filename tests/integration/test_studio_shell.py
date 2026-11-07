@@ -25,7 +25,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from biocall_studio.review.application.controller import default_spectrogram_snapshot
+from biocall_studio.review.application.controller import (
+    ReviewSessionController,
+    default_spectrogram_snapshot,
+)
 from biocall_studio.review.application.data_location import ReviewDataLocationManager
 from biocall_studio.review.application.generation import (
     GenerationCancelled,
@@ -378,6 +381,48 @@ def test_review_data_folder_moves_in_app_and_reopens_without_touching_detect(
     assert detect_marker.read_bytes() == b"detect-owned"
     assert coordinator.review_page.currentWidget() is coordinator.review_page.data_settings_page
     assert "moved" in coordinator.review_page.data_settings_page.status_label.text().casefold()
+
+    existing = tmp_path / "existing-review-data"
+    existing_controller = ReviewSessionController(suite_root, review_data_root=existing)
+    settings = default_spectrogram_snapshot()
+    existing_controller.ensure_default_preset(
+        settings, saved_at="2026-11-06T09:05:00.000Z"
+    )
+    existing_controller.create_preset(
+        name="Alpaca hum detail",
+        effective_settings=settings.effective_settings,
+        saved_at="2026-11-06T09:06:00.000Z",
+    )
+    existing_controller.shutdown()
+    existing_database = (existing / "sessions.sqlite3").read_bytes()
+
+    def accept_existing() -> None:
+        dialog = QApplication.activeModalWidget()
+        assert dialog is not None
+        assert isinstance(dialog, QMessageBox)
+        assert dialog.defaultButton().text() == "Cancel"
+        next(
+            button
+            for button in dialog.findChildren(QPushButton)
+            if button.text() == "Use this data"
+        ).click()
+
+    QTimer.singleShot(0, accept_existing)
+    coordinator.review_page.data_settings_page.folder_picker.setFolderPath(str(existing))
+    qtbot.waitUntil(
+        lambda: coordinator.review_controller.store.root == existing,
+        timeout=20_000,
+    )
+
+    assert ReviewDataLocationManager(suite_root).current_root() == existing
+    assert coordinator.review_controller.intake.store.root == existing
+    assert (existing / "sessions.sqlite3").read_bytes() == existing_database
+    assert target.is_dir()
+    assert {preset.preset_name for preset in coordinator.review_controller.list_presets()} == {
+        "Default",
+        "Alpaca hum detail",
+    }
+    assert "opened" in coordinator.review_page.data_settings_page.status_label.text().casefold()
     _finish(qtbot, coordinator)
 
 
@@ -684,6 +729,11 @@ def test_open_review_survives_navigation_and_one_exit_policy_fails_closed(
     session_id = _create_open_review_session(coordinator)
     page = coordinator.shell_window.review_page
     assert page.current_state is not None
+    page.session_page.name_input.control.setCursorPosition(
+        len(page.session_page.name_input.control.text())
+    )
+    page.session_page.render_state(page.current_state)
+    assert page.session_page.name_input.control.cursorPosition() == 0
     page.current_state.scroll_offset = 17
 
     coordinator.open_workspace(WorkspaceRoute.REVIEW)

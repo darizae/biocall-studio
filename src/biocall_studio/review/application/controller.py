@@ -31,6 +31,7 @@ from biocall_studio.review.domain.spectrograms import (
 from biocall_studio.review.persistence.export_history import ReviewExportHistoryStore
 from biocall_studio.review.persistence.intake import (
     IntakeAvailability,
+    ReviewIntakeStore,
     ReviewResultIntake,
 )
 from biocall_studio.review.persistence.sessions import (
@@ -73,7 +74,6 @@ class ReviewSessionController:
         if requested.is_symlink():
             raise ValueError("Suite application-data root cannot be a symlink.")
         self.suite_data_root = requested.resolve(strict=False)
-        self.intake = intake or ReviewResultIntake(self.suite_data_root)
         selected_root = (
             self.suite_data_root / "review" / "v1"
             if review_data_root is None
@@ -82,6 +82,10 @@ class ReviewSessionController:
         if selected_root.is_symlink():
             raise ValueError("Review application-data root cannot be a symlink.")
         self.review_data_root = selected_root.resolve(strict=False)
+        self.intake = intake or ReviewResultIntake(
+            self.suite_data_root,
+            store=ReviewIntakeStore(self.review_data_root),
+        )
         self.store = store or ReviewSessionStore(self.review_data_root)
         self.export_history = export_history or ReviewExportHistoryStore(self.store.root)
         self._owner_lease = owner_lease or ReviewOwnerLease.create(self.store.root)

@@ -666,25 +666,11 @@ class ReviewDataSettingsPage(QScrollArea):
         selected = Path(value)
         if selected.resolve(strict=False) == self.current_root.resolve(strict=False):
             return
-        dialog = QMessageBox(self)
-        dialog.setObjectName("reviewDataMoveDialog")
-        dialog.setWindowTitle("Review data folder")
-        dialog.setText("Move existing Review data to the selected folder?")
-        cancel = dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
-        move = dialog.addButton("Move existing data", QMessageBox.ButtonRole.AcceptRole)
-        dialog.setDefaultButton(cancel)
-        dialog.setEscapeButton(cancel)
-        dialog.exec()
-        if dialog.clickedButton() is move:
-            self.folder_change_requested.emit(selected)
-        else:
-            self.folder_picker.blockSignals(True)
-            self.folder_picker.setFolderPath(str(self.current_root))
-            self.folder_picker.blockSignals(False)
+        self.folder_change_requested.emit(selected)
 
-    def set_moving(self, moving: bool) -> None:
+    def set_moving(self, moving: bool, *, message: str = "Moving Review data…") -> None:
         self.folder_picker.setEnabled(not moving)
-        self.status_label.setText("Moving Review data…" if moving else self.status_label.text())
+        self.status_label.setText(message if moving else self.status_label.text())
 
     def set_status(self, message: str) -> None:
         self.status_label.setText(message)
@@ -1072,6 +1058,8 @@ class ReviewSessionPage(QWidget):
         session = state.session
         self.name_input.control.blockSignals(True)
         self.name_input.control.setText(session.name)
+        self.name_input.control.setCursorPosition(0)
+        self.name_input.control.deselect()
         self.name_input.control.blockSignals(False)
         self.name_input.control.setEnabled(session.state is ReviewSessionState.OPEN)
         self.status_badge.setText(session.state.value.title())

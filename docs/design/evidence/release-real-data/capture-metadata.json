@@ -1,0 +1,164 @@
+{
+  "application": {
+    "branch": "review-release-evidence-real-data",
+    "head": "0a3feb80e9dc1cc3b75f14aef6b06d7aaadcae6a",
+    "working_tree_diff_sha256": "a4e140b908cc49d4dd545cc182950e0347c13addb955c54701887eae6aa2b6f0"
+  },
+  "capture_mode": "visible Cocoa QScreen capture of live PySide6 windows",
+  "captured_at": "2026-11-07T09:32:19+00:00",
+  "captures": [
+    {
+      "device_pixel_ratio": 2.0,
+      "file": "00-studio.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "device_pixel_ratio": 2.0,
+      "file": "01-train-collection.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "device_pixel_ratio": 2.0,
+      "file": "02-train-dataset-builder.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "device_pixel_ratio": 2.0,
+      "file": "03-detect-runs.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "device_pixel_ratio": 2.0,
+      "file": "04-detect-run.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "device_pixel_ratio": 2.0,
+      "file": "05-detect-results.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "device_pixel_ratio": 2.0,
+      "file": "06-review-data-folder.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "device_pixel_ratio": 2.0,
+      "file": "07-review-sessions.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "device_pixel_ratio": 2.0,
+      "file": "08-review-gallery.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "device_pixel_ratio": 2.0,
+      "file": "09-review-one-by-one.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    },
+    {
+      "device_pixel_ratio": 2.0,
+      "file": "10-review-spectrograms.png",
+      "logical_viewport": [
+        1280,
+        807
+      ],
+      "png_pixels": [
+        2560,
+        1614
+      ]
+    }
+  ],
+  "platform": {
+    "alp_ui_version": "0.1.0a0",
+    "os": "macOS-26.6.2-arm64-arm-64bit",
+    "qt_platform": "cocoa",
+    "qt_version": "6.11.2",
+    "screen": "Built-in Retina Display",
+    "screen_device_pixel_ratio": 2.0
+  },
+  "real_example": {
+    "name": "Verified real alpaca hums",
+    "provenance_sha256": "8e456d3c941a61e307463e2e6a257ae2e84708cd815529c0773757fed5f5dbd4",
+    "review_call_labels": 18,
+    "review_candidates": 64,
+    "review_not_call_labels": 0,
+    "review_session_id": "rsn_cc355ef3ebdc4bec928ee1189268a7a7",
+    "review_unreviewed": 46,
+    "source_wav": "/Users/danie/repos/biocall-studio/work/manual-review-real-hums/source/recordings/verified-real-hums.wav",
+    "source_wav_sha256": "66ae94d75cd08c9e805f6ce7c7c993c9f9a68a8613c9740732fbb65a0b2eac86",
+    "train_positive_examples": 24,
+    "train_recordings": 3
+  }
+}

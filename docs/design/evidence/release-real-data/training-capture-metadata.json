@@ -1,0 +1,145 @@
+{
+  "capture_mode": "visible Cocoa QScreen capture of a live PySide6 window",
+  "captured_at": "2026-11-07T09:47:37+00:00",
+  "collection_id": "collection-991c7068-ccc7-4d34-a979-b047ab4e4fec",
+  "current_stage_at_capture": "Train and validate CNN",
+  "dataset_id": "dataset-release-real-hums-seed0",
+  "logical_viewport": [
+    1280,
+    807
+  ],
+  "png_pixels": [
+    2560,
+    1614
+  ],
+  "positive_examples": 24,
+  "progress_at_capture": 38,
+  "qt_platform": "cocoa",
+  "run_id": "run-77668f62-3d0e-4046-b4fd-04f67cff0771",
+  "source_recordings": 3,
+  "status_at_capture": "running",
+  "train_loss": [
+    {
+      "epoch": 1,
+      "loss": 0.871
+    },
+    {
+      "epoch": 2,
+      "loss": 0.145
+    },
+    {
+      "epoch": 3,
+      "loss": 0.042
+    },
+    {
+      "epoch": 4,
+      "loss": 0.021
+    },
+    {
+      "epoch": 5,
+      "loss": 0.009
+    },
+    {
+      "epoch": 6,
+      "loss": 0.006
+    },
+    {
+      "epoch": 7,
+      "loss": 0.033
+    },
+    {
+      "epoch": 8,
+      "loss": 0.007
+    },
+    {
+      "epoch": 9,
+      "loss": 0.003
+    },
+    {
+      "epoch": 10,
+      "loss": 0.02
+    },
+    {
+      "epoch": 11,
+      "loss": 0.007
+    },
+    {
+      "epoch": 12,
+      "loss": 0.002
+    },
+    {
+      "epoch": 13,
+      "loss": 0.013
+    },
+    {
+      "epoch": 14,
+      "loss": 0.003
+    },
+    {
+      "epoch": 15,
+      "loss": 0.063
+    }
+  ],
+  "val_loss": [
+    {
+      "epoch": 1,
+      "loss": 0.694
+    },
+    {
+      "epoch": 2,
+      "loss": 0.694
+    },
+    {
+      "epoch": 3,
+      "loss": 0.695
+    },
+    {
+      "epoch": 4,
+      "loss": 0.701
+    },
+    {
+      "epoch": 5,
+      "loss": 0.743
+    },
+    {
+      "epoch": 6,
+      "loss": 0.841
+    },
+    {
+      "epoch": 7,
+      "loss": 0.952
+    },
+    {
+      "epoch": 8,
+      "loss": 1.076
+    },
+    {
+      "epoch": 9,
+      "loss": 1.141
+    },
+    {
+      "epoch": 10,
+      "loss": 1.414
+    },
+    {
+      "epoch": 11,
+      "loss": 1.367
+    },
+    {
+      "epoch": 12,
+      "loss": 1.2
+    },
+    {
+      "epoch": 13,
+      "loss": 1.164
+    },
+    {
+      "epoch": 14,
+      "loss": 0.928
+    },
+    {
+      "epoch": 15,
+      "loss": 0.641
+    }
+  ]
+}

@@ -16,9 +16,11 @@ from biocall_studio.review.application.controller import (
     default_spectrogram_snapshot,
 )
 from biocall_studio.review.application.data_location import (
+    ReviewDataChangePlan,
     ReviewDataLocationError,
     ReviewDataLocationManager,
     ReviewDataMovePlan,
+    ReviewDataUsePlan,
 )
 from biocall_studio.review.domain.intake import ReviewResultKind
 from biocall_studio.review.gui.workspace import ReviewResultChoice, ReviewWorkspacePage
@@ -37,14 +39,14 @@ from biocall_studio.train.application.workspace import WorkspaceController
 from biocall_studio.train.gui.window import MainWindow
 
 
-class _ReviewDataMoveThread(QThread):
+class _ReviewDataChangeThread(QThread):
     succeeded = Signal(object)
     failed = Signal(str)
 
     def __init__(
         self,
         manager: ReviewDataLocationManager,
-        plan: ReviewDataMovePlan,
+        plan: ReviewDataChangePlan,
         *,
         confirm_storage: bool,
     ):
@@ -55,11 +57,16 @@ class _ReviewDataMoveThread(QThread):
 
     def run(self) -> None:
         try:
-            self.manager.move(self.plan, confirm_storage=self.confirm_storage)
+            if isinstance(self.plan, ReviewDataUsePlan):
+                self.manager.use_existing(self.plan)
+            else:
+                self.manager.move(self.plan, confirm_storage=self.confirm_storage)
         except (OSError, RuntimeError, TypeError, ValueError):
-            self.failed.emit("Couldn't move Review data. Your original folder is unchanged.")
+            self.failed.emit(
+                "Couldn't change the Review data folder. Your current folder is unchanged."
+            )
             return
-        self.succeeded.emit(self.plan.target_root)
+        self.succeeded.emit(self.plan)
 
 
 class StudioCoordinator(QObject):
@@ -87,7 +94,7 @@ class StudioCoordinator(QObject):
         self.review_controller, self.review_page = self._create_review_workspace(
             self.review_data_locations.current_root()
         )
-        self._review_move_thread: _ReviewDataMoveThread | None = None
+        self._review_move_thread: _ReviewDataChangeThread | None = None
         self._exit_after_review_move = False
         self.shell_window = StudioWindow(self.detect_controller, self.review_page)
         self.train_window = MainWindow(
@@ -254,7 +261,7 @@ class StudioCoordinator(QObject):
             )
             return
         try:
-            plan = self.review_data_locations.plan_move(
+            plan = self.review_data_locations.plan_change(
                 target,
                 forbidden_roots=tuple(Path(root) for root in self._review_move_forbidden_roots()),
             )
@@ -262,8 +269,30 @@ class StudioCoordinator(QObject):
             page.data_settings_page.reset_selection()
             page.data_settings_page.set_status(str(exc))
             return
+
+        dialog = QMessageBox(self.shell_window)
+        dialog.setObjectName("reviewDataFolderDialog")
+        dialog.setWindowTitle("Review data folder")
+        cancel = dialog.addButton("Cancel", QMessageBox.ButtonRole.RejectRole)
+        if isinstance(plan, ReviewDataUsePlan):
+            dialog.setText(
+                "Use the Review sessions and settings already in this folder? "
+                "Your current Review data will stay where it is."
+            )
+            proceed = dialog.addButton("Use this data", QMessageBox.ButtonRole.AcceptRole)
+        else:
+            dialog.setText("Move existing Review data to the selected folder?")
+            proceed = dialog.addButton("Move existing data", QMessageBox.ButtonRole.AcceptRole)
+        dialog.setDefaultButton(cancel)
+        dialog.setEscapeButton(cancel)
+        dialog.exec()
+        if dialog.clickedButton() is not proceed:
+            page.data_settings_page.reset_selection()
+            page.data_settings_page.set_status("Review data folder unchanged.")
+            return
+
         confirmed = False
-        if plan.storage_estimate.requires_confirmation:
+        if isinstance(plan, ReviewDataMovePlan) and plan.storage_estimate.requires_confirmation:
             answer = QMessageBox.question(
                 self.shell_window,
                 "Review data folder",
@@ -275,10 +304,17 @@ class StudioCoordinator(QObject):
                 page.data_settings_page.set_status("Review data folder unchanged.")
                 return
             confirmed = True
-        page.data_settings_page.set_moving(True)
+        page.data_settings_page.set_moving(
+            True,
+            message=(
+                "Opening Review data…"
+                if isinstance(plan, ReviewDataUsePlan)
+                else "Moving Review data…"
+            ),
+        )
         page.shutdown()
         self.review_controller.shutdown()
-        thread = _ReviewDataMoveThread(
+        thread = _ReviewDataChangeThread(
             self.review_data_locations,
             plan,
             confirm_storage=confirmed,
@@ -307,10 +343,15 @@ class StudioCoordinator(QObject):
         page.data_settings_page.set_status(status)
         page.focus_initial()
 
-    def _review_data_move_succeeded(self, target) -> None:
+    def _review_data_move_succeeded(self, plan: ReviewDataChangePlan) -> None:
+        using_existing = isinstance(plan, ReviewDataUsePlan)
         self._replace_review_workspace(
-            target,
-            status="Review data moved. Existing sessions and settings are ready.",
+            plan.target_root,
+            status=(
+                "Review data opened. Existing sessions and settings are ready."
+                if using_existing
+                else "Review data moved. Existing sessions and settings are ready."
+            ),
         )
 
     def _review_data_move_failed(self, message: str) -> None:
@@ -320,14 +361,14 @@ class StudioCoordinator(QObject):
                 root,
                 status=(
                     message
-                    or "Couldn't move Review data. Your original folder is unchanged."
+                    or "Couldn't change the Review data folder. Your current folder is unchanged."
                 ),
             )
         except (OSError, RuntimeError, ValueError):
             QMessageBox.critical(
                 self.shell_window,
                 "Review data folder",
-                "Couldn't move Review data. Your original folder is unchanged.",
+                "Couldn't change the Review data folder. Your current folder is unchanged.",
             )
 
     def show_studio(self) -> None:

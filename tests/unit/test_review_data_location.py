@@ -12,6 +12,7 @@ from biocall_studio.review.application.controller import (
 from biocall_studio.review.application.data_location import (
     ReviewDataLocationError,
     ReviewDataLocationManager,
+    ReviewDataUsePlan,
 )
 
 
@@ -67,7 +68,7 @@ def test_review_data_folder_move_is_versioned_atomic_and_restartable(
     reopened.shutdown()
 
 
-def test_review_data_folder_rejects_symlinks_overlap_and_nonempty_destination(
+def test_review_data_folder_accepts_compatible_existing_data_and_rejects_other_content(
     tmp_path: Path,
 ) -> None:
     """Case: UT-REVW-014."""
@@ -78,6 +79,7 @@ def test_review_data_folder_rejects_symlinks_overlap_and_nonempty_destination(
         default_spectrogram_snapshot(), saved_at="2026-11-06T10:00:00.000Z"
     )
     controller.shutdown()
+    source = manager.current_root()
 
     with pytest.raises(ReviewDataLocationError, match="Train or Detect"):
         manager.plan_move(suite_root / "detect" / "v1" / "review")
@@ -93,4 +95,36 @@ def test_review_data_folder_rejects_symlinks_overlap_and_nonempty_destination(
     occupied.mkdir()
     (occupied / "unrelated.txt").write_text("not Review data", encoding="utf-8")
     with pytest.raises(ReviewDataLocationError, match="already contains"):
-        manager.plan_move(occupied)
+        manager.plan_change(occupied)
+
+    existing = tmp_path / "existing-review-data"
+    existing_controller = ReviewSessionController(
+        tmp_path / "other-suite",
+        review_data_root=existing,
+    )
+    existing_controller.ensure_default_preset(
+        default_spectrogram_snapshot(), saved_at="2026-11-06T11:00:00.000Z"
+    )
+    existing_controller.shutdown()
+    existing_database = (existing / "sessions.sqlite3").read_bytes()
+
+    plan = manager.plan_change(existing)
+    assert isinstance(plan, ReviewDataUsePlan)
+    assert plan.source_root == source
+    assert plan.target_root == existing
+    assert plan.session_count == 0
+    manager.use_existing(plan)
+
+    assert manager.current_root() == existing
+    assert source.is_dir()
+    assert (existing / "sessions.sqlite3").read_bytes() == existing_database
+    reopened = ReviewSessionController(suite_root, review_data_root=manager.current_root())
+    assert reopened.intake.store.root == existing
+    assert reopened.list_presets() == (default_spectrogram_snapshot(),)
+    reopened.shutdown()
+
+    corrupt = tmp_path / "corrupt-review-data"
+    corrupt.mkdir()
+    (corrupt / "sessions.sqlite3").write_bytes(b"not sqlite")
+    with pytest.raises(ReviewDataLocationError, match="corrupt"):
+        manager.plan_change(corrupt)
