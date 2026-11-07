@@ -14,4 +14,8 @@
 
 **GitHub API:** PR/commits, version/doc/license changes, source/CI status. **ChatGPT VM:** static audits, focused tests, wheel and hashes. **Local native:** none in this spec. No new screenshots, physical playback, soak, 50k replay or large performance work.
 
-**Done:** one accurately pinned release candidate, evidence/canonical docs consistent, focused checks green (or explicitly blocked), proposed tag **uncreated**, handed off to two installer lanes in [04](04-installer-gates.md).
+**Done:** an accurately pinned **provisional** candidate merged to `main`, evidence/canonical docs consistent, focused checks green (or explicitly blocked), proposed tag **uncreated**, handed off to the packaging-source PR and then two native installer lanes in [04](04-installer-gates.md). The final immutable installer SHA is selected **after** the 04 packaging PR merges.
+
+## Branch, release-candidate PR and provisional SHA
+
+Follow [VERSION_CONTROL.md](VERSION_CONTROL.md). Start from the reviewed **post-02 Studio `main`** using `release/biocall-v0.1.0a1-candidate`. This is the owner-reviewed PR that commits the version bump, exact released-upstream wheel/metadata pins, license notices, worker resource contracts and human-facing release notes. Run **focused** validations only; merge the candidate-prep PR into `main` and record that merge SHA. **Do not declare it the final frozen installer/test SHA:** spec 04 still has a packaging-source PR to merge. No tag, installer upload or complete Studio test suite here; the final release SHA is selected only after the spec 04 packaging PR merges.
