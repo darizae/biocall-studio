@@ -2,18 +2,29 @@
 from __future__ import annotations
 
 import errno
+import gc
 import hashlib
+import json
 import math
 import os
+import resource
 import struct
 import time
+import tracemalloc
 import wave
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 from alp_ui.components import HelpHint
-from PySide6.QtCore import QItemSelection, QItemSelectionModel, Qt, QTimer
+from PySide6.QtCore import (
+    QCoreApplication,
+    QEvent,
+    QItemSelection,
+    QItemSelectionModel,
+    Qt,
+    QTimer,
+)
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -25,6 +36,10 @@ from PySide6.QtWidgets import (
 )
 
 from biocall_studio.review.application.controller import ReviewSessionController
+from biocall_studio.review.application.generation import (
+    GenerationCompletion,
+    GenerationToken,
+)
 from biocall_studio.review.domain.intake import (
     REVIEW_INTAKE_SCHEMA_VERSION,
     EligibleCandidate,
@@ -419,7 +434,7 @@ def test_empty_cache_gallery_generates_visible_and_nearby_rows_without_bulk(
         or bool(page._spectrogram_failures),
         timeout=15_000,
     )
-    assert page._spectrogram_failures == []
+    assert not page._spectrogram_failures
     start, end = page._visible_gallery_rows()
     assert end > start
     assert painted_rows
@@ -448,8 +463,190 @@ def test_empty_cache_gallery_generates_visible_and_nearby_rows_without_bulk(
     qtbot.waitUntil(lambda: page.gallery_model.cached_thumbnail_count >= 4, timeout=15_000)
     assert hash_calls == 1
     assert wav_path.read_bytes() == source_before
+
+    state = page.current_state
+    assert state is not None
+    snapshot = controller.store.load_settings(session_id)
+    row = page.gallery_model.candidate_at(0)
+    token = GenerationToken(
+        session_id,
+        state.session.settings_epoch,
+        snapshot.settings_digest,
+        row.source_sha256,
+        request_epoch=page._gallery_epoch,
+    )
+    for index in range(10_000):
+        page._spectrogram_job_ready(
+            (
+                "thumbnail",
+                0,
+                row.candidate_id,
+                page._gallery_epoch,
+                GenerationCompletion(
+                    content_key=f"spec_{index:064x}",
+                    outcome="failed",
+                    token=token,
+                    entry=None,
+                    prepared=None,
+                    display_payload=None,
+                    elapsed_milliseconds=1,
+                    error=f"failure-{index:05d}:" + "x" * 600,
+                ),
+            )
+        )
+    assert len(page._spectrogram_failures) == 64
+    assert all(len(message) <= 512 for message in page._spectrogram_failures)
+    assert page._spectrogram_failures[0].startswith("failure-09936:")
+    assert page._spectrogram_failures[-1].startswith("failure-09999:")
+
+    for _cycle in range(10):
+        page._set_search("no matching recording")
+        assert page.gallery_model.cached_thumbnail_count == 0
+        page._set_search("")
+        assert page.gallery_model.cached_thumbnail_count == 0
+        page._set_filter("call")
+        assert page.gallery_model.cached_thumbnail_count == 0
+        page._set_filter("all")
+        assert page.gallery_model.cached_thumbnail_count == 0
+        page.open_session(session_id)
+        assert page.gallery_model.cached_thumbnail_count == 0
+        if page.gallery_model.rowCount():
+            first = page.gallery_model.index(0, 0)
+            assert page.gallery_model.data(first, Qt.ItemDataRole.DecorationRole) is None
+            assert page.gallery_model.data(first, Qt.ItemDataRole.UserRole + 1) is None
     page.shutdown()
     controller.shutdown()
+
+
+@pytest.mark.native_cocoa
+def test_native_cocoa_review_navigation_records_memory_diagnostics(
+    qapp, qtbot, tmp_path: Path
+) -> None:
+    """Case: IT-REVW-015."""
+    source_root = tmp_path / "source"
+    wav_path = source_root / "recordings" / "field-call.wav"
+    source_sha256 = _write_wav(wav_path)
+    source_before = wav_path.read_bytes()
+    controller, first_session_id = _session(
+        tmp_path / "suite", count=8, source_sha256=source_sha256
+    )
+    first = controller.store.get_session(first_session_id)
+    controller.close_session(
+        first_session_id,
+        expected_revision=first.revision,
+        closed_at="2026-11-07T09:00:00.000Z",
+    )
+    projection = _projection(
+        8,
+        source_sha256=source_sha256,
+        recording_name="field-call.wav",
+    )
+    second = controller.store.create_session(
+        name="Afternoon review",
+        source=ReviewSessionSource.from_projection(
+            projection,
+            score_semantics="binary_softmax_target_output_index_1; not_a_calibrated_probability",
+            eligibility_threshold=0.5,
+        ),
+        candidates=projection.candidates,
+        settings=_settings(),
+        owner_id=controller.owner_id,
+        created_at="2026-11-07T10:00:00.000Z",
+        session_id="rsn_" + "b" * 32,
+    )
+
+    tracemalloc.start()
+    page = ReviewWorkspacePage(
+        controller,
+        source_root_resolver=lambda _session: source_root,
+    )
+    page.resize(980, 700)
+    page.show()
+    page.open_session(second.session_id)
+    page._set_view("gallery")
+    qtbot.waitUntil(lambda: page.gallery_model.cached_thumbnail_count > 0, timeout=20_000)
+    gc.collect()
+    traced_start, traced_peak_start = tracemalloc.get_traced_memory()
+    rss_start = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    max_gallery_pairs = page.gallery_model.cached_thumbnail_count
+    max_failure_count = len(page._spectrogram_failures)
+
+    for cycle in range(8):
+        page.open_session(first_session_id if cycle % 2 else second.session_id)
+        page._set_view("gallery")
+        page._set_search("field-call")
+        page._set_filter("all")
+        qtbot.waitUntil(
+            lambda: page.gallery_model.cached_thumbnail_count > 0,
+            timeout=20_000,
+        )
+        page.show_spectrograms()
+        page.show_session()
+        qapp.processEvents()
+        assert page.gallery_model.cached_thumbnail_count <= 64
+        assert len(page._spectrogram_failures) <= 64
+        max_gallery_pairs = max(
+            max_gallery_pairs,
+            page.gallery_model.cached_thumbnail_count,
+        )
+        max_failure_count = max(max_failure_count, len(page._spectrogram_failures))
+
+    qtbot.waitUntil(
+        lambda: page.supervisor.pending_count == 0 and page.supervisor.active_count == 0,
+        timeout=20_000,
+    )
+    terminal_batches = tuple(
+        batch for batch in page.supervisor._batches.values() if batch.done
+    )
+    assert terminal_batches
+    assert all(not batch.states and batch.iterator is None for batch in terminal_batches)
+    terminal_batch_count = len(terminal_batches)
+    gallery_pairs = page.gallery_model.cached_thumbnail_count
+    failure_count = len(page._spectrogram_failures)
+    retained_state_keys = sum(len(batch.states) for batch in terminal_batches)
+
+    page.shutdown()
+    page.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    qapp.processEvents()
+    del terminal_batches
+    page = None
+    gc.collect()
+    traced_end, traced_peak_end = tracemalloc.get_traced_memory()
+    rss_end = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    tracemalloc.stop()
+    controller.shutdown()
+    assert wav_path.read_bytes() == source_before
+
+    report = {
+        "gallery_pair_count": gallery_pairs,
+        "iterations": 8,
+        "max_gallery_pair_count": max_gallery_pairs,
+        "max_retained_failure_count": max_failure_count,
+        "retained_failure_count": failure_count,
+        "terminal_batch_count": terminal_batch_count,
+        "terminal_state_key_count": retained_state_keys,
+        "max_rss_bytes": {
+            "start": rss_start,
+            "end": rss_end,
+            "delta": rss_end - rss_start,
+        },
+        "tracemalloc_bytes": {
+            "start_current": traced_start,
+            "start_peak": traced_peak_start,
+            "end_current": traced_end,
+            "end_peak": traced_peak_end,
+            "current_delta": traced_end - traced_start,
+        },
+    }
+    report_path = Path(
+        os.environ.get(
+            "BIOCALL_STUDIO_REVIEW_MEMORY_REPORT",
+            tmp_path / "review-memory-retention.json",
+        )
+    )
+    report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    assert report_path.is_file()
 
 
 def test_rapid_detail_navigation_labels_and_play_do_not_block_or_paint_stale(

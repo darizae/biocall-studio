@@ -3,9 +3,12 @@ from __future__ import annotations
 import hashlib
 import threading
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
 
 from biocall_studio.review.application.cache import change_session_settings_with_preflight
 from biocall_studio.review.application.calibration import (
@@ -125,7 +128,7 @@ def test_generation_queue_is_bounded_prioritized_and_deduplicated() -> None:
 
 
 def test_rv10_priority_identity_calibration_retention_and_selection_truth(
-    tmp_path, monkeypatch
+    qapp, tmp_path, monkeypatch
 ) -> None:
     """Case: UT-REVW-015."""
     current = _key(10)
@@ -205,6 +208,47 @@ def test_rv10_priority_identity_calibration_retention_and_selection_truth(
     )
     assert bounded.size_plan.peak_bytes is not None
     assert bounded.calibration_version is None
+
+    import biocall_studio.review.gui.models as models_module
+
+    class FakeReviewViewState:
+        row_count = 65
+
+        def page(self, offset, limit):
+            return tuple(
+                SimpleNamespace(candidate_id=f"cand_{index:032x}")
+                for index in range(offset, min(offset + limit, self.row_count))
+            )
+
+    monkeypatch.setattr(models_module, "ReviewViewState", FakeReviewViewState)
+    gallery = models_module.ReviewGalleryModel(FakeReviewViewState())
+    thumbnail = QPixmap(2, 2)
+    thumbnail.fill(Qt.GlobalColor.black)
+    metadata = _raster().metadata
+    for _cycle in range(100):
+        for row in range(65):
+            gallery.put_thumbnail(
+                f"cand_{row:032x}",
+                thumbnail,
+                metadata,
+                row=row,
+            )
+        pixmap_count = sum(
+            gallery.data(gallery.index(row, 0), Qt.ItemDataRole.DecorationRole) is not None
+            for row in range(65)
+        )
+        metadata_count = sum(
+            gallery.data(gallery.index(row, 0), Qt.ItemDataRole.UserRole + 1) is not None
+            for row in range(65)
+        )
+        assert pixmap_count == metadata_count == gallery.cached_thumbnail_count == 64
+        gallery.refresh(clear_thumbnails=True)
+        assert gallery.cached_thumbnail_count == 0
+        assert all(
+            gallery.data(gallery.index(row, 0), Qt.ItemDataRole.DecorationRole) is None
+            and gallery.data(gallery.index(row, 0), Qt.ItemDataRole.UserRole + 1) is None
+            for row in range(65)
+        )
 
     cache = SpectrogramCache(tmp_path / "decoded-cache", limit_bytes=20_000_000)
     raster = _raster()
@@ -286,11 +330,101 @@ def test_rv10_priority_identity_calibration_retention_and_selection_truth(
         storage_estimate=ready,
     )
     release.set()
-    assert supervisor.wait(bulk, timeout=5).completed == 1
-    assert supervisor.wait(visible, timeout=5).completed == 1
+    bulk_progress = supervisor.wait(bulk, timeout=5)
+    visible_progress = supervisor.wait(visible, timeout=5)
+    assert bulk_progress.completed == 1
+    assert visible_progress.completed == 1
     assert displayed.wait(5)
     assert display_sizes == [raster.width * raster.height * 3]
+    for batch_id, final_progress in (
+        (bulk, bulk_progress),
+        (visible, visible_progress),
+    ):
+        retained_batch = supervisor._batches[batch_id]
+        assert retained_batch.done
+        assert retained_batch.states == {}
+        assert retained_batch.iterator is None
+        assert supervisor.progress(batch_id) == final_progress
     supervisor.shutdown(wait=True)
+
+    pressure = SpectrogramGenerationSupervisor(
+        cache,
+        token_is_current=lambda _token: True,
+        max_workers=1,
+        max_pending=1,
+    )
+    pressure_started = threading.Event()
+    pressure_release = threading.Event()
+
+    def blocked_render(_prepared, _cancelled):
+        pressure_started.set()
+        pressure_release.wait(5)
+        return raster
+
+    active_batch = pressure.submit(
+        GenerationJob(
+            _key(100),
+            SpectrogramImageTier.THUMBNAIL,
+            CachePriority.VISIBLE_THUMBNAIL,
+            token,
+            blocked_render,
+        ),
+        storage_estimate=ready,
+    )
+    assert pressure_started.wait(5)
+
+    invalidated_batch = pressure.submit(
+        GenerationJob(
+            _key(101),
+            SpectrogramImageTier.THUMBNAIL,
+            CachePriority.NEARBY_PREFETCH,
+            GenerationToken("session-invalidated", 1, "5" * 64, token.source_sha256),
+            lambda _prepared, _cancelled: raster,
+        ),
+        storage_estimate=ready,
+    )
+    pressure.invalidate_session_epoch("session-invalidated", 1)
+    assert pressure._batches[invalidated_batch].done
+    assert pressure._batches[invalidated_batch].states == {}
+    assert pressure._batches[invalidated_batch].iterator is None
+    invalidated_progress = pressure.progress(invalidated_batch)
+    assert invalidated_progress.done and invalidated_progress.failed == 1
+
+    dropped_batch = pressure.submit(
+        GenerationJob(
+            _key(102),
+            SpectrogramImageTier.THUMBNAIL,
+            CachePriority.NEARBY_PREFETCH,
+            token,
+            lambda _prepared, _cancelled: raster,
+        ),
+        storage_estimate=ready,
+    )
+    retained_batch_id = pressure.submit(
+        GenerationJob(
+            _key(103),
+            SpectrogramImageTier.THUMBNAIL,
+            CachePriority.CURRENT_DETAIL,
+            token,
+            lambda _prepared, _cancelled: raster,
+        ),
+        storage_estimate=ready,
+    )
+    assert pressure._batches[dropped_batch].done
+    assert pressure._batches[dropped_batch].states == {}
+    assert pressure._batches[dropped_batch].iterator is None
+    dropped_progress = pressure.progress(dropped_batch)
+    assert dropped_progress.done and dropped_progress.cancelled == 1
+
+    retained_progress = pressure.cancel(retained_batch_id)
+    assert retained_progress.done and retained_progress.cancelled == 1
+    assert pressure._batches[retained_batch_id].states == {}
+    pressure.cancel(active_batch)
+    pressure_release.set()
+    active_progress = pressure.wait(active_batch, timeout=5)
+    assert active_progress.done and active_progress.cancelled == 1
+    assert pressure._batches[active_batch].states == {}
+    pressure.shutdown(wait=True)
 
     selected, limited = bounded_selection(tuple(f"cand_{index}" for index in range(1_005)))
     assert limited and len(selected) == 1_000

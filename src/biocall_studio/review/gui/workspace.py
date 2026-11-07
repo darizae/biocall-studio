@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import threading
 import uuid
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -141,6 +142,9 @@ from biocall_studio.shared.storage import (
     format_output_estimate,
     require_storage_admission,
 )
+
+_SPECTROGRAM_FAILURE_LIMIT = 64
+_SPECTROGRAM_FAILURE_MESSAGE_LIMIT = 512
 
 
 def _now() -> str:
@@ -1639,7 +1643,9 @@ class ReviewWorkspacePage(QWidget):
         self._current_request_epoch = 0
         self._gallery_epoch = 0
         self._requested_thumbnails: set[tuple[int, str]] = set()
-        self._spectrogram_failures: list[str] = []
+        self._spectrogram_failures: deque[str] = deque(
+            maxlen=_SPECTROGRAM_FAILURE_LIMIT
+        )
         self._visible_thumbnail_keys: set[str] = set()
         self._source_identity_cache = SourceIdentityCache(max_entries=128)
         self.cache = SpectrogramCache(
@@ -2796,14 +2802,14 @@ class ReviewWorkspacePage(QWidget):
             self.table_model.refresh()
             self.gallery_model.refresh(clear_thumbnails=True)
 
-    def _render(self) -> None:
+    def _render(self, *, clear_gallery_thumbnails: bool = False) -> None:
         state = self.current_state
         if state is None:
             return
         self.session_chip.setText(state.session.name)
         self.session_page.render_state(state)
         self.table_model.refresh()
-        self.gallery_model.refresh()
+        self.gallery_model.refresh(clear_thumbnails=clear_gallery_thumbnails)
         self.session_page.selection_label.setText(
             f"{len(state.selected_candidate_ids):,} selected"
             if state.selected_candidate_ids
@@ -2826,7 +2832,7 @@ class ReviewWorkspacePage(QWidget):
             self.supervisor.drop_prefetch_except(set())
         state.set_query(view=target)
         self._persist_view()
-        self._render()
+        self._render(clear_gallery_thumbnails=True)
 
     def _set_filter(self, value: str) -> None:
         state = self.current_state
@@ -2837,7 +2843,7 @@ class ReviewWorkspacePage(QWidget):
         self.supervisor.drop_prefetch_except(set())
         state.set_query(filter_name=ReviewFilter(value))
         self._persist_view()
-        self._render()
+        self._render(clear_gallery_thumbnails=True)
 
     def _set_sort(self, value: str) -> None:
         state = self.current_state
@@ -2848,7 +2854,7 @@ class ReviewWorkspacePage(QWidget):
         self.supervisor.drop_prefetch_except(set())
         state.set_query(sort=ReviewSort(value))
         self._persist_view()
-        self._render()
+        self._render(clear_gallery_thumbnails=True)
 
     def _set_search(self, value: str) -> None:
         state = self.current_state
@@ -3202,7 +3208,9 @@ class ReviewWorkspacePage(QWidget):
         if not isinstance(completion, GenerationCompletion):
             return
         if completion.error:
-            self._spectrogram_failures.append(completion.error)
+            self._spectrogram_failures.append(
+                completion.error[:_SPECTROGRAM_FAILURE_MESSAGE_LIMIT]
+            )
         if kind == "thumbnail":
             self._requested_thumbnails.discard((request_epoch, completion.content_key))
             state = self.current_state

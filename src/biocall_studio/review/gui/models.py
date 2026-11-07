@@ -128,8 +128,9 @@ class ReviewGalleryModel(QAbstractListModel):
     ):
         super().__init__(parent)
         self._paged = _PagedCandidates(state)
-        self._thumbnails: OrderedDict[str, QPixmap] = OrderedDict()
-        self._thumbnail_metadata: dict[str, SpectrogramMetadata] = {}
+        self._thumbnail_cache: OrderedDict[
+            str, tuple[QPixmap, SpectrogramMetadata]
+        ] = OrderedDict()
 
     @property
     def state(self) -> ReviewViewState:
@@ -143,12 +144,12 @@ class ReviewGalleryModel(QAbstractListModel):
         self.beginResetModel()
         self._paged.clear()
         if clear_thumbnails:
-            self._thumbnails.clear()
+            self._thumbnail_cache.clear()
         self.endResetModel()
 
     @property
     def cached_thumbnail_count(self) -> int:
-        return len(self._thumbnails)
+        return len(self._thumbnail_cache)
 
     def put_thumbnail(
         self,
@@ -170,23 +171,19 @@ class ReviewGalleryModel(QAbstractListModel):
         current = self._paged.row(row)
         if current.candidate_id != candidate_id:
             return
-        self._thumbnails[candidate_id] = thumbnail
-        self._thumbnail_metadata[candidate_id] = metadata
-        self._thumbnails.move_to_end(candidate_id)
-        while len(self._thumbnails) > 64:
-            removed, _thumbnail = self._thumbnails.popitem(last=False)
-            self._thumbnail_metadata.pop(removed, None)
+        self._thumbnail_cache[candidate_id] = (thumbnail, metadata)
+        self._thumbnail_cache.move_to_end(candidate_id)
+        while len(self._thumbnail_cache) > 64:
+            self._thumbnail_cache.popitem(last=False)
         index = self.index(row, 0)
         self.dataChanged.emit(index, index, [Qt.ItemDataRole.DecorationRole])
 
     def drop_thumbnails(self, candidate_ids: tuple[str, ...] | None = None) -> None:
         if candidate_ids is None:
-            self._thumbnails.clear()
-            self._thumbnail_metadata.clear()
+            self._thumbnail_cache.clear()
         else:
             for candidate_id in candidate_ids:
-                self._thumbnails.pop(candidate_id, None)
-                self._thumbnail_metadata.pop(candidate_id, None)
+                self._thumbnail_cache.pop(candidate_id, None)
 
     def candidate_at(self, row: int) -> ReviewCandidateView:
         return self._paged.row(row)
@@ -205,12 +202,17 @@ class ReviewGalleryModel(QAbstractListModel):
         if role == Qt.ItemDataRole.UserRole:
             return row.candidate_id
         if role == Qt.ItemDataRole.DecorationRole:
-            thumbnail = self._thumbnails.get(row.candidate_id)
-            if thumbnail is not None:
-                self._thumbnails.move_to_end(row.candidate_id)
-            return thumbnail
+            cached = self._thumbnail_cache.get(row.candidate_id)
+            if cached is not None:
+                self._thumbnail_cache.move_to_end(row.candidate_id)
+                return cached[0]
+            return None
         if role == Qt.ItemDataRole.UserRole + 1:
-            return self._thumbnail_metadata.get(row.candidate_id)
+            cached = self._thumbnail_cache.get(row.candidate_id)
+            if cached is not None:
+                self._thumbnail_cache.move_to_end(row.candidate_id)
+                return cached[1]
+            return None
         if role == Qt.ItemDataRole.AccessibleTextRole:
             return (
                 f"{row.recording_name}, {_time_text(row.start_time_ns)}, "

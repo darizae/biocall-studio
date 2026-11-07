@@ -180,6 +180,8 @@ def test_async_generation_reuse_stale_epoch_cancel_retry_and_50k_bound(tmp_path)
     first_batch = supervisor.submit_bulk(iter((job,)), storage_estimate=ready)
     first = supervisor.wait(first_batch, timeout=10)
     assert first.completed == 1 and first.failed == first.cancelled == 0
+    assert supervisor._batches[first_batch].states == {}
+    assert supervisor._batches[first_batch].iterator is None
     entry = cache.lookup(key)
     assert entry is not None and entry.source_sha256 == candidate.source_sha256
     assert entry.size_bytes <= ready.expected_final.high_bytes
@@ -198,7 +200,9 @@ def test_async_generation_reuse_stale_epoch_cancel_retry_and_50k_bound(tmp_path)
         ),
         storage_estimate=ready,
     )
-    assert supervisor.wait(reused, timeout=5).cache_hits == 1
+    reused_progress = supervisor.wait(reused, timeout=5)
+    assert reused_progress.cache_hits == 1
+    assert supervisor._batches[reused].states == {}
     assert renders == 1
 
     cleared = cache.clear((key,))
@@ -245,6 +249,7 @@ def test_async_generation_reuse_stale_epoch_cancel_retry_and_50k_bound(tmp_path)
     release.set()
     stale_progress = supervisor.wait(stale_batch, timeout=10)
     assert stale_progress.failed == 1
+    assert supervisor._batches[stale_batch].states == {}
     assert cache.lookup(stale_job.content_key) is None
 
     started = threading.Event()
@@ -276,7 +281,9 @@ def test_async_generation_reuse_stale_epoch_cancel_retry_and_50k_bound(tmp_path)
     cancel_batch = supervisor.submit(cancel_job, storage_estimate=ready)
     assert started.wait(5)
     supervisor.cancel(cancel_batch)
-    assert supervisor.wait(cancel_batch, timeout=5).cancelled == 1
+    cancelled_progress = supervisor.wait(cancel_batch, timeout=5)
+    assert cancelled_progress.cancelled == 1
+    assert supervisor._batches[cancel_batch].states == {}
     assert cache.lookup(cancel_job.content_key) is None
 
     clear_started = threading.Event()
@@ -309,7 +316,9 @@ def test_async_generation_reuse_stale_epoch_cancel_retry_and_50k_bound(tmp_path)
     assert clear_started.wait(5)
     supervisor.clear_cache((clear_job.content_key,))
     clear_release.set()
-    assert supervisor.wait(clear_batch, timeout=10).failed == 1
+    clear_progress = supervisor.wait(clear_batch, timeout=10)
+    assert clear_progress.failed == 1
+    assert supervisor._batches[clear_batch].states == {}
     assert cache.lookup(clear_job.content_key) is None
 
     produced = 0
@@ -339,7 +348,10 @@ def test_async_generation_reuse_stale_epoch_cancel_retry_and_50k_bound(tmp_path)
     assert supervisor.pending_count <= supervisor.max_pending
     supervisor.cancel(large_batch)
     bulk_release.set()
-    supervisor.wait(large_batch, timeout=5)
+    large_progress = supervisor.wait(large_batch, timeout=5)
+    assert large_progress.done
+    assert supervisor._batches[large_batch].states == {}
+    assert supervisor._batches[large_batch].iterator is None
     supervisor.shutdown(wait=True)
 
     assert _sha256(source) == source_before

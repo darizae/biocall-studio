@@ -127,6 +127,7 @@ class _Batch:
     exhausted: bool
     thumbnail_only: bool
     cancelled_by_user: bool = False
+    done: bool = False
     requested: int = 0
     completed: int = 0
     failed: int = 0
@@ -233,6 +234,7 @@ class SpectrogramGenerationSupervisor:
             if batch is not None and batch.states.get(content_key) == "pending":
                 batch.states[content_key] = "cancelled"
                 batch.cancelled += 1
+                self._compact_if_terminal_locked(batch)
 
     def _enqueue_locked(self, batch: _Batch, job: GenerationJob) -> bool:
         if job.content_key in batch.states:
@@ -243,10 +245,12 @@ class SpectrogramGenerationSupervisor:
             if existing.job.tier is not job.tier:
                 batch.states[job.content_key] = "failed"
                 batch.failed += 1
+                self._compact_if_terminal_locked(batch)
                 return True
             if len(existing.subscribers) >= _MAX_DEDUP_SUBSCRIBERS:
                 batch.states[job.content_key] = "failed"
                 batch.failed += 1
+                self._compact_if_terminal_locked(batch)
                 return True
             existing.subscribers[batch.batch_id] = job
             if job.token not in existing.all_tokens:
@@ -260,6 +264,7 @@ class SpectrogramGenerationSupervisor:
                     batch.states[job.content_key] = "cancelled"
                     batch.cancelled += 1
                     existing.subscribers.pop(batch.batch_id, None)
+                    self._compact_if_terminal_locked(batch)
             return True
         offer = self._queue.offer(CacheQueueRequest(job.content_key, job.priority))
         for dropped_key in offer.dropped_keys:
@@ -267,6 +272,7 @@ class SpectrogramGenerationSupervisor:
         if not offer.accepted:
             batch.states[job.content_key] = "cancelled"
             batch.cancelled += 1
+            self._compact_if_terminal_locked(batch)
             return False
         self._items[job.content_key] = _WorkItem(
             job=job,
@@ -306,6 +312,7 @@ class SpectrogramGenerationSupervisor:
                 # Equal/lower-priority bulk work waits for actual capacity instead
                 # of consuming the rest of a very large iterator.
                 break
+        self._compact_if_terminal_locked(batch)
 
     def submit(
         self,
@@ -463,6 +470,7 @@ class SpectrogramGenerationSupervisor:
                 item = active[1]
             if item is not None:
                 current_tokens = set(result.current_tokens)
+                touched_batches: list[_Batch] = []
                 for batch_id, subscriber in tuple(item.subscribers.items()):
                     token = subscriber.token
                     token_is_current = token in current_tokens or (
@@ -472,6 +480,7 @@ class SpectrogramGenerationSupervisor:
                     batch = self._batches.get(batch_id)
                     if batch is None or batch.states.get(content_key) != "active":
                         continue
+                    touched_batches.append(batch)
                     if batch.cancelled_by_user or result.outcome == "cancelled":
                         batch.states[content_key] = "cancelled"
                         batch.cancelled += 1
@@ -505,6 +514,8 @@ class SpectrogramGenerationSupervisor:
                                 ),
                             )
                         )
+                for batch in touched_batches:
+                    self._compact_if_terminal_locked(batch)
             for batch in self._batches.values():
                 self._feed_bulk_locked(batch)
             self._condition.notify_all()
@@ -534,16 +545,31 @@ class SpectrogramGenerationSupervisor:
                 continue
 
     @staticmethod
-    def _is_done(batch: _Batch) -> bool:
+    def _has_reached_terminal_state(batch: _Batch) -> bool:
         outstanding = any(state in {"pending", "active"} for state in batch.states.values())
         source_done = batch.exhausted or batch.cancelled_by_user
         return source_done and not outstanding
+
+    def _compact_if_terminal_locked(self, batch: _Batch) -> bool:
+        if batch.done:
+            return True
+        if not self._has_reached_terminal_state(batch):
+            return False
+        batch.done = True
+        batch.iterator = None
+        batch.states.clear()
+        return True
+
+    @staticmethod
+    def _is_done(batch: _Batch) -> bool:
+        return batch.done
 
     def progress(self, batch_id: str) -> GenerationProgress:
         with self._condition:
             batch = self._batches.get(batch_id)
             if batch is None:
                 raise KeyError("Spectrogram generation batch does not exist.")
+            self._compact_if_terminal_locked(batch)
             pending = sum(state == "pending" for state in batch.states.values())
             active = sum(state == "active" for state in batch.states.values())
             return GenerationProgress(
@@ -555,7 +581,7 @@ class SpectrogramGenerationSupervisor:
                 cache_hits=batch.cache_hits,
                 pending=pending,
                 active=active,
-                done=self._is_done(batch),
+                done=batch.done,
             )
 
     def wait(self, batch_id: str, *, timeout: float) -> GenerationProgress:
@@ -599,6 +625,7 @@ class SpectrogramGenerationSupervisor:
                     )
                     if not other_live:
                         item.cancel_event.set()
+            self._compact_if_terminal_locked(batch)
             self._condition.notify_all()
             return self.progress(batch_id)
 
@@ -613,6 +640,7 @@ class SpectrogramGenerationSupervisor:
     def invalidate_session_epoch(self, session_id: str, settings_epoch: int) -> None:
         """Cancel or mark stale work from the superseded settings transaction."""
         with self._condition:
+            touched_batches: dict[str, _Batch] = {}
             for content_key, item in tuple(self._items.items()):
                 affected = tuple(
                     batch_id
@@ -638,9 +666,12 @@ class SpectrogramGenerationSupervisor:
                     if batch is not None and batch.states.get(content_key) == "pending":
                         batch.states[content_key] = "failed"
                         batch.failed += 1
+                        touched_batches[batch_id] = batch
                 if not item.subscribers:
                     self._queue.remove(content_key)
                     self._items.pop(content_key, None)
+            for batch in touched_batches.values():
+                self._compact_if_terminal_locked(batch)
             self._condition.notify_all()
 
     def clear_cache(self, content_keys: tuple[str, ...] | list[str]) -> CacheMutation:
