@@ -8,7 +8,7 @@ Review and merge **each existing planning PR into its own repository's `main` fi
 
 ## Library lanes — concurrently across repos, sequential within each
 
-See the authoritative per-repo contracts: [alp-ui VERSION_CONTROL](https://github.com/darizae/alp-ui/blob/spec/2026-11-release-preparation/docs/project/specs/2026-11-release-preparation/VERSION_CONTROL.md) and [toolbox VERSION_CONTROL](https://github.com/darizae/bioacoustics-dl-toolbox/blob/spec/2026-11-release-preparation/docs/specs/2026-11-release-preparation/VERSION_CONTROL.md).
+See the authoritative per-repo contracts: [alp-ui VERSION_CONTROL](https://github.com/darizae/alp-ui/blob/main/docs/project/specs/2026-11-release-preparation/VERSION_CONTROL.md) and [toolbox VERSION_CONTROL](https://github.com/darizae/bioacoustics-dl-toolbox/blob/main/docs/specs/2026-11-release-preparation/VERSION_CONTROL.md).
 
 - **alp-ui** `feat/alp-ui-01-reuse-boundaries` → merge `main`; `docs/alp-ui-02-human-readme` → merge; `release/alp-ui-v0.1.0a1` → merge. **Only then** run its own release checks on `main HEAD`, create annotated `v0.1.0a1`, publish tested wheels, and record exact tag target SHA/hash/URL.
 - **Toolbox** `feat/toolbox-01-headless-spectrogram` → merge `main`; `docs/toolbox-02-human-readme` → merge; `release/toolbox-v0.3.0` → merge. **Only then** run its own tests/build on `main HEAD`, create annotated `v0.3.0` and publish tested GitHub wheels/notes. If the feature/version decision changes, update refs and notes before tagging.
