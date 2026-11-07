@@ -1,0 +1,22 @@
+# 01 — Shrink BioCall Studio through real upstream ownership, not forced abstractions
+
+## Verified code shape
+
+- `src/biocall_studio/review/workflows/spectrograms.py` currently contains a NumPy-only deterministic `calculate_stft_power`, frequency/resampling/relative dB/palette functions, and `render_spectrogram`, plus app-specific `SpectrogramRenderRequest` and content keys.
+- `src/biocall_studio/review/domain/spectrograms.py` owns candidate context, per-session settings, image tiers, coordinate/provenance metadata and app invariants. `review/application/generation.py`, `review/persistence/cache.py` and the Qt Review workspace own asynchronous queues, storage quotas, epochs and painting. `review/gui/audio_proof.py` owns QMediaPlayer/playback and app-aware `SpectrogramView`.
+- `bioacoustics_dl_toolbox/audio/transforms.py` already has a **PyTorch** power `Spectrogram` for learning. `audio/preprocessing.py` wraps model feature transforms; their FFT window, normalization and input contracts must not silently replace Review's distinct NumPy scientific visual rendering.
+- `alp-ui` already offers a generic `Plot`, Qt controls and HelpHints; no automatic extraction of Review's audio/coordinate/domain UI is justified.
+
+## Extraction order
+
+1. **API/VM audit:** map all Review rendering functions, inputs, dependency footprint, call sites and tests; compare method semantics against existing toolbox STFT. Identify which small, domain-neutral calculations are reusable by *any* bioacoustic inspector without a BioCall/Qt dependency. **Don't lift the whole current module unchanged** or introduce toolbox→BioCall imports.
+2. **Toolbox first:** propose a headless optional-independent `bioacoustics_dl_toolbox.visualization` (or `audio` if existing structure fits better) public NumPy spectrogram calculation plus raster data return API. Expose validated explicit sample rate, window/hop, channel-power mean, DC removal, frequency crop, relative dB, palette, raster dimensions and mapping metadata as warranted by real callers; avoid Studio settings types, session keys, image-cache persistence, QImage, Qt, presets or overlays. Avoid forcing Matplotlib/torchvision for this API: the current toolbox already depends on NumPy. Choose the smallest API and document stable shapes/units.
+3. **Protect scientific semantics:** exact windowing (symmetric Hann, non-centering and FFT padding), framing at ends, opposite-phase stereo, peak of the cropped band, relative—not absolute—dB, frequency/time coordinates, palette determinism, silence, short clips, variable sample rates, and byte/array numerical equivalence with **existing** Review tests. If a change is intentional, version the renderer/cache identity and record the migration; never silently reuse old images with different pixels. Toolbox checkpoint/ML model transforms remain unchanged.
+4. **Downstream adapter second:** replace duplicated pure functions in Review with toolbox imports, keep BioCall-owned `CandidateContext`, `SpectrogramSettings`, `SpectrogramMetadata`, versioned keys, bounded recording read, queue/cache/quotas, session ownership, Qt axes/overlays and QMediaPlayer. Avoid broad rearchitecting of already working Review behavior.
+5. **UI review last:** only propose an `alp-ui` native widget if it is generic, missing from the public API, and useful independently of BioCall. Most spectrogram-specific GUI belongs in BioCall Studio; do not load FFT or QtMultimedia into `alp-ui`.
+
+## Tests and evidence
+
+Use toolbox's deterministic **unit suite** plus focused numerical tests and BioCall's unit/integration **base suite** (standard `scripts/run_tests.py background`; no soak/native playback/capture/50k). Existing Cocoa evidence in `docs/design/evidence/release-real-data` and `docs/design/evidence/review-correction/native-rv10` is sufficient for README imagery; source scientific verification remains test-driven. Verify the installed toolbox module's real path/version/SHA against the committed library before downstream pin changes. Keep generated caches and source WAV unchanged.
+
+**Acceptance:** a demonstrable reduction in duplicate Studio DSP code, a genuinely reusable standalone toolbox API with no application dependency or changed model preprocessing, preserved numerics and content keys (unless explicitly versioned), all affected base tests green, and exact upstream commit/version in BioCall metadata. If extraction adds more indirection than it removes, record a no-extraction decision rather than manufacture a framework.
