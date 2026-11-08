@@ -24,6 +24,12 @@ Existing real Cocoa screenshots under `docs/design/evidence/release-real-data` a
 
 **GitHub API/VM:** packaging source PRs, metadata, static checks; a GitHub-hosted **Windows x64** runner is a genuine native Windows environment for automated build/install/smoke, not a surrogate Linux VM. **Native Mac and Windows environments:** actual freeze/sign/install/launch/uninstall and user-data checks. The source suite is already a separate **local spec 05 pass**, not part of these lanes. **Done only when:** installer source merged, the local suite passed on the frozen SHA, both OS native installer hashes and genuine minimal smoke evidence exist, and absent signing/GUI/legal gates are explicitly flagged. **No tag or release in spec 04: execute [Studio 06](06-release-and-post-release-cleanup.md) afterward.**
 
+## Execution environments
+
+- **macOS lane (prompt 12):** actually run `packaging/macos/build.sh` and `packaging/macos/smoke.sh` **on the owner's Mac**. ChatGPT web can inspect/patch scripts through GitHub, but its Linux/cloud VM is not a substitute for Mac native Qt/freeze/signing or installed-app smoke.
+- **Windows lane (prompt 13):** ChatGPT web manages source/workflow PRs, reads GitHub Actions logs and coordinates artifacts; the native `windows-2025` **GitHub-hosted Windows x64 VM** executes PowerShell/PyInstaller/Inno Setup and real installed-app tests. If the connected GitHub tool cannot dispatch workflows, **the owner triggers Actions → Run workflow** (or `gh workflow run`); ChatGPT must not claim it triggered a job it could not invoke.
+- **Fallback:** an interactive Windows x64 cloud VM accessed by Remote Desktop **from the Mac**, only for GUI/installer verification the hosted runner cannot genuinely perform. No borrowed Windows laptop.
+
 ## Windows without a borrowed laptop — remote execution is supported
 
 **Preferred approach:** use a short, manually dispatched **GitHub Actions** workflow in this repository on a genuine Windows x64 hosted VM, e.g. `runs-on: windows-2025` (not `windows-11-arm`). Build/verify the same frozen `STUDIO_RELEASE_SHA` after the local Studio spec 05 suite has passed. The existing `packaging/windows/build.ps1`, `packaging/windows/biocall.spec`, `packaging/windows/biocall.iss` and `packaging/windows/smoke.ps1` are the actual starting point; `.github/workflows/installer-source.yml` is currently **Linux-only packaging preflight**, not a Windows build or installed smoke result.
