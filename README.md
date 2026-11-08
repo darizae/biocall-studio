@@ -30,7 +30,7 @@ Explore detections in a spectrogram gallery or inspect them individually. Listen
 
 ## Getting started
 
-BioCall Studio currently runs from source; desktop installers are not yet available. Use Python **3.11–3.13** and follow the [installation guide](docs/DEVELOPMENT.md#install-from-published-wheels) to set up the application.
+The first macOS and Windows installers have been built for testing, but **no publicly downloadable BioCall Studio release assets are available yet**. Download links will appear here after a clearly labeled unsigned test pre-release is actually uploaded. For now, use Python **3.11–3.13** and follow the [installation guide](docs/DEVELOPMENT.md#install-from-published-wheels) to run from source.
 
 Launch it from your checkout:
 
@@ -44,4 +44,4 @@ Launch it from your checkout:
 
 ## License
 
-The application license has not yet been specified. The [third-party redistribution notices](docs/legal/THIRD_PARTY_NOTICES.md) identify the released GPL-3.0-only scientific toolbox, MIT UI library, Qt and font obligations. They do **not** grant a BioCall Studio application license or approve public binaries.
+**BioCall Studio's original application source is licensed under [GNU GPL-3.0-only](LICENSE).** Upstream dependencies keep their own licenses: see the [third-party redistribution notices](docs/legal/THIRD_PARTY_NOTICES.md) for the GPL-3.0-only scientific toolbox, MIT alp-ui, Qt/PySide6 and bundled-font terms. A testing label does not waive the requirement to provide corresponding source and applicable notices when distributing installers.
