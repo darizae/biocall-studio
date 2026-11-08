@@ -119,9 +119,7 @@ class ModelSnapshot:
         if "/" in self.model_id or not self.label.strip():
             raise ValueError("ModelSnapshot identity is invalid.")
         for digest in (self.manifest_sha256, self.artifact_sha256):
-            invalid_character = any(
-                character not in "0123456789abcdef" for character in digest
-            )
+            invalid_character = any(character not in "0123456789abcdef" for character in digest)
             if len(digest) != 64 or invalid_character:
                 raise ValueError("ModelSnapshot digest is invalid.")
         if self.class_to_index != (("noise", 0), ("target", 1)):
@@ -297,9 +295,7 @@ class ModelSnapshot:
             ),
             rf_feature_family=raw["rf_feature_family"],
             rf_feature_names=tuple(raw["rf_feature_names"]),
-            rf_feature_config=_items_from_json(
-                raw["rf_feature_config"], label="RF feature config"
-            ),
+            rf_feature_config=_items_from_json(raw["rf_feature_config"], label="RF feature config"),
             loader_api=raw["loader_api"],
             loader_distribution=raw["loader_distribution"],
             loader_version=raw["loader_version"],

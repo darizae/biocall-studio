@@ -39,7 +39,7 @@ from biocall_studio.shared.storage import pcm_wav_bytes
 
 
 def _result(
-    specs: tuple[tuple[str, str, int, int, tuple[tuple[int, int], ...]], ...]
+    specs: tuple[tuple[str, str, int, int, tuple[tuple[int, int], ...]], ...],
 ) -> DetectionResult:
     inventory_id = "inv_" + "1" * 32
     outcomes = []
@@ -197,9 +197,7 @@ def test_exact_frame_byte_and_raven_offset_arithmetic_has_no_accumulated_drift()
 
 def test_storage_plan_counts_snippets_concat_and_tsv_once() -> None:
     """Case: UT-SIZE-001."""
-    result = _result(
-        (("recordings/a.wav", "7", 8_000, 1, ((1, 4), (10, 15))),)
-    )
+    result = _result((("recordings/a.wav", "7", 8_000, 1, ((1, 4), (10, 15))),))
     snapshot = _snapshot(result, mode=ExportMode.BOTH)
     plan = estimate_export_artifacts(snapshot)
 
@@ -313,9 +311,7 @@ def test_windows_safe_names_mixed_format_policy_and_no_overwrite(tmp_path):
     assert len({name.casefold() for name in names}) == 2
     assert all(name.startswith("snippets/") and name.endswith(".wav") for name in names)
     assert all(not any(character in name for character in '<>:"|?*') for name in names)
-    reserved = safe_snippet_relative_path(
-        "recordings/CON.wav", 1, 2, "cand_" + "f" * 32
-    )
+    reserved = safe_snippet_relative_path("recordings/CON.wav", 1, 2, "cand_" + "f" * 32)
     assert Path(reserved).stem.split("__", 1)[0] == "CON_source"
 
     with pytest.raises(ValueError, match="same sample rate, channel count, and sample width"):

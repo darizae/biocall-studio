@@ -70,9 +70,7 @@ def _make_collection(root: Path) -> None:
         )
 
 
-def _capture_export_confirmation(
-    app, window: MainWindow, output: Path, settle_ms: int
-) -> None:
+def _capture_export_confirmation(app, window: MainWindow, output: Path, settle_ms: int) -> None:
     captured = False
 
     def capture_and_cancel() -> None:
@@ -125,9 +123,7 @@ def main(argv: list[str] | None = None) -> int:
         f"PySide6/Qt={pyside_version} alp-ui={importlib.metadata.version('alp-ui')}"
     )
 
-    with tempfile.TemporaryDirectory(
-        prefix="biocall-studio-spec05d-", dir="/tmp"
-    ) as temporary:
+    with tempfile.TemporaryDirectory(prefix="biocall-studio-spec05d-", dir="/tmp") as temporary:
         temporary_root = Path(temporary)
         root = temporary_root / "Spec05dExample"
         _make_collection(root)

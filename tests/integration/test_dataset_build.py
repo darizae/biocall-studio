@@ -150,7 +150,7 @@ def test_real_source_audio_is_materialized_with_protected_windows_and_grouped_sp
     assert {path: path.read_bytes() for path in positive_bytes} == positive_bytes
     assert load_dataset(root, artifact.dataset_id).manifest == artifact.manifest
     extraction = artifact.manifest["source_policy"]["audio_extraction"]
-    assert extraction["revision"] == "22c1b342918b33c62288f23b660aa716f3e361e6"
+    assert extraction["revision"] == "7027bd84cc5a44a27bf201332af540f090c38365"
     assert str(root) not in json.dumps(artifact.manifest)
 
 
@@ -329,9 +329,7 @@ def test_native_builder_controls_states_worker_and_dataset_navigation(
     assert builder.build_button.isEnabled()
     assert builder.storage_section.isVisible()
     assert builder.storage_section.output.text().startswith("Estimated output: ")
-    assert builder.storage_section.peak.text().startswith(
-        "Space needed while running: about "
-    )
+    assert builder.storage_section.peak.text().startswith("Space needed while running: about ")
     assert builder.storage_section.free.text().startswith("Free on collection: ")
     storage_hints = {
         hint.objectName(): (hint.accessibleName(), hint.accessibleDescription())

@@ -591,8 +591,9 @@ def test_native_finalized_export_preflight_publish_and_history(qapp, qtbot, tmp_
     assert page.export_page.show_button.isVisible()
     assert page.export_page.status_label.text() == "Export complete."
 
-    page.show_landing()
-    assert page.landing_page.exports.rowCount() == 1
-    assert page.landing_page.exports.item(0, 0).text() == "Field review"
-    assert "rexp_" not in page.landing_page.exports.item(0, 0).text()
+    page.show_exports()
+    assert page.currentWidget() is page.exports_page
+    assert page.exports_page.exports.rowCount() == 1
+    assert page.exports_page.exports.item(0, 0).text() == "Field review"
+    assert "rexp_" not in page.exports_page.exports.item(0, 0).text()
     page.shutdown()

@@ -420,9 +420,7 @@ def test_typed_handoff_preserves_role_semantics_and_unproven_prediction_parity(
     assert rf.snapshot.family is ModelFamily.RANDOM_FOREST
     assert rf.snapshot.role is ModelRole.INTERVAL_REFINEMENT
     assert rf.snapshot.rf_probability_column == 1
-    assert rf.snapshot.rf_feature_names == tuple(
-        rf_manifest["random_forest"]["features"]["names"]
-    )
+    assert rf.snapshot.rf_feature_names == tuple(rf_manifest["random_forest"]["features"]["names"])
     assert rf.snapshot.prediction_parity is ScientificEvidenceState.UNPROVEN
     assert ModelSnapshot.from_dict(rf.snapshot.to_dict()) == rf.snapshot
 

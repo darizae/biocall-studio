@@ -16,7 +16,11 @@ from bioacoustics_dl_toolbox.models import Classifier, ResidualEncoder
 from bioacoustics_dl_toolbox.training.checkpoints import save_model
 
 from biocall_studio.shared.integrity import sha256_file
-from biocall_studio.train.domain.model import validate_model_manifest
+from biocall_studio.train.domain.model import (
+    MODEL_TOOLBOX_REVISION,
+    MODEL_TOOLBOX_VERSION,
+    validate_model_manifest,
+)
 from biocall_studio.train.persistence.models import (
     discard_uncommitted_model,
     load_model,
@@ -137,8 +141,8 @@ def _manifest(checkpoint, *, digest: str | None = None) -> dict:
             "trainer": {"distribution": "biocall-studio", "version": "0.1.0a0"},
             "toolbox": {
                 "distribution": "bioacoustics-dl-toolbox",
-                "version": "0.2.0",
-                "revision": "22c1b342918b33c62288f23b660aa716f3e361e6",
+                "version": MODEL_TOOLBOX_VERSION,
+                "revision": MODEL_TOOLBOX_REVISION,
             },
             "torch_version": torch.__version__,
             "scientific_reference": "alpaca-pipelines@91af5287dc18313f88902dc9696e8756274736b3",

@@ -85,9 +85,7 @@ def _complete_publication(
     return completed
 
 
-def test_persisted_detect_results_intake_is_paged_safe_and_source_immutable(
-    tmp_path, wav_factory
-):
+def test_persisted_detect_results_intake_is_paged_safe_and_source_immutable(tmp_path, wav_factory):
     """Case: IT-REVW-001."""
     suite_root = tmp_path / "suite-data"
     source_root = tmp_path / "field-recordings"
@@ -253,8 +251,7 @@ def test_persisted_detect_results_intake_is_paged_safe_and_source_immutable(
     assert rf_prepared.source.parent_score_semantics == cnn.score_semantics
     assert tuple(row.candidate_id for row in rf_prepared.candidates) == (first.candidate_id,)
     assert (
-        intake.intake(collection.ref.collection_id, rf.result_id).manifest
-        == rf_inspection.manifest
+        intake.intake(collection.ref.collection_id, rf.result_id).manifest == rf_inspection.manifest
     )
     assert paths.review == paths.root / "review" / "v1"
     assert intake.store.root == paths.review

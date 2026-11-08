@@ -59,9 +59,7 @@ def test_detect_collection_identity_schema_and_public_serialization_are_independ
     assert "source_root" not in first.to_public_dict()
     assert "/Volumes/Field" not in repr(first.to_public_dict())
     assert binding.source_root_uri not in repr(first.to_public_dict())
-    assert detect_workspace_path(Path("/application/data")) == Path(
-        "/application/data/detect/v1"
-    )
+    assert detect_workspace_path(Path("/application/data")) == Path("/application/data/detect/v1")
 
     for version in (0, DETECT_COLLECTION_SCHEMA_VERSION + 1):
         payload = {**first.to_public_dict(), "schema_version": version}
@@ -78,10 +76,7 @@ def test_root_state_relink_confirmation_and_inventory_freshness_are_explicit():
         decide_root_binding(expected, RootObservation.available(expected))
         is RootBindingDecision.VALID
     )
-    assert (
-        decide_root_binding(expected, RootObservation.missing())
-        is RootBindingDecision.MISSING
-    )
+    assert decide_root_binding(expected, RootObservation.missing()) is RootBindingDecision.MISSING
     assert (
         decide_root_binding(expected, RootObservation.inaccessible())
         is RootBindingDecision.INACCESSIBLE
@@ -137,6 +132,4 @@ def test_detect_relative_references_normalize_and_reject_portable_collisions():
     """Case: UT-DET-003."""
     assert validate_relative_reference("recordings/REC_A.wav") == "recordings/REC_A.wav"
     with pytest.raises(ValueError, match="collision"):
-        ensure_unique_relative_references(
-            ["recordings/Caf\u00e9.wav", "recordings/cafe\u0301.WAV"]
-        )
+        ensure_unique_relative_references(["recordings/Caf\u00e9.wav", "recordings/cafe\u0301.WAV"])

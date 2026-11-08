@@ -12,8 +12,8 @@ from biocall_studio.train.domain.rf_training import rf_feature_names
 MODEL_SCHEMA_VERSION = 1
 MODEL_FORMAT = "bioacoustics-dl-toolbox-pytorch"
 MODEL_FORMAT_VERSION = 2
-MODEL_TOOLBOX_VERSION = "0.2.0"
-MODEL_TOOLBOX_REVISION = "22c1b342918b33c62288f23b660aa716f3e361e6"
+MODEL_TOOLBOX_VERSION = "0.3.0"
+MODEL_TOOLBOX_REVISION = "7027bd84cc5a44a27bf201332af540f090c38365"
 MODEL_SCIENTIFIC_REFERENCE = "alpaca-pipelines@91af5287dc18313f88902dc9696e8756274736b3"
 _METRIC_NAMES = frozenset({"accuracy", "precision", "recall", "f1", "roc_auc"})
 

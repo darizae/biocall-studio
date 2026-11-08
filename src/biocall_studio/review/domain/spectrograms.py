@@ -347,10 +347,7 @@ class SpectrogramMetadata:
             self.sample_rate_hz <= 0
             or self.channels <= 0
             or self.source_frame_count <= 0
-            or not 0
-            <= self.context_start_frame
-            < self.context_end_frame
-            <= self.source_frame_count
+            or not 0 <= self.context_start_frame < self.context_end_frame <= self.source_frame_count
             or not self.context_start_frame
             <= self.candidate_start_frame
             < self.candidate_end_frame
@@ -366,10 +363,14 @@ class SpectrogramMetadata:
             or self.n_fft & (self.n_fft - 1)
         ):
             raise ValueError("Spectrogram metadata frame geometry is invalid.")
-        if not isinstance(self.tier, SpectrogramImageTier) or (
-            self.width,
-            self.height,
-        ) != self.tier.dimensions:
+        if (
+            not isinstance(self.tier, SpectrogramImageTier)
+            or (
+                self.width,
+                self.height,
+            )
+            != self.tier.dimensions
+        ):
             raise ValueError("Spectrogram metadata image tier is invalid.")
         if not isinstance(self.palette, Palette) or self.contrast_db not in _CONTRAST_CHOICES:
             raise ValueError("Spectrogram metadata display settings are invalid.")

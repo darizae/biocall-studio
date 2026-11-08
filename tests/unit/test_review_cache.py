@@ -434,9 +434,7 @@ def test_rv10_priority_identity_calibration_retention_and_selection_truth(
 
 def test_cache_publish_lookup_lru_clear_and_containment(tmp_path) -> None:
     """Case: UT-REVW-007."""
-    cache = SpectrogramCache(
-        tmp_path / "review" / "v1" / "spectrograms", limit_bytes=20_000_000
-    )
+    cache = SpectrogramCache(tmp_path / "review" / "v1" / "spectrograms", limit_bytes=20_000_000)
     raster = _raster()
     entry = cache.publish(raster, settings_digest="4" * 64)
     assert entry.content_key == raster.content_key
@@ -572,8 +570,7 @@ def test_review_storage_adapter_uses_measured_incremental_bytes_and_rev05() -> N
     )
     assert unknown.size_plan.expected_final.kind is EstimateKind.UNAVAILABLE
     assert (
-        assess_review_cache_storage(unknown, capacity=capacity).decision
-        is StorageDecision.UNKNOWN
+        assess_review_cache_storage(unknown, capacity=capacity).decision is StorageDecision.UNKNOWN
     )
 
     stale = assess_review_cache_storage(

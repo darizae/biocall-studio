@@ -234,18 +234,14 @@ class DetectRunRepository:
             raise RunConflictError("Only one Active Detect Run is allowed.") from exc
         try:
             directory.mkdir(mode=0o700)
-            _write_json_atomic(
-                directory / "request.json", request.to_dict(), replace=False
-            )
+            _write_json_atomic(directory / "request.json", request.to_dict(), replace=False)
             record = new_run_record(
                 request,
                 title=title,
                 stages=stages,
                 now=request.created_at,
             )
-            _write_json_atomic(
-                directory / "run.json", record.to_dict(), replace=False
-            )
+            _write_json_atomic(directory / "run.json", record.to_dict(), replace=False)
         except Exception:
             if directory.exists() and not directory.is_symlink():
                 shutil.rmtree(directory)
@@ -327,9 +323,7 @@ class DetectRunRepository:
     def write_receipt(self, receipt: PublicationReceipt) -> Path:
         path = self.run_directory(receipt.run_id) / "receipt.json"
         if path.exists():
-            existing = PublicationReceipt.from_dict(
-                _read_json(path, label="PublicationReceipt")
-            )
+            existing = PublicationReceipt.from_dict(_read_json(path, label="PublicationReceipt"))
             if existing != receipt:
                 raise FileExistsError("A different PublicationReceipt already exists.")
             return path

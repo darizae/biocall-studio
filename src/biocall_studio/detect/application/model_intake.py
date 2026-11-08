@@ -55,9 +55,7 @@ def _trusted_train_location(root: Path) -> None:
         or models_root.is_symlink()
         or alpaca_root.is_symlink()
     ):
-        raise ValueError(
-            "Choose a Model from a trusted Train Model location (.alpaca/models)."
-        )
+        raise ValueError("Choose a Model from a trusted Train Model location (.alpaca/models).")
     collection_path = alpaca_root / "collection.json"
     collection = _read_json(
         collection_path,
@@ -174,9 +172,7 @@ def _snapshot(
         feature_names: tuple[str, ...] = ()
         feature_config: _ConfigItems = ()
         spectrogram = _config_items(transforms["spectrogram"], label="spectrogram config")
-        normalization = _config_items(
-            transforms["normalization"], label="normalization config"
-        )
+        normalization = _config_items(transforms["normalization"], label="normalization config")
         preprocessing = tuple(transforms["preprocessing_order"])
         loader_api = "bioacoustics_dl_toolbox.training.checkpoints.load_model"
         window_duration = input_spec["window_duration_ms"]
@@ -233,13 +229,9 @@ def _snapshot(
         rf_feature_names=feature_names,
         rf_feature_config=feature_config,
         loader_api=loader_api,
-        loader_distribution=(
-            "bioacoustics-dl-toolbox" if family is ModelFamily.CNN else "joblib"
-        ),
+        loader_distribution=("bioacoustics-dl-toolbox" if family is ModelFamily.CNN else "joblib"),
         loader_version=(
-            version("bioacoustics-dl-toolbox")
-            if family is ModelFamily.CNN
-            else version("joblib")
+            version("bioacoustics-dl-toolbox") if family is ModelFamily.CNN else version("joblib")
         ),
         source_revision=source_revision,
         runtime_versions=runtime_versions,

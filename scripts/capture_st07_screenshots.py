@@ -48,9 +48,7 @@ def _wav(
     payload = bytearray()
     for frame in range(frames):
         for channel in range(channels):
-            payload.extend(
-                struct.pack("<h", ((frame * 97 + channel * 701) % 20_000) - 10_000)
-            )
+            payload.extend(struct.pack("<h", ((frame * 97 + channel * 701) % 20_000) - 10_000))
     with wave.open(str(path), "wb") as stream:
         stream.setnchannels(channels)
         stream.setsampwidth(2)
@@ -193,8 +191,7 @@ def main(argv: list[str] | None = None) -> int:
         controller._worker_step_delay_seconds = 0.15
         controller.choose_model_root(str(model.root))
         _wait_until(
-            lambda: controller.model_reference is not None
-            and not controller.is_model_loading
+            lambda: controller.model_reference is not None and not controller.is_model_loading
         )
         print("Accepted Model; scanning recording inventory...", flush=True)
         controller.choose_source_root(str(source))
@@ -230,9 +227,7 @@ def main(argv: list[str] | None = None) -> int:
             f"{page.route_stack.minimumSizeHint().width()}",
             flush=True,
         )
-        _wait_until(
-            lambda: page.is_compact and page.horizontalScrollBar().maximum() == 0
-        )
+        _wait_until(lambda: page.is_compact and page.horizontalScrollBar().maximum() == 0)
         page.verticalScrollBar().setValue(page.verticalScrollBar().maximum())
         _capture(
             window,
@@ -245,9 +240,11 @@ def main(argv: list[str] | None = None) -> int:
         controller.start_detection(DetectionSettings(1.0, 50, 200, 16))
         print("Started real CNN detection Worker; capturing Run states...", flush=True)
         _wait_until(
-            lambda: controller.current_run is not None
-            and controller.current_run.status is DetectRunStatus.RUNNING
-            and controller.current_run.progress >= 10
+            lambda: (
+                controller.current_run is not None
+                and controller.current_run.status is DetectRunStatus.RUNNING
+                and controller.current_run.progress >= 10
+            )
         )
         _capture(
             window,
@@ -255,8 +252,10 @@ def main(argv: list[str] | None = None) -> int:
             settle_ms=200,
         )
         _wait_until(
-            lambda: controller.current_run is not None
-            and controller.current_run.status is DetectRunStatus.COMPLETED
+            lambda: (
+                controller.current_run is not None
+                and controller.current_run.status is DetectRunStatus.COMPLETED
+            )
         )
         if controller.current_result is None or controller.current_result.failed_files != 1:
             raise RuntimeError("Native ST-07 completion did not preserve the file failure.")

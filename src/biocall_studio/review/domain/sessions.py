@@ -309,9 +309,7 @@ class ReviewSessionSource:
             or not 0 <= self.eligibility_threshold <= 1
         ):
             raise ValueError("Review eligibility threshold is invalid.")
-        if (self.parent_score_semantics is None) != (
-            self.parent_eligibility_threshold is None
-        ):
+        if (self.parent_score_semantics is None) != (self.parent_eligibility_threshold is None):
             raise ValueError("Review parent score provenance is incomplete.")
         if self.parent_score_semantics is not None and (
             not isinstance(self.parent_score_semantics, str)

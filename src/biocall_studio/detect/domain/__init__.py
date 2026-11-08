@@ -115,9 +115,7 @@ class DetectCollectionRef:
 
     def __post_init__(self) -> None:
         if self.schema_version != DETECT_COLLECTION_SCHEMA_VERSION:
-            raise ValueError(
-                f"Unsupported Detect Collection schema: {self.schema_version!r}."
-            )
+            raise ValueError(f"Unsupported Detect Collection schema: {self.schema_version!r}.")
         validate_collection_id(self.collection_id)
         normalized = validate_display_label(self.display_label)
         if normalized != self.display_label:

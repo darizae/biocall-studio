@@ -139,9 +139,7 @@ def _prepare_suite(example_root: Path, suite_root: Path) -> None:
 def _prepare_review_session(example_root: Path) -> str:
     suite_root = example_root / "app-data"
     review_root = suite_root / "review" / "v1"
-    provenance = json.loads(
-        (example_root / "REAL_HUM_PROVENANCE.json").read_text(encoding="utf-8")
-    )
+    provenance = json.loads((example_root / "REAL_HUM_PROVENANCE.json").read_text(encoding="utf-8"))
     if any(row["human_binary_target"] != "positive" for row in provenance["rows"]):
         raise RuntimeError("The release Review cohort contains an unexpected human label.")
     detect = DetectWorkspaceController(suite_root)
@@ -283,17 +281,21 @@ def main(argv: list[str] | None = None) -> int:
             review_page.open_session(session_id)
             review_page.show_spectrograms()
             _wait_until(
-                lambda: review_page._generation_prepare_thread is None
-                and review_page.cache_page.generate_button.isEnabled(),
+                lambda: (
+                    review_page._generation_prepare_thread is None
+                    and review_page.cache_page.generate_button.isEnabled()
+                ),
                 timeout_ms=45_000,
             )
             _button(review_page.cache_page, "Generate all").click()
             try:
                 _wait_until(
-                    lambda: review_page._generation_batch_id is None
-                    and review_page._generation_prepare_thread is None
-                    and review_page.cache_page.progress_label.text()
-                    == "Retained 64 of 64 thumbnails.",
+                    lambda: (
+                        review_page._generation_batch_id is None
+                        and review_page._generation_prepare_thread is None
+                        and review_page.cache_page.progress_label.text()
+                        == "Retained 64 of 64 thumbnails."
+                    ),
                     timeout_ms=100_000,
                 )
             except TimeoutError:
@@ -372,25 +374,28 @@ def main(argv: list[str] | None = None) -> int:
 
         review_page.show_spectrograms()
         _wait_until(
-            lambda: review_page.calibration_store.calibration(
-                SpectrogramImageTier.THUMBNAIL
-            )
-            is not None,
+            lambda: (
+                review_page.calibration_store.calibration(SpectrogramImageTier.THUMBNAIL)
+                is not None
+            ),
             timeout_ms=45_000,
         )
         _wait_until(
-            lambda: review_page._generation_prepare_thread is None
-            and review_page.cache_page.generate_button.isEnabled(),
+            lambda: (
+                review_page._generation_prepare_thread is None
+                and review_page.cache_page.generate_button.isEnabled()
+            ),
             timeout_ms=45_000,
         )
         _button(review_page.cache_page, "Generate all").click()
         _wait_until(
-            lambda: review_page._generation_batch_id is None
-            and review_page._generation_prepare_thread is None
-            and review_page.cache_page.availability_label.text()
-            == "64 of 64 spectrograms available"
-            and review_page.cache_page.progress_label.text()
-            == "Retained 64 of 64 thumbnails.",
+            lambda: (
+                review_page._generation_batch_id is None
+                and review_page._generation_prepare_thread is None
+                and review_page.cache_page.availability_label.text()
+                == "64 of 64 spectrograms available"
+                and review_page.cache_page.progress_label.text() == "Retained 64 of 64 thumbnails."
+            ),
             timeout_ms=100_000,
         )
         _capture(coordinator.shell_window, output, "10-review-spectrograms.png", captures)

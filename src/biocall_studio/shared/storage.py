@@ -447,9 +447,7 @@ def _volume_groups(
             _bounded_bytes(peak, "Peak additional space")
         # A failed query cannot prove that two destinations share a filesystem.
         group_key = (
-            observation.volume_id
-            if observation.free_bytes is not None
-            else f"unknown:{label}"
+            observation.volume_id if observation.free_bytes is not None else f"unknown:{label}"
         )
         groups.setdefault(group_key, []).append((label, peak, observation))
 
@@ -547,11 +545,7 @@ def assess_storage(
             decision = StorageDecision.INSUFFICIENT
         else:
             tight_ceiling = _add_bounded(required, reserve, "Tight-space threshold")
-            decision = (
-                StorageDecision.TIGHT
-                if free < tight_ceiling
-                else StorageDecision.READY
-            )
+            decision = StorageDecision.TIGHT if free < tight_ceiling else StorageDecision.READY
         assessments.append(
             VolumeAssessment(
                 label,
@@ -569,8 +563,7 @@ def assess_storage(
     if StorageDecision.INSUFFICIENT in decisions:
         decision = StorageDecision.INSUFFICIENT
         reason = (
-            "Not enough free space for this operation. Choose another destination or free up "
-            "space."
+            "Not enough free space for this operation. Choose another destination or free up space."
         )
     elif StorageDecision.UNKNOWN in decisions:
         decision = StorageDecision.UNKNOWN

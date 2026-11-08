@@ -128,9 +128,7 @@ class ReviewGalleryModel(QAbstractListModel):
     ):
         super().__init__(parent)
         self._paged = _PagedCandidates(state)
-        self._thumbnail_cache: OrderedDict[
-            str, tuple[QPixmap, SpectrogramMetadata]
-        ] = OrderedDict()
+        self._thumbnail_cache: OrderedDict[str, tuple[QPixmap, SpectrogramMetadata]] = OrderedDict()
 
     @property
     def state(self) -> ReviewViewState:
@@ -196,9 +194,7 @@ class ReviewGalleryModel(QAbstractListModel):
             return None
         row = self._paged.row(index.row())
         if role == Qt.ItemDataRole.DisplayRole:
-            return (
-                f"{row.recording_name}\n{_time_text(row.start_time_ns)}   {_label_text(row)}"
-            )
+            return f"{row.recording_name}\n{_time_text(row.start_time_ns)}   {_label_text(row)}"
         if role == Qt.ItemDataRole.UserRole:
             return row.candidate_id
         if role == Qt.ItemDataRole.DecorationRole:
@@ -214,10 +210,7 @@ class ReviewGalleryModel(QAbstractListModel):
                 return cached[1]
             return None
         if role == Qt.ItemDataRole.AccessibleTextRole:
-            return (
-                f"{row.recording_name}, {_time_text(row.start_time_ns)}, "
-                f"{_label_text(row)}"
-            )
+            return f"{row.recording_name}, {_time_text(row.start_time_ns)}, {_label_text(row)}"
         if role == Qt.ItemDataRole.SizeHintRole:
             return QSize(284, 108)
         return None

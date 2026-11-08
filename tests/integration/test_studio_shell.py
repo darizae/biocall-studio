@@ -314,9 +314,7 @@ def test_review_sidebar_routes_active_state_and_responsive_accessibility(qtbot, 
     _finish(qtbot, coordinator)
 
 
-def test_review_data_folder_moves_in_app_and_reopens_without_touching_detect(
-    qtbot, tmp_path
-):
+def test_review_data_folder_moves_in_app_and_reopens_without_touching_detect(qtbot, tmp_path):
     """Case: IT-REVW-014."""
     create_studio_application()
     suite_root = tmp_path / "application-data"
@@ -385,9 +383,7 @@ def test_review_data_folder_moves_in_app_and_reopens_without_touching_detect(
     existing = tmp_path / "existing-review-data"
     existing_controller = ReviewSessionController(suite_root, review_data_root=existing)
     settings = default_spectrogram_snapshot()
-    existing_controller.ensure_default_preset(
-        settings, saved_at="2026-11-06T09:05:00.000Z"
-    )
+    existing_controller.ensure_default_preset(settings, saved_at="2026-11-06T09:05:00.000Z")
     existing_controller.create_preset(
         name="Alpaca hum detail",
         effective_settings=settings.effective_settings,
@@ -772,13 +768,16 @@ def test_open_review_survives_navigation_and_one_exit_policy_fails_closed(
     assert dialog.informativeText().count("Spectrogram generation in Review") == 1
     coordinator.request_application_exit()
     assert coordinator.exit_dialog is dialog
-    assert len(
-        [
-            widget
-            for widget in qapp.topLevelWidgets()
-            if widget.objectName() == "studioExitDialog" and widget.isVisible()
-        ]
-    ) == 1
+    assert (
+        len(
+            [
+                widget
+                for widget in qapp.topLevelWidgets()
+                if widget.objectName() == "studioExitDialog" and widget.isVisible()
+            ]
+        )
+        == 1
+    )
     qtbot.keyClick(dialog, Qt.Key.Key_Escape)
     qtbot.waitUntil(lambda: coordinator.exit_dialog is None)
     assert coordinator.review_controller.store.open_session().session_id == session_id
@@ -797,8 +796,10 @@ def test_open_review_survives_navigation_and_one_exit_policy_fails_closed(
     assert dialog is not None
     next(button for button in dialog.buttons() if button.text() == "Save and Exit").click()
     qtbot.waitUntil(
-        lambda: coordinator.exit_failure_dialog is not None
-        and coordinator.exit_failure_dialog.isVisible()
+        lambda: (
+            coordinator.exit_failure_dialog is not None
+            and coordinator.exit_failure_dialog.isVisible()
+        )
     )
     failure = coordinator.exit_failure_dialog
     assert failure is not None
@@ -823,8 +824,10 @@ def test_open_review_survives_navigation_and_one_exit_policy_fails_closed(
     assert dialog is not None
     next(button for button in dialog.buttons() if button.text() == "Save and Exit").click()
     qtbot.waitUntil(
-        lambda: coordinator.exit_failure_dialog is not None
-        and coordinator.exit_failure_dialog.isVisible()
+        lambda: (
+            coordinator.exit_failure_dialog is not None
+            and coordinator.exit_failure_dialog.isVisible()
+        )
     )
     failure = coordinator.exit_failure_dialog
     assert failure is not None
@@ -841,7 +844,10 @@ def test_open_review_survives_navigation_and_one_exit_policy_fails_closed(
     assert dialog is not None
     next(button for button in dialog.buttons() if button.text() == "Save and Exit").click()
     qtbot.waitUntil(lambda: coordinator._application_exit_complete, timeout=15_000)
-    assert coordinator.review_controller.store.get_session(session_id).state is ReviewSessionState.CLOSED
+    assert (
+        coordinator.review_controller.store.get_session(session_id).state
+        is ReviewSessionState.CLOSED
+    )
     assert not coordinator.shell_window.isVisible()
     assert not coordinator.train_window.isVisible()
 

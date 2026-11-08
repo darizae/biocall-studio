@@ -188,9 +188,7 @@ def _planned_export_receipt(
         "format_policy": snapshot.format_policy,
         "collision_policy": snapshot.collision_policy,
         "completed_at": snapshot.created_at,
-        "final_destination": str(
-            Path(snapshot.destination_parent) / snapshot.directory_name
-        ),
+        "final_destination": str(Path(snapshot.destination_parent) / snapshot.directory_name),
         "files": [item.to_dict() for item in files],
         "snippets": [item.to_dict() for item in snippets],
         "concat_mappings": [item.to_dict() for item in concat],
@@ -212,9 +210,7 @@ def _planned_export_receipt(
 def estimate_export_artifacts(snapshot: ExportSnapshot) -> OperationSizePlan:
     """Calculate every destination file exactly from the frozen frame mapping."""
     snapshot_size = len(_json_bytes(snapshot.to_dict()))
-    sizes: dict[str, tuple[str, int]] = {
-        "export-snapshot.json": ("snapshot", snapshot_size)
-    }
+    sizes: dict[str, tuple[str, int]] = {"export-snapshot.json": ("snapshot", snapshot_size)}
     if snapshot.mode.includes_snippets:
         for candidate in snapshot.candidates:
             sizes[candidate.snippet_relative_path] = (
@@ -244,9 +240,7 @@ def estimate_export_artifacts(snapshot: ExportSnapshot) -> OperationSizePlan:
         for path, (kind, size) in sorted(sizes.items())
     )
     receipt = _planned_export_receipt(snapshot, files, rows)
-    total = sum(size for _kind, size in sizes.values()) + len(
-        _json_bytes(receipt.to_dict())
-    )
+    total = sum(size for _kind, size in sizes.values()) + len(_json_bytes(receipt.to_dict()))
     return OperationSizePlan(
         ByteEstimate.exact(total),
         total,

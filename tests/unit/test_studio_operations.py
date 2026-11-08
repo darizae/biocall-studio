@@ -76,8 +76,7 @@ def test_open_review_exit_policy_combines_save_and_worker_ownership_without_muta
     assert not blocked.allowed
     assert blocked.blocking_operation == review
     assert blocked.reason == (
-        "Spectrogram generation is active in Review. Stop it before starting CNN Training "
-        "in Train."
+        "Spectrogram generation is active in Review. Stop it before starting CNN Training in Train."
     )
 
     # Pure decisions cannot save, stop, close, or otherwise mutate owned work.

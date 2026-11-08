@@ -70,10 +70,13 @@ def test_window_hop_resample_padding_arithmetic_and_invalid_configuration():
 
 def test_target_score_threshold_and_merge_semantics_reject_ambiguous_outputs():
     """Case: UT-DET-014."""
-    assert target_score(
-        {"noise": 0.5, "target": 0.5},
-        class_to_index=(("noise", 0), ("target", 1)),
-    ) == 0.5
+    assert (
+        target_score(
+            {"noise": 0.5, "target": 0.5},
+            class_to_index=(("noise", 0), ("target", 1)),
+        )
+        == 0.5
+    )
     for probabilities in (
         {"target": 0.8, "noise": 0.2},  # wrong output-column order
         {"noise": 0.2},
@@ -153,9 +156,7 @@ def test_source_timestamps_deterministic_ids_immutable_result_and_file_statuses(
         candidates=(candidate,),
     )
     zero = RecordingOutcome.succeeded(
-        recording_ref=recording_identity(
-            "inv_" + "1" * 32, "recordings/zero.wav", "3" * 64
-        ),
+        recording_ref=recording_identity("inv_" + "1" * 32, "recordings/zero.wav", "3" * 64),
         recording_key="recordings/zero.wav",
         source_sha256="3" * 64,
         sample_rate_hz=16_000,
@@ -164,9 +165,7 @@ def test_source_timestamps_deterministic_ids_immutable_result_and_file_statuses(
         candidates=(),
     )
     failed = RecordingOutcome.failed(
-        recording_ref=recording_identity(
-            "inv_" + "1" * 32, "recordings/broken.wav", "4" * 64
-        ),
+        recording_ref=recording_identity("inv_" + "1" * 32, "recordings/broken.wav", "4" * 64),
         recording_key="recordings/broken.wav",
         source_sha256="4" * 64,
         sample_rate_hz=16_000,

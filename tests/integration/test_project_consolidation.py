@@ -7,6 +7,7 @@ import subprocess
 import sys
 import venv
 import zipfile
+from importlib.util import find_spec
 from pathlib import Path
 
 import pytest
@@ -21,22 +22,21 @@ def test_unified_wheel_shell_and_private_workers_have_one_installed_identity(tmp
     root = Path(__file__).resolve().parents[2]
     wheel_dir = tmp_path / "wheels"
     wheel_dir.mkdir()
-    for source in (root.parent / "bioacoustics-dl-toolbox", root.parent / "alp-ui", root):
-        subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "pip",
-                "wheel",
-                "--no-deps",
-                "--wheel-dir",
-                str(wheel_dir),
-                str(source),
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "wheel",
+            "--no-deps",
+            "--wheel-dir",
+            str(wheel_dir),
+            str(root),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     wheel = next(wheel_dir.glob("biocall_studio-*.whl"))
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()
@@ -48,14 +48,31 @@ def test_unified_wheel_shell_and_private_workers_have_one_installed_identity(tmp
     venv.EnvBuilder(with_pip=True).create(environment)
     python = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     scripts = environment / ("Scripts" if os.name == "nt" else "bin")
+    toolbox_spec = find_spec("bioacoustics_dl_toolbox")
+    alp_ui_spec = find_spec("alp_ui")
+    assert toolbox_spec is not None and toolbox_spec.origin is not None
+    assert alp_ui_spec is not None and alp_ui_spec.origin is not None
+    released_site_packages = Path(toolbox_spec.origin).resolve().parent.parent
+    assert Path(alp_ui_spec.origin).resolve().parent.parent == released_site_packages
+    child_site_packages = Path(
+        subprocess.run(
+            [str(python), "-c", "import sysconfig; print(sysconfig.get_path('purelib'))"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    )
+    (child_site_packages / "released-upstreams.pth").write_text(
+        f"{released_site_packages}\n", encoding="utf-8"
+    )
     subprocess.run(
         [
             str(python),
             "-m",
             "pip",
             "install",
-            "--find-links",
-            str(wheel_dir),
+            "--no-deps",
+            "--force-reinstall",
             str(wheel),
         ],
         check=True,
@@ -72,10 +89,12 @@ def test_unified_wheel_shell_and_private_workers_have_one_installed_identity(tmp
                 "from importlib.metadata import version; "
                 "assert importlib.util.find_spec('biocall_studio' + '_train') is None; "
                 f"root=pathlib.Path(r'{environment}'); "
-                "assert pathlib.Path(alp_ui.__file__).is_relative_to(root); "
-                "assert pathlib.Path(bioacoustics_dl_toolbox.__file__).is_relative_to(root); "
-                "assert version('alp-ui') == '0.1.0a0'; "
-                "assert version('bioacoustics-dl-toolbox') == '0.2.0'; "
+                f"siblings=pathlib.Path(r'{root.parent}'); "
+                "assert not pathlib.Path(alp_ui.__file__).is_relative_to(siblings / 'alp-ui'); "
+                "assert not pathlib.Path(bioacoustics_dl_toolbox.__file__).is_relative_to("
+                "siblings / 'bioacoustics-dl-toolbox'); "
+                "assert version('alp-ui') == '0.1.0a1'; "
+                "assert version('bioacoustics-dl-toolbox') == '0.3.0'; "
                 "print(biocall_studio.__file__)"
             ),
         ],

@@ -779,9 +779,7 @@ def test_native_validation_preserves_values_blocks_launch_and_resets(
 
     monkeypatch.setattr(QMessageBox, "exec", accept_dialog)
     assert confirm_storage(page, page.storage_estimate)
-    monkeypatch.setattr(
-        "biocall_studio.train.gui.training.confirm_storage", lambda *_args: False
-    )
+    monkeypatch.setattr("biocall_studio.train.gui.training.confirm_storage", lambda *_args: False)
     page.start_button.click()
     assert not started
     assert window.controller.active_run is None
@@ -793,9 +791,7 @@ def test_native_validation_preserves_values_blocks_launch_and_resets(
         datetime(2026, 11, 3, tzinfo=UTC),
     )
     page._validate_and_refresh()
-    monkeypatch.setattr(
-        "biocall_studio.train.gui.training.confirm_storage", lambda *_args: True
-    )
+    monkeypatch.setattr("biocall_studio.train.gui.training.confirm_storage", lambda *_args: True)
     monkeypatch.setattr(
         QInputDialog,
         "getText",

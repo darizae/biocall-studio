@@ -83,7 +83,9 @@ def decide_application_exit(
         )
     if not operations:
         return ExitDecision(ExitAction.EXIT_NOW, (), "")
-    summary = "Active work: " + "; ".join(
-        f"{operation.label} in {operation.owner.value}" for operation in operations
-    ) + "."
+    summary = (
+        "Active work: "
+        + "; ".join(f"{operation.label} in {operation.owner.value}" for operation in operations)
+        + "."
+    )
     return ExitDecision(ExitAction.CONFIRM_STOP, operations, summary)

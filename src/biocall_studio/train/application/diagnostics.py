@@ -36,9 +36,7 @@ class DiagnosticSession:
         settings_symlink = requested_settings_dir.is_symlink()
         self.settings_dir = requested_settings_dir.resolve()
         self.log_dir = self.settings_dir / "logs"
-        self.path = self.log_dir / (
-            f"session-{datetime.now(UTC):%Y-%m-%d}-{self.session_id}.jsonl"
-        )
+        self.path = self.log_dir / (f"session-{datetime.now(UTC):%Y-%m-%d}-{self.session_id}.jsonl")
         self._closed = False
         self._handler: DiagnosticJsonlHandler | None = None
         self._loggers: dict[str, logging.Logger] = {}

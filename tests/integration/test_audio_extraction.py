@@ -168,7 +168,7 @@ def test_toolbox_failures_cancel_and_existing_output_leave_no_partial_snippet(
 def test_fresh_installed_process_resolves_committed_separate_toolbox(tmp_path):
     """Case: IT-AUDIO-004."""
     repository = Path(__file__).resolve().parents[2]
-    toolbox = repository.parent / "bioacoustics-dl-toolbox"
+    sibling_toolbox = repository.parent / "bioacoustics-dl-toolbox"
     script = """
 import importlib.util
 import json
@@ -196,7 +196,9 @@ print(json.dumps({
     )
     resolved = json.loads(completed.stdout)
 
-    assert Path(resolved["package_file"]).resolve().is_relative_to(toolbox.resolve())
+    package_file = Path(resolved["package_file"]).resolve()
+    assert "site-packages" in package_file.parts
+    assert not package_file.is_relative_to(sibling_toolbox.resolve())
     assert "alpaca-pipelines" not in resolved["package_file"]
     assert set(resolved) == {
         "package_file",
@@ -208,6 +210,6 @@ print(json.dumps({
     }
     assert resolved["api_module"] == "bioacoustics_dl_toolbox.audio.io"
     assert resolved["distribution"] == "bioacoustics-dl-toolbox"
-    assert resolved["version"] == "0.2.0"
-    assert resolved["revision"] == "22c1b342918b33c62288f23b660aa716f3e361e6"
+    assert resolved["version"] == "0.3.0"
+    assert resolved["revision"] == "7027bd84cc5a44a27bf201332af540f090c38365"
     assert resolved["legacy_computation"] is False

@@ -120,18 +120,14 @@ def _validate_source(
     except InventoryScanCancelled as exc:
         raise RefinementCancelled("RF refinement stopped during input validation.") from exc
     except (OSError, RuntimeError, ValueError) as exc:
-        raise FrozenInputChanged(
-            "A parent recording changed or became unavailable."
-        ) from exc
+        raise FrozenInputChanged("A parent recording changed or became unavailable.") from exc
 
 
 def _recheck_model(reference):
     try:
         return recheck_model_reference(reference)
     except (OSError, RuntimeError, ValueError) as exc:
-        raise FrozenModelChanged(
-            "The frozen RF Model changed or became unavailable."
-        ) from exc
+        raise FrozenModelChanged("The frozen RF Model changed or became unavailable.") from exc
 
 
 def run_refinement(
@@ -162,9 +158,10 @@ def run_refinement(
         _emit("started")
         _log(log, "worker_started", "RF candidate refinement Worker started", context=context)
         settings = dict(request.settings)
-        if set(settings) != {"run_kind", "parent_result_id", "parent_result_digest"} or settings[
-            "run_kind"
-        ] != "rf_refinement":
+        if (
+            set(settings) != {"run_kind", "parent_result_id", "parent_result_digest"}
+            or settings["run_kind"] != "rf_refinement"
+        ):
             raise ParentResultChanged("RF refinement request contract is invalid.")
         if step_delay_seconds:
             time.sleep(step_delay_seconds)
@@ -175,9 +172,7 @@ def run_refinement(
                 repository.collection_root, str(settings["parent_result_id"])
             )
         except (OSError, RuntimeError, ValueError) as exc:
-            raise ParentResultChanged(
-                "The immutable parent Result cannot be reopened."
-            ) from exc
+            raise ParentResultChanged("The immutable parent Result cannot be reopened.") from exc
         if (
             parent.result_digest != settings["parent_result_digest"]
             or parent.collection_id != request.collection_id
@@ -195,9 +190,7 @@ def run_refinement(
             raise FrozenInputChanged("Frozen Detect inputs cannot be reopened.") from exc
         candidate_keys = tuple(
             sorted(
-                recording.recording_key
-                for recording in parent.recordings
-                if recording.candidates
+                recording.recording_key for recording in parent.recordings if recording.candidates
             )
         )
         if (
@@ -221,9 +214,7 @@ def run_refinement(
                 or row.wav.frame_count != parent_recording.frame_count
                 or row.wav.channels != parent_recording.channels
             ):
-                raise FrozenInputChanged(
-                    "A recording fingerprint differs from the parent Result."
-                )
+                raise FrozenInputChanged("A recording fingerprint differs from the parent Result.")
             _validate_source(
                 collection.source_root,
                 row,
@@ -241,18 +232,14 @@ def run_refinement(
         ):
             raise FrozenModelChanged("The selected RF ModelSnapshot no longer matches.")
         reference = _recheck_model(reference)
-        structure = structurally_reload_rf_directory(
-            reference.root, reference.snapshot.model_id
-        )
+        structure = structurally_reload_rf_directory(reference.root, reference.snapshot.model_id)
         if (
             structure.feature_names != reference.snapshot.rf_feature_names
             or structure.feature_config != dict(reference.snapshot.rf_feature_config)
             or structure.target_probability_column != reference.snapshot.rf_probability_column
         ):
             raise FrozenModelChanged("RF Model structure disagrees with its ModelSnapshot.")
-        estimator = joblib.load(
-            reference.root / reference.snapshot.artifact_relative_path
-        )
+        estimator = joblib.load(reference.root / reference.snapshot.artifact_relative_path)
         if not isinstance(estimator, RandomForestClassifier):
             raise FrozenModelChanged("RF artifact is not a supported RandomForestClassifier.")
         probability_class_order = tuple(int(value) for value in estimator.classes_)
@@ -332,9 +319,7 @@ def run_refinement(
             )
 
         reference = _recheck_model(reference)
-        reopened_parent = load_detection_result(
-            repository.collection_root, parent.result_id
-        )
+        reopened_parent = load_detection_result(repository.collection_root, parent.result_id)
         if reopened_parent != parent:
             raise ParentResultChanged("The parent Result changed during RF refinement.")
         result = DerivedResult.create(

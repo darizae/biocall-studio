@@ -708,9 +708,7 @@ class ReviewSessionStore:
                 (session_id,),
             ).fetchone()
             if dependent is not None:
-                raise ReviewSessionConflict(
-                    "Delete its linked successor sessions first."
-                )
+                raise ReviewSessionConflict("Delete its linked successor sessions first.")
             if cancel_requested is not None:
                 if cancel_requested.is_set():
                     raise ReviewSessionConflict("Review session deletion was cancelled.")

@@ -80,10 +80,7 @@ def estimate_dataset_artifacts(
         )
     snippet_count = len(positives) + len(noise.windows)
     metadata_ceiling = (
-        32 * 1_024
-        + snippet_count * (2_048 + 256)
-        + len(records) * 1_024
-        + len(positives) * 512
+        32 * 1_024 + snippet_count * (2_048 + 256) + len(records) * 1_024 + len(positives) * 512
     )
     high = audio_bytes + metadata_ceiling
     plan = OperationSizePlan(
@@ -213,9 +210,7 @@ def estimate_model_artifacts(
             )
         sample_nodes = max(1, 2 * snippet_count - 1)
         depth_nodes = (
-            sample_nodes
-            if depth is None
-            else min(sample_nodes, 2 ** min(depth + 1, 62) - 1)
+            sample_nodes if depth is None else min(sample_nodes, 2 ** min(depth + 1, 62) - 1)
         )
         low = max(64 * 1_024, trees * 512)
         high = trees * depth_nodes * 128 + 2 * MIB

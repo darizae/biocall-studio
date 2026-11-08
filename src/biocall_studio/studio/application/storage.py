@@ -22,8 +22,6 @@ class SuiteDataPaths:
         train = resolved / "train" / "v1"
         detect = resolved / "detect" / "v1"
         review = resolved / "review" / "v1"
-        if not all(
-            path.is_relative_to(resolved) for path in (train, detect, review)
-        ):
+        if not all(path.is_relative_to(resolved) for path in (train, detect, review)):
             raise ValueError("Workflow application-data roots must stay inside the suite root.")
         return cls(root=resolved, train=train, detect=detect, review=review)

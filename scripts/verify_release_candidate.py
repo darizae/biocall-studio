@@ -25,15 +25,27 @@ RESOURCES = (
     "biocall_studio/resources/legal/THIRD_PARTY_NOTICES.md",
 )
 UPSTREAM = (
-    ("alp-ui", "alp_ui", "0.1.0a1", "41bac72971b96d352da752cc0ff140afe3ac312a",
-     "20590366d06591837c2567df1191b472b9db494e5440ce3a3fadfbf1b8d53d6c"),
-    ("bioacoustics-dl-toolbox", "bioacoustics_dl_toolbox", "0.3.0",
-     "7027bd84cc5a44a27bf201332af540f090c38365",
-     "c0f7679cbf788c2900eff26b8db719941a513fc96b5f28348e2838c8df595b28"),
+    (
+        "alp-ui",
+        "alp_ui",
+        "0.1.0a1",
+        "41bac72971b96d352da752cc0ff140afe3ac312a",
+        "20590366d06591837c2567df1191b472b9db494e5440ce3a3fadfbf1b8d53d6c",
+    ),
+    (
+        "bioacoustics-dl-toolbox",
+        "bioacoustics_dl_toolbox",
+        "0.3.0",
+        "7027bd84cc5a44a27bf201332af540f090c38365",
+        "c0f7679cbf788c2900eff26b8db719941a513fc96b5f28348e2838c8df595b28",
+    ),
 )
 MODES = (
-    "train-dataset-build", "train-cnn-training", "train-rf-training",
-    "detect-cnn", "detect-rf-refinement",
+    "train-dataset-build",
+    "train-cnn-training",
+    "train-rf-training",
+    "detect-cnn",
+    "detect-rf-refinement",
 )
 
 
@@ -103,10 +115,14 @@ def verify(dist: Path, wheelhouse: Path) -> None:
             assert mode in archive.read("biocall_studio/cli.py").decode()
     with tarfile.open(sdists[0], "r:gz") as archive:
         members = [x.name for x in archive.getmembers() if x.isfile()]
-        for item in ("pyproject.toml", "README.md",
-                     "docs/legal/THIRD_PARTY_NOTICES.md",
-                     "docs/science/TRAINING_CONFIGURATION_FIELDS.json",
-                     "assets/branding/icons/icon.icns", "assets/branding/icons/icon.ico"):
+        for item in (
+            "pyproject.toml",
+            "README.md",
+            "docs/legal/THIRD_PARTY_NOTICES.md",
+            "docs/science/TRAINING_CONFIGURATION_FIELDS.json",
+            "assets/branding/icons/icon.icns",
+            "assets/branding/icons/icon.ico",
+        ):
             assert any(x.endswith("/" + item) for x in members), f"Sdist missing {item}"
     for path in (
         "assets/branding/icons/icon.icns",
@@ -116,8 +132,16 @@ def verify(dist: Path, wheelhouse: Path) -> None:
         icon = ROOT / path
         assert icon.is_file() and icon.stat().st_size > 1024
         print(f"ICON SHA256 {path} {sha256(icon)}")
-    for package in ("PySide6", "PySide6-Addons", "PySide6-Essentials",
-                    "numpy", "scipy", "torch", "librosa", "scikit-learn"):
+    for package in (
+        "PySide6",
+        "PySide6-Addons",
+        "PySide6-Essentials",
+        "numpy",
+        "scipy",
+        "torch",
+        "librosa",
+        "scikit-learn",
+    ):
         try:
             print(f"DEPENDENCY {package}=={metadata.version(package)}")
         except metadata.PackageNotFoundError:

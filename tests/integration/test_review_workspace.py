@@ -393,9 +393,7 @@ def test_empty_cache_gallery_generates_visible_and_nearby_rows_without_bulk(
     wav_path = source_root / "recordings" / "field-call.wav"
     source_sha256 = _write_wav(wav_path, seconds=27.5)
     source_before = wav_path.read_bytes()
-    controller, session_id = _session(
-        tmp_path / "suite", count=36, source_sha256=source_sha256
-    )
+    controller, session_id = _session(tmp_path / "suite", count=36, source_sha256=source_sha256)
 
     import biocall_studio.review.gui.workspace as workspace_module
     import biocall_studio.review.workflows.audio as audio_module
@@ -430,8 +428,7 @@ def test_empty_cache_gallery_generates_visible_and_nearby_rows_without_bulk(
     page.session_page.gallery.doItemsLayout()
 
     qtbot.waitUntil(
-        lambda: page.gallery_model.cached_thumbnail_count >= 2
-        or bool(page._spectrogram_failures),
+        lambda: page.gallery_model.cached_thumbnail_count >= 2 or bool(page._spectrogram_failures),
         timeout=15_000,
     )
     assert not page._spectrogram_failures
@@ -595,9 +592,7 @@ def test_native_cocoa_review_navigation_records_memory_diagnostics(
         lambda: page.supervisor.pending_count == 0 and page.supervisor.active_count == 0,
         timeout=20_000,
     )
-    terminal_batches = tuple(
-        batch for batch in page.supervisor._batches.values() if batch.done
-    )
+    terminal_batches = tuple(batch for batch in page.supervisor._batches.values() if batch.done)
     assert terminal_batches
     assert all(not batch.states and batch.iterator is None for batch in terminal_batches)
     terminal_batch_count = len(terminal_batches)
@@ -656,9 +651,7 @@ def test_rapid_detail_navigation_labels_and_play_do_not_block_or_paint_stale(
     source_root = tmp_path / "source"
     wav_path = source_root / "recordings" / "field-call.wav"
     source_sha256 = _write_wav(wav_path)
-    controller, session_id = _session(
-        tmp_path / "suite", count=6, source_sha256=source_sha256
-    )
+    controller, session_id = _session(tmp_path / "suite", count=6, source_sha256=source_sha256)
 
     import biocall_studio.review.gui.workspace as workspace_module
     import biocall_studio.review.workflows.audio as audio_module
@@ -737,9 +730,11 @@ def test_rapid_detail_navigation_labels_and_play_do_not_block_or_paint_stale(
     qtbot.waitUntil(lambda: page.session_page.play_button.isEnabled(), timeout=15_000)
     page._next()
     qtbot.waitUntil(
-        lambda: page.session_page.play_button.isEnabled()
-        and page.session_page.spectrogram.metadata is not None
-        and page.session_page.spectrogram.metadata.candidate_id == current,
+        lambda: (
+            page.session_page.play_button.isEnabled()
+            and page.session_page.spectrogram.metadata is not None
+            and page.session_page.spectrogram.metadata.candidate_id == current
+        ),
         timeout=15_000,
     )
     assert rendered.count(current) == rendered_before_revisit
@@ -760,9 +755,7 @@ def test_measured_retention_pressure_clear_disk_full_restart_and_delete(
     source_sha256 = _write_wav(wav_path, seconds=23)
     source_before = wav_path.read_bytes()
     suite_root = tmp_path / "suite"
-    controller, session_id = _session(
-        suite_root, count=30, source_sha256=source_sha256
-    )
+    controller, session_id = _session(suite_root, count=30, source_sha256=source_sha256)
     page = ReviewWorkspacePage(
         controller,
         source_root_resolver=lambda _session: source_root,
@@ -777,14 +770,16 @@ def test_measured_retention_pressure_clear_disk_full_restart_and_delete(
     assert page.cache_page.output_value.text() == "Unknown"
     page.show_session()
     qtbot.waitUntil(
-        lambda: page.calibration_store.calibration(
-            page._request_for_row(
-                page.gallery_model.candidate_at(0),
-                controller.store.load_settings(session_id),
-                tier=workspace_module.SpectrogramImageTier.THUMBNAIL,
-            ).tier
-        )
-        is not None,
+        lambda: (
+            page.calibration_store.calibration(
+                page._request_for_row(
+                    page.gallery_model.candidate_at(0),
+                    controller.store.load_settings(session_id),
+                    tier=workspace_module.SpectrogramImageTier.THUMBNAIL,
+                ).tier
+            )
+            is not None
+        ),
         timeout=20_000,
     )
 
@@ -797,13 +792,17 @@ def test_measured_retention_pressure_clear_disk_full_restart_and_delete(
     assert page.cache_page.output_value.text() != "Unknown"
     _button(page.cache_page, "Generate all").click()
     qtbot.waitUntil(
-        lambda: page._generation_batch_id is not None
-        or "Retained" in page.cache_page.progress_label.text(),
+        lambda: (
+            page._generation_batch_id is not None
+            or "Retained" in page.cache_page.progress_label.text()
+        ),
         timeout=20_000,
     )
     qtbot.waitUntil(
-        lambda: page._generation_batch_id is None
-        and "Retained 30 of 30" in page.cache_page.progress_label.text(),
+        lambda: (
+            page._generation_batch_id is None
+            and "Retained 30 of 30" in page.cache_page.progress_label.text()
+        ),
         timeout=30_000,
     )
     assert page.cache.limit_bytes > 1
@@ -817,8 +816,7 @@ def test_measured_retention_pressure_clear_disk_full_restart_and_delete(
     )
     page.session_page.table.selectionModel().select(
         selection,
-        QItemSelectionModel.SelectionFlag.ClearAndSelect
-        | QItemSelectionModel.SelectionFlag.Rows,
+        QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows,
     )
     assert len(page.current_state.selected_candidate_ids) == 30
     assert page.session_page.selection_label.text() == "30 selected"
@@ -915,8 +913,7 @@ def test_native_cache_generation_preset_switch_and_saved_examples_are_bounded(
     assert page.cache_page.output_value.text() == "Unknown"
     _button(page.cache_page, "Generate all").click()
     qtbot.waitUntil(
-        lambda: page.cache_page.availability_label.text()
-        == "4 of 4 spectrograms available",
+        lambda: page.cache_page.availability_label.text() == "4 of 4 spectrograms available",
         timeout=10_000,
     )
 
@@ -929,9 +926,7 @@ def test_native_cache_generation_preset_switch_and_saved_examples_are_bounded(
     assert isinstance(thumbnail, QPixmap) and not thumbnail.isNull()
     page.session_page.gallery.doItemsLayout()
     qtbot.waitUntil(
-        lambda: not page.session_page.gallery.visualRect(
-            page.gallery_model.index(0, 0)
-        ).isEmpty()
+        lambda: not page.session_page.gallery.visualRect(page.gallery_model.index(0, 0)).isEmpty()
     )
     _capture_if_requested(page, "review-gallery-normal.png")
     labels_before = tuple(
@@ -950,9 +945,7 @@ def test_native_cache_generation_preset_switch_and_saved_examples_are_bounded(
     palette.setCurrentIndex(page.settings_page._control_values["palette"].index("viridis"))
     _button(page.settings_page, "Save changes").click()
     alternate = next(
-        preset
-        for preset in controller.list_presets()
-        if preset.preset_name == "Birdsong detail"
+        preset for preset in controller.list_presets() if preset.preset_name == "Birdsong detail"
     )
     assert alternate.effective_settings["palette"] == "viridis"
     original_session = controller.store.get_session(session_id)
@@ -972,10 +965,13 @@ def test_native_cache_generation_preset_switch_and_saved_examples_are_bounded(
     )
     changed_session = controller.store.get_session(session_id)
     assert changed_session.settings_epoch == original_session.settings_epoch + 1
-    assert tuple(
-        controller.store.candidate_by_id(session_id, f"cand_{index:032x}").label
-        for index in range(4)
-    ) == labels_before
+    assert (
+        tuple(
+            controller.store.candidate_by_id(session_id, f"cand_{index:032x}").label
+            for index in range(4)
+        )
+        == labels_before
+    )
 
     page.show_settings()
     alternate_settings_index = page.settings_page.preset_select.control.findData(
@@ -1007,10 +1003,13 @@ def test_native_cache_generation_preset_switch_and_saved_examples_are_bounded(
     _button(page.settings_page, "Delete").click()
     assert not example_directory.exists()
     assert wav_path.read_bytes() == before
-    assert tuple(
-        controller.store.candidate_by_id(session_id, f"cand_{index:032x}").label
-        for index in range(4)
-    ) == labels_before
+    assert (
+        tuple(
+            controller.store.candidate_by_id(session_id, f"cand_{index:032x}").label
+            for index in range(4)
+        )
+        == labels_before
+    )
     page.shutdown()
     controller.shutdown()
 
@@ -1019,9 +1018,7 @@ def test_sessions_delete_is_confirmed_background_safe_and_returns_to_sessions(
     qapp, qtbot, tmp_path: Path
 ) -> None:
     """Case: IT-REVW-014."""
-    controller, session_id = _session(
-        tmp_path / "suite", count=4, source_sha256="2" * 64
-    )
+    controller, session_id = _session(tmp_path / "suite", count=4, source_sha256="2" * 64)
     opened = controller.store.get_session(session_id)
     closed = controller.close_session(
         session_id,

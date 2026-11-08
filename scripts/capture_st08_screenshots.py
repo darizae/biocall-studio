@@ -28,8 +28,10 @@ from biocall_studio.train.application.workspace import WorkspaceController
 
 def _wait_completed(controller) -> None:
     _wait_until(
-        lambda: controller.current_run is not None
-        and controller.current_run.status is DetectRunStatus.COMPLETED
+        lambda: (
+            controller.current_run is not None
+            and controller.current_run.status is DetectRunStatus.COMPLETED
+        )
     )
 
 
@@ -66,8 +68,7 @@ def main(argv: list[str] | None = None) -> int:
         controller = coordinator.detect_controller
         controller.choose_model_root(str(model.root))
         _wait_until(
-            lambda: controller.model_reference is not None
-            and not controller.is_model_loading
+            lambda: controller.model_reference is not None and not controller.is_model_loading
         )
         controller.choose_source_root(str(source))
         _wait_until(lambda: controller.inputs_ready)
@@ -90,9 +91,7 @@ def main(argv: list[str] | None = None) -> int:
         explorer = page.result_explorer
         candidate_recording_row = next(
             index
-            for index, recording in enumerate(
-                controller.selected_result_projection.recordings
-            )
+            for index, recording in enumerate(controller.selected_result_projection.recordings)
             if recording.candidates
         )
         explorer.recording_table.setCurrentIndex(
@@ -146,10 +145,7 @@ def main(argv: list[str] | None = None) -> int:
             decision=InclusionDecision.EXCLUDED,
         )
         controller.select_result(partial.result_id)
-        if (
-            controller.selected_result_projection.source_state
-            is not ResultSourceState.STALE
-        ):
+        if controller.selected_result_projection.source_state is not ResultSourceState.STALE:
             raise RuntimeError("Prior Result did not become visibly stale after inventory change.")
         window.resize(1180, 790)
         page.verticalScrollBar().setValue(0)
@@ -180,9 +176,11 @@ def main(argv: list[str] | None = None) -> int:
         page._set_route("results")
         window.resize(700, 780)
         _wait_until(
-            lambda: page.is_compact
-            and explorer.current_state_key == "source-unavailable"
-            and page.horizontalScrollBar().maximum() == 0
+            lambda: (
+                page.is_compact
+                and explorer.current_state_key == "source-unavailable"
+                and page.horizontalScrollBar().maximum() == 0
+            )
         )
         page.verticalScrollBar().setValue(0)
         _capture(

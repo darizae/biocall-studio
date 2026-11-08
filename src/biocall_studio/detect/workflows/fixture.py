@@ -132,9 +132,7 @@ def run_fixture(
                 "progress",
                 progress=progress,
                 stage_index=stage_index,
-                message=(
-                    "Worker lifecycle active" if stage_index else "Frozen inputs accepted"
-                ),
+                message=("Worker lifecycle active" if stage_index else "Frozen inputs accepted"),
             )
 
         if repository.cancellation_requested(request.run_id) or not guard.owner_alive():

@@ -65,9 +65,7 @@ _KNOWN_FIELDS = frozenset(
 )
 _NAME = re.compile(r"^[a-z][a-z0-9_.-]{0,127}$")
 _EVENT = re.compile(r"^[a-z][a-z0-9_]{0,95}$")
-_APP_LOG_NAME = re.compile(
-    r"^session-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{4,64}\.jsonl(?:\.[1-3])?$"
-)
+_APP_LOG_NAME = re.compile(r"^session-\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]{4,64}\.jsonl(?:\.[1-3])?$")
 _WORKER_LOG_NAME = re.compile(r"^worker\.jsonl(?:\.[1-3])?$")
 _SECRET = re.compile(
     r"(?i)\b(?:api[_-]?(?:key|token)|access[_-]?token|token|password|passwd|secret|credential)"
@@ -77,9 +75,7 @@ _WINDOWS_PATH = re.compile(r"(?i)(?<![A-Za-z0-9])(?:[A-Z]:[\\/](?:[^\s<>\"']+))"
 _UNC_PATH = re.compile(r"(?<![A-Za-z0-9])(?:\\\\[^\s<>\"']+)")
 _HOME_PATH = re.compile(r"(?<![A-Za-z0-9])(?:~[\\/][^\s<>\"']+)")
 _POSIX_PATH = re.compile(r"(?<![A-Za-z0-9])/(?:[^\s<>\"']+)")
-_PORTABLE_PATH = re.compile(
-    r"(?i)(?<![A-Za-z0-9_.-])(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+"
-)
+_PORTABLE_PATH = re.compile(r"(?i)(?<![A-Za-z0-9_.-])(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+")
 _WAV_NAME = re.compile(r"(?i)(?<![A-Za-z0-9_.-])[A-Za-z0-9_.-]+\.wav\b")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
 
@@ -152,21 +148,19 @@ def encode_diagnostic_record(
             normalized = _safe_identifier(value)
             if normalized is not None:
                 record[key] = normalized
-        elif key in _NUMBER_CONTEXT and isinstance(value, (int, float)) and not isinstance(
-            value, bool
+        elif (
+            key in _NUMBER_CONTEXT
+            and isinstance(value, (int, float))
+            and not isinstance(value, bool)
         ):
             record[key] = value
-    encoded = (json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode(
-        "utf-8"
-    )
+    encoded = (json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
     if len(encoded) > MAX_RECORD_BYTES:
         record["message"] = "Diagnostic record exceeded its size limit"
         for key in tuple(record):
             if key in _STRING_CONTEXT | _NUMBER_CONTEXT:
                 record.pop(key)
-        encoded = (json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode(
-            "utf-8"
-        )
+        encoded = (json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
     return encoded
 
 
@@ -213,8 +207,10 @@ class BoundedJsonlSink:
         if self.failed:
             return
         try:
-            fitted = payload if len(payload) <= self.max_bytes else _fallback_record(
-                payload, self.max_bytes
+            fitted = (
+                payload
+                if len(payload) <= self.max_bytes
+                else _fallback_record(payload, self.max_bytes)
             )
             if not fitted:
                 raise OSError("Diagnostic record cannot fit the configured sink budget.")

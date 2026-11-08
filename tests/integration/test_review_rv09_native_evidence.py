@@ -156,9 +156,7 @@ def _create_session(
         name=name,
         source=ReviewSessionSource.from_projection(
             projection,
-            score_semantics=(
-                "binary_softmax_target_output_index_1; not_a_calibrated_probability"
-            ),
+            score_semantics=("binary_softmax_target_output_index_1; not_a_calibrated_probability"),
             eligibility_threshold=0.5,
         ),
         candidates=projection.candidates,
@@ -401,8 +399,7 @@ def test_visible_cocoa_captures_complete_rv09_owner_review_set(qapp, qtbot, tmp_
             timeout=30_000,
         )
         qtbot.waitUntil(
-            lambda: page.calibration_store.calibration(SpectrogramImageTier.THUMBNAIL)
-            is not None,
+            lambda: page.calibration_store.calibration(SpectrogramImageTier.THUMBNAIL) is not None,
             timeout=15_000,
         )
         page.show_spectrograms()
@@ -427,8 +424,7 @@ def test_visible_cocoa_captures_complete_rv09_owner_review_set(qapp, qtbot, tmp_
         page.show_spectrograms()
         _button(page.cache_page, "Generate all").click()
         qtbot.waitUntil(
-            lambda: page.cache_page.availability_label.text()
-            == "12 of 12 spectrograms available",
+            lambda: page.cache_page.availability_label.text() == "12 of 12 spectrograms available",
             timeout=15_000,
         )
         _capture(qtbot, window, output, "06-spectrograms.png", captures)
@@ -437,9 +433,7 @@ def test_visible_cocoa_captures_complete_rv09_owner_review_set(qapp, qtbot, tmp_
         _button(page.session_page, "One by one").click()
         QTimer.singleShot(
             250,
-            lambda: _capture_dialog_then_cancel(
-                qtbot, window, output, "07-finalize.png", captures
-            ),
+            lambda: _capture_dialog_then_cancel(qtbot, window, output, "07-finalize.png", captures),
         )
         _button(page.session_page, "Finalize").click()
         assert controller.store.get_session(active.session_id).revision == active.revision
@@ -456,9 +450,9 @@ def test_visible_cocoa_captures_complete_rv09_owner_review_set(qapp, qtbot, tmp_
         qtbot.waitUntil(lambda: page.gallery_model.cached_thumbnail_count >= 2, timeout=15_000)
         page.session_page.gallery.doItemsLayout()
         qtbot.waitUntil(
-            lambda: not page.session_page.gallery.visualRect(
-                page.gallery_model.index(1, 0)
-            ).isEmpty()
+            lambda: (
+                not page.session_page.gallery.visualRect(page.gallery_model.index(1, 0)).isEmpty()
+            )
         )
         first = page.session_page.gallery.visualRect(page.gallery_model.index(0, 0))
         second = page.session_page.gallery.visualRect(page.gallery_model.index(1, 0))

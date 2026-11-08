@@ -289,7 +289,7 @@ class ReviewIntakeStore:
                         manifest.recording_count,
                         manifest.failed_recording_count,
                         manifest.eligible_candidate_count,
-                    )
+                    ),
                 )
                 connection.executemany(
                     """
@@ -348,9 +348,7 @@ class ReviewIntakeStore:
             raise ReviewIntakeStorageError("Review projection did not verify after publication.")
         return manifest
 
-    def load_manifest(
-        self, collection_id: str, result_id: str
-    ) -> ReviewIntakeManifest | None:
+    def load_manifest(self, collection_id: str, result_id: str) -> ReviewIntakeManifest | None:
         validate_collection_id(collection_id)
         if not isinstance(result_id, str) or _RESULT_ID.fullmatch(result_id) is None:
             raise ValueError("Review Result reference is invalid.")
@@ -479,9 +477,7 @@ class ReviewResultIntake:
 
     def _completed_record(self, repository: DetectRunRepository, result_id: str):
         records = tuple(
-            record
-            for record in repository.list_records()
-            if record.artifact_id == result_id
+            record for record in repository.list_records() if record.artifact_id == result_id
         )
         if len(records) != 1 or records[0].status is not DetectRunStatus.COMPLETED:
             raise ValueError("Detect Result does not belong to one completed Run.")
@@ -540,9 +536,7 @@ class ReviewResultIntake:
                 IntakeAvailability.RELINK_NEEDED,
                 "The recordings folder is unavailable. Relink the Detect Collection.",
             )
-        inventory_rows = {
-            row.recording_key: row for row in origin.inventory.recordings
-        }
+        inventory_rows = {row.recording_key: row for row in origin.inventory.recordings}
         for recording in projection.recordings:
             try:
                 validate_recording_source(

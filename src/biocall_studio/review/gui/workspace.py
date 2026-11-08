@@ -161,8 +161,7 @@ def _completed_date(timestamp: str) -> str:
 def _style_selected_button(button: Button) -> None:
     state = interactions(ALPACA_LIGHT)
     button.setStyleSheet(
-        button.styleSheet()
-        + f"QPushButton:checked {{ background-color: {state.selected_surface}; "
+        button.styleSheet() + f"QPushButton:checked {{ background-color: {state.selected_surface}; "
         f"color: {ALPACA_LIGHT.colors.primary_hover}; "
         f"border-color: {ALPACA_LIGHT.colors.primary}; }}"
     )
@@ -215,12 +214,10 @@ class _GalleryDelegate(QStyledItemDelegate):
             if metadata is not None:
                 left = image_rect.x() + (image_rect.width() - scaled.width()) // 2
                 top = image_rect.y() + (image_rect.height() - scaled.height()) // 2
-                start = left + metadata.frame_fraction(
-                    metadata.candidate_start_frame
-                ) * scaled.width()
-                end = left + metadata.frame_fraction(
-                    metadata.candidate_end_frame
-                ) * scaled.width()
+                start = (
+                    left + metadata.frame_fraction(metadata.candidate_start_frame) * scaled.width()
+                )
+                end = left + metadata.frame_fraction(metadata.candidate_end_frame) * scaled.width()
                 painter.fillRect(
                     int(start),
                     top,
@@ -448,6 +445,7 @@ class ReviewLandingPage(QScrollArea):
         presets = self.controller.list_presets()
         if 0 <= row < len(self.choices) and 0 <= preset_index < len(presets):
             self.start_requested.emit(self.choices[row], presets[preset_index])
+
 
 class ReviewSessionsPage(QScrollArea):
     session_requested = Signal(str)
@@ -1032,6 +1030,7 @@ class ReviewSessionPage(QWidget):
             self.query_layout.addWidget(self.sort_label, 0, 6)
             self.query_layout.addWidget(self.sort, 0, 7)
             self.query_layout.setColumnStretch(4, 1)
+
     def set_compact(self, compact: bool) -> None:
         self.set_responsive(700 if compact else 1180)
 
@@ -1359,9 +1358,7 @@ class ReviewExportPage(QScrollArea):
         cards.addWidget(self.format_card, 0, 0)
 
         self.decisions_card = Card()
-        self.decisions_card.content_layout.addWidget(
-            Text("Finalized decisions", role="heading")
-        )
+        self.decisions_card.content_layout.addWidget(Text("Finalized decisions", role="heading"))
         self.decisions_total = QLabel()
         self.decisions_total.setAccessibleName("Finalized included and excluded counts")
         self.decisions_card.content_layout.addWidget(self.decisions_total)
@@ -1423,19 +1420,14 @@ class ReviewExportPage(QScrollArea):
     def set_session(self, session: ReviewSession) -> None:
         included = session.call_count + session.unreviewed_count
         self.session_label.setText(
-            f"{session.name} · {included:,} included · "
-            f"{session.not_call_count:,} excluded"
+            f"{session.name} · {included:,} included · {session.not_call_count:,} excluded"
         )
-        self.decisions_total.setText(
-            f"{included:,} included · {session.not_call_count:,} excluded"
-        )
+        self.decisions_total.setText(f"{included:,} included · {session.not_call_count:,} excluded")
         self.call_summary.setText(f"✓ Call  {session.call_count:,} · human accepted")
         self.unreviewed_summary.setText(
             f"○ Unreviewed  {session.unreviewed_count:,} · model detections"
         )
-        self.not_call_summary.setText(
-            f"× Not a call  {session.not_call_count:,} · excluded"
-        )
+        self.not_call_summary.setText(f"× Not a call  {session.not_call_count:,} · excluded")
         previous = tuple(
             record
             for record in self.controller.list_export_history()
@@ -1643,18 +1635,14 @@ class ReviewWorkspacePage(QWidget):
         self._current_request_epoch = 0
         self._gallery_epoch = 0
         self._requested_thumbnails: set[tuple[int, str]] = set()
-        self._spectrogram_failures: deque[str] = deque(
-            maxlen=_SPECTROGRAM_FAILURE_LIMIT
-        )
+        self._spectrogram_failures: deque[str] = deque(maxlen=_SPECTROGRAM_FAILURE_LIMIT)
         self._visible_thumbnail_keys: set[str] = set()
         self._source_identity_cache = SourceIdentityCache(max_entries=128)
         self.cache = SpectrogramCache(
             controller.store.root / "cache" / "spectrograms",
             limit_bytes=512 * 1024 * 1024,
         )
-        self.calibration_store = CacheCalibrationStore(
-            self.cache.root / "calibration-v1.json"
-        )
+        self.calibration_store = CacheCalibrationStore(self.cache.root / "calibration-v1.json")
         self.supervisor = SpectrogramGenerationSupervisor(
             self.cache,
             token_is_current=lambda token: session_token_is_current(self.controller, token),
@@ -1729,9 +1717,7 @@ class ReviewWorkspacePage(QWidget):
         self.sessions_page.successor_requested.connect(self._continue_in_new_session)
         self.sessions_page.delete_requested.connect(self._confirm_delete_session)
         self.sessions_page.choose_result_requested.connect(self.show_landing)
-        self.data_settings_page.folder_change_requested.connect(
-            self.data_folder_change_requested
-        )
+        self.data_settings_page.folder_change_requested.connect(self.data_folder_change_requested)
         self.navigation.route_requested.connect(self._navigate_sidebar)
         self.navigation.back_requested.connect(self.return_requested)
         self.exit_button.clicked.connect(self.exit_requested)
@@ -1953,9 +1939,7 @@ class ReviewWorkspacePage(QWidget):
         else:
             self.show_session()
 
-    def _cache_calibration(
-        self, tier: SpectrogramImageTier
-    ):
+    def _cache_calibration(self, tier: SpectrogramImageTier):
         try:
             return self.calibration_store.calibration(tier)
         except (OSError, TypeError, ValueError, json.JSONDecodeError):
@@ -2523,9 +2507,7 @@ class ReviewWorkspacePage(QWidget):
             )
             if self._pending_retained_limit is None:
                 raise ValueError("Complete thumbnail retention is not measurable.")
-            self.cache.set_limit_bytes(
-                max(self.cache.limit_bytes, self._pending_retained_limit)
-            )
+            self.cache.set_limit_bytes(max(self.cache.limit_bytes, self._pending_retained_limit))
             batch_id = self.supervisor.submit_bulk(
                 self._generation_jobs(session, snapshot, Path(source_root)),
                 storage_estimate=estimate,
@@ -2674,9 +2656,7 @@ class ReviewWorkspacePage(QWidget):
         self._start_delete_session(opened)
 
     def _start_delete_session(self, session: ReviewSession) -> None:
-        thread = _ReviewSessionDeleteThread(
-            self.controller, session.session_id, session.revision
-        )
+        thread = _ReviewSessionDeleteThread(self.controller, session.session_id, session.revision)
         self._delete_thread = thread
         thread.succeeded.connect(self._session_deleted)
         thread.failed.connect(
@@ -2890,15 +2870,12 @@ class ReviewWorkspacePage(QWidget):
             for index in selected_rows[: len(retained)]:
                 selection_model.select(
                     index,
-                    selection_model.SelectionFlag.Select
-                    | selection_model.SelectionFlag.Rows,
+                    selection_model.SelectionFlag.Select | selection_model.SelectionFlag.Rows,
                 )
             selection_model.blockSignals(False)
         state.set_selection(retained)
         self.session_page.selection_label.setText(
-            f"{len(retained):,} selected (limit)"
-            if limited
-            else f"{len(retained):,} selected"
+            f"{len(retained):,} selected (limit)" if limited else f"{len(retained):,} selected"
         )
         self.session_page.clear_selected_button.setEnabled(bool(retained))
 
@@ -3208,9 +3185,7 @@ class ReviewWorkspacePage(QWidget):
         if not isinstance(completion, GenerationCompletion):
             return
         if completion.error:
-            self._spectrogram_failures.append(
-                completion.error[:_SPECTROGRAM_FAILURE_MESSAGE_LIMIT]
-            )
+            self._spectrogram_failures.append(completion.error[:_SPECTROGRAM_FAILURE_MESSAGE_LIMIT])
         if kind == "thumbnail":
             self._requested_thumbnails.discard((request_epoch, completion.content_key))
             state = self.current_state

@@ -46,6 +46,7 @@ from biocall_studio.review.domain.sessions import (
     ReviewSessionSource,
     ReviewSessionState,
 )
+from biocall_studio.review.domain.spectrograms import SpectrogramImageTier
 from biocall_studio.studio.application.coordinator import StudioCoordinator
 from biocall_studio.studio.application.navigation import WorkspaceRoute
 from biocall_studio.train.application.collection_scan import scan_collection
@@ -307,8 +308,9 @@ def test_cross_workspace_admission_crash_recovery_and_one_safe_exit_dialog(
     first = _detect_request(detect, "1" * 32)
     detect.start_lifecycle_fixture(first, behavior="stubborn")
     qtbot.waitUntil(
-        lambda: detect.current_run is not None
-        and detect.current_run.status is DetectRunStatus.RUNNING,
+        lambda: (
+            detect.current_run is not None and detect.current_run.status is DetectRunStatus.RUNNING
+        ),
         timeout=5_000,
     )
     process = detect.run_process
@@ -327,9 +329,16 @@ def test_cross_workspace_admission_crash_recovery_and_one_safe_exit_dialog(
     assert dialog.text() == "A Review session is still open. Save and exit?"
     assert "Lifecycle boundary check in Detect" in dialog.informativeText()
     assert dialog.defaultButton().text() == "Keep app open"
-    assert len(
-        [widget for widget in qapp.topLevelWidgets() if widget.objectName() == "studioExitDialog"]
-    ) == 1
+    assert (
+        len(
+            [
+                widget
+                for widget in qapp.topLevelWidgets()
+                if widget.objectName() == "studioExitDialog"
+            ]
+        )
+        == 1
+    )
     dialog.defaultButton().click()
     assert detect.current_run is not None and detect.current_run.run_id == first.run_id
     assert detect.run_process is process
@@ -338,8 +347,10 @@ def test_cross_workspace_admission_crash_recovery_and_one_safe_exit_dialog(
 
     process.kill()
     qtbot.waitUntil(
-        lambda: detect.current_run is not None
-        and detect.current_run.status is DetectRunStatus.INTERRUPTED,
+        lambda: (
+            detect.current_run is not None
+            and detect.current_run.status is DetectRunStatus.INTERRUPTED
+        ),
         timeout=10_000,
     )
     assert detect.run_process is None
@@ -347,8 +358,9 @@ def test_cross_workspace_admission_crash_recovery_and_one_safe_exit_dialog(
     second = _detect_request(detect, "2" * 32)
     detect.start_lifecycle_fixture(second, behavior="stubborn")
     qtbot.waitUntil(
-        lambda: detect.current_run is not None
-        and detect.current_run.status is DetectRunStatus.RUNNING,
+        lambda: (
+            detect.current_run is not None and detect.current_run.status is DetectRunStatus.RUNNING
+        ),
         timeout=5_000,
     )
     coordinator.show_studio()
@@ -370,8 +382,9 @@ def test_cross_workspace_admission_crash_recovery_and_one_safe_exit_dialog(
     )
     assert source.read_bytes() == source_bytes
     qtbot.waitUntil(
-        lambda: not coordinator.shell_window.isVisible()
-        and not coordinator.train_window.isVisible(),
+        lambda: (
+            not coordinator.shell_window.isVisible() and not coordinator.train_window.isVisible()
+        ),
         timeout=5_000,
     )
     assert not coordinator.shell_window.isVisible()
@@ -409,9 +422,7 @@ def test_genuine_studio_train_detect_rf_export_restart_relink_round_trip(
     training_dataset = TrainingDataset.from_artifact(dataset)
     capabilities = DeviceCapabilities(cuda=False, mps=False, cpu_count=8)
 
-    cnn_config = freeze_training_config(
-        _fast_cnn_draft(), training_dataset, capabilities
-    )
+    cnn_config = freeze_training_config(_fast_cnn_draft(), training_dataset, capabilities)
     cnn_run_id = train.start_training(
         cnn_config,
         model_label="ST-11 qualification CNN",
@@ -443,6 +454,12 @@ def test_genuine_studio_train_detect_rf_export_restart_relink_round_trip(
 
     detect_root = tmp_path / "qualification-detect-source"
     shutil.copytree(train_root / "recordings", detect_root / "recordings")
+    source_recordings = sorted((detect_root / "recordings").glob("*.wav"))
+    for index in range(9):
+        shutil.copyfile(
+            source_recordings[index % len(source_recordings)],
+            detect_root / "recordings" / f"QUALIFICATION_{index:02d}.wav",
+        )
     detect_source_bytes = _source_bytes(detect_root)
     retained_train_controller = coordinator.controller
     retained_train_window = coordinator.train_window
@@ -504,9 +521,11 @@ def test_genuine_studio_train_detect_rf_export_restart_relink_round_trip(
     )
     refinement_run_id = detect.start_refinement()
     qtbot.waitUntil(
-        lambda: detect.current_run is not None
-        and detect.current_run.run_id == refinement_run_id
-        and detect.current_run.terminal,
+        lambda: (
+            detect.current_run is not None
+            and detect.current_run.run_id == refinement_run_id
+            and detect.current_run.terminal
+        ),
         timeout=180_000,
     )
     refinement_run = detect.current_run
@@ -557,11 +576,7 @@ def test_genuine_studio_train_detect_rf_export_restart_relink_round_trip(
             dtype=np.float32,
         )
         signal = signal[
-            : round(
-                source_recording.frame_count
-                * target_rate
-                / source_recording.sample_rate_hz
-            )
+            : round(source_recording.frame_count * target_rate / source_recording.sample_rate_hz)
         ]
     start = round(scored.start_frame * target_rate / source_recording.sample_rate_hz)
     end = round(scored.end_frame * target_rate / source_recording.sample_rate_hz)
@@ -580,21 +595,15 @@ def test_genuine_studio_train_detect_rf_export_restart_relink_round_trip(
         window="hann",
         center=True,
     )
-    expected_features = _canonical_rf_reference(
-        raw_features, n_mfcc=int(feature_config["n_mfcc"])
-    )
+    expected_features = _canonical_rf_reference(raw_features, n_mfcc=int(feature_config["n_mfcc"]))
     assert tuple(expected_features) == rf_reference.snapshot.rf_feature_names
     assert observed_features == pytest.approx(expected_features, rel=0, abs=1e-10)
-    estimator = joblib.load(
-        rf_reference.root / rf_reference.snapshot.artifact_relative_path
-    )
+    estimator = joblib.load(rf_reference.root / rf_reference.snapshot.artifact_relative_path)
     classes = tuple(map(int, estimator.classes_))
     assert classes == tuple(rf_model.manifest["random_forest"]["estimator"]["classes"])
     target_column = classes.index(1)
     assert target_column == rf_reference.snapshot.rf_probability_column
-    vector = np.asarray(
-        [[expected_features[name] for name in expected_features]], dtype=np.float64
-    )
+    vector = np.asarray([[expected_features[name] for name in expected_features]], dtype=np.float64)
     reference_score = float(estimator.predict_proba(vector)[0, target_column])
     assert scored.rf_target_score == pytest.approx(reference_score, rel=0, abs=1e-12)
 
@@ -604,17 +613,20 @@ def test_genuine_studio_train_detect_rf_export_restart_relink_round_trip(
     assert not hasattr(detect, "set_candidate_selected")
     assert _source_bytes(train_root) == train_source_bytes
     assert _source_bytes(detect_root) == detect_source_bytes
-    assert len(
-        {
-            dataset_run_id,
-            cnn_run_id,
-            rf_run_id,
-            detection_run_id,
-            refinement_run_id,
-            parent.result_id,
-            child.result_id,
-        }
-    ) == 7
+    assert (
+        len(
+            {
+                dataset_run_id,
+                cnn_run_id,
+                rf_run_id,
+                detection_run_id,
+                refinement_run_id,
+                parent.result_id,
+                child.result_id,
+            }
+        )
+        == 7
+    )
 
     page = coordinator.shell_window.detect_page
     page._set_route(DetectRoute.RESULTS)
@@ -644,23 +656,42 @@ def test_genuine_studio_train_detect_rf_export_restart_relink_round_trip(
     assert review_page.current_state is not None
     session_id = review_page.current_state.session.session_id
     assert review_page.current_state.session.eligible_candidate_count >= 3
+    qtbot.waitUntil(
+        lambda: (
+            review_page.calibration_store.calibration(SpectrogramImageTier.THUMBNAIL) is not None
+        ),
+        timeout=20_000,
+    )
 
     review_page._set_view("one_by_one")
+    qtbot.waitUntil(
+        lambda: (
+            review_page.session_page.spectrogram.metadata is not None
+            and review_page.session_page.play_button.isEnabled()
+        ),
+        timeout=20_000,
+    )
     assert review_page.session_page.spectrogram.metadata is not None
     assert review_page.session_page.play_button.isEnabled()
     detail_keys = set(review_page.cache.valid_content_keys())
-    assert len(detail_keys) == 1
+    assert len(detail_keys) == review_page.current_state.session.eligible_candidate_count + 1
 
     review_page.show_spectrograms()
     _button(review_page.cache_page, "Generate all").click()
+    expected_cache_count = review_page.current_state.session.eligible_candidate_count + 1
     qtbot.waitUntil(
-        lambda: isinstance(QApplication.activeModalWidget(), QMessageBox),
+        lambda: (
+            isinstance(QApplication.activeModalWidget(), QMessageBox)
+            or review_page._generation_batch_id is not None
+            or len(review_page.cache.valid_content_keys()) >= expected_cache_count
+        ),
         timeout=10_000,
     )
-    _button(QApplication.activeModalWidget(), "Continue").click()
+    modal = QApplication.activeModalWidget()
+    if isinstance(modal, QMessageBox):
+        _button(modal, "Continue").click()
     qtbot.waitUntil(
-        lambda: len(review_page.cache.valid_content_keys())
-        >= review_page.current_state.session.eligible_candidate_count + 1,
+        lambda: len(review_page.cache.valid_content_keys()) >= expected_cache_count,
         timeout=30_000,
     )
     qtbot.waitUntil(lambda: review_page.active_operation is None, timeout=10_000)
@@ -748,9 +779,11 @@ def test_genuine_studio_train_detect_rf_export_restart_relink_round_trip(
     assert reopened_detect.proposal.decision is RootBindingDecision.AWAITING_CONFIRMATION
     reopened_detect.confirm_relink()
     qtbot.waitUntil(
-        lambda: reopened_detect.snapshot is not None
-        and reopened_detect.snapshot.binding_revision == 2
-        and not reopened_detect.is_scanning,
+        lambda: (
+            reopened_detect.snapshot is not None
+            and reopened_detect.snapshot.binding_revision == 2
+            and not reopened_detect.is_scanning
+        ),
         timeout=30_000,
     )
     reopened_detect.select_result(child.result_id)

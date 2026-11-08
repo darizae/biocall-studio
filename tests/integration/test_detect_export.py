@@ -229,9 +229,7 @@ def test_both_mode_concat_pcm_raven_offsets_and_receipt_reopen_are_exact(tmp_pat
 
     receipt = publish_export(snapshot, source_root=source)
     final = Path(receipt.final_destination)
-    actual_output_bytes = sum(
-        path.stat().st_size for path in final.rglob("*") if path.is_file()
-    )
+    actual_output_bytes = sum(path.stat().st_size for path in final.rglob("*") if path.is_file())
     assert actual_output_bytes == storage.expected_final.high_bytes
     assert storage.peak_bytes == actual_output_bytes
     _, first_pcm = _pcm(first)
@@ -397,9 +395,7 @@ def test_export_history_restart_verification_and_corrupt_record_isolation(
     assert reopened.verified_export_receipt == receipts[0]
 
     changed_file = next(
-        path
-        for path in Path(receipts[1].final_destination).rglob("*.wav")
-        if path.is_file()
+        path for path in Path(receipts[1].final_destination).rglob("*.wav") if path.is_file()
     )
     changed_file.write_bytes(changed_file.read_bytes() + b"changed")
     reopened.select_export(receipts[1].export_id)
@@ -429,8 +425,7 @@ def test_export_history_restart_verification_and_corrupt_record_isolation(
     try:
         controller.select_export(receipts[2].export_id)
         qtbot.waitUntil(
-            lambda: controller.export_verification_state
-            is ExportAvailability.INACCESSIBLE,
+            lambda: controller.export_verification_state is ExportAvailability.INACCESSIBLE,
             timeout=10_000,
         )
         qtbot.waitUntil(

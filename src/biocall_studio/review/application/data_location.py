@@ -180,13 +180,9 @@ def _safe_tree_facts(root: Path) -> tuple[dict[str, int | str], ...]:
                 raise ReviewDataLocationError("Review data cannot contain symbolic links.")
             if name in names:
                 if not stat.S_ISDIR(metadata.st_mode):
-                    raise ReviewDataLocationError(
-                        "Review data contains an unsupported file type."
-                    )
+                    raise ReviewDataLocationError("Review data contains an unsupported file type.")
             elif not stat.S_ISREG(metadata.st_mode):
-                raise ReviewDataLocationError(
-                    "Review data contains an unsupported file type."
-                )
+                raise ReviewDataLocationError("Review data contains an unsupported file type.")
             count += 1
             if count > _MAX_FILES:
                 raise ReviewDataLocationError(
@@ -223,17 +219,13 @@ def _inspect_database(
         connection.execute("PRAGMA trusted_schema = OFF")
         version = connection.execute("PRAGMA user_version").fetchone()[0]
         if version != expected_version:
-            raise ReviewDataLocationError(
-                f"The existing {label} uses an unsupported version."
-            )
+            raise ReviewDataLocationError(f"The existing {label} uses an unsupported version.")
         check = connection.execute("PRAGMA quick_check").fetchone()[0]
         if check != "ok":
             raise ReviewDataLocationError(f"The existing {label} is corrupt.")
         tables = {
             row[0]
-            for row in connection.execute(
-                "SELECT name FROM sqlite_schema WHERE type = 'table'"
-            )
+            for row in connection.execute("SELECT name FROM sqlite_schema WHERE type = 'table'")
         }
         if not required_tables.issubset(tables):
             raise ReviewDataLocationError(
@@ -342,9 +334,7 @@ class ReviewDataLocationManager:
             Path(suite_data_root), label="Suite application-data root"
         )
         self.default_root = self.suite_data_root / "review" / "v1"
-        self.preference_path = (
-            self.suite_data_root / "settings" / "review-data-location-v1.json"
-        )
+        self.preference_path = self.suite_data_root / "settings" / "review-data-location-v1.json"
 
     def current_root(self) -> Path:
         path = self.preference_path
@@ -365,9 +355,7 @@ class ReviewDataLocationManager:
             raise ReviewDataLocationError("Review data-folder settings are unsupported.")
         return self._validate_target(Path(raw["review_data_root"]), forbidden_roots=())
 
-    def _validate_target(
-        self, target: Path, *, forbidden_roots: tuple[Path, ...]
-    ) -> Path:
+    def _validate_target(self, target: Path, *, forbidden_roots: tuple[Path, ...]) -> Path:
         resolved = _resolved_absolute(target, label="Review data folder")
         protected = (
             self.suite_data_root / "train",
@@ -559,9 +547,10 @@ class ReviewDataLocationManager:
                 source_file = plan.source_root / item.relative_path
                 destination_file = staging / item.relative_path
                 destination_file.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
-                with source_file.open("rb") as source_stream, destination_file.open(
-                    "xb"
-                ) as destination_stream:
+                with (
+                    source_file.open("rb") as source_stream,
+                    destination_file.open("xb") as destination_stream,
+                ):
                     while chunk := source_stream.read(_COPY_CHUNK_BYTES):
                         if cancel_requested.is_set():
                             raise ReviewDataLocationError("Review data move was cancelled.")

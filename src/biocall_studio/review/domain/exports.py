@@ -875,9 +875,7 @@ def create_review_export_plan(
         try:
             row = next(rows)
         except StopIteration as exc:
-            raise ValueError(
-                "Review export is missing finalized candidate decisions."
-            ) from exc
+            raise ValueError("Review export is missing finalized candidate decisions.") from exc
         if row.ordinal != item.ordinal or row.candidate_id != item.candidate_id:
             raise ValueError("Review export candidate does not match its finalized decision.")
         encoded = _canonical_bytes(row.to_dict())

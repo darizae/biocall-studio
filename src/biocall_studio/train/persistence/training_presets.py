@@ -17,7 +17,7 @@ from biocall_studio.train.domain.training import TrainingDraft
 
 PRESET_STORE_SCHEMA_VERSION = 1
 CATALOG_REVISION = "training-fields-v1"
-TOOLBOX_SCHEMA_REVISION = "bioacoustics-dl-toolbox-0.2.0"
+TOOLBOX_SCHEMA_REVISION = "bioacoustics-dl-toolbox-0.3.0"
 PIPELINE_SCHEMA_REVISION = "alpaca-pipelines-training-spec-v1"
 
 

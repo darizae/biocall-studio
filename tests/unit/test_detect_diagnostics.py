@@ -84,25 +84,29 @@ def test_diagnostic_rotation_reader_and_symlink_policy(tmp_path: Path):
 
     records, notices = read_diagnostic_records(collection, path, max_bytes=700)
     assert records and not notices
-    assert all(set(item) <= {
-        "schema_version",
-        "timestamp_utc",
-        "level",
-        "component",
-        "event",
-        "message",
-        "pid",
-        "run_id",
-        "request_id",
-        "launch_id",
-        "status",
-        "stage",
-        "progress",
-        "stage_index",
-        "exit_code",
-        "dropped_bytes",
-        "count",
-    } for item in records)
+    assert all(
+        set(item)
+        <= {
+            "schema_version",
+            "timestamp_utc",
+            "level",
+            "component",
+            "event",
+            "message",
+            "pid",
+            "run_id",
+            "request_id",
+            "launch_id",
+            "status",
+            "stage",
+            "progress",
+            "stage_index",
+            "exit_code",
+            "dropped_bytes",
+            "count",
+        }
+        for item in records
+    )
 
     outside = tmp_path / "outside.jsonl"
     outside.write_text("{}\n")

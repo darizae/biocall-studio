@@ -197,9 +197,7 @@ def run_detection(
         # Run-level failure, never a per-file zero-candidate outcome.
         for row in rows:
             _check_cancelled(repository, request.run_id, guard)
-            _validate_source(
-                collection.source_root, row, repository, request.run_id, guard
-            )
+            _validate_source(collection.source_root, row, repository, request.run_id, guard)
         _emit(
             "progress",
             progress=10,
@@ -218,9 +216,7 @@ def run_detection(
             _check_cancelled(repository, request.run_id, guard)
             if step_delay_seconds:
                 time.sleep(step_delay_seconds)
-            path = _validate_source(
-                collection.source_root, row, repository, request.run_id, guard
-            )
+            path = _validate_source(collection.source_root, row, repository, request.run_id, guard)
             wav = row.wav
             if wav is None or row.content_sha256 is None:
                 raise FrozenInputChanged("Frozen inventory row lacks verified WAV facts.")
@@ -275,9 +271,7 @@ def run_detection(
                     )
                 )
             # Detect replacement during decode/inference before accepting this outcome.
-            _validate_source(
-                collection.source_root, row, repository, request.run_id, guard
-            )
+            _validate_source(collection.source_root, row, repository, request.run_id, guard)
             progress = 10 + round(((index + 1) / len(rows)) * 78)
             _emit(
                 "progress",

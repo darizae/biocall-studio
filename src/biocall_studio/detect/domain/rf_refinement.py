@@ -41,9 +41,7 @@ _MODEL_ID = re.compile(r"mdl_[0-9a-f]{32}")
 _RECORDING_ID = re.compile(r"rec_[0-9a-f]{32}")
 _CANDIDATE_ID = re.compile(r"cand_[0-9a-f]{32}")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
-_UNSCORED_REASONS = frozenset(
-    {"short_segment", "feature_extraction_failed", "non_finite_features"}
-)
+_UNSCORED_REASONS = frozenset({"short_segment", "feature_extraction_failed", "non_finite_features"})
 _ROBUST_FEATURE_NAMES = (
     "Dur 90% (s)",
     "Dur 50% (s)",
@@ -185,8 +183,10 @@ def target_probability_score(
         raise RfFeatureSchemaError("RF prediction must contain one two-class probability row.")
     if not np.isfinite(values).all():
         raise ValueError("RF prediction contains non-finite probabilities.")
-    if (values < 0).any() or (values > 1).any() or not math.isclose(
-        float(values.sum()), 1.0, rel_tol=1e-9, abs_tol=1e-9
+    if (
+        (values < 0).any()
+        or (values > 1).any()
+        or not math.isclose(float(values.sum()), 1.0, rel_tol=1e-9, abs_tol=1e-9)
     ):
         raise ValueError("RF prediction does not contain valid class probabilities.")
     return float(values[0, target_probability_column])
@@ -237,9 +237,7 @@ def prepare_candidate_segment(
             ),
             dtype=np.float32,
         )
-        expected_samples = round(
-            source_samples * target_sample_rate_hz / source_sample_rate_hz
-        )
+        expected_samples = round(source_samples * target_sample_rate_hz / source_sample_rate_hz)
         values = values[:expected_samples]
     start = round(start_frame * target_sample_rate_hz / source_sample_rate_hz)
     end = round(end_frame * target_sample_rate_hz / source_sample_rate_hz)
@@ -252,9 +250,9 @@ def prepare_candidate_segment(
         if short_segment_policy == "reject":
             return None
         missing = minimum_samples - int(segment.shape[0])
-        segment = np.pad(
-            segment, (missing // 2, missing - missing // 2), mode="constant"
-        ).astype(np.float32, copy=False)
+        segment = np.pad(segment, (missing // 2, missing - missing // 2), mode="constant").astype(
+            np.float32, copy=False
+        )
     return segment
 
 
@@ -714,8 +712,7 @@ class DerivedResult:
         if not keys or keys != sorted(keys) or len(keys) != len(set(keys)):
             raise ValueError("Derived Result recordings must be nonempty, unique and sorted.")
         successful = sum(
-            recording.parent_status is FileOutcomeStatus.SUCCEEDED
-            for recording in self.recordings
+            recording.parent_status is FileOutcomeStatus.SUCCEEDED for recording in self.recordings
         )
         candidates = tuple(
             candidate for recording in self.recordings for candidate in recording.candidates
@@ -817,8 +814,7 @@ class DerivedResult:
         if set(decisions) != set(parent_ids):
             raise ValueError("Derived Result decision refers to an unknown parent candidate.")
         recordings = tuple(
-            DerivedRecording.from_parent(recording, decisions)
-            for recording in parent.recordings
+            DerivedRecording.from_parent(recording, decisions) for recording in parent.recordings
         )
         candidates = tuple(
             candidate for recording in recordings for candidate in recording.candidates
@@ -936,9 +932,7 @@ class DerivedResult:
         values["feature_names"] = tuple(raw["feature_names"])
         values["feature_config"] = tuple(config_rows)
         values["preprocessing_order"] = tuple(raw["preprocessing_order"])
-        values["recordings"] = tuple(
-            DerivedRecording.from_dict(item) for item in raw["recordings"]
-        )
+        values["recordings"] = tuple(DerivedRecording.from_dict(item) for item in raw["recordings"])
         return cls(**values)
 
     def verify_parent(self, parent: DetectionResult) -> None:
@@ -967,9 +961,7 @@ class DerivedResult:
                 or derived_recording.channels != parent_recording.channels
                 or derived_recording.parent_status is not parent_recording.status
                 or derived_recording.parent_error_code != parent_recording.error_code
-                or tuple(
-                    candidate.parent_candidate() for candidate in derived_recording.candidates
-                )
+                or tuple(candidate.parent_candidate() for candidate in derived_recording.candidates)
                 != parent_recording.candidates
             ):
                 raise ValueError(

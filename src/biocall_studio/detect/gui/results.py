@@ -392,9 +392,7 @@ class ResultExplorer(QWidget):
             prior_digest = (
                 None if self.storage_estimate is None else self.storage_estimate.input_digest
             )
-            estimate = self.controller.estimate_refinement_storage(
-                expected_digest=prior_digest
-            )
+            estimate = self.controller.estimate_refinement_storage(expected_digest=prior_digest)
             self.storage_estimate = estimate
             self.storage_section.set_estimate(estimate, variable=True)
             if not estimate.can_start or not confirm_storage(self, estimate):

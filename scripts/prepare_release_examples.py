@@ -61,13 +61,10 @@ def _write_collection(example_root: Path, output: Path) -> tuple[str, int, int]:
         rows = provenance["rows"][: RECORDING_COUNT * POSITIVES_PER_RECORDING]
         for recording_index in range(RECORDING_COUNT):
             group = rows[
-                recording_index
-                * POSITIVES_PER_RECORDING : (recording_index + 1)
+                recording_index * POSITIVES_PER_RECORDING : (recording_index + 1)
                 * POSITIVES_PER_RECORDING
             ]
-            group_start = max(
-                0, int(group[0]["output_start_frame"]) - parameters.framerate
-            )
+            group_start = max(0, int(group[0]["output_start_frame"]) - parameters.framerate)
             group_end = min(
                 parameters.nframes,
                 int(group[-1]["output_end_frame"]) + parameters.framerate,

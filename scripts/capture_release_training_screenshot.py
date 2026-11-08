@@ -167,10 +167,7 @@ def _trend_ready(controller: WorkspaceController) -> bool:
     train = _losses(run, "train")
     val = _losses(run, "val")
     return (
-        len(train) >= 4
-        and len(val) >= 4
-        and train[-1][1] < train[0][1]
-        and val[-1][1] < val[0][1]
+        len(train) >= 4 and len(val) >= 4 and train[-1][1] < train[0][1] and val[-1][1] < val[0][1]
     )
 
 

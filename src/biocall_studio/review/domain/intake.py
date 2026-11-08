@@ -70,14 +70,14 @@ class ReviewRecording:
     def __post_init__(self) -> None:
         if type(self.ordinal) is not int or self.ordinal < 0:
             raise ValueError("Review recording order is invalid.")
-        if not isinstance(self.recording_ref, str) or _RECORDING_ID.fullmatch(
-            self.recording_ref
-        ) is None:
-            raise ValueError("Review recording reference is invalid.")
         if (
-            validate_relative_reference(self.recording_key) != self.recording_key
-            or not self.recording_key.casefold().endswith(".wav")
+            not isinstance(self.recording_ref, str)
+            or _RECORDING_ID.fullmatch(self.recording_ref) is None
         ):
+            raise ValueError("Review recording reference is invalid.")
+        if validate_relative_reference(
+            self.recording_key
+        ) != self.recording_key or not self.recording_key.casefold().endswith(".wav"):
             raise ValueError("Review recording key is invalid.")
         _digest(self.source_sha256, "Review recording source digest")
         if (
@@ -140,9 +140,10 @@ class EligibleCandidate:
             or self.recording_ordinal < 0
         ):
             raise ValueError("Review candidate order is invalid.")
-        if not isinstance(self.candidate_id, str) or _CANDIDATE_ID.fullmatch(
-            self.candidate_id
-        ) is None:
+        if (
+            not isinstance(self.candidate_id, str)
+            or _CANDIDATE_ID.fullmatch(self.candidate_id) is None
+        ):
             raise ValueError("Review candidate identifier is invalid.")
         ReviewRecording(
             ordinal=self.recording_ordinal,
@@ -249,9 +250,10 @@ class ReviewIntakeManifest:
             _digest(self.parent_result_digest, "Review parent Result digest")
         if type(self.binding_revision) is not int or self.binding_revision < 1:
             raise ValueError("Review binding revision is invalid.")
-        if not isinstance(self.inventory_id, str) or _INVENTORY_ID.fullmatch(
-            self.inventory_id
-        ) is None:
+        if (
+            not isinstance(self.inventory_id, str)
+            or _INVENTORY_ID.fullmatch(self.inventory_id) is None
+        ):
             raise ValueError("Review inventory reference is invalid.")
         _digest(self.inventory_digest, "Review inventory digest")
         if not isinstance(self.source_time_semantics, str) or not self.source_time_semantics:
@@ -386,9 +388,7 @@ def build_review_projection(
     parent: DetectionResult | None = None,
 ) -> ReviewIntakeProjection:
     """Validate Detect lineage and freeze only the candidates Review may expose."""
-    checked_result, checked_inventory, checked_parent = _validated_inputs(
-        result, inventory, parent
-    )
+    checked_result, checked_inventory, checked_parent = _validated_inputs(result, inventory, parent)
     _digest(publication_digest, "Detect publication digest")
     if (
         checked_result.collection_id != checked_inventory.collection_id
@@ -402,9 +402,7 @@ def build_review_projection(
         raise ValueError("Result recordings do not match the frozen included inventory.")
     inventory_rows = {row.recording_key: row for row in checked_inventory.recordings}
     result_kind = (
-        ReviewResultKind.RF
-        if isinstance(checked_result, DerivedResult)
-        else ReviewResultKind.CNN
+        ReviewResultKind.RF if isinstance(checked_result, DerivedResult) else ReviewResultKind.CNN
     )
     candidate_rows: list[EligibleCandidate] = []
     recording_rows: list[ReviewRecording] = []
@@ -460,9 +458,7 @@ def build_review_projection(
         )
         for candidate in eligible:
             rf_score = (
-                candidate.rf_target_score
-                if isinstance(checked_result, DerivedResult)
-                else None
+                candidate.rf_target_score if isinstance(checked_result, DerivedResult) else None
             )
             if isinstance(checked_result, DerivedResult) and rf_score is None:
                 raise ValueError("An RF-accepted candidate requires a finite RF score.")
@@ -497,9 +493,7 @@ def build_review_projection(
         result_digest=checked_result.result_digest,
         publication_digest=publication_digest,
         parent_result_id=(
-            checked_result.parent_result_id
-            if isinstance(checked_result, DerivedResult)
-            else None
+            checked_result.parent_result_id if isinstance(checked_result, DerivedResult) else None
         ),
         parent_result_digest=(
             checked_result.parent_result_digest

@@ -549,9 +549,9 @@ def discover_wavs(
     _check_cancel(cancel)
     if len(issues) > MAX_INVENTORY_ISSUES:
         omitted = len(issues) - MAX_INVENTORY_ISSUES + 1
-        issues = sorted(
-            issues, key=lambda issue: (issue.relative_path, issue.code, issue.message)
-        )[: MAX_INVENTORY_ISSUES - 1]
+        issues = sorted(issues, key=lambda issue: (issue.relative_path, issue.code, issue.message))[
+            : MAX_INVENTORY_ISSUES - 1
+        ]
         issues.append(
             InventoryIssue(
                 "issues_truncated",

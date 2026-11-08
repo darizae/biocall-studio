@@ -17,12 +17,8 @@ MAX_RECORD_BYTES = 8 * 1024
 MAX_MESSAGE_CHARACTERS = 1_000
 
 _LEVELS = frozenset({"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"})
-_STRING_CONTEXT = frozenset(
-    {"run_id", "request_id", "launch_id", "status", "stage"}
-)
-_NUMBER_CONTEXT = frozenset(
-    {"progress", "stage_index", "exit_code", "dropped_bytes", "count"}
-)
+_STRING_CONTEXT = frozenset({"run_id", "request_id", "launch_id", "status", "stage"})
+_NUMBER_CONTEXT = frozenset({"progress", "stage_index", "exit_code", "dropped_bytes", "count"})
 _KNOWN_FIELDS = frozenset(
     {
         "schema_version",
@@ -44,16 +40,12 @@ _SECRET = re.compile(
     r"(?i)\b(?:api[_-]?(?:key|token)|access[_-]?token|token|password|passwd|secret|credential)"
     r"\s*[:=]\s*[^\s,;]+"
 )
-_EXCEPTION = re.compile(
-    r"\b[A-Za-z_][A-Za-z0-9_.]*(?:Error|Exception)\s*\([^)]*\)"
-)
+_EXCEPTION = re.compile(r"\b[A-Za-z_][A-Za-z0-9_.]*(?:Error|Exception)\s*\([^)]*\)")
 _WINDOWS_PATH = re.compile(r"(?i)(?<![A-Za-z0-9])(?:[A-Z]:[\\/][^\s<>\"']+)")
 _UNC_PATH = re.compile(r"(?<![A-Za-z0-9])(?:\\\\[^\s<>\"']+)")
 _HOME_PATH = re.compile(r"(?<![A-Za-z0-9])(?:~[\\/][^\s<>\"']+)")
 _POSIX_PATH = re.compile(r"(?<![A-Za-z0-9])/(?:[^\s<>\"']+)")
-_PORTABLE_PATH = re.compile(
-    r"(?i)(?<![A-Za-z0-9_.-])(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+"
-)
+_PORTABLE_PATH = re.compile(r"(?i)(?<![A-Za-z0-9_.-])(?:[A-Za-z0-9_.-]+[\\/])+[A-Za-z0-9_.-]+")
 _WAV_NAME = re.compile(r"(?i)(?<![A-Za-z0-9_.-])[A-Za-z0-9_.-]+\.wav\b")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]+")
 
@@ -119,8 +111,10 @@ def encode_diagnostic_record(
             safe = _safe_identifier(value)
             if safe is not None:
                 record[key] = safe
-        elif key in _NUMBER_CONTEXT and isinstance(value, (int, float)) and not isinstance(
-            value, bool
+        elif (
+            key in _NUMBER_CONTEXT
+            and isinstance(value, (int, float))
+            and not isinstance(value, bool)
         ):
             record[key] = value
     encoded = (json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode()

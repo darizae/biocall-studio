@@ -19,7 +19,7 @@ SKIP_DIRS = {".git", ".venv", "node_modules", "work", ".release-wheels", ".pytes
 MARKDOWN_LINK = re.compile(r"!?\[([^\]]*)\]\((<[^>]+>|[^\s)]+)(?:\s+[^)]*)?\)")
 HTML_TARGET = re.compile(r"<(?:img|a)\b[^>]*(?:src|href)\s*=\s*[\"']([^\"']+)[\"']", re.I)
 IMG_TAG = re.compile(r"<img\b[^>]*>", re.I)
-ATTR = re.compile(r'([a-zA-Z-]+)\s*=\s*[\"\']([^\"\']*)[\"\']')
+ATTR = re.compile(r"([a-zA-Z-]+)\s*=\s*[\"\']([^\"\']*)[\"\']")
 FENCE = re.compile(r"^\s*```")
 
 
@@ -62,9 +62,7 @@ def _png_dimensions(path: Path) -> tuple[int, int]:
 def main() -> int:
     errors: list[str] = []
     docs = sorted(
-        path
-        for path in ROOT.rglob("*.md")
-        if not (SKIP_DIRS & set(path.relative_to(ROOT).parts))
+        path for path in ROOT.rglob("*.md") if not (SKIP_DIRS & set(path.relative_to(ROOT).parts))
     )
     links = 0
     for doc in docs:
@@ -110,8 +108,7 @@ def main() -> int:
         or cohort["review_not_call_labels"] != 0
         or cohort["review_unreviewed"] != 46
         or sum(
-            cohort[k]
-            for k in ("review_call_labels", "review_not_call_labels", "review_unreviewed")
+            cohort[k] for k in ("review_call_labels", "review_not_call_labels", "review_unreviewed")
         )
         != cohort["review_candidates"]
     ):
@@ -120,10 +117,7 @@ def main() -> int:
         errors.append("Genuine native capture provenance changed")
     if training["status_at_capture"] != "running" or training["qt_platform"] != "cocoa":
         errors.append("Genuine Train progress capture provenance changed")
-    if not all(
-        len(cohort[name]) == 64
-        for name in ("source_wav_sha256", "provenance_sha256")
-    ):
+    if not all(len(cohort[name]) == 64 for name in ("source_wav_sha256", "provenance_sha256")):
         errors.append("Real WAV or human-provenance hash invalid")
     for item in capture["captures"]:
         image = SCREENSHOTS / item["file"]

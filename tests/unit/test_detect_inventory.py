@@ -126,12 +126,10 @@ def test_normalized_path_and_file_identity_conflicts_never_collapse_rows():
         }
     )
 
-    assert portable == (
-        ("recordings/Caf\u00e9.wav", "recordings/cafe\u0301.WAV"),
+    assert portable == (("recordings/Caf\u00e9.wav", "recordings/cafe\u0301.WAV"),)
+    assert find_portable_path_conflicts(("recordings/Night/a.wav", "recordings/night/b.wav")) == (
+        ("recordings/Night/a.wav", "recordings/night/b.wav"),
     )
-    assert find_portable_path_conflicts(
-        ("recordings/Night/a.wav", "recordings/night/b.wav")
-    ) == (("recordings/Night/a.wav", "recordings/night/b.wav"),)
     assert hardlinks == (("recordings/a-copy.wav", "recordings/a.wav"),)
     with pytest.raises(ValueError, match="traversal"):
         DecisionRule.folder("../outside", InclusionDecision.INCLUDED)
@@ -239,9 +237,7 @@ def test_bulk_inclusion_is_a_revision_checked_complete_atomic_replacement():
             ),
         ),
         decision_rules=(
-            DecisionRule.file(
-                "incoming/explicitly-excluded.wav", InclusionDecision.EXCLUDED
-            ),
+            DecisionRule.file("incoming/explicitly-excluded.wav", InclusionDecision.EXCLUDED),
             DecisionRule.file("recordings/invalid.wav", InclusionDecision.EXCLUDED),
         ),
         scanned_at=SCANNED_AT,
@@ -283,26 +279,21 @@ def test_bulk_inclusion_is_a_revision_checked_complete_atomic_replacement():
         "positives/labeled.wav",
         "recordings/already-included.wav",
     }
-    assert {
-        rule.path for rule in plan.snapshot.decision_rules
-    } == {
+    assert {rule.path for rule in plan.snapshot.decision_rules} == {
         "incoming/explicitly-excluded.wav",
         "positives/labeled.wav",
         "recordings/already-included.wav",
         "recordings/invalid.wav",
     }
-    assert resolve_decision(
-        "positives/labeled.wav", plan.snapshot.decision_rules
-    ).decision is InclusionDecision.INCLUDED
+    assert (
+        resolve_decision("positives/labeled.wav", plan.snapshot.decision_rules).decision
+        is InclusionDecision.INCLUDED
+    )
     invalid = next(
-        row
-        for row in plan.snapshot.recordings
-        if row.recording_key == "recordings/invalid.wav"
+        row for row in plan.snapshot.recordings if row.recording_key == "recordings/invalid.wav"
     )
     missing = next(
-        row
-        for row in plan.snapshot.recordings
-        if row.recording_key == "recordings/missing.wav"
+        row for row in plan.snapshot.recordings if row.recording_key == "recordings/missing.wav"
     )
     assert (invalid.status, invalid.decision) == (
         RecordingStatus.INVALID,

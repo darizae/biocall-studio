@@ -356,12 +356,8 @@ class SpectrogramGenerationSupervisor:
     def _dispatch(self) -> None:
         while True:
             with self._condition:
-                while (
-                    not self._shutdown
-                    and (
-                        len(self._active) >= self.max_workers
-                        or self._queue.pending_count == 0
-                    )
+                while not self._shutdown and (
+                    len(self._active) >= self.max_workers or self._queue.pending_count == 0
                 ):
                     self._condition.wait()
                 if self._shutdown:
@@ -391,11 +387,7 @@ class SpectrogramGenerationSupervisor:
             current = tuple(token for token in item.all_tokens if self.token_is_current(token))
             if not current:
                 return _WorkResult("stale", ())
-            loaded = (
-                self.cache.load_rgb(item.job.content_key)
-                if item.job.load_display
-                else None
-            )
+            loaded = self.cache.load_rgb(item.job.content_key) if item.job.load_display else None
             entry = loaded[0] if loaded is not None else self.cache.lookup(item.job.content_key)
             if (
                 entry is not None
@@ -419,9 +411,7 @@ class SpectrogramGenerationSupervisor:
             if item.job.admit_write is not None:
                 item.job.admit_write()
             prepared = (
-                item.job.prepare(item.cancel_event.is_set)
-                if item.job.prepare is not None
-                else None
+                item.job.prepare(item.cancel_event.is_set) if item.job.prepare is not None else None
             )
             raster = item.job.render(prepared, item.cancel_event.is_set)
             if not isinstance(raster, SpectrogramRaster):

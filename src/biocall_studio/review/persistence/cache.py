@@ -130,10 +130,13 @@ def inspect_rgb_png(payload: bytes, *, expected_width: int, expected_height: int
     width, height, bit_depth, colour, compression, filtering, interlace = struct.unpack(
         ">IIBBBBB", header
     )
-    if (
-        (width, height) != (expected_width, expected_height)
-        or (bit_depth, colour, compression, filtering, interlace) != (8, 2, 0, 0, 0)
-    ):
+    if (width, height) != (expected_width, expected_height) or (
+        bit_depth,
+        colour,
+        compression,
+        filtering,
+        interlace,
+    ) != (8, 2, 0, 0, 0):
         raise ValueError("Cached PNG format or dimensions do not match the manifest.")
     compressed = b"".join(value for kind, value in chunks if kind == b"IDAT")
     try:
@@ -418,11 +421,7 @@ class SpectrogramCache:
                     pass
                 failure = "disk_full" if isinstance(exc, OSError) and exc.errno == 28 else None
                 if failure is None:
-                    failure = (
-                        "permission"
-                        if isinstance(exc, PermissionError)
-                        else "encode_failed"
-                    )
+                    failure = "permission" if isinstance(exc, PermissionError) else "encode_failed"
                 self.mark_failed(raster.content_key, failure)
                 raise
             entry = self.lookup(raster.content_key)
@@ -619,9 +618,7 @@ class SpectrogramCache:
         invalidate_publications: bool = True,
     ) -> CacheMutation:
         keys = tuple(dict.fromkeys(validate_spectrogram_content_key(key) for key in content_keys))
-        protected = frozenset(
-            validate_spectrogram_content_key(key) for key in protected_keys
-        )
+        protected = frozenset(validate_spectrogram_content_key(key) for key in protected_keys)
         deleted: list[str] = []
         failed: list[str] = []
         skipped: list[str] = []

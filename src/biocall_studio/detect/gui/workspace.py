@@ -251,9 +251,7 @@ class DetectWorkspacePage(QWidget):
 
         self.body = QWidget()
         light_palette = self.body.palette()
-        light_palette.setColor(
-            QPalette.ColorRole.Window, QColor(ALPACA_LIGHT.colors.background)
-        )
+        light_palette.setColor(QPalette.ColorRole.Window, QColor(ALPACA_LIGHT.colors.background))
         self.body.setAutoFillBackground(True)
         self.body.setPalette(light_palette)
         self.body_layout = QVBoxLayout(self.body)
@@ -267,9 +265,7 @@ class DetectWorkspacePage(QWidget):
         self.content_scroll.setAccessibleName("Detect page content")
         self.content_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.content_scroll.setWidgetResizable(True)
-        self.content_scroll.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
-        )
+        self.content_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         self.content = QWidget()
         self.content.setAutoFillBackground(True)
@@ -311,9 +307,7 @@ class DetectWorkspacePage(QWidget):
         models_actions = QHBoxLayout()
         models_actions.addStretch()
         self.models_continue_button = Button("Continue to Recordings", variant="primary")
-        self.models_continue_button.clicked.connect(
-            lambda: self._set_route(DetectRoute.RECORDINGS)
-        )
+        self.models_continue_button.clicked.connect(lambda: self._set_route(DetectRoute.RECORDINGS))
         models_actions.addWidget(self.models_continue_button)
         models_view_layout.addLayout(models_actions)
         models_view_layout.addStretch()
@@ -334,14 +328,10 @@ class DetectWorkspacePage(QWidget):
         recordings_layout.addWidget(self.different_card)
         recordings_actions = QHBoxLayout()
         self.recordings_back_button = Button("Back to Models", variant="outline")
-        self.recordings_back_button.clicked.connect(
-            lambda: self._set_route(DetectRoute.MODELS)
-        )
+        self.recordings_back_button.clicked.connect(lambda: self._set_route(DetectRoute.MODELS))
         recordings_actions.addWidget(self.recordings_back_button)
         recordings_actions.addStretch()
-        self.recordings_continue_button = Button(
-            "Continue to New detection", variant="primary"
-        )
+        self.recordings_continue_button = Button("Continue to New detection", variant="primary")
         self.recordings_continue_button.clicked.connect(
             lambda: self._set_route(DetectRoute.NEW_DETECTION)
         )
@@ -357,15 +347,11 @@ class DetectWorkspacePage(QWidget):
         self.result_explorer.recordings_requested.connect(
             lambda: self._set_route(DetectRoute.RECORDINGS)
         )
-        self.result_explorer.models_requested.connect(
-            lambda: self._set_route(DetectRoute.MODELS)
-        )
+        self.result_explorer.models_requested.connect(lambda: self._set_route(DetectRoute.MODELS))
         self.export_history_page = ExportHistoryPage(self.controller)
         self.export_history_page.export_requested.connect(self._open_export_detail)
         self.export_detail_page = ExportDetailPage(self.controller, self._show_in_folder)
-        self.export_detail_page.back_requested.connect(
-            lambda: self._set_route(DetectRoute.EXPORTS)
-        )
+        self.export_detail_page.back_requested.connect(lambda: self._set_route(DetectRoute.EXPORTS))
         self._route_pages = {
             DetectRoute.NEW_DETECTION: self.new_detection_view,
             DetectRoute.RECORDINGS: self.recordings_view,
@@ -395,12 +381,8 @@ class DetectWorkspacePage(QWidget):
         self.folder_picker.folderChanged.connect(self.controller.choose_source_root)
         self.relink_picker.folderChanged.connect(self.controller.choose_source_root)
         self.minimum_score.valueChanged.connect(lambda _value: self._render_readiness())
-        self.window_overlap.currentIndexChanged.connect(
-            lambda _index: self._render_readiness()
-        )
-        self.combine_nearby.currentIndexChanged.connect(
-            lambda _index: self._render_readiness()
-        )
+        self.window_overlap.currentIndexChanged.connect(lambda _index: self._render_readiness())
+        self.combine_nearby.currentIndexChanged.connect(lambda _index: self._render_readiness())
         self.current_route = DetectRoute.MODELS
         self._navigate_new_detection()
         self._render()
@@ -563,16 +545,12 @@ class DetectWorkspacePage(QWidget):
         self.nav_scroll.setStyleSheet("QScrollArea { background: transparent; border: 0; }")
         nav_content = QWidget()
         nav_palette = nav_content.palette()
-        nav_palette.setColor(
-            QPalette.ColorRole.Window, QColor(ALPACA_LIGHT.colors.surface)
-        )
+        nav_palette.setColor(QPalette.ColorRole.Window, QColor(ALPACA_LIGHT.colors.surface))
         nav_content.setAutoFillBackground(True)
         nav_content.setPalette(nav_palette)
         self.nav_scroll.viewport().setAutoFillBackground(True)
         self.nav_scroll.viewport().setPalette(nav_palette)
-        self.navigation_layout = QBoxLayout(
-            QBoxLayout.Direction.TopToBottom, nav_content
-        )
+        self.navigation_layout = QBoxLayout(QBoxLayout.Direction.TopToBottom, nav_content)
         self.navigation_layout.setContentsMargins(0, 0, 0, 0)
         self.navigation_layout.setSpacing(7)
         labels = {
@@ -674,13 +652,9 @@ class DetectWorkspacePage(QWidget):
         summary.addWidget(self.run_summary_model, 1, 0)
         summary.addWidget(self.run_summary_recordings, 1, 1)
         self.change_model_button = Button("Change model", variant="outline", size="small")
-        self.change_model_button.clicked.connect(
-            lambda: self._set_route(DetectRoute.MODELS)
-        )
+        self.change_model_button.clicked.connect(lambda: self._set_route(DetectRoute.MODELS))
         summary.addWidget(self.change_model_button, 2, 0, Qt.AlignmentFlag.AlignLeft)
-        self.change_recordings_button = Button(
-            "Review recordings", variant="outline", size="small"
-        )
+        self.change_recordings_button = Button("Review recordings", variant="outline", size="small")
         self.change_recordings_button.clicked.connect(
             lambda: self._set_route(DetectRoute.RECORDINGS)
         )
@@ -688,18 +662,14 @@ class DetectWorkspacePage(QWidget):
         summary.setColumnStretch(0, 1)
         summary.setColumnStretch(1, 1)
         self.run_summary_card.content_layout.addLayout(summary)
-        self.run_blocker = Text(
-            "Choose a compatible detection model.", role="body", word_wrap=True
-        )
+        self.run_blocker = Text("Choose a compatible detection model.", role="body", word_wrap=True)
         self.run_blocker.setAccessibleName("Detection readiness")
         self.run_summary_card.content_layout.addWidget(self.run_blocker)
         outer.addWidget(self.run_summary_card)
         outer.addWidget(self.settings_card)
         footer = QHBoxLayout()
         self.settings_back_button = Button("Back to Recordings", variant="outline")
-        self.settings_back_button.clicked.connect(
-            lambda: self._set_route(DetectRoute.RECORDINGS)
-        )
+        self.settings_back_button.clicked.connect(lambda: self._set_route(DetectRoute.RECORDINGS))
         footer.addWidget(self.settings_back_button)
         footer.addStretch()
         outer.addLayout(footer)
@@ -741,9 +711,7 @@ class DetectWorkspacePage(QWidget):
         card.content_layout.addWidget(self.refinement_model_picker)
         actions = QHBoxLayout()
         actions.addStretch()
-        self.clear_refinement_model_button = Button(
-            "Clear model", variant="outline", size="small"
-        )
+        self.clear_refinement_model_button = Button("Clear model", variant="outline", size="small")
         self.clear_refinement_model_button.clicked.connect(
             self.controller.clear_refinement_model_selection
         )
@@ -1412,13 +1380,9 @@ class DetectWorkspacePage(QWidget):
         self.model_detail.setText(correction)
         self.model_detail.setVisible(bool(correction))
         inputs_locked = self.controller.is_run_active
-        self.model_picker.setEnabled(
-            state is not ModelIntakeState.LOADING and not inputs_locked
-        )
+        self.model_picker.setEnabled(state is not ModelIntakeState.LOADING and not inputs_locked)
         self.clear_model_button.setEnabled(
-            selected is not None
-            and state is not ModelIntakeState.LOADING
-            and not inputs_locked
+            selected is not None and state is not ModelIntakeState.LOADING and not inputs_locked
         )
         if state is not ModelIntakeState.LOADING:
             self.model_picker.setFolderPath("" if selected is None else str(selected))
@@ -1471,14 +1435,10 @@ class DetectWorkspacePage(QWidget):
             state is not ModelIntakeState.LOADING and not inputs_locked
         )
         self.clear_refinement_model_button.setEnabled(
-            selected is not None
-            and state is not ModelIntakeState.LOADING
-            and not inputs_locked
+            selected is not None and state is not ModelIntakeState.LOADING and not inputs_locked
         )
         if state is not ModelIntakeState.LOADING:
-            self.refinement_model_picker.setFolderPath(
-                "" if selected is None else str(selected)
-            )
+            self.refinement_model_picker.setFolderPath("" if selected is None else str(selected))
 
     def _render_readiness(self) -> None:
         settings_locked = self.controller.is_run_active
@@ -1491,8 +1451,7 @@ class DetectWorkspacePage(QWidget):
         snapshot = self.controller.snapshot
         reference = self.controller.model_reference
         model_ready = (
-            self.controller.model_state is ModelIntakeState.COMPATIBLE
-            and reference is not None
+            self.controller.model_state is ModelIntakeState.COMPATIBLE and reference is not None
         )
         self.models_continue_button.setEnabled(model_ready)
         self.recordings_continue_button.setEnabled(self.controller.recordings_reviewed)
@@ -1524,9 +1483,7 @@ class DetectWorkspacePage(QWidget):
             self.start_detection_button.setText("Detection running")
             self.start_detection_button.setEnabled(False)
         else:
-            self.start_detection_button.setEnabled(
-                self.controller.inputs_ready and storage_ready
-            )
+            self.start_detection_button.setEnabled(self.controller.inputs_ready and storage_ready)
         self.change_model_button.setEnabled(not settings_locked)
         self.change_recordings_button.setEnabled(not settings_locked)
         if self.controller.is_run_active:
@@ -1727,8 +1684,7 @@ class DetectWorkspacePage(QWidget):
         )
         self.run_guidance.setText(guidance)
         self.cancel_run_button.setEnabled(
-            record.active
-            and record.status in {DetectRunStatus.PREPARING, DetectRunStatus.RUNNING}
+            record.active and record.status in {DetectRunStatus.PREPARING, DetectRunStatus.RUNNING}
         )
         self.open_run_result_button.setEnabled(
             record.status is DetectRunStatus.COMPLETED and result is not None

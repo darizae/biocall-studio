@@ -125,9 +125,7 @@ class SavedExampleStore:
     def revision_labels(self, preset: SpectrogramSettingsSnapshot) -> tuple[str, ...]:
         return tuple(label for _path, label in self.examples(preset))
 
-    def examples(
-        self, preset: SpectrogramSettingsSnapshot
-    ) -> tuple[tuple[Path, str], ...]:
+    def examples(self, preset: SpectrogramSettingsSnapshot) -> tuple[tuple[Path, str], ...]:
         directory = self._directory(preset.preset_id)
         if not directory.is_dir() or directory.is_symlink():
             return ()

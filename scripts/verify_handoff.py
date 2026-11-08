@@ -84,9 +84,7 @@ def audit_markdown_links(root: Path, *, require_private: bool = False) -> list[s
         if path.is_relative_to(private_root):
             continue  # Private documents are outside this tracked public audit.
         document = path.read_text(encoding="utf-8")
-        for raw_link in re.findall(
-            r"!?\[[^\]]+\]\(([^\s)]+)(?:\s+[^)]*)?\)", document
-        ):
+        for raw_link in re.findall(r"!?\[[^\]]+\]\(([^\s)]+)(?:\s+[^)]*)?\)", document):
             link = unquote(raw_link.split("#", maxsplit=1)[0])
             if not link or link.startswith(("http://", "https://", "mailto:")):
                 continue

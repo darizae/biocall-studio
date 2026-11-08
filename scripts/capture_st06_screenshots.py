@@ -141,8 +141,10 @@ def main(argv: list[str] | None = None) -> int:
 
         controller.start_lifecycle_fixture(_request(controller, "1"), behavior="stubborn")
         _wait_until(
-            lambda: controller.current_run is not None
-            and controller.current_run.status is DetectRunStatus.RUNNING
+            lambda: (
+                controller.current_run is not None
+                and controller.current_run.status is DetectRunStatus.RUNNING
+            )
         )
         _capture(
             window,
@@ -158,8 +160,10 @@ def main(argv: list[str] | None = None) -> int:
             settle_ms=300,
         )
         _wait_until(
-            lambda: controller.current_run is not None
-            and controller.current_run.status is DetectRunStatus.CANCELLED
+            lambda: (
+                controller.current_run is not None
+                and controller.current_run.status is DetectRunStatus.CANCELLED
+            )
         )
         window.resize(700, 780)
         _capture(
@@ -171,8 +175,10 @@ def main(argv: list[str] | None = None) -> int:
         window.resize(1180, 790)
         controller.start_lifecycle_fixture(_request(controller, "2"), behavior="fail")
         _wait_until(
-            lambda: controller.current_run is not None
-            and controller.current_run.status is DetectRunStatus.FAILED
+            lambda: (
+                controller.current_run is not None
+                and controller.current_run.status is DetectRunStatus.FAILED
+            )
         )
         _capture(
             window,
@@ -182,8 +188,10 @@ def main(argv: list[str] | None = None) -> int:
 
         controller.start_lifecycle_fixture(_request(controller, "3"), behavior="crash")
         _wait_until(
-            lambda: controller.current_run is not None
-            and controller.current_run.status is DetectRunStatus.INTERRUPTED
+            lambda: (
+                controller.current_run is not None
+                and controller.current_run.status is DetectRunStatus.INTERRUPTED
+            )
         )
         _capture(
             window,
@@ -193,8 +201,10 @@ def main(argv: list[str] | None = None) -> int:
 
         controller.start_lifecycle_fixture(_request(controller, "4"), behavior="success")
         _wait_until(
-            lambda: controller.current_run is not None
-            and controller.current_run.status is DetectRunStatus.COMPLETED
+            lambda: (
+                controller.current_run is not None
+                and controller.current_run.status is DetectRunStatus.COMPLETED
+            )
         )
         window.resize(700, 780)
         _capture(

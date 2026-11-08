@@ -25,9 +25,7 @@ MAX_PUBLICATION_BYTES = 64 * 1024 * 1024
 _ARTIFACT_ID = re.compile(r"pub_[0-9a-f]{32}")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _FILE_NAME = re.compile(r"[a-z][a-z0-9_.-]{0,127}")
-_ARTIFACT_KINDS = frozenset(
-    {"lifecycle_fixture", "detection_result", "derived_result"}
-)
+_ARTIFACT_KINDS = frozenset({"lifecycle_fixture", "detection_result", "derived_result"})
 
 
 def _fsync_directory(path: Path) -> None:
@@ -172,9 +170,7 @@ class PublicationIdentity:
             "artifact_digest",
             "published_at",
         }
-        if not isinstance(raw, dict) or set(raw) != expected or not isinstance(
-            raw["files"], list
-        ):
+        if not isinstance(raw, dict) or set(raw) != expected or not isinstance(raw["files"], list):
             raise ValueError("Publication identity document is invalid.")
         return cls(
             schema_version=raw["schema_version"],
@@ -299,9 +295,7 @@ def stage_detection_result(
         raise ValueError("The launch staging directory is not contained.")
     stage.mkdir(mode=0o700)
     payload_path = stage / "result.json"
-    payload = (
-        json.dumps(result.to_dict(), sort_keys=True, separators=(",", ":")) + "\n"
-    ).encode()
+    payload = (json.dumps(result.to_dict(), sort_keys=True, separators=(",", ":")) + "\n").encode()
     if len(payload) > MAX_PUBLICATION_BYTES:
         raise ValueError("DetectionResult exceeds the publication byte limit.")
     descriptor = os.open(payload_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -310,9 +304,7 @@ def stage_detection_result(
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
-    files = (
-        PublicationFile("result.json", len(payload), hashlib.sha256(payload).hexdigest()),
-    )
+    files = (PublicationFile("result.json", len(payload), hashlib.sha256(payload).hexdigest()),)
     identity = PublicationIdentity.create(
         request,
         files,
@@ -332,7 +324,8 @@ def stage_derived_result(
     """Stage one complete immutable child Result without touching its parent."""
     settings = dict(request.settings)
     if (
-        settings != {
+        settings
+        != {
             "parent_result_digest": result.parent_result_digest,
             "parent_result_id": result.parent_result_id,
             "run_kind": "rf_refinement",
@@ -357,9 +350,7 @@ def stage_derived_result(
         raise ValueError("The launch staging directory is not contained.")
     stage.mkdir(mode=0o700)
     payload_path = stage / "result.json"
-    payload = (
-        json.dumps(result.to_dict(), sort_keys=True, separators=(",", ":")) + "\n"
-    ).encode()
+    payload = (json.dumps(result.to_dict(), sort_keys=True, separators=(",", ":")) + "\n").encode()
     if len(payload) > MAX_PUBLICATION_BYTES:
         raise ValueError("DerivedResult exceeds the publication byte limit.")
     descriptor = os.open(payload_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -368,9 +359,7 @@ def stage_derived_result(
         os.fsync(descriptor)
     finally:
         os.close(descriptor)
-    files = (
-        PublicationFile("result.json", len(payload), hashlib.sha256(payload).hexdigest()),
-    )
+    files = (PublicationFile("result.json", len(payload), hashlib.sha256(payload).hexdigest()),)
     identity = PublicationIdentity.create(
         request,
         files,
@@ -426,11 +415,7 @@ def _load_identity(directory: Path) -> PublicationIdentity:
 
 
 def _publication_root(collection: Path, artifact_kind: str) -> Path:
-    name = (
-        "results"
-        if artifact_kind in {"detection_result", "derived_result"}
-        else "publications"
-    )
+    name = "results" if artifact_kind in {"detection_result", "derived_result"} else "publications"
     return _validate_directory(collection, collection / name, label="Publication root")
 
 
@@ -454,8 +439,7 @@ def publish_staged_artifact(
         for artifact_kind in ("detection_result", "lifecycle_fixture")
     )
     if any(
-        (root / request.artifact_id).exists()
-        or (root / request.artifact_id).is_symlink()
+        (root / request.artifact_id).exists() or (root / request.artifact_id).is_symlink()
         for root in roots
     ):
         raise FileExistsError("The immutable Detect publication already exists.")

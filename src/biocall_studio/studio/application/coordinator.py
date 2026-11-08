@@ -72,9 +72,7 @@ class _ReviewDataChangeThread(QThread):
 class StudioCoordinator(QObject):
     """Retain Train intact while the suite shell controls visibility and app exit."""
 
-    def __init__(
-        self, controller: WorkspaceController, *, detect_data_dir=None
-    ):
+    def __init__(self, controller: WorkspaceController, *, detect_data_dir=None):
         super().__init__()
         app = QApplication.instance()
         if not isinstance(app, QApplication):
@@ -114,14 +112,10 @@ class StudioCoordinator(QObject):
         self._review_stop_deadline = 0.0
 
         self.controller.set_run_admission(
-            lambda run_id, label: self._assert_run_admitted(
-                WorkflowOwner.TRAIN, run_id, label
-            )
+            lambda run_id, label: self._assert_run_admitted(WorkflowOwner.TRAIN, run_id, label)
         )
         self.detect_controller.set_run_admission(
-            lambda run_id, label: self._assert_run_admitted(
-                WorkflowOwner.DETECT, run_id, label
-            )
+            lambda run_id, label: self._assert_run_admitted(WorkflowOwner.DETECT, run_id, label)
         )
 
         self.shell_window.workspace_requested.connect(self.open_workspace)
@@ -220,9 +214,7 @@ class StudioCoordinator(QObject):
     def _review_source_root(self, session: ReviewSession):
         try:
             source = self.review_controller.store.load_source(session.session_id)
-            collection = self.detect_controller.store.load_collection(
-                source.manifest.collection_id
-            )
+            collection = self.detect_controller.store.load_collection(source.manifest.collection_id)
             if (
                 self.detect_controller.store.root_decision(collection)
                 is not RootBindingDecision.VALID
@@ -241,7 +233,9 @@ class StudioCoordinator(QObject):
         }
         for collection_id in collection_ids:
             try:
-                roots.append(self.detect_controller.store.load_collection(collection_id).source_root)
+                roots.append(
+                    self.detect_controller.store.load_collection(collection_id).source_root
+                )
             except (OSError, RuntimeError, ValueError):
                 continue
         for record in self.review_controller.list_export_history():
@@ -459,13 +453,11 @@ class StudioCoordinator(QObject):
         dialog.setText(decision.summary)
         if review_exit:
             active = "; ".join(
-                f"{operation.label} in {operation.owner.value}"
-                for operation in decision.operations
+                f"{operation.label} in {operation.owner.value}" for operation in decision.operations
             )
             dialog.setInformativeText(
                 "BioCall Studio will save and close the Review session, stop active work "
-                "safely, and then exit."
-                + (f" Active work: {active}." if active else "")
+                "safely, and then exit." + (f" Active work: {active}." if active else "")
             )
         else:
             dialog.setInformativeText(

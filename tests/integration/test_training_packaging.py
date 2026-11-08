@@ -9,6 +9,12 @@ from pathlib import Path
 
 import pytest
 
+from biocall_studio.train.domain.model import (
+    MODEL_TOOLBOX_REVISION,
+    MODEL_TOOLBOX_VERSION,
+)
+from biocall_studio.train.workflows.audio import TOOLBOX_SOURCE_REVISION
+
 pytestmark = [pytest.mark.integration, pytest.mark.packaged]
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -21,6 +27,9 @@ def test_training_wheels_use_committed_toolbox_artifact_without_sibling_imports(
     assert project["project"]["version"] == "0.1.0a1"
     assert "bioacoustics-dl-toolbox[rf]==0.3.0" in project["project"]["dependencies"]
     assert "alp-ui==0.1.0a1" in project["project"]["dependencies"]
+    assert MODEL_TOOLBOX_VERSION == science["bioacoustics-dl-toolbox-version"]
+    assert MODEL_TOOLBOX_REVISION == science["bioacoustics-dl-toolbox-revision"]
+    assert TOOLBOX_SOURCE_REVISION == science["bioacoustics-dl-toolbox-revision"]
 
     published = (
         (

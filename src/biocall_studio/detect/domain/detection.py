@@ -157,9 +157,7 @@ def map_resampled_interval_to_source(
     ):
         raise ValueError("Source interval time-base facts are invalid.")
     start = (start_sample * source_sample_rate_hz) // model_sample_rate_hz
-    end = (
-        end_sample * source_sample_rate_hz + model_sample_rate_hz - 1
-    ) // model_sample_rate_hz
+    end = (end_sample * source_sample_rate_hz + model_sample_rate_hz - 1) // model_sample_rate_hz
     start = min(start, source_frame_count)
     end = min(end, source_frame_count)
     if end <= start:

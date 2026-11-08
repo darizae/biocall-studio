@@ -33,8 +33,7 @@ def test_broken_live_markdown_link_remains_a_failure(tmp_path):
 def test_required_current_review_contract_cannot_disappear(tmp_path):
     problems = handoff.audit_repository(tmp_path)
     assert (
-        "Missing current Review contract: "
-        "docs/specs/review/SPECTROGRAM_DECISIONS.md"
+        "Missing current Review contract: docs/specs/review/SPECTROGRAM_DECISIONS.md"
     ) in problems
     assert "Missing current handoff file: docs/agent/ROUTING.md" in problems
 
@@ -42,9 +41,7 @@ def test_required_current_review_contract_cannot_disappear(tmp_path):
 def test_private_site_links_are_optional_unless_explicitly_requested(tmp_path):
     document = tmp_path / "docs" / "start.md"
     document.parent.mkdir()
-    document.write_text(
-        "[private skill](priv/hpc-source-access/SKILL.md)", encoding="utf-8"
-    )
+    document.write_text("[private skill](priv/hpc-source-access/SKILL.md)", encoding="utf-8")
     assert handoff.audit_markdown_links(tmp_path) == []
     assert handoff.audit_markdown_links(tmp_path, require_private=True) == [
         "Broken Markdown link: docs/start.md → priv/hpc-source-access/SKILL.md"
@@ -63,8 +60,7 @@ def test_missing_markdown_image_is_a_failure(tmp_path):
 def test_native_gate_checks_current_st11_evidence(tmp_path):
     errors = handoff.audit_repository(tmp_path, require_native_ux=True)
     assert (
-        "Missing ST-11 native evidence: "
-        "docs/design/evidence/st-11-native/review-normal.png"
+        "Missing ST-11 native evidence: docs/design/evidence/st-11-native/review-normal.png"
     ) in errors
     assert all("spec-01-native" not in error for error in errors)
 

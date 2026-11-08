@@ -25,14 +25,10 @@ from biocall_studio.detect.domain.rf_refinement import (
 
 def _parent() -> DetectionResult:
     inventory_id = "inv_" + "1" * 32
-    recording_ref = recording_identity(
-        inventory_id, "recordings/dawn.wav", "7" * 64
-    )
+    recording_ref = recording_identity(inventory_id, "recordings/dawn.wav", "7" * 64)
     candidates = tuple(
         CandidateInterval.create(
-            candidate_id=candidate_identity(
-                recording_ref, start, end, f"cnn-science-{index}"
-            ),
+            candidate_id=candidate_identity(recording_ref, start, end, f"cnn-science-{index}"),
             recording_ref=recording_ref,
             start_frame=start,
             end_frame=end,
@@ -109,21 +105,15 @@ def _derived(
 
 def test_ordered_rf_features_and_probability_class_column_are_strict():
     """Case: UT-DET-018."""
-    vector = ordered_feature_vector(
-        {"first": 1.25, "second": -2.5}, ("first", "second")
-    )
+    vector = ordered_feature_vector({"first": 1.25, "second": -2.5}, ("first", "second"))
     assert vector.dtype == np.float64
     assert vector.shape == (1, 2)
     assert vector.tolist() == [[1.25, -2.5]]
 
     with pytest.raises(ValueError, match="order"):
-        ordered_feature_vector(
-            {"second": -2.5, "first": 1.25}, ("first", "second")
-        )
+        ordered_feature_vector({"second": -2.5, "first": 1.25}, ("first", "second"))
     with pytest.raises(ValueError, match="non-finite"):
-        ordered_feature_vector(
-            {"first": 1.25, "second": float("nan")}, ("first", "second")
-        )
+        ordered_feature_vector({"first": 1.25, "second": float("nan")}, ("first", "second"))
 
     assert target_probability_score(
         np.asarray([[0.2, 0.8]], dtype=np.float64),

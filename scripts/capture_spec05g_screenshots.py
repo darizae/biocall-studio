@@ -104,9 +104,7 @@ def main(argv: list[str] | None = None) -> int:
         f"appearance={app.styleHints().colorScheme().name}"
     )
 
-    with tempfile.TemporaryDirectory(
-        prefix="biocall-studio-spec05g-", dir="/tmp"
-    ) as temporary:
+    with tempfile.TemporaryDirectory(prefix="biocall-studio-spec05g-", dir="/tmp") as temporary:
         temporary_root = Path(temporary)
         root = temporary_root / "Spec05gExample"
         _make_collection(root)

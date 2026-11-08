@@ -75,9 +75,9 @@ def _bounded_text(value: object, label: str, *, maximum: int = MAX_RUN_MESSAGE) 
     return normalized
 
 
-def _settings(value: Mapping[str, _Scalar] | tuple[tuple[str, _Scalar], ...]) -> tuple[
-    tuple[str, _Scalar], ...
-]:
+def _settings(
+    value: Mapping[str, _Scalar] | tuple[tuple[str, _Scalar], ...],
+) -> tuple[tuple[str, _Scalar], ...]:
     rows = tuple(value.items()) if isinstance(value, Mapping) else tuple(value)
     if len(rows) > 64:
         raise ValueError("Detect Run settings exceed the 64-field limit.")
@@ -331,9 +331,10 @@ class PublicationReceipt:
         _identifier(self.request_id, _REQUEST_ID, "Detect request ID")
         _identifier(self.launch_id, _LAUNCH_ID, "Detect launch ID")
         _identifier(self.artifact_id, _ARTIFACT_ID, "publication artifact ID")
-        if not isinstance(self.artifact_kind, str) or _ARTIFACT_KIND.fullmatch(
-            self.artifact_kind
-        ) is None:
+        if (
+            not isinstance(self.artifact_kind, str)
+            or _ARTIFACT_KIND.fullmatch(self.artifact_kind) is None
+        ):
             raise ValueError("Publication artifact kind is invalid.")
         _digest(self.artifact_digest, "Publication artifact digest")
         _utc(self.published_at, "Publication time")
@@ -412,9 +413,9 @@ class DetectRunRecord:
             _bounded_text(stage, "Detect Run stage", maximum=100)
         if type(self.progress) is not int or not 0 <= self.progress <= 100:
             raise ValueError("Detect Run progress is invalid.")
-        maximum_stage = len(self.stages) if self.status is DetectRunStatus.COMPLETED else len(
-            self.stages
-        ) - 1
+        maximum_stage = (
+            len(self.stages) if self.status is DetectRunStatus.COMPLETED else len(self.stages) - 1
+        )
         if type(self.stage_index) is not int or not 0 <= self.stage_index <= maximum_stage:
             raise ValueError("Detect Run stage index is invalid.")
         if self.process_id is not None and (

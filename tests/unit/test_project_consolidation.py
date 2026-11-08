@@ -41,6 +41,7 @@ def test_unified_package_has_strict_workflow_ownership_and_no_removed_namespace(
         "owner_lifetime.py",
         "paths.py",
         "storage.py",
+        "worker_launch.py",
     }
 
     for path in package.rglob("*.py"):
@@ -102,6 +103,5 @@ def test_suite_data_paths_are_versioned_separate_and_contained(tmp_path):
     assert paths.review == paths.root / "review" / "v1"
     assert len({paths.train, paths.detect, paths.review}) == 3
     assert all(
-        path.is_relative_to(paths.root)
-        for path in (paths.train, paths.detect, paths.review)
+        path.is_relative_to(paths.root) for path in (paths.train, paths.detect, paths.review)
     )

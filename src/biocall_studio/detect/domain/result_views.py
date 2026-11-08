@@ -125,8 +125,7 @@ class RecordingViewRow:
             outcome=outcome.status,
             error_code=outcome.error_code,
             candidates=tuple(
-                CandidateViewRow.from_candidate(candidate)
-                for candidate in outcome.candidates
+                CandidateViewRow.from_candidate(candidate) for candidate in outcome.candidates
             ),
         )
 
@@ -247,9 +246,7 @@ def project_result(
         binding_revision=result.binding_revision,
         inventory_id=result.inventory_id,
         inventory_digest=result.inventory_digest,
-        model_id=(
-            result.rf_model_id if isinstance(result, DerivedResult) else result.model_id
-        ),
+        model_id=(result.rf_model_id if isinstance(result, DerivedResult) else result.model_id),
         model_snapshot_id=(
             result.rf_model_snapshot_id
             if isinstance(result, DerivedResult)
@@ -271,21 +268,13 @@ def project_result(
             )
             for recording in result.recordings
         ),
-        parent_result_id=(
-            result.parent_result_id if isinstance(result, DerivedResult) else None
-        ),
+        parent_result_id=(result.parent_result_id if isinstance(result, DerivedResult) else None),
         parent_result_digest=(
             result.parent_result_digest if isinstance(result, DerivedResult) else None
         ),
-        accepted_count=(
-            result.accepted_count if isinstance(result, DerivedResult) else None
-        ),
-        rejected_count=(
-            result.rejected_count if isinstance(result, DerivedResult) else None
-        ),
-        unscored_count=(
-            result.unscored_count if isinstance(result, DerivedResult) else None
-        ),
+        accepted_count=(result.accepted_count if isinstance(result, DerivedResult) else None),
+        rejected_count=(result.rejected_count if isinstance(result, DerivedResult) else None),
+        unscored_count=(result.unscored_count if isinstance(result, DerivedResult) else None),
         threshold=result.threshold if isinstance(result, DerivedResult) else None,
     )
 
@@ -304,23 +293,16 @@ class ResultSelection:
             raise ResultSelectionError("Unsupported Result selection schema.")
         if not isinstance(self.result_id, str) or _RESULT_ID.fullmatch(self.result_id) is None:
             raise ResultSelectionError("Result selection Result ID is invalid.")
-        if (
-            not isinstance(self.result_digest, str)
-            or _SHA256.fullmatch(self.result_digest) is None
-        ):
+        if not isinstance(self.result_digest, str) or _SHA256.fullmatch(self.result_digest) is None:
             raise ResultSelectionError("Result selection digest is invalid.")
         if type(self.selection_revision) is not int or self.selection_revision < 0:
             raise ResultSelectionError("Result selection revision is invalid.")
         if len(self.candidate_ids) > MAX_SELECTED_CANDIDATES:
             raise ResultSelectionError("Result selection exceeds its candidate limit.")
-        if (
-            any(
-                not isinstance(candidate_id, str)
-                or _CANDIDATE_ID.fullmatch(candidate_id) is None
-                for candidate_id in self.candidate_ids
-            )
-            or len(self.candidate_ids) != len(set(self.candidate_ids))
-        ):
+        if any(
+            not isinstance(candidate_id, str) or _CANDIDATE_ID.fullmatch(candidate_id) is None
+            for candidate_id in self.candidate_ids
+        ) or len(self.candidate_ids) != len(set(self.candidate_ids)):
             raise ResultSelectionError("Result selection candidate IDs are invalid.")
         if not isinstance(self.updated_at, str) or not self.updated_at.endswith("Z"):
             raise ResultSelectionError("Result selection timestamp must be UTC.")
@@ -392,10 +374,7 @@ class FrozenResultSelection:
             raise ResultSelectionError("Unsupported frozen Result selection schema.")
         if not isinstance(self.result_id, str) or _RESULT_ID.fullmatch(self.result_id) is None:
             raise ResultSelectionError("Frozen Result selection ID is invalid.")
-        if (
-            not isinstance(self.result_digest, str)
-            or _SHA256.fullmatch(self.result_digest) is None
-        ):
+        if not isinstance(self.result_digest, str) or _SHA256.fullmatch(self.result_digest) is None:
             raise ResultSelectionError("Frozen Result selection digest is invalid.")
         if self.result_kind not in {"original", "derived"}:
             raise ResultSelectionError("Frozen Result selection kind is invalid.")
@@ -414,8 +393,7 @@ class FrozenResultSelection:
         if (
             len(self.candidate_ids) > MAX_SELECTED_CANDIDATES
             or any(
-                not isinstance(candidate_id, str)
-                or _CANDIDATE_ID.fullmatch(candidate_id) is None
+                not isinstance(candidate_id, str) or _CANDIDATE_ID.fullmatch(candidate_id) is None
                 for candidate_id in self.candidate_ids
             )
             or len(self.candidate_ids) != len(set(self.candidate_ids))
@@ -478,10 +456,7 @@ def _ordered_candidate_ids(
 def freeze_result_selection(
     result: ResultArtifact, selection: ResultSelection
 ) -> FrozenResultSelection:
-    if (
-        selection.result_id != result.result_id
-        or selection.result_digest != result.result_digest
-    ):
+    if selection.result_id != result.result_id or selection.result_digest != result.result_digest:
         raise ResultSelectionError("Result selection does not match the immutable Result.")
     ordered = _ordered_candidate_ids(result, selection.candidate_ids)
     return FrozenResultSelection(

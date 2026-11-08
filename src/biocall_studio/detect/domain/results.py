@@ -29,9 +29,7 @@ _MODEL_ID = re.compile(r"mdl_[0-9a-f]{32}")
 _RECORDING_ID = re.compile(r"rec_[0-9a-f]{32}")
 _CANDIDATE_ID = re.compile(r"cand_[0-9a-f]{32}")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
-_FILE_ERROR_CODES = frozenset(
-    {"audio_decode_failed", "inference_failed", "unsupported_output"}
-)
+_FILE_ERROR_CODES = frozenset({"audio_decode_failed", "inference_failed", "unsupported_output"})
 
 
 class FileOutcomeStatus(StrEnum):
@@ -233,12 +231,8 @@ class RecordingOutcome:
                 candidate.recording_ref != self.recording_ref
                 or candidate.end_frame > self.frame_count
                 or candidate.start_frame <= previous_end
-                or candidate.start_time_ns != _frame_ns(
-                    candidate.start_frame, self.sample_rate_hz
-                )
-                or candidate.end_time_ns != _frame_ns(
-                    candidate.end_frame, self.sample_rate_hz
-                )
+                or candidate.start_time_ns != _frame_ns(candidate.start_frame, self.sample_rate_hz)
+                or candidate.end_time_ns != _frame_ns(candidate.end_frame, self.sample_rate_hz)
             ):
                 raise ValueError("Recording candidates do not match source-time provenance.")
             previous_end = candidate.end_frame
@@ -317,8 +311,10 @@ class RecordingOutcome:
             "candidates",
             "error_code",
         }
-        if not isinstance(raw, dict) or set(raw) != expected or not isinstance(
-            raw["candidates"], list
+        if (
+            not isinstance(raw, dict)
+            or set(raw) != expected
+            or not isinstance(raw["candidates"], list)
         ):
             raise ValueError("Recording outcome document is invalid.")
         return cls(
@@ -417,9 +413,7 @@ class DetectionResult:
         keys = [recording.recording_key for recording in self.recordings]
         if not keys or keys != sorted(keys) or len(keys) != len(set(keys)):
             raise ValueError("Detection Result recordings must be nonempty, unique and sorted.")
-        succeeded = sum(
-            item.status is FileOutcomeStatus.SUCCEEDED for item in self.recordings
-        )
+        succeeded = sum(item.status is FileOutcomeStatus.SUCCEEDED for item in self.recordings)
         failed = len(self.recordings) - succeeded
         candidates = sum(len(item.candidates) for item in self.recordings)
         if succeeded < 1:
@@ -536,9 +530,7 @@ class DetectionResult:
             "source_time_semantics": SOURCE_TIME_SEMANTICS,
             "completed_at": completed_at,
             "completeness": (
-                ResultCompleteness.COMPLETE
-                if failed == 0
-                else ResultCompleteness.PARTIAL
+                ResultCompleteness.COMPLETE if failed == 0 else ResultCompleteness.PARTIAL
             ),
             "successful_files": successful,
             "failed_files": failed,
@@ -584,16 +576,17 @@ class DetectionResult:
             "candidate_count",
             "recordings",
         }
-        if not isinstance(raw, dict) or set(raw) != expected or not isinstance(
-            raw["recordings"], list
-        ) or not isinstance(raw["settings"], dict):
+        if (
+            not isinstance(raw, dict)
+            or set(raw) != expected
+            or not isinstance(raw["recordings"], list)
+            or not isinstance(raw["settings"], dict)
+        ):
             raise ValueError("DetectionResult document is invalid.")
         values = dict(raw)
         values["settings"] = DetectionSettings.from_mapping(raw["settings"])
         values["completeness"] = ResultCompleteness(raw["completeness"])
-        values["recordings"] = tuple(
-            RecordingOutcome.from_dict(item) for item in raw["recordings"]
-        )
+        values["recordings"] = tuple(RecordingOutcome.from_dict(item) for item in raw["recordings"])
         return cls(**values)
 
 

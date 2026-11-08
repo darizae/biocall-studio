@@ -46,9 +46,7 @@ def _outcome(
         )
     candidates = tuple(
         CandidateInterval.create(
-            candidate_id=candidate_identity(
-                recording_id, start, end, f"scientific-{index}"
-            ),
+            candidate_id=candidate_identity(recording_id, start, end, f"scientific-{index}"),
             recording_ref=recording_id,
             start_frame=start,
             end_frame=end,
@@ -173,9 +171,7 @@ def test_result_projection_selection_digest_mapping_and_no_cross_result_bleed(tm
     selection_path = store.path_for(first.result_id)
     missing_candidate = json.loads(selection_path.read_text(encoding="utf-8"))
     missing_candidate["candidate_ids"] = ["cand_" + "f" * 32]
-    selection_path.write_text(
-        json.dumps(missing_candidate, sort_keys=True), encoding="utf-8"
-    )
+    selection_path.write_text(json.dumps(missing_candidate, sort_keys=True), encoding="utf-8")
     removed = store.read(first)
     assert removed.reconciliation is SelectionReconciliation.CANDIDATES_REMOVED
     assert removed.selection.selection_revision == 2
@@ -236,14 +232,10 @@ def test_result_status_and_provenance_decisions_are_truthful():
         ),
     )
 
-    populated_view = project_result(
-        populated, source_state=ResultSourceState.AVAILABLE
-    )
+    populated_view = project_result(populated, source_state=ResultSourceState.AVAILABLE)
     empty_view = project_result(empty, source_state=ResultSourceState.AVAILABLE)
     partial_view = project_result(partial, source_state=ResultSourceState.AVAILABLE)
-    unavailable_view = project_result(
-        populated, source_state=ResultSourceState.UNAVAILABLE
-    )
+    unavailable_view = project_result(populated, source_state=ResultSourceState.UNAVAILABLE)
     stale_view = project_result(populated, source_state=ResultSourceState.STALE)
 
     assert populated_view.content_state is ResultContentState.POPULATED

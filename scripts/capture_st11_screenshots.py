@@ -152,9 +152,11 @@ def main(argv: list[str] | None = None) -> int:
             _build_config(scan), dataset_id="dataset-st11-exit-evidence"
         )
         _wait_until(
-            lambda: controller.active_run is not None
-            and controller.active_run.run_id == run_id
-            and controller.active_run.status is RunStatus.RUNNING
+            lambda: (
+                controller.active_run is not None
+                and controller.active_run.run_id == run_id
+                and controller.active_run.status is RunStatus.RUNNING
+            )
         )
         coordinator.show_studio()
         coordinator.shell_window.show()
@@ -166,8 +168,7 @@ def main(argv: list[str] | None = None) -> int:
         QTest.qWait(250)
         coordinator.shell_window.close()
         _wait_until(
-            lambda: coordinator.exit_dialog is not None
-            and coordinator.exit_dialog.isVisible()
+            lambda: coordinator.exit_dialog is not None and coordinator.exit_dialog.isVisible()
         )
         _capture(
             coordinator.shell_window,
@@ -177,13 +178,12 @@ def main(argv: list[str] | None = None) -> int:
         dialog = coordinator.exit_dialog
         if dialog is None:
             raise RuntimeError("Shared exit confirmation disappeared before capture.")
-        stop = next(
-            button for button in dialog.buttons() if button.text() == "Stop work and Exit"
-        )
+        stop = next(button for button in dialog.buttons() if button.text() == "Stop work and Exit")
         stop.click()
         _wait_until(
-            lambda: controller._shutdown_finished
-            and coordinator.detect_controller._shutdown_finished
+            lambda: (
+                controller._shutdown_finished and coordinator.detect_controller._shutdown_finished
+            )
         )
         QTest.qWait(100)
     app.processEvents()

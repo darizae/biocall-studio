@@ -13,26 +13,38 @@ from biocall_studio.detect.application.navigation import (
 def test_typed_routes_adaptive_entry_and_nested_highlighting_fail_closed():
     """Case: UT-DET-025."""
     assert parse_detect_route("models") is DetectRoute.MODELS
-    assert adaptive_new_detection_route(
-        model_compatible=False,
-        recordings_reviewed=False,
-        active_run=False,
-    ) is DetectRoute.MODELS
-    assert adaptive_new_detection_route(
-        model_compatible=True,
-        recordings_reviewed=False,
-        active_run=False,
-    ) is DetectRoute.RECORDINGS
-    assert adaptive_new_detection_route(
-        model_compatible=True,
-        recordings_reviewed=True,
-        active_run=False,
-    ) is DetectRoute.NEW_DETECTION
-    assert adaptive_new_detection_route(
-        model_compatible=False,
-        recordings_reviewed=False,
-        active_run=True,
-    ) is DetectRoute.RUN_DETAIL
+    assert (
+        adaptive_new_detection_route(
+            model_compatible=False,
+            recordings_reviewed=False,
+            active_run=False,
+        )
+        is DetectRoute.MODELS
+    )
+    assert (
+        adaptive_new_detection_route(
+            model_compatible=True,
+            recordings_reviewed=False,
+            active_run=False,
+        )
+        is DetectRoute.RECORDINGS
+    )
+    assert (
+        adaptive_new_detection_route(
+            model_compatible=True,
+            recordings_reviewed=True,
+            active_run=False,
+        )
+        is DetectRoute.NEW_DETECTION
+    )
+    assert (
+        adaptive_new_detection_route(
+            model_compatible=False,
+            recordings_reviewed=False,
+            active_run=True,
+        )
+        is DetectRoute.RUN_DETAIL
+    )
 
     assert active_sidebar_route(DetectRoute.RUN_DETAIL) is DetectRoute.RUNS
     assert active_sidebar_route(DetectRoute.EXPORT_DETAIL) is DetectRoute.EXPORTS

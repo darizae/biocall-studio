@@ -125,9 +125,7 @@ def _ensure_directory(path: Path) -> None:
         raise WorkspaceMetadataError(f"Application-owned path cannot be a symlink: {path.name}")
     if path.exists():
         if not path.is_dir():
-            raise WorkspaceMetadataError(
-                f"Application-owned path must be a directory: {path.name}"
-            )
+            raise WorkspaceMetadataError(f"Application-owned path must be a directory: {path.name}")
     else:
         path.mkdir(mode=0o700)
     path.chmod(0o700)
@@ -211,9 +209,7 @@ class DetectWorkspaceStore:
             raise WorkspaceMetadataError("ModelSnapshot path cannot be a symlink.")
         if snapshot_path.exists():
             try:
-                existing = ModelSnapshot.from_dict(
-                    _read_json(snapshot_path, label="ModelSnapshot")
-                )
+                existing = ModelSnapshot.from_dict(_read_json(snapshot_path, label="ModelSnapshot"))
             except ValueError as exc:
                 raise WorkspaceMetadataError(f"Stored ModelSnapshot is invalid: {exc}") from exc
             if existing != reference.snapshot:
@@ -270,9 +266,7 @@ class DetectWorkspaceStore:
         return VerifiedModelReference(root, snapshot)
 
     def load_model_reference(self) -> VerifiedModelReference | None:
-        return self._load_model_reference(
-            self.model_selection_path, label="Detect Model selection"
-        )
+        return self._load_model_reference(self.model_selection_path, label="Detect Model selection")
 
     def load_refinement_model_reference(self) -> VerifiedModelReference | None:
         return self._load_model_reference(
@@ -315,9 +309,7 @@ class DetectWorkspaceStore:
                 "The recordings folder and Detect application-data folder must be separate."
             )
 
-    def create_collection(
-        self, display_label: str, source_root: Path
-    ) -> PersistedDetectCollection:
+    def create_collection(self, display_label: str, source_root: Path) -> PersistedDetectCollection:
         observation, resolved = _inspect_root(source_root)
         if observation.evidence is None:
             state = "missing" if observation.kind.value == "missing" else "cannot be read"
@@ -365,9 +357,7 @@ class DetectWorkspaceStore:
         except Exception:
             if previous is not None:
                 if binding_written:
-                    _write_json_atomic(
-                        paths.private_binding, previous.binding.to_private_dict()
-                    )
+                    _write_json_atomic(paths.private_binding, previous.binding.to_private_dict())
                 if manifest_written:
                     _write_json_atomic(paths.public_manifest, previous.ref.to_public_dict())
             raise
@@ -386,9 +376,7 @@ class DetectWorkspaceStore:
                             paths.last_good_binding, previous.binding.to_private_dict()
                         )
                     if last_good_manifest_written:
-                        _write_json_atomic(
-                            paths.last_good_manifest, previous.ref.to_public_dict()
-                        )
+                        _write_json_atomic(paths.last_good_manifest, previous.ref.to_public_dict())
                 raise
 
     def _load_pair(
@@ -473,9 +461,7 @@ class DetectWorkspaceStore:
         observation, _ = _inspect_root(collection.source_root)
         return decide_root_binding(collection.ref.root_evidence, observation)
 
-    def prepare_relink(
-        self, collection_id: str, candidate_root: Path
-    ) -> RootBindingProposal:
+    def prepare_relink(self, collection_id: str, candidate_root: Path) -> RootBindingProposal:
         current = self.load_collection(collection_id)
         observation, resolved = _inspect_root(candidate_root)
         evidence = observation.evidence
@@ -646,17 +632,13 @@ class DetectWorkspaceStore:
                 "scanned_at": snapshot.scanned_at,
                 "freshness_strategy": snapshot.freshness_strategy,
                 "conflict_policy": snapshot.conflict_policy,
-                "decision_rules": [
-                    rule.to_dict() for rule in snapshot.decision_rules
-                ],
+                "decision_rules": [rule.to_dict() for rule in snapshot.decision_rules],
                 "issues": [issue.to_dict() for issue in snapshot.issues],
                 "counts": snapshot.counts.to_dict(),
                 "partitions": partitions,
             }
             serialized_manifest = (
-                json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=False).encode(
-                    "utf-8"
-                )
+                json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=False).encode("utf-8")
                 + b"\n"
             )
             if len(serialized_manifest) > _MAX_METADATA_BYTES:
@@ -668,9 +650,7 @@ class DetectWorkspaceStore:
             if temporary.exists():
                 shutil.rmtree(temporary)
 
-    def _load_inventory_id(
-        self, paths: CollectionPaths, inventory_id: str
-    ) -> InventorySnapshot:
+    def _load_inventory_id(self, paths: CollectionPaths, inventory_id: str) -> InventorySnapshot:
         directory = self._inventory_directory(paths, inventory_id)
         if (
             paths.inventories_directory.is_symlink()

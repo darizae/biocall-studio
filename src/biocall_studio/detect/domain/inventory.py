@@ -456,10 +456,7 @@ class InventorySnapshot:
             )
         if len(self.decision_rules) > MAX_DECISION_RULES:
             raise ValueError("Inventory has too many explicit decision rules.")
-        rule_keys = [
-            (portable_identity(rule.path), rule.is_folder)
-            for rule in self.decision_rules
-        ]
+        rule_keys = [(portable_identity(rule.path), rule.is_folder) for rule in self.decision_rules]
         if len(rule_keys) != len(set(rule_keys)):
             raise ValueError("Inventory contains conflicting duplicate decision rules.")
         if len(self.issues) > MAX_INVENTORY_ISSUES:
@@ -602,8 +599,7 @@ def plan_include_all_valid_recordings(
     replaced_exclusions = sum(
         row.status is RecordingStatus.VALID
         and row.decision is InclusionDecision.EXCLUDED
-        and row.decision_origin
-        in {DecisionOrigin.EXPLICIT_FILE, DecisionOrigin.EXPLICIT_FOLDER}
+        and row.decision_origin in {DecisionOrigin.EXPLICIT_FILE, DecisionOrigin.EXPLICIT_FOLDER}
         for row in snapshot.recordings
     )
     if replaced_exclusions and not exclusions_confirmed:
@@ -711,9 +707,7 @@ def find_portable_path_conflicts(paths: Iterable[str]) -> tuple[tuple[str, ...],
             identity = portable_identity(parent)
             parent_spellings[identity].add(parent)
             parent_members[identity].add(path)
-    conflicts = {
-        tuple(sorted(values)) for values in groups.values() if len(values) > 1
-    }
+    conflicts = {tuple(sorted(values)) for values in groups.values() if len(values) > 1}
     for identity, spellings in parent_spellings.items():
         if len(spellings) <= 1:
             continue
