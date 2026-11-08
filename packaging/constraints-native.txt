@@ -1,0 +1,11 @@
+# One reviewed cross-platform native dependency baseline, taken from B3's
+# observed 2026-11-08 Linux candidate environment. NOT a completed Windows
+# or macOS lock: each native runner must record `pip freeze` and wheel hashes.
+PySide6-Addons==6.11.3
+PySide6-Essentials==6.11.3
+shiboken6==6.11.3
+numpy==2.5.4
+scipy==1.18.1
+scikit-learn==1.9.1
+torch==2.9.1
+librosa==0.11.0

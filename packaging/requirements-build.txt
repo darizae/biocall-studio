@@ -1,0 +1,4 @@
+# Native freezer toolchain only. Scientific dependencies come from pyproject.toml
+# and the two checksum-verified published upstream release wheels.
+pyinstaller==6.22.3
+build==1.3.0

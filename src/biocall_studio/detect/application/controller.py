@@ -85,6 +85,7 @@ from biocall_studio.detect.persistence.diagnostics import (
 from biocall_studio.detect.persistence.export_history import ExportHistoryStore
 from biocall_studio.detect.persistence.runs import DetectRunRepository
 from biocall_studio.detect.workflows.exports import verify_export_directory
+from biocall_studio.shared.worker_launch import worker_command
 from biocall_studio.shared.storage import (
     CapacityObservation,
     StorageEstimate,
@@ -1840,10 +1841,7 @@ class DetectWorkspaceController(QObject):
             "--worker-step-delay",
             str(self._worker_step_delay_seconds),
         ]
-        return (
-            sys.executable,
-            arguments if getattr(sys, "frozen", False) else ["-m", "biocall_studio", *arguments],
-        )
+        return worker_command(arguments)
 
     def _cache_run(self, record: DetectRunRecord, *, persist: bool = True) -> None:
         repository = self._run_repository
