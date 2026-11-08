@@ -94,7 +94,7 @@ def main() -> int:
     for image in required:
         if image not in readme:
             errors.append(f"README misses required genuine brand/screenshot: {image}")
-    if not (ROOT / "LICENSE").exists() and re.search(r"license(?:-|_)(?:mit|gpl|apache)", readme, re.I):
+    if not (ROOT / "LICENSE").exists() and re.search(\n        r"license(?:-|_)(?:mit|gpl|apache)", readme, re.I\n    ):
         errors.append("README claims a license badge despite missing application LICENSE")
 
     capture = json.loads((SCREENSHOTS / "capture-metadata.json").read_text(encoding="utf-8"))
