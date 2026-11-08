@@ -1,93 +1,57 @@
 # Development and local execution
 
-## Toolchain and dependency provenance
+BioCall Studio is one Python distribution, one PySide6 app and one public `biocall-studio` console command. Use **Python 3.11–3.13**. This guide installs the **published, hash-verified library wheels**, never a sibling editable `../alp-ui` or `../bioacoustics-dl-toolbox` checkout. Their exact versions, tag target source SHAs, wheel URLs and SHA-256 digests are recorded in [`pyproject.toml`](../pyproject.toml).
 
-Use Python **3.11–3.13**. BioCall Studio is one `biocall-studio` distribution and one
-`biocall_studio` package. The adjacent dependency revisions are recorded under
-`tool.biocall-studio.science` in `pyproject.toml`:
+## Install from published wheels
 
-- `../bioacoustics-dl-toolbox` supplies bounded audio, CNN, and RF feature primitives;
-- `../alp-ui` supplies the public native PySide6 widgets and theme.
-
-Do not substitute similarly named packages or a copied toolbox inside another repository. Confirm
-the installed imports before scientific or native UI work:
-
-```bash
-python -c "import alp_ui, bioacoustics_dl_toolbox; print(alp_ui.__file__); print(bioacoustics_dl_toolbox.__file__)"
-```
-
-Create a clean source environment from the repository root:
+From a clean BioCall Studio checkout on macOS or Linux with the GitHub CLI authenticated if required:
 
 ```bash
 python3.12 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -e '../bioacoustics-dl-toolbox[rf]'
-.venv/bin/python -m pip install -e ../alp-ui
+mkdir -p .release-wheels
+gh release download v0.1.0a1 --repo darizae/alp-ui \
+  --pattern 'alp_ui-0.1.0a1-py3-none-any.whl' --dir .release-wheels
+gh release download v0.3.0 --repo darizae/bioacoustics-dl-toolbox \
+  --pattern 'bioacoustics_dl_toolbox-0.3.0-py3-none-any.whl' --dir .release-wheels
+printf '%s  %s\n' \
+  20590366d06591837c2567df1191b472b9db494e5440ce3a3fadfbf1b8d53d6c \
+  .release-wheels/alp_ui-0.1.0a1-py3-none-any.whl | shasum -a 256 -c -
+printf '%s  %s\n' \
+  c0f7679cbf788c2900eff26b8db719941a513fc96b5f28348e2838c8df595b28 \
+  .release-wheels/bioacoustics_dl_toolbox-0.3.0-py3-none-any.whl | shasum -a 256 -c -
+.venv/bin/python -m pip install --no-deps .release-wheels/*.whl
 .venv/bin/python -m pip install -e '.[test,integration]'
+.venv/bin/python -m pip check
 .venv/bin/python -m biocall_studio
 ```
 
-`.venv/bin/biocall-studio` is the equivalent and only public console command. Worker arguments
-are private. Train and Detect supervisors invoke the same `.venv/bin/python` interpreter with a
-private `--worker <mode> ...` argument in development.
+For application use without contributor test tools, substitute `pip install -e .` after installing the wheels. The latter `-e` refers only to the **Studio checkout**, not an upstream sibling; neither published wheel is editable. If GitHub CLI cannot fetch an asset, use its exact public release URL from `pyproject.toml` and **verify the same SHA-256** before installation. A missing/mismatched wheel blocks the environment. On Windows, translate activation/path/hash steps on an actually verified native platform rather than claiming these Unix commands are qualified. No desktop installer is currently published.
+
+Check actual installed versions/import origins:
+
+```bash
+.venv/bin/python -c 'from importlib.metadata import version; import alp_ui, bioacoustics_dl_toolbox; print(version("alp-ui"), alp_ui.__file__); print(version("bioacoustics-dl-toolbox"), bioacoustics_dl_toolbox.__file__)'
+```
 
 ## Tests and audit
 
-Use the repository runner instead of invoking the Qt suite directly on an interactive desktop. Its
-default `background` mode selects Qt's offscreen platform, runs every ordinary non-soak test except
-the explicitly Cocoa-only assertions, and never maps application windows onto the desktop:
+For owner-authorized development on an interactive macOS machine, `scripts/run_tests.py background` forces offscreen Qt. For a focused test (ordinary full suite is reserved for spec 05 during the current release series):
 
 ```bash
-.venv/bin/python scripts/run_tests.py background
-.venv/bin/python scripts/run_tests.py background tests/integration/test_detect_runs.py -q
+.venv/bin/python scripts/run_tests.py background tests/unit/test_review_spectrograms.py -q
+.venv/bin/python scripts/run_tests.py background tests/integration/test_review_cache_generation.py -q
+.venv/bin/python -m ruff check src tests scripts
+.venv/bin/python scripts/audit_test_ids.py
+.venv/bin/python scripts/audit_docs.py
+.venv/bin/python scripts/verify_handoff.py
+.venv/bin/python scripts/check_fixtures.py
 ```
 
-For a shorter TDD loop, `quick` additionally excludes wheel/install boundary tests marked
-`packaged`. It is not the before-commit full suite:
+The test-index audit verifies referenced ID names, **not** that tests pass. Qt offscreen tests, static audits and genuine native Cocoa/Windows execution are separate forms of evidence. Any visible native sessions require a scoped owner-approved task and must be closed after capture. Physical audio, accessibility, install/uninstall, platform-specific workers and signing cannot be inferred from offscreen tests.
 
-```bash
-.venv/bin/python scripts/run_tests.py quick tests/unit -q
-```
+Tests use deterministic local WAV fixtures; never run a write-capable manual session on tracked test data. Keep real/private field audio, HPC paths, tokens and staging artifacts out of Git. [Fixture index](INTEGRATION_TEST_DATA.md) and [test behavior index](INTEGRATION_TEST_BEHAVIORS.md) remain authoritative for scripted audits.
 
-Native Cocoa qualification remains separate because offscreen rendering cannot prove macOS color
-scheme, window-manager, native-dialog or installed-app behavior. This command may cover or focus
-the active desktop and therefore requires an explicit acknowledgement. Run it only with the
-owner's agreement or in a dedicated macOS test session:
+## Scientific and release responsibilities
 
-```bash
-.venv/bin/python scripts/run_tests.py native --allow-visible
-```
-
-The background run and native run are complementary evidence; never report the background run as
-native Cocoa, installed macOS or Windows qualification. Then run the non-pytest audits:
-
-```bash
-python -m ruff check src tests scripts
-python scripts/audit_test_ids.py
-python scripts/verify_handoff.py
-python scripts/check_fixtures.py
-git diff --check
-```
-
-Ordinary pytest excludes the durability marker. Initiate the soak separately:
-
-```bash
-BIOCALL_STUDIO_SOAK_REPORT=/tmp/biocall-studio-soak-observations.json \
-  python -m pytest -m soak tests/integration/test_long_running_runs.py -q -s
-```
-
-Real Qt/application/filesystem and QProcess integration uses isolated temporary Collections and
-application data in both modes. Offscreen rendering does not replace native visual or dialog
-review. Windows commands, filesystem locking, QProcess behavior, packaging, and installers remain
-unqualified until exercised on native Windows under the release gate.
-
-## Data and release boundaries
-
-Tests use deterministic short WAV generators and the policy in
-[`INTEGRATION_TEST_DATA.md`](INTEGRATION_TEST_DATA.md). Never point a write-capable manual session
-at tracked fixtures. Validate Git LFS objects where required and keep private HPC material
-untracked.
-
-Follow [`IMPLEMENTATION_SEQUENCE.md`](IMPLEMENTATION_SEQUENCE.md) and the active stage only.
-Installer, signing, publication, and cross-workflow end-to-end claims remain owned by ST-11 and the
-[`RELEASE_PROCESS.md`](RELEASE_PROCESS.md).
+Train/Detect/Review own their separate state and scientific outputs; [architecture](ARCHITECTURE.md), [model contract](science/MODEL_EXPORT_CONTRACT.md), [release process](RELEASE_PROCESS.md) and [current release route](IMPLEMENTATION_SEQUENCE.md) remain authoritative. The upstream spectrogram is a **Review display raster**, never the CNN feature representation. The full Studio suite, installer-source freeze, native packaging and release promotion belong to later release specs. No published Studio installer is claimed.

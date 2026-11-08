@@ -13,7 +13,7 @@ installed-app check below is **deferred** to a separately approved packaging sta
 
 A non-developer installs one versioned **BioCall Studio** `.app` from a signed, notarized and
 stapled `.dmg`. The app opens the Studio launchpad and the real Train and Detect workflows;
-Review remains an explicit placeholder. A clean machine needs no source checkout, shell, venv,
+Review is implemented in the source application; this installer gate must qualify its native session, audio, spectrogram and reviewed export behavior on the installed build. A clean machine needs no source checkout, shell, venv,
 network connection or global Python.
 
 The installed app must run every bundled scientific boundary used by the source application:

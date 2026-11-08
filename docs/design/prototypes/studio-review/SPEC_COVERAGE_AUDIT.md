@@ -38,7 +38,7 @@ Existing **57/57** main checks and **22/22** edge checks passed after the correc
 
 ## Re-audit: fixed shortcuts, HelpHints and complete prototype-to-spec synchronization (2026-11-03)
 
-**Source of truth:** [`RV-05`](../../../specs/review/RV-05-native-review-ui.md), with `RV-03` owning source/audio and `RV-08` owning native qualification. The original repository RV-01, RV-02, RV-04, RV-06 and RV-07 contracts were rechecked and **not changed**. The four changed documents (`README`, `RV-03`, `RV-05`, `RV-08`) are included in the synchronized deliverable; they do not assert that RV-01–RV-08 have been implemented. The owner-requested new shortcut/tooltips remain pending owner design approval.
+**Source of truth:** [`RV-05`](../../../specs/review/README.md), with `RV-03` owning source/audio and `RV-08` owning native qualification. The original repository RV-01, RV-02, RV-04, RV-06 and RV-07 contracts were rechecked and **not changed**. The four changed documents (`README`, `RV-03`, `RV-05`, `RV-08`) are included in the synchronized deliverable; they do not assert that RV-01–RV-08 have been implemented. The owner-requested new shortcut/tooltips remain pending owner design approval.
 
 | Review contract or visible UI | Prototype behavior, source and coverage | Result / outstanding qualification |
 |---|---|---|

@@ -1,35 +1,8 @@
-# Review — ordered, owner-approved implementation specifications
+# Review — canonical result, session, spectrogram and export contract
 
-**Status:** The local `review` baseline contains RV-01–RV-07 source at `570adc7`. RV-08 has an isolated source-app qualification handoff on `review-rv08-qualification`; [actual evidence](../../RV-08_QUALIFICATION.md) records passing feasible automation and the remaining visible-native/field-data/UX-document owner blockers. **Sequence:** completed REV-05 baseline → RV-01 → RV-02 → RV-03 → RV-04 → RV-05 → RV-06 → RV-07 → RV-08. Each stage is isolated, sequential and requires an explicit owner review gate. No stage may be silently skipped, co-implemented with a later stage, or begun from an unreviewed predecessor. These documents supersede the earlier single-file Review planning proposal; do not keep or publish `docs/specs/REVIEW-workspace-plan.md` as a competing authority.
+**Implementation status (2026-11-08):** the Review source is merged into BioCall Studio `main`; its former RV-01–RV-10 stage plans are implementation history, **not pending stage directions**. The final owner visual/field and native installed-app approval remains separate. [Actual visible Cocoa evidence](../../design/evidence/review-correction/README.md) and [genuine alpaca-hum screenshots with machine provenance](../../design/evidence/release-real-data/README.md) must not be called installed-installer proof. For current behavior also inspect `src/biocall_studio/review`, [architecture](../../ARCHITECTURE.md), [Vision](../../VISION.md), and the [immutable Detect Result contract](../../PREDICTION.md).
 
-## Additive spectrogram planning (RV-03 approved; production calibration pending)
-
-[Owner decisions / researcher copy](SPECTROGRAM_DECISIONS.md) · [Separate scientific and performance investigation pre-spec](SPECTROGRAM_GENERATION_INVESTIGATION.md). These two documents **augment rather than supersede** the eight sequential RV stages. The owner approved a 4.2 kHz adjustable default, compact + minimal Advanced settings, relative intensity/contrast, per-channel-power stereo, protected Default with user editable presets/impact confirmation, Review-local Settings, session-specific safe cache invalidation and thumbnail-first generation on 2026-11-03, then approved RV-03 on 2026-11-04. RV-03 supplies exact R-array parity plus generated-WAV and bundled-synthetic offscreen Qt measurements for its fixed v1 raster tiers; representative field-call readability and installed physical-device evidence remain separate qualification limits. RV-04 implements quota mechanics, encoded cache persistence, measured-cohort adapter inputs and supervised generation without promoting sandbox pilot rates into production constants. Do not change Review eligibility, fixed shortcuts, approved label/session/export contracts, or reimplement shared REV-05. The two root UX design documents remain absent, so their historical provenance/sign-off is not verified.
-
-## Active corrective route after native UI inspection
-
-**RV-09 → RV-10 now override any impression that RV-08 is ready for merge.** [RV-09](RV-09-native-visual-parity-and-data-management.md) owns the actual [prototype screenshot](../../design/evidence/review-correction/README.md) comparison, **mandatory persistent sidebar**, identical launchpad Open actions, safe **Delete session** across states, in-app **Review data folder** with migration/restart integrity, and independently committed/reinstalled reusable public `alp-ui` fixes when needed. [RV-10](RV-10-spectrogram-interactivity-and-qualification.md) follows only after RV-09's owner-approved visible gate and owns responsive async current/visible/nearby rendering, cache reuse/eviction, honest REV-05 sizing, source verification and focused tests. **No long-running tests in either corrective stage; 120-second hard per-invocation budget** unless separately authorized. Commit real visible native-after screenshots and compare side by side with the images; no approval from offscreen/HTML screenshots alone. Preserve every RV-01–RV-08 scientific/annotation/export decision.
-
-## REV-05 prerequisite — satisfied on reviewed `main`
-
-REV-05 is **implemented and owner-reviewed** on the current `main` baseline (`c00d8808a2d1`, 2026-11-03). The source contains the Qt-free `StorageEstimate` contract in `src/biocall_studio/shared/storage.py`, Train/Detect sizing adapters, native preflight integration and indexed `UT-SIZE-*` / `IT-SIZE-*` cases. Its [completed RV-01 handoff](../manual_revision_specs/REV-05-output-size-preflight.md#mandatory-final-handoff-to-review-rv-01) is the authoritative transition; the historical 2026-11-02 missing-implementation warning no longer applies.
-
-RV-01 begins on this **reviewed, REV-05-complete base**. Review must reuse the existing shared contract: only Review-specific spectrogram sizing/preflight belongs to RV-04 and export sizing/preflight to RV-06. Never re-plan or reimplement REV-05 in RV-01–RV-08. At implementation time verify the actual checkout/dependency versions; if the shared contract is absent from a different checkout, obtain the correct reviewed base rather than creating a replacement.
-
-## Stage route (read only the active stage)
-
-| Order | Owning specification | Completion gate / output |
-|---|---|---|
-| 1 | [RV-01 — Result intake](RV-01-result-intake.md) | Verified CNN-all/RF-accepted-only, stable versioned projection; immutable source |
-| 2 | [RV-02 — Sessions and annotations](RV-02-sessions-and-annotations.md) | Transactions, only one Open session, bulk, undo, finalization/successor |
-| 3 | [RV-03 — Audio and spectrograms](RV-03-audio-and-spectrograms.md) | Source-exact context, native audio, scientifically readable renderer |
-| 4 | [RV-04 — Cache, Workers and preflight](RV-04-cache-generation-and-preflight.md) | Hybrid generation, REV-05 adapter, cancellation, eviction, flush |
-| 5 | [RV-05 — Native Review UI](RV-05-native-review-ui.md) | Gallery/List/One by one, approved exact copy, 50k UI, real Qt |
-| 6 | [RV-06 — Review corpus exports](RV-06-corpus-export.md) | All formats, mixed labels, 10k cap removed, 50k publication and receipts |
-| 7 | [RV-07 — Studio and Detect migration](RV-07-studio-detect-migration.md) | Single exit policy, remove new Detect export route, legacy readers retained |
-| 8 | [RV-08 — Whole-Studio qualification](RV-08-qualification.md) | Full Train→Detect→Review→Export and regression sign-off |
-
-**Strict chain:** RV-01 starts from the reviewed REV-05-complete baseline. RV-02 waits for RV-01 sign-off, RV-03 for RV-02, and so forth, even if their internal contracts are independently testable. Tests/implementation may not be pulled into a sibling stage to bypass review. All stage branches start from the *latest reviewed* integration base; no automatic merges or pushes.
+The tables below retain approved scientific, annotation, source-provenance and safety semantics; historical RV identifiers in coverage tables are **traceability labels only**. Their tests are indexed by [unit IDs](../../UNIT_TESTING.md), [integration IDs](../../INTEGRATION_TEST_BEHAVIORS.md) and [fixture IDs](../../INTEGRATION_TEST_DATA.md). [Spectrogram owner decisions](SPECTROGRAM_DECISIONS.md) are separately preserved, including settings snapshot and cache-version rules. New **Review exports** are not the legacy Detect export flow.
 
 ## Locked owner decisions and export truth table
 
@@ -49,7 +22,7 @@ RV-01 begins on this **reviewed, REV-05-complete base**. Review must reuse the e
 | Spectrograms | Hybrid on-demand + nearby prefetch + optional **Generate all** asynchronously. Estimate disk use before bulk generation via REV-05. Automatic bounded cache eviction plus manual individual/multi-item Clear spectrograms, independently of label state. Deleting cache must not delete annotations/recordings. |
 | Scale | Tens of thousands of eligible candidates; acceptance must exercise >=50,000 candidate metadata plus real audio boundaries. No 10,000-candidate export ceiling. |
 | Output | Preserve individual PCM WAV snippets, concatenated WAV + Raven TSV + provenance, and Both. One export interface after finalization with format selection and Show in folder. |
-| Presentation | Minimal readable text; use recognizable accessible status icons, ideally existing public `alp-ui`, upstream generic primitive only if verified missing. No repetitive captions, dev language, fake progress/status. The approved wording is in [RV-05](RV-05-native-review-ui.md). |
+| Presentation | Minimal readable text; use recognizable accessible status icons, ideally existing public `alp-ui`, upstream generic primitive only if verified missing. No repetitive captions, dev language, fake progress/status. The approved wording is in the native Review interface. |
 | Releases | macOS/Windows installer/signing/distribution tasks untouched; no implicit packaging qualification. |
 
 ### Export truth table
@@ -67,7 +40,7 @@ RV-01 begins on this **reviewed, REV-05-complete base**. Review must reuse the e
 An **Accept all** operation on an RF Result never accepts RF-rejected/unscored items. Labeling all eligible candidates is not the same as proving every one was individually listened to; preserve the distinction in metadata. The `Not a call` action reverses an earlier human or bulk acceptance, until finalization. There must be no separate “Export as detected” route/button: the owner expressly rejected it.
 ## Shared architecture and ownership boundaries
 
-Proposed package layout (names are a guide; exact class/function names follow stage tests and source conventions):
+Implemented source ownership (exact names are in the current tree):
 
 ```text
 src/biocall_studio/
@@ -94,7 +67,7 @@ src/biocall_studio/
 - Active session and Worker state are different: one session can remain open with no Worker; one Worker may generate/cache or export while the user navigates. Respect existing suite-wide scientific Worker admission; do not invent parallel operations that undermine ownership. Lightweight on-demand tasks may use a supervised bounded background executor if safe, but their cancellation/lifetime still must be explicit and tested.
 ## Complete requirement-to-owner coverage (no orphan decisions)
 
-The owning stage must assert the requirement or link to an exact acceptance test. RV-08 audits every row below; a missing gate blocks qualification. Common invariants in this index apply to all stages, but implementation and tests belong **only** to the named stage.
+Historical owning-stage identifiers remain for traceability. They are not instructions to restart stages or to claim that source tests substitute for final owner/native release qualification.
 
 | Locked requirement | Owning spec / gate |
 |---|---|
@@ -150,11 +123,7 @@ The owning stage must assert the requirement or link to an exact acceptance test
 **Immutability:** input Model, CNN Result, RF-derived Result, original WAV bytes, finalized Review snapshot and previously published exports are distinct independently verifiable artifacts. A Review session may mutate only its own still-Open annotation store; closed sessions resume for editing, finalized do not. Cache may be removed/regenerated without changing any of those scientific digests. Exported source intervals never use context/window boundaries; candidate source times persist from original Detect Result. Maintain stable source identities even if the user's recording folder moves after an explicit verified relink. Do not claim missing files had zero candidates, nor claim unreviewed were verified.
 
 **Atomic publish:** stage same-volume with private permissions, validate format and capacity, checksum output, no overwrite, publish only on full success, record/reconcile state. A Worker process exit code is not sufficient proof. Follow the preexisting source-writer validation patterns; avoid new global recovery subsystems.
-## Git and test-index discipline
 
-- Read [Git delivery](../../agent/GIT_DELIVERY.md) and source checkout before each stage, confirm `git status`/branch/SHA, and start `review-rvNN-<purpose>` from the last owner-reviewed Review integration baseline (create it only after explicit owner approval). No editing unrelated Train behavior, installers or sibling libraries.
-- Stage acceptance case identifiers are *proposals*: register owning cases in [unit](../../UNIT_TESTING.md) and [integration](../../INTEGRATION_TEST_BEHAVIORS.md) indexes during that stage's TDD, not in this planning-only patch. Use [fixture index](../../INTEGRATION_TEST_DATA.md), minimum real boundary samples and existing regression anchors. No duplicate test index.
-- Before each implementation commit: owning cases + affected regressions + full feasible ordinary suites, Ruff, test-ID audit and source immutability check. Native screenshots and real audio/Worker acceptance at owning boundaries; >=600-second soak only with separate authorization. Exact pass/fail/blocked/deferred evidence and SHAs, no invented pass.
-- Entire Train→Detect→Review→Export E2E test belongs to **RV-08 only**, updating existing ST-11-owned cases in place. Any `alp-ui` or scientific-toolbox gap needs a separate repository branch, test, commit, SHA and downstream requalification.
-- Reviewed local integration requires separate owner approval. **Never automatically push, open a PR, merge, tag, publish or perform macOS/Windows release tasks.**
+## Current qualification boundary
 
+Source-level Review workflows and rendering are implemented. The [real-audio screenshot evidence](../../design/evidence/release-real-data/README.md) records 64 source-time eligible candidates, 18 human Call decisions, 0 Not a call and 46 intentionally Unreviewed, **not** an all-negative or fully reviewed cohort. The installed release and cross-platform gates remain pending in [the release process](../../RELEASE_PROCESS.md). The scientific [Review display raster](SPECTROGRAM_DECISIONS.md) is distinct from the toolbox's CNN training/inference spectrogram feature representation.

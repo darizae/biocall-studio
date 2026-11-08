@@ -1,6 +1,6 @@
 # Review spectrogram generation — owner decisions and copy register
 
-**Decision source:** owner answers of 2026-11-03 to the eight Phase-1 questions. **State:** approved product direction; proposed *numeric implementation details* marked for pre-spec qualification below, not silently treated as measured scientific defaults. Preserve RV-01–RV-08 lifecycle and approved shortcut/copy baseline.
+**Decision source:** owner answers of 2026-11-03 to the eight Phase-1 questions. **Status:** implemented source renderer/settings/cache in Studio `main`; these approved decisions remain the scientific/researcher-copy contract. Numerical defaults are defined and tested in source rather than inferred from early proposed benchmarks. Final native install/owner field qualification is separate.
 
 | ID | Decision / alternatives considered | Owner resolution and rationale | Changes governed |
 |---|---|---|---|
@@ -22,7 +22,7 @@
 
 ## Researcher controls and HelpHint text
 
-The compact simple five controls and exactly three collapsed Advanced controls are proposed in [pre-spec §3](SPECTROGRAM_GENERATION_INVESTIGATION.md#3-proposed-user-settings-contract-for-qualification). The owner approved their *scope*, not numerical input caps, native image dimensions or benchmark rates. The proposed tooltips in that table are the working copy to validate against actual `alp-ui` HelpHint and the prototype. Add only necessary concise copy below; existing RV-05 tooltip and shortcut strings are unchanged.
+The compact researcher controls and three Advanced controls retain the owner's approved scope. **Current implemented numeric bounds and defaults are defined by** `src/biocall_studio/review/domain/spectrograms.py` and the indexed spectrogram tests, not unverified historical benchmark estimates. Exact defaults/settings snapshots must remain versioned and source-auditable; existing keyboard and HelpHint behavior must not be silently rewritten.
 
 | New interaction | Proposed visible wording |
 |---|---|
@@ -36,10 +36,17 @@ The compact simple five controls and exactly three collapsed Advanced controls a
 | Estimate disclaimer | **Illustrative estimate** in browser prototype; actual native Review range/unknown and REV-05 labels after calibration |
 | Independent test | **Choose WAV** with native file picker in final application; browser test reads a local WAV without creating a Result or session |
 
-## Pending engineering qualification — not reopened product decisions
+## Implemented numeric rules and outstanding qualification
 
-- Exact three Sound detail window sizes at non-48k rates; custom 20/25/30/40/50/60/80/100 ms choices, 50/75% overlap and 0/100/300 Hz minimum proposed as **advanced initial numeric bounds**. These can be tightened if representative scientific tests justify it; researcher-visible changes require sign-off.
-- Maximum safe test WAV duration/file size; exact native thumbnail/detail pixel sizes/HiDPI and codec; numerical parity tolerance and boundary/short-clip behavior; cache quota and output-time calibration from real representative WAVs; local example image retention quota. These are **research/implementation gates**, not blanket owner acceptance of the unmeasured numbers.
-- Two absent files in the supplied baseline — root `docs/design/UX_PARITY_MATRIX.md` and `docs/design/PROTOTYPE_ACCEPTANCE.md` — must be recovered before claiming complete historical UX parity review. Prototype-local acceptance documents were present and have their own tests.
+- The three Sound-detail modes and custom 20/25/30/40/50/60/80/100 ms, 50/75% overlap and 0/100/300 Hz advanced choices are implemented and validated by the current `SpectrogramSettings`/unit tests. Their exact sample-rate-dependent rounding, short-clip handling and image tiers are defined in source. Altering a researcher-visible choice still requires explicit scientific/owner review.
+- Current fixed 320×120/1,200×450 tiers, source-time coordinate semantics, cropped-band relative-dB scaling, palette and cache-version contract are implemented. **Still not established** by the tests or existing screenshots: representative field-cohort timing and disk estimates, final physical-device playback/accessibility, installed macOS/Windows performance, and the final owner release qualification. Do not promote unmeasured benchmark rates or a UI screenshot into such evidence.
+- The supplied early prototype materials did not contain `docs/design/UX_PARITY_MATRIX.md` or root `docs/design/PROTOTYPE_ACCEPTANCE.md`. Their missing historical sign-off cannot be retrospectively assumed; current [visible native evidence](../../design/evidence/review-correction/README.md) and future native release checks are separate.
 
 **No approval** to change previously fixed F/D/S, J/K/L/Space/arrow/Undo mappings, label semantics, finalized immutability, source data, or shared REV-05. This log is the traceable source of the new decisions; do not silently substitute a later implementation agent's preferences.
+
+
+## Retained scientific rationale from the implemented investigation
+
+The historical R generator used a 2,000-sample **non-centered, non-border-padded** Hann analysis window at 48 kHz, 1,000-sample hop and 2,048-point FFT tail zero padding. Review instead averages **independent channel powers**, not stereo waveforms, so opposite-phase recordings do not cancel. Spectral power is one-sided unscaled `|rfft|²`; short one/two-sample windows use rectangular weights. Frequency bins have exact Hz centers/edges, and even-window timestamps preserve doubled source-frame centers for half-frame accuracy. Pixel interpolation uses **linear power** before conversion to `10 log10(power / cropped-band peak)`; `[-contrast_db, 0]` is a *relative* scale, not dB SPL or between-recording loudness. Qt overlays labels and axes; cache stores data-only RGB and little-endian float32 dB. No synthetic padding silence is inserted. Changing these scientific/pixel rules requires explicit renderer/cache-version migration and parity tests.
+
+Current v1 tiers are 320×120 thumbnails and 1,200×450 detail images; the selected setting resolves `window_samples`, `hop_samples`, `n_fft`, Nyquist-clamped frequency bounds and `short_clip_window`. Studio's source-frame metadata, immutable cache key, channel policy, session/preset settings snapshots and playback are Studio-owned. The published toolbox `visualization.spectrogram` API owns only pure numerical STFT/raster DSP, **not** CNN/RF Model features. The older 2026-11 research questions about native timing/space calibration were hypotheses, not measured service-level guarantees.
