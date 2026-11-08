@@ -12,6 +12,7 @@ from bioacoustics_dl_toolbox.visualization.spectrogram import (
     calculate_stft_power,
     rasterize_spectrogram,
 )
+
 from biocall_studio.review.domain.sessions import SpectrogramSettingsSnapshot
 from biocall_studio.review.domain.spectrograms import (
     CHANNEL_POLICY,
@@ -23,6 +24,7 @@ from biocall_studio.review.domain.spectrograms import (
     SpectrogramRaster,
     SpectrogramSettings,
 )
+
 
 def _settings_json(settings: SpectrogramSettings) -> str:
     return json.dumps(settings.to_mapping(), sort_keys=True, separators=(",", ":"))
