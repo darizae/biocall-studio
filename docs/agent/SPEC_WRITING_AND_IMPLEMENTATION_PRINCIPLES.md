@@ -52,4 +52,4 @@ Read [`../UNIT_TESTING.md`](../UNIT_TESTING.md) before declaring a case integrat
 - [ ] New UI Components use actual local `alp-ui` API, not imagined library exports.
 - [ ] No unowned dependencies, artifact formats, user-facing workflows or compatibility assumptions slipped into scope.
 
-For ordinary implementation, follow the [active spec](ROUTING.md), exact [test indexes](../INTEGRATION_TESTING.md) and [Git delivery](GIT_DELIVERY.md); do not load this checklist as a mandatory startup reference. Scientific upstream modifications follow the [toolbox workflow](UPSTREAM_TOOLBOX_WORKFLOW.md) only if justified.
+For ordinary implementation, follow the [active spec](ROUTING.md), exact [test indexes](../INTEGRATION_TESTING.md) and [Git delivery](../specs/release-preparation-2026-11/VERSION_CONTROL.md); do not load this checklist as a mandatory startup reference. Scientific upstream modifications follow the [toolbox workflow](UPSTREAM_TOOLBOX_WORKFLOW.md) only if justified.
