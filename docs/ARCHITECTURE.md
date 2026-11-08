@@ -73,5 +73,5 @@ versions, annotated-tag *target commits*, wheel SHA-256 and installed import ori
 Changes to either dependency belong on independent reviewed branches in those repositories.
 
 macOS is the currently exercised native development platform. Native Windows filesystem, process,
-UI, packaging, and installer behavior must be qualified on Windows before release. Full
-cross-workflow Studio end-to-end qualification remains owned by ST-11.
+UI, packaging, and installer behavior must be qualified on Windows before release. Existing ST-11 indexed cross-workflow tests remain relevant, but the final complete Studio
+source-suite qualification for the frozen release commit is owned by [spec 05](specs/release-preparation-2026-11/05-final-upstream-release-qualification.md).

@@ -22,9 +22,11 @@ installed, signed, notarized, uploaded or promoted. All `IT-MAC-*`, `IT-WIN-*` a
    receipts/digests must reopen; exports are written only to an explicit destination.
 4. **Exercise the installed app.** From a clean target: launch Studio; run genuine Train
    Dataset→CNN/RF; structurally reload both Models; retain Train state across workspace switching;
-   run Detect scan→CNN→Results→RF→WAV+Raven export; restart/reopen/relink; exercise source
-   replacement, missing Model, crash, cancel, global Run admission and one confirmed safe quit.
-   Include a verified Review Result → native spectrogram/audio labeling → Finalize → reviewed WAV/Raven export, preserving source hashes and partial-review provenance.
+   run Detect scan→CNN→Results→optional RF-derived Result; then open a verified Result in
+   Review, use native spectrogram/audio and human labels, Finalize, and publish/reopen the
+   Review-owned WAV and/or Raven TSV corpus export. Restart/reopen/relink, test source replacement,
+   missing Model, crash, cancel, global Run admission and one confirmed safe quit. Verify source
+   hashes and partial-review provenance; historical Detect export readers remain supported.
 5. **Verify native UX.** Check the accepted Studio/Detect hierarchy and current Train UI at normal
    and compact sizes, focus/keyboard order, accessible HelpHints, tooltips/copy, plots/tables and
    empty/error/busy/success states. Capture the actual installed application; offscreen grabs are
