@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError
+from importlib import metadata as distribution_metadata
+from importlib import util
+from pathlib import Path
 
 import numpy as np
 import pytest
 
+from bioacoustics_dl_toolbox.visualization.spectrogram import (
+    calculate_stft_power,
+    rasterize_spectrogram,
+)
 from biocall_studio.review.domain.intake import EligibleCandidate
 from biocall_studio.review.domain.sessions import DEFAULT_PRESET_ID, SpectrogramSettingsSnapshot
 from biocall_studio.review.domain.spectrograms import (
@@ -19,8 +26,8 @@ from biocall_studio.review.domain.spectrograms import (
 )
 from biocall_studio.review.workflows.spectrograms import (
     SpectrogramRenderRequest,
-    calculate_stft_power,
     render_spectrogram,
+    spectrogram_content_key,
 )
 
 
@@ -114,23 +121,25 @@ def test_explicit_stft_matches_r_reference_and_keys_every_rendering_input():
             0.022791599075738,
         ]
     )
-    mono_power, centers_x2 = calculate_stft_power(
+    mono = calculate_stft_power(
         signal[np.newaxis, :],
+        sample_rate_hz=1_000,
         window_samples=8,
         hop_samples=4,
         n_fft=8,
         remove_dc=True,
     )
-    stereo_power, stereo_centers_x2 = calculate_stft_power(
+    stereo = calculate_stft_power(
         np.stack((signal, -signal)),
+        sample_rate_hz=1_000,
         window_samples=8,
         hop_samples=4,
         n_fft=8,
         remove_dc=True,
     )
-    np.testing.assert_allclose(mono_power[:, 0], expected_r_power, rtol=1e-12, atol=1e-12)
-    np.testing.assert_allclose(stereo_power, mono_power, rtol=0, atol=0)
-    assert centers_x2 == stereo_centers_x2 == (7,)
+    np.testing.assert_allclose(mono.power[:, 0], expected_r_power, rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(stereo.power, mono.power, rtol=0, atol=0)
+    assert mono.frame_centers_x2 == stereo.frame_centers_x2 == (7,)
 
     balanced = SpectrogramSettings()
     plan = balanced.resolve(sample_rate_hz=48_000, available_frames=240_000)
@@ -287,3 +296,86 @@ def test_explicit_stft_matches_r_reference_and_keys_every_rendering_input():
     for invalid_key in ("", "spec_bad", "spec_" + "0" * 63, "spec_" + "g" * 64):
         with pytest.raises(ValueError, match="identity"):
             validate_spectrogram_content_key(invalid_key)
+
+
+@pytest.mark.parametrize(
+    ("distribution", "import_name", "expected_version"),
+    [
+        ("bioacoustics-dl-toolbox", "bioacoustics_dl_toolbox", "0.3.0"),
+        ("alp-ui", "alp_ui", "0.1.0a1"),
+    ],
+)
+def test_upstream_release_imports_come_from_installed_wheels(
+    distribution: str, import_name: str, expected_version: str
+) -> None:
+    """The adapter is qualified against installed releases, not sibling src trees."""
+    assert distribution_metadata.version(distribution) == expected_version
+    module = util.find_spec(import_name)
+    assert module is not None and module.origin is not None
+    assert "site-packages" in Path(module.origin).resolve().parts
+
+
+def test_released_toolbox_adapter_preserves_source_axes_pixels_and_cache_key() -> None:
+    """Nonzero context origin and opposed stereo must retain Review v1 output."""
+    candidate = _candidate(
+        start_frame=24_000,
+        end_frame=24_800,
+        sample_rate_hz=8_000,
+        frame_count=60_000,
+        channels=2,
+    )
+    context = plan_candidate_context(candidate, context_seconds=1)
+    assert context.context_start_frame > 0
+    frame = np.arange(context.frame_count, dtype=np.float64)
+    signal = 0.25 + np.sin(2 * np.pi * 700 * frame / context.sample_rate_hz)
+    samples = np.stack((signal, -signal))
+    settings = SpectrogramSettings(
+        frequency_max_hz=3_000,
+        frequency_min_hz=100,
+        exact_window_ms=20,
+        overlap_percent=75,
+        contrast_db=65,
+        palette=Palette.VIRIDIS,
+    )
+    request = SpectrogramRenderRequest(
+        candidate_id=candidate.candidate_id,
+        source_sha256=candidate.source_sha256,
+        context=context,
+        settings=settings,
+        tier=SpectrogramImageTier.THUMBNAIL,
+    )
+    plan = settings.resolve(
+        sample_rate_hz=context.sample_rate_hz, available_frames=context.frame_count
+    )
+    spectral = calculate_stft_power(
+        samples,
+        sample_rate_hz=context.sample_rate_hz,
+        window_samples=plan.window_samples,
+        hop_samples=plan.hop_samples,
+        n_fft=plan.n_fft,
+        remove_dc=True,
+        source_start_frame=context.context_start_frame,
+    )
+    upstream = rasterize_spectrogram(
+        spectral,
+        width=320,
+        height=120,
+        frequency_min_hz=plan.frequency_min_hz,
+        frequency_max_hz=plan.frequency_max_hz,
+        contrast_db=settings.contrast_db,
+        palette=settings.palette.value,
+    )
+    studio = render_spectrogram(samples, request)
+
+    assert studio.rgb_bytes == upstream.rgb_bytes
+    assert studio.relative_db_f32 == upstream.relative_db_f32_bytes
+    assert studio.metadata.frame_centers_x2 == upstream.frame_centers_x2
+    assert studio.metadata.frequency_centers_hz == upstream.frequency_centers_hz
+    assert studio.metadata.frequency_edges_hz == upstream.frequency_edges_hz
+    assert studio.metadata.window_function == spectral.window_function
+    assert studio.metadata.short_clip_window == plan.short_clip_window
+    assert studio.metadata.context_start_frame == context.context_start_frame
+    assert studio.metadata.context_end_frame == context.context_end_frame
+    assert studio.metadata.candidate_start_frame == context.candidate_start_frame
+    assert studio.metadata.candidate_end_frame == context.candidate_end_frame
+    assert studio.content_key == spectrogram_content_key(request)
