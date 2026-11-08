@@ -29,22 +29,14 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Download published upstream release wheels
-        env:
-          # A read-only fine-grained PAT (or GitHub App token) granted only
-          # Contents: read on private darizae/alp-ui. Never use a source checkout.
-          GH_TOKEN: ${{ secrets.ALP_UI_RELEASE_READ_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
-          if [ -z "${GH_TOKEN:-}" ]; then
-            echo "::error::Configure Studio Actions secret ALP_UI_RELEASE_READ_TOKEN with Contents:read on private darizae/alp-ui."
-            exit 1
-          fi
           mkdir -p .release-wheels
-          gh release download v0.1.0a1 \
-            --repo darizae/alp-ui \
-            --pattern 'alp_ui-0.1.0a1-py3-none-any.whl' \
-            --dir .release-wheels
+          # Both releases are public; do not require a cross-repository token.
+          curl --fail --location --retry 3 \
+            --output .release-wheels/alp_ui-0.1.0a1-py3-none-any.whl \
+            'https://github.com/darizae/alp-ui/releases/download/v0.1.0a1/alp_ui-0.1.0a1-py3-none-any.whl'
           curl --fail --location --retry 3 \
             --output .release-wheels/bioacoustics_dl_toolbox-0.3.0-py3-none-any.whl \
             'https://github.com/darizae/bioacoustics-dl-toolbox/releases/download/v0.3.0/bioacoustics_dl_toolbox-0.3.0-py3-none-any.whl'
