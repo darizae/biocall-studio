@@ -1,6 +1,6 @@
 # Review spectrogram generation — owner decisions and copy register
 
-**Decision source:** owner answers of 2026-11-03 to the eight Phase-1 questions. **State:** approved product direction; proposed *numeric implementation details* marked for pre-spec qualification below, not silently treated as measured scientific defaults. Preserve RV-01–RV-08 lifecycle and approved shortcut/copy baseline.
+**Decision source:** owner answers of 2026-11-03 to the eight Phase-1 questions. **Status:** implemented source renderer/settings/cache in Studio `main`; these approved decisions remain the scientific/researcher-copy contract. Numerical defaults are defined and tested in source rather than inferred from early proposed benchmarks. Final native install/owner field qualification is separate.
 
 | ID | Decision / alternatives considered | Owner resolution and rationale | Changes governed |
 |---|---|---|---|
@@ -22,7 +22,7 @@
 
 ## Researcher controls and HelpHint text
 
-The compact simple five controls and exactly three collapsed Advanced controls are proposed in [pre-spec §3](SPECTROGRAM_GENERATION_INVESTIGATION.md#3-proposed-user-settings-contract-for-qualification). The owner approved their *scope*, not numerical input caps, native image dimensions or benchmark rates. The proposed tooltips in that table are the working copy to validate against actual `alp-ui` HelpHint and the prototype. Add only necessary concise copy below; existing RV-05 tooltip and shortcut strings are unchanged.
+The compact researcher controls and three Advanced controls retain the owner's approved scope. **Current implemented numeric bounds and defaults are defined by** `src/biocall_studio/review/domain/spectrograms.py` and the indexed spectrogram tests, not unverified historical benchmark estimates. Exact defaults/settings snapshots must remain versioned and source-auditable; existing keyboard and HelpHint behavior must not be silently rewritten.
 
 | New interaction | Proposed visible wording |
 |---|---|
@@ -43,3 +43,10 @@ The compact simple five controls and exactly three collapsed Advanced controls a
 - Two absent files in the supplied baseline — root `docs/design/UX_PARITY_MATRIX.md` and `docs/design/PROTOTYPE_ACCEPTANCE.md` — must be recovered before claiming complete historical UX parity review. Prototype-local acceptance documents were present and have their own tests.
 
 **No approval** to change previously fixed F/D/S, J/K/L/Space/arrow/Undo mappings, label semantics, finalized immutability, source data, or shared REV-05. This log is the traceable source of the new decisions; do not silently substitute a later implementation agent's preferences.
+
+
+## Retained scientific rationale from the implemented investigation
+
+The historical R generator used a 2,000-sample **non-centered, non-border-padded** Hann analysis window at 48 kHz, 1,000-sample hop and 2,048-point FFT tail zero padding. Review instead averages **independent channel powers**, not stereo waveforms, so opposite-phase recordings do not cancel. Spectral power is one-sided unscaled `|rfft|²`; short one/two-sample windows use rectangular weights. Frequency bins have exact Hz centers/edges, and even-window timestamps preserve doubled source-frame centers for half-frame accuracy. Pixel interpolation uses **linear power** before conversion to `10 log10(power / cropped-band peak)`; `[-contrast_db, 0]` is a *relative* scale, not dB SPL or between-recording loudness. Qt overlays labels and axes; cache stores data-only RGB and little-endian float32 dB. No synthetic padding silence is inserted. Changing these scientific/pixel rules requires explicit renderer/cache-version migration and parity tests.
+
+Current v1 tiers are 320×120 thumbnails and 1,200×450 detail images; the selected setting resolves `window_samples`, `hop_samples`, `n_fft`, Nyquist-clamped frequency bounds and `short_clip_window`. Studio's source-frame metadata, immutable cache key, channel policy, session/preset settings snapshots and playback are Studio-owned. The published toolbox `visualization.spectrogram` API owns only pure numerical STFT/raster DSP, **not** CNN/RF Model features. The older 2026-11 research questions about native timing/space calibration were hypotheses, not measured service-level guarantees.

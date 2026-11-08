@@ -1,6 +1,6 @@
 # Controlled BioCall Studio native releases
 
-**Status after ST-11:** this is the release gate, not a release record. No installer was built,
+**Status (2026-11-08):** this is the release gate, not a release record. Train, Detect and Review source workflows are implemented on `main`; Studio's final local suite and native installers are **not** qualified. No installer was built,
 installed, signed, notarized, uploaded or promoted. All `IT-MAC-*`, `IT-WIN-*` and installed
 `IT-E2E-*` checks remain deferred until a separately approved packaging stage executes
 [macOS spec 06](specs/06-macos-release-and-installer.md) or
@@ -24,7 +24,7 @@ installed, signed, notarized, uploaded or promoted. All `IT-MAC-*`, `IT-WIN-*` a
    Dataset→CNN/RF; structurally reload both Models; retain Train state across workspace switching;
    run Detect scan→CNN→Results→RF→WAV+Raven export; restart/reopen/relink; exercise source
    replacement, missing Model, crash, cancel, global Run admission and one confirmed safe quit.
-   Review remains a placeholder.
+   Include a verified Review Result → native spectrogram/audio labeling → Finalize → reviewed WAV/Raven export, preserving source hashes and partial-review provenance.
 5. **Verify native UX.** Check the accepted Studio/Detect hierarchy and current Train UI at normal
    and compact sizes, focus/keyboard order, accessible HelpHints, tooltips/copy, plots/tables and
    empty/error/busy/success states. Capture the actual installed application; offscreen grabs are
@@ -37,7 +37,7 @@ installed, signed, notarized, uploaded or promoted. All `IT-MAC-*`, `IT-WIN-*` a
    app binaries and shortcuts but preserves recordings, Train Collections, Detect exports and
    per-user data unless a separate explicit removal option names and confirms those targets.
 8. **Promote explicitly.** Require green native test IDs, installer and dependency SHA-256 values,
-   license/security review, brand/name redistribution clearance, SBOM where practical, known
+   resolved BioCall Studio application license (currently **not declared**), toolbox GPL-3.0-only and Qt/PySide6 redistribution compliance, security review, brand/name clearance, SBOM where practical, known
    limitations and owner signoff. Upload only the tested immutable digest. Never auto-promote.
 9. **Rollback.** Retain the previous verified installer and manifest. Never rewrite a release tag
    or silently replace binaries; test migration refusal/compatibility before distribution.
