@@ -16,9 +16,9 @@ env:
 
 jobs:
   unit:
-    # B2 and B3 have dedicated scoped workflows. Never run the ordinary suite
+    # B2, B3 and B4 have dedicated scoped workflows. Never run the ordinary suite
     # for their PRs or merge commits; B5 alone owns complete qualification.
-    if: ${{ !((github.event_name == 'pull_request' && (github.head_ref == 'docs/biocall-02-human-readme' || github.head_ref == 'release/biocall-v0.1.0a1-candidate')) || (github.event_name == 'push' && (contains(github.event.head_commit.message, 'docs/biocall-02-human-readme') || contains(github.event.head_commit.message, 'release/biocall-v0.1.0a1-candidate')))) }}
+    if: ${{ !((github.event_name == 'pull_request' && (github.head_ref == 'docs/biocall-02-human-readme' || github.head_ref == 'release/biocall-v0.1.0a1-candidate' || github.head_ref == 'release/biocall-v0.1.0a1-installers')) || (github.event_name == 'push' && (contains(github.event.head_commit.message, 'docs/biocall-02-human-readme') || contains(github.event.head_commit.message, 'release/biocall-v0.1.0a1-candidate') || contains(github.event.head_commit.message, 'release/biocall-v0.1.0a1-installers')))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
