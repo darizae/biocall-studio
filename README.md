@@ -28,9 +28,18 @@ Explore detections in a spectrogram gallery or inspect them individually. Listen
 
 <img src="docs/design/evidence/release-real-data/09-review-one-by-one.png" width="920" alt="BioCall Studio Review workspace showing an alpaca-call spectrogram, playback, and labeling controls">
 
-## Getting started
+## Download BioCall Studio — v0.1.0a1 Alpha
 
-The first macOS and Windows installers have been built for testing, but **no publicly downloadable BioCall Studio release assets are available yet**. Download links will appear here after a clearly labeled unsigned test pre-release is actually uploaded. For now, use Python **3.11–3.13** and follow the [installation guide](docs/DEVELOPMENT.md#install-from-published-wheels) to run from source.
+- **Download for Windows (64-bit)** — [BioCall-Studio-0.1.0a1-windows-x86_64.exe](https://github.com/darizae/biocall-studio/releases/download/v0.1.0a1/BioCall-Studio-0.1.0a1-windows-x86_64.exe) · SHA-256 `d91a7469117c208ee3c5807e08c2b05fd7c3ce26a9ee3043917a211a403f85bb`
+- **Download for macOS (Apple Silicon)** — [BioCall-Studio-0.1.0a1-macos.dmg](https://github.com/darizae/biocall-studio/releases/download/v0.1.0a1/BioCall-Studio-0.1.0a1-macos.dmg) · SHA-256 `751bea1750710e423fb7a83752c9d27d7ddbd5db65503ae98d9707b60bb4347f`
+
+This is a free, open-source (GPL-3.0-only), experimental **alpha**. Verify with the [SHA-256 checksums](https://github.com/darizae/biocall-studio/releases/download/v0.1.0a1/SHA256SUMS); see the [release notes](https://github.com/darizae/biocall-studio/releases/tag/v0.1.0a1) for the exact tested source SHA, smoke evidence, [source](https://github.com/darizae/biocall-studio/tree/8554089cc7f0878e3dd594ca3620e90c4f16b6f8) and [license](https://github.com/darizae/biocall-studio/blob/main/LICENSE) links.
+
+The installers are currently **unsigned**: Windows may display a **SmartScreen** warning (More info → Run anyway), and macOS may block the app through **Gatekeeper** because it is not notarized (right-click → Open, or allow in System Settings → Privacy & Security). Only **Windows x86-64** and **Apple Silicon macOS** builds are verified. Report bugs through [GitHub Issues](https://github.com/darizae/biocall-studio/issues).
+
+### Run from source (developers)
+
+Use Python **3.11–3.13** and follow the [installation guide](docs/DEVELOPMENT.md#install-from-published-wheels).
 
 Launch it from your checkout:
 
