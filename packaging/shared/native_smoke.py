@@ -86,7 +86,12 @@ def check(gui: Path, worker: Path, root: Path) -> dict[str, object]:
                 if response.returncode == 0:
                     raise AssertionError(f"{mode} accepted malformed request")
                 combined = response.stdout + response.stderr
-                missing = ("ModuleNotFoundError", "ImportError", "DLL load failed", "No module named")
+                missing = (
+                    "ModuleNotFoundError",
+                    "ImportError",
+                    "DLL load failed",
+                    "No module named",
+                )
                 if any(message in combined for message in missing):
                     raise AssertionError(f"Missing bundled module in {mode}: {combined[-1200:]}")
                 results[mode] = response.returncode
