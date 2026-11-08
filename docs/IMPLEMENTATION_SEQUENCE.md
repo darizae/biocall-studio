@@ -7,12 +7,12 @@
 ## Current ordered release stages
 
 1. **01 — Completed/merged.** [Published upstream spectrogram adapter](specs/release-preparation-2026-11/01-upstream-ownership.md) with exact science pins in [`pyproject.toml`](../pyproject.toml).
-2. **02 — Current documentation PR.** [Human-facing README and safe Markdown consolidation](specs/release-preparation-2026-11/02-human-readme-and-docs.md); no final-suite claim.
-3. **03 — Pending.** [Source/package and legal/lock candidate](specs/release-preparation-2026-11/03-base-suite-and-release-candidate.md), only after spec 02 merges.
+2. **02 — Completed/merged.** [Human-facing README and safe Markdown consolidation](specs/release-preparation-2026-11/02-human-readme-and-docs.md), [PR #7](https://github.com/darizae/biocall-studio/pull/7) merged. The post-02 starting `main` for 03 was `dc788cffb2ad0ad951dc39d7f9e4dc343cae1a90`.
+3. **03 — Provisional candidate preparation.** [Source, wheel metadata, legal/lock notices and focused regressions](specs/release-preparation-2026-11/03-base-suite-and-release-candidate.md). Proposed version `0.1.0a1`; see [draft manifest](releases/v0.1.0a1-manifest.md), [release notes](releases/v0.1.0a1-notes.md) and [license gate](legal/THIRD_PARTY_NOTICES.md). Its merged main commit is **not** the final installer SHA.
 4. **04 — Pending.** [Installer source/native macOS and Windows lanes](specs/release-preparation-2026-11/04-installer-gates.md) from one frozen reviewed SHA.
 5. **05 — Last.** [Local full Studio suite, owner promotion and post-release spec-series retirement](specs/release-preparation-2026-11/05-final-upstream-release-qualification.md). **Do not retire the 2026-11 spec series before this gate.**
 
-[Version-control and main synchronization rules](specs/release-preparation-2026-11/VERSION_CONTROL.md) govern this series. A documentation or source CI check is not evidence of signed/notarized macOS or Windows installers. App-level licensing is currently **undeclared**; resolve it and third-party GPL/Qt redistribution obligations before release. No Studio installer, Studio `v0.1.0a1` tag, full local suite or release approval is asserted.
+[Version-control and main synchronization rules](specs/release-preparation-2026-11/VERSION_CONTROL.md) govern this series. A documentation or source CI check is not evidence of signed/notarized macOS or Windows installers. App-level licensing remains **undeclared**; third-party notices record actual licenses, but app-level compatibility/redistribution, including GPL/Qt terms, requires owner/legal clearance before public binaries. No Studio installer, Studio `v0.1.0a1` tag, full local suite or release approval is asserted.
 
 ## Canonical retained contracts
 
