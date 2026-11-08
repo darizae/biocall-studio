@@ -85,7 +85,10 @@ def collect_bundle() -> tuple[list[tuple[str, str]], list[str]]:
         hidden.update(collect_submodules(package, on_error="warn once"))
     # Include eager entrypoints even when importlib dynamic edges are invisible.
     hidden.update(
-        ("biocall_studio.cli", "biocall_studio.studio.application.app",
-         "biocall_studio.studio.application.coordinator")
+        (
+            "biocall_studio.cli",
+            "biocall_studio.studio.application.app",
+            "biocall_studio.studio.application.coordinator",
+        )
     )
     return sorted(set(datas)), sorted(hidden)

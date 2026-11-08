@@ -19,7 +19,8 @@ def test_worker_launch_sources_and_native_paths(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "frozen", False, raising=False)
     arguments = ["--worker", "train-dataset-build"]
     assert worker_command(arguments) == (
-        str(tmp_path / "python"), ["-m", "biocall_studio", *arguments]
+        str(tmp_path / "python"),
+        ["-m", "biocall_studio", *arguments],
     )
     monkeypatch.setattr(sys, "frozen", True, raising=False)
     monkeypatch.setattr(sys, "platform", "darwin")
@@ -34,9 +35,7 @@ def test_windows_worker_must_be_console_executable(monkeypatch, tmp_path):
         worker_command(["--worker", "detect-cnn"])
     worker = tmp_path / "BioCall Studio Worker.exe"
     worker.touch()
-    assert worker_command(["--worker", "detect-cnn"]) == (
-        str(worker), ["--worker", "detect-cnn"]
-    )
+    assert worker_command(["--worker", "detect-cnn"]) == (str(worker), ["--worker", "detect-cnn"])
 
 
 def test_native_configs_are_both_present_and_source_paths_are_not_bundled():
@@ -51,8 +50,8 @@ def test_native_configs_are_both_present_and_source_paths_are_not_bundled():
         assert "collect_bundle()" in source
         assert "BioCall Studio" in source
     windows = specs[1].read_text(encoding="utf-8")
-    assert 'console=False' in windows
-    assert 'console=True' in windows
+    assert "console=False" in windows
+    assert "console=True" in windows
     assert "BioCall Studio Worker" in windows
     macos = specs[0].read_text(encoding="utf-8")
     assert "icon.icns" in macos and "BUNDLE(" in macos
@@ -67,11 +66,18 @@ def test_canonical_version_and_published_wheels():
     assert project["project"]["version"] == "0.1.0a1"
     pins = project["tool"]["biocall-studio"]["science"]
     expected = (
-        ("alp-ui", "0.1.0a1", "41bac72971b96d352da752cc0ff140afe3ac312a",
-         "20590366d06591837c2567df1191b472b9db494e5440ce3a3fadfbf1b8d53d6c"),
-        ("bioacoustics-dl-toolbox", "0.3.0",
-         "7027bd84cc5a44a27bf201332af540f090c38365",
-         "c0f7679cbf788c2900eff26b8db719941a513fc96b5f28348e2838c8df595b28"),
+        (
+            "alp-ui",
+            "0.1.0a1",
+            "41bac72971b96d352da752cc0ff140afe3ac312a",
+            "20590366d06591837c2567df1191b472b9db494e5440ce3a3fadfbf1b8d53d6c",
+        ),
+        (
+            "bioacoustics-dl-toolbox",
+            "0.3.0",
+            "7027bd84cc5a44a27bf201332af540f090c38365",
+            "c0f7679cbf788c2900eff26b8db719941a513fc96b5f28348e2838c8df595b28",
+        ),
     )
     for package, version, revision, digest in expected:
         assert pins[f"{package}-version"] == version
@@ -97,10 +103,17 @@ def test_shared_freezer_lists_every_private_worker_and_legal_resource():
     parsed = ast.parse(source)
     assert parsed
     for name in (
-        "train-dataset-build", "train-cnn-training", "train-rf-training",
-        "detect-cnn", "detect-rf-refinement",
-        "biocall_studio", "alp_ui", "bioacoustics_dl_toolbox",
-        "copy_metadata", "collect_data_files", "collect_submodules",
+        "train-dataset-build",
+        "train-cnn-training",
+        "train-rf-training",
+        "detect-cnn",
+        "detect-rf-refinement",
+        "biocall_studio",
+        "alp_ui",
+        "bioacoustics_dl_toolbox",
+        "copy_metadata",
+        "collect_data_files",
+        "collect_submodules",
     ):
         assert name in source
     for filename in (

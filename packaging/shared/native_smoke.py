@@ -17,8 +17,11 @@ from contextlib import contextmanager
 from pathlib import Path
 
 MODES = (
-    "train-dataset-build", "train-cnn-training", "train-rf-training",
-    "detect-cnn", "detect-rf-refinement",
+    "train-dataset-build",
+    "train-cnn-training",
+    "train-rf-training",
+    "detect-cnn",
+    "detect-rf-refinement",
 )
 
 
@@ -50,7 +53,11 @@ def call(executable: Path, arguments: list[str], cwd: Path, *, timeout: int = 30
     env["PYTHONNOUSERSITE"] = "1"
     return subprocess.run(
         [str(executable), *arguments],
-        cwd=cwd, env=env, capture_output=True, text=True, timeout=timeout,
+        cwd=cwd,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
     )
 
 
@@ -78,8 +85,14 @@ def check(gui: Path, worker: Path, root: Path) -> dict[str, object]:
                 request.write_text("{", encoding="utf-8")
                 response = call(
                     worker,
-                    ["--worker", mode, "--request", str(request),
-                     "--owner-lease", str(isolated / "supervisor.lease")],
+                    [
+                        "--worker",
+                        mode,
+                        "--request",
+                        str(request),
+                        "--owner-lease",
+                        str(isolated / "supervisor.lease"),
+                    ],
                     isolated,
                     timeout=60,
                 )
@@ -103,15 +116,15 @@ def check(gui: Path, worker: Path, root: Path) -> dict[str, object]:
         env["PYTHONNOUSERSITE"] = "1"
         process = subprocess.Popen(
             [str(gui), "--settings-dir", str(user_data)],
-            cwd=isolated, env=env,
-            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+            cwd=isolated,
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
         )
         try:
             time.sleep(6)
             if process.poll() is not None:
-                raise AssertionError(
-                    f"Installed GUI exited on startup: {process.returncode}"
-                )
+                raise AssertionError(f"Installed GUI exited on startup: {process.returncode}")
             if user_data.resolve().is_relative_to(gui.parent):
                 raise AssertionError("Mutable user-data root is inside the app bundle.")
         finally:

@@ -18,8 +18,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTED_MODES = (
-    "train-dataset-build", "train-cnn-training", "train-rf-training",
-    "detect-cnn", "detect-rf-refinement",
+    "train-dataset-build",
+    "train-cnn-training",
+    "train-rf-training",
+    "detect-cnn",
+    "detect-rf-refinement",
 )
 UPSTREAM = {
     "alp-ui": ("alp_ui", "0.1.0a1"),
@@ -52,9 +55,7 @@ def check(wheelhouse: Path, *, frozen: bool = False) -> dict[str, object]:
         url = science[f"{name}-wheel-url"]
         if len(expected) != 64 or sha256(path) != expected:
             raise RuntimeError(f"Published upstream wheel SHA-256 mismatch: {name}")
-        if url != (
-            f"https://github.com/darizae/{name}/releases/download/v{release}/{path.name}"
-        ):
+        if url != (f"https://github.com/darizae/{name}/releases/download/v{release}/{path.name}"):
             raise RuntimeError(f"Unexpected published release URL for {name}")
         if science[f"{name}-version"] != release or len(science[f"{name}-revision"]) != 40:
             raise RuntimeError(f"Upstream version/revision mismatch for {name}")
@@ -78,9 +79,7 @@ def check(wheelhouse: Path, *, frozen: bool = False) -> dict[str, object]:
         if path.stat().st_size < 1024 or path.read_bytes()[:4] != signature:
             raise RuntimeError(f"Invalid native brand asset: {path}")
         icons[name] = sha256(path)
-    revision = subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
-    ).strip()
+    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     if frozen:
         import os
 
