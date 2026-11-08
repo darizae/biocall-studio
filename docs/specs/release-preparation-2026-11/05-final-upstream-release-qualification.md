@@ -2,6 +2,12 @@
 
 **Execution position: prompt 11**, immediately after the shared installer-source PR from [04](04-installer-gates.md) is reviewed and merged into BioCall Studio `main`. [Spec 06](06-release-and-post-release-cleanup.md) is now the **last release/publishing spec** and owns post-release Markdown retirement. No fresh full test suite is requested after the installer lanes unless source or approved dependencies change.
 
+## Who executes what
+
+**ChatGPT web: setup/coordination only.** It may inspect tags/hashes, write and submit the Windows Actions workflow PR, and prepare commands or analyze logs. **The owner's Mac: required executor of this full unit/integration suite.** The ChatGPT cloud VM, a GitHub Actions Linux job, or a Windows runner does not satisfy this explicitly local gate. If the agent cannot access the Mac, provide the exact local steps and leave the test **PENDING**.
+
+**Before launching locally**, use **prompt 10B** to either merge the Windows GitHub Actions workflow into `main` or choose the interactive remote Windows VM path without a repository workflow change. A later workflow source commit invalidates the frozen SHA and requires repeating this local test.
+
 ## Freeze and verify the exact source/dependencies
 
 1. Verify the already published [alp-ui](https://github.com/darizae/alp-ui/releases) and [bioacoustics-dl-toolbox](https://github.com/darizae/bioacoustics-dl-toolbox/releases) release wheel assets. The currently observed versions are `alp-ui v0.1.0a1` and `toolbox v0.3.0`, but inspect the live approved version/tag target commit, URL and wheel SHA-256 at execution. Verify the Studio `pyproject.toml` dependency constraints and `[tool.biocall-studio.science]` provenance, not just version labels.
