@@ -7,6 +7,10 @@ import json
 from dataclasses import asdict, dataclass
 
 import numpy as np
+from bioacoustics_dl_toolbox.visualization.spectrogram import (
+    calculate_stft_power,
+    rasterize_spectrogram,
+)
 
 from biocall_studio.review.domain.sessions import SpectrogramSettingsSnapshot
 from biocall_studio.review.domain.spectrograms import (
@@ -14,43 +18,11 @@ from biocall_studio.review.domain.spectrograms import (
     SPECTROGRAM_ALGORITHM_VERSION,
     SPECTROGRAM_RENDER_VERSION,
     CandidateContext,
-    Palette,
     SpectrogramImageTier,
     SpectrogramMetadata,
     SpectrogramRaster,
     SpectrogramSettings,
 )
-
-_PALETTE_STOPS = {
-    Palette.MAGMA: np.asarray(
-        (
-            (0, 0, 4),
-            (28, 16, 68),
-            (79, 18, 123),
-            (129, 37, 129),
-            (181, 54, 122),
-            (229, 80, 100),
-            (251, 135, 97),
-            (254, 194, 135),
-            (252, 253, 191),
-        ),
-        dtype=np.float64,
-    ),
-    Palette.VIRIDIS: np.asarray(
-        (
-            (68, 1, 84),
-            (71, 44, 122),
-            (59, 82, 139),
-            (44, 113, 142),
-            (33, 144, 141),
-            (39, 173, 129),
-            (92, 200, 99),
-            (170, 220, 50),
-            (253, 231, 37),
-        ),
-        dtype=np.float64,
-    ),
-}
 
 
 def _settings_json(settings: SpectrogramSettings) -> str:
@@ -109,146 +81,6 @@ class SpectrogramRenderRequest:
         )
 
 
-def calculate_stft_power(
-    samples: np.ndarray,
-    *,
-    window_samples: int,
-    hop_samples: int,
-    n_fft: int,
-    remove_dc: bool,
-) -> tuple[np.ndarray, tuple[int, ...]]:
-    """Return channel-power-mean one-sided FFT power and exact doubled centers.
-
-    Frames are full, non-centred, and unpadded at clip borders. FFT tail zero
-    padding is controlled only by ``n_fft``. A symmetric Hann is used, matching
-    the historical R expression ``0.5 - 0.5*cos(2*pi*k/(N-1))``.
-    """
-
-    audio = np.asarray(samples, dtype=np.float64)
-    if audio.ndim != 2 or audio.shape[0] < 1 or audio.shape[1] < 1:
-        raise ValueError("Spectrogram audio must contain channels and frames.")
-    if not np.isfinite(audio).all():
-        raise ValueError("Spectrogram audio contains non-finite samples.")
-    for value, label in (
-        (window_samples, "window"),
-        (hop_samples, "hop"),
-        (n_fft, "FFT"),
-    ):
-        if type(value) is not int or value <= 0:
-            raise ValueError(f"Spectrogram {label} length is invalid.")
-    if window_samples > audio.shape[1]:
-        raise ValueError("Spectrogram window exceeds the available clip.")
-    if n_fft < window_samples or n_fft & (n_fft - 1):
-        raise ValueError("Spectrogram FFT length must be a power of two covering the window.")
-    if not isinstance(remove_dc, bool):
-        raise TypeError("Spectrogram DC policy is invalid.")
-
-    working = audio - audio.mean(axis=1, keepdims=True) if remove_dc else audio
-    starts = np.arange(0, working.shape[1] - window_samples + 1, hop_samples, dtype=np.int64)
-    if starts.size == 0:
-        starts = np.asarray((0,), dtype=np.int64)
-    if window_samples < 3:
-        # The symmetric Hann degenerates to all-zero weights at two samples.
-        # A rectangular edge window preserves the only real samples without padding.
-        window = np.ones(window_samples, dtype=np.float64)
-    else:
-        positions = np.arange(window_samples, dtype=np.float64)
-        window = 0.5 - 0.5 * np.cos(2 * np.pi * positions / (window_samples - 1))
-
-    accumulated = np.zeros((n_fft // 2 + 1, starts.size), dtype=np.float64)
-    for channel in working:
-        frames = np.stack(
-            tuple(channel[int(start) : int(start) + window_samples] for start in starts),
-            axis=0,
-        )
-        transformed = np.fft.rfft(frames * window[np.newaxis, :], n=n_fft, axis=1)
-        accumulated += (transformed.real**2 + transformed.imag**2).T
-    accumulated /= working.shape[0]
-    centers_x2 = tuple(int(2 * start + window_samples - 1) for start in starts)
-    return accumulated, centers_x2
-
-
-def _frequency_edges(
-    centers: np.ndarray,
-    *,
-    lower: float,
-    upper: float,
-    bin_width: float,
-) -> tuple[float, ...]:
-    if centers.size == 0:
-        return (lower, upper)
-    if centers.size == 1:
-        return (lower, upper)
-    midpoints = (centers[:-1] + centers[1:]) / 2
-    edges = np.concatenate(
-        (
-            np.asarray((max(lower, centers[0] - bin_width / 2),)),
-            midpoints,
-            np.asarray((min(upper, centers[-1] + bin_width / 2),)),
-        )
-    )
-    edges[0] = lower
-    edges[-1] = upper
-    return tuple(float(value) for value in edges)
-
-
-def _resample_power(
-    power: np.ndarray,
-    *,
-    frame_centers: np.ndarray,
-    context_frames: int,
-    frequencies: np.ndarray,
-    frequency_min: float,
-    frequency_max: float,
-    width: int,
-    height: int,
-) -> np.ndarray:
-    target_frames = (np.arange(width, dtype=np.float64) + 0.5) * context_frames / width
-    time_resampled = np.empty((power.shape[0], width), dtype=np.float64)
-    for frequency_index, row in enumerate(power):
-        time_resampled[frequency_index] = np.interp(
-            target_frames,
-            frame_centers,
-            row,
-            left=row[0],
-            right=row[-1],
-        )
-    target_frequencies = frequency_min + (
-        (np.arange(height, dtype=np.float64) + 0.5)
-        * (frequency_max - frequency_min)
-        / height
-    )
-    raster = np.empty((height, width), dtype=np.float64)
-    for column in range(width):
-        raster[:, column] = np.interp(
-            target_frequencies,
-            frequencies,
-            time_resampled[:, column],
-        )
-    return np.flipud(raster)
-
-
-def _relative_db(power: np.ndarray, contrast_db: int, *, peak: float) -> np.ndarray:
-    if not np.isfinite(peak) or peak <= 0:
-        return np.full(power.shape, -float(contrast_db), dtype=np.float64)
-    relative = np.full(power.shape, -float(contrast_db), dtype=np.float64)
-    positive = power > 0
-    relative[positive] = 10 * np.log10(power[positive] / peak)
-    return np.clip(relative, -float(contrast_db), 0.0)
-
-
-def _apply_palette(relative_db: np.ndarray, contrast_db: int, palette: Palette) -> bytes:
-    normalized = np.clip((relative_db + contrast_db) / contrast_db, 0, 1)
-    stops = _PALETTE_STOPS[palette]
-    stop_x = np.linspace(0, 1, stops.shape[0])
-    rgb = np.empty((*relative_db.shape, 3), dtype=np.uint8)
-    for channel in range(3):
-        rgb[:, :, channel] = np.rint(
-            np.interp(normalized.ravel(), stop_x, stops[:, channel]).reshape(normalized.shape)
-        ).astype(np.uint8)
-    return rgb.tobytes(order="C")
-
-
 def spectrogram_content_key(request: SpectrogramRenderRequest) -> str:
     """Return the complete immutable cache identity without rendering pixels."""
     if not isinstance(request, SpectrogramRenderRequest):
@@ -284,43 +116,28 @@ def render_spectrogram(
         sample_rate_hz=request.context.sample_rate_hz,
         available_frames=request.context.frame_count,
     )
-    power, relative_centers_x2 = calculate_stft_power(
+    sample_rate = request.context.sample_rate_hz
+    width, height = request.tier.dimensions
+
+    # Only NumPy display DSP lives upstream. Studio continues to own the
+    # validated source context, settings, cache identity and result metadata.
+    spectral = calculate_stft_power(
         audio,
+        sample_rate_hz=sample_rate,
         window_samples=plan.window_samples,
         hop_samples=plan.hop_samples,
         n_fft=plan.n_fft,
         remove_dc=True,
+        source_start_frame=request.context.context_start_frame,
     )
-    sample_rate = request.context.sample_rate_hz
-    frequencies = np.arange(power.shape[0], dtype=np.float64) * sample_rate / plan.n_fft
-    populated = (frequencies >= plan.frequency_min_hz) & (
-        frequencies <= plan.frequency_max_hz
-    )
-    populated_centers = frequencies[populated]
-    bin_width = sample_rate / plan.n_fft
-    frequency_edges = _frequency_edges(
-        populated_centers,
-        lower=float(plan.frequency_min_hz),
-        upper=float(plan.frequency_max_hz),
-        bin_width=bin_width,
-    )
-    width, height = request.tier.dimensions
-    relative_centers = np.asarray(relative_centers_x2, dtype=np.float64) / 2
-    raster_power = _resample_power(
-        power,
-        frame_centers=relative_centers,
-        context_frames=request.context.frame_count,
-        frequencies=frequencies,
-        frequency_min=float(plan.frequency_min_hz),
-        frequency_max=float(plan.frequency_max_hz),
+    raster = rasterize_spectrogram(
+        spectral,
         width=width,
         height=height,
-    )
-    band_peak = float(np.max(power[populated])) if populated.any() else 0.0
-    relative_db = _relative_db(
-        raster_power,
-        request.settings.contrast_db,
-        peak=band_peak,
+        frequency_min_hz=plan.frequency_min_hz,
+        frequency_max_hz=plan.frequency_max_hz,
+        contrast_db=request.settings.contrast_db,
+        palette=request.settings.palette.value,
     )
     metadata = SpectrogramMetadata(
         algorithm_version=request.algorithm_version,
@@ -340,17 +157,12 @@ def render_spectrogram(
         requested_window_samples=plan.requested_window_samples,
         n_fft=plan.n_fft,
         hop_samples=plan.hop_samples,
-        window_function=(
-            "symmetric-hann" if plan.window_samples >= 3 else "short-clip-rectangular"
-        ),
-        frame_centers_x2=tuple(
-            center + 2 * request.context.context_start_frame
-            for center in relative_centers_x2
-        ),
-        frequency_centers_hz=tuple(float(value) for value in populated_centers),
-        frequency_edges_hz=frequency_edges,
-        frequency_min_hz=float(plan.frequency_min_hz),
-        frequency_max_hz=float(plan.frequency_max_hz),
+        window_function=spectral.window_function,
+        frame_centers_x2=raster.frame_centers_x2,
+        frequency_centers_hz=raster.frequency_centers_hz,
+        frequency_edges_hz=raster.frequency_edges_hz,
+        frequency_min_hz=raster.frequency_min_hz,
+        frequency_max_hz=raster.frequency_max_hz,
         width=width,
         height=height,
         tier=request.tier,
@@ -367,19 +179,14 @@ def render_spectrogram(
         content_key=spectrogram_content_key(request),
         width=width,
         height=height,
-        rgb_bytes=_apply_palette(
-            relative_db,
-            request.settings.contrast_db,
-            request.settings.palette,
-        ),
-        relative_db_f32=np.asarray(relative_db, dtype="<f4").tobytes(order="C"),
+        rgb_bytes=raster.rgb_bytes,
+        relative_db_f32=raster.relative_db_f32_bytes,
         metadata=metadata,
     )
 
 
 __all__ = [
     "SpectrogramRenderRequest",
-    "calculate_stft_power",
     "render_spectrogram",
     "spectrogram_content_key",
 ]

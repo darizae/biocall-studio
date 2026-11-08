@@ -9,8 +9,8 @@ description = "Native bioacoustics workspace for model training and call detecti
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
 dependencies = [
-  "bioacoustics-dl-toolbox[rf]==0.2.0",
-  "alp-ui==0.1.0a0",
+  "bioacoustics-dl-toolbox[rf]==0.3.0",
+  "alp-ui==0.1.0a1",
   "joblib>=1.4,<2",
   "numpy>=2,<3",
   "PySide6-Addons>=6.11,<6.12",
@@ -50,7 +50,11 @@ extend-exclude = ["tests/data"]
 select = ["E", "F", "I", "UP"]
 
 [tool.biocall-studio.science]
-bioacoustics-dl-toolbox-version = "0.2.0"
-bioacoustics-dl-toolbox-revision = "22c1b342918b33c62288f23b660aa716f3e361e6"
-alp-ui-version = "0.1.0a0"
-alp-ui-revision = "8cdc91f56005fcd0f3c4004b66016b3d237a10c3"
+bioacoustics-dl-toolbox-version = "0.3.0"
+bioacoustics-dl-toolbox-revision = "7027bd84cc5a44a27bf201332af540f090c38365"
+bioacoustics-dl-toolbox-wheel-url = "https://github.com/darizae/bioacoustics-dl-toolbox/releases/download/v0.3.0/bioacoustics_dl_toolbox-0.3.0-py3-none-any.whl"
+bioacoustics-dl-toolbox-wheel-sha256 = "c0f7679cbf788c2900eff26b8db719941a513fc96b5f28348e2838c8df595b28"
+alp-ui-version = "0.1.0a1"
+alp-ui-revision = "41bac72971b96d352da752cc0ff140afe3ac312a"
+alp-ui-wheel-url = "https://github.com/darizae/alp-ui/releases/download/v0.1.0a1/alp_ui-0.1.0a1-py3-none-any.whl"
+alp-ui-wheel-sha256 = "20590366d06591837c2567df1191b472b9db494e5440ce3a3fadfbf1b8d53d6c"

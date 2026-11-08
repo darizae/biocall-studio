@@ -8,10 +8,16 @@ on:
 permissions:
   contents: read
 
+# B1 changes are tested only with focused regressions. The complete Studio
+# unit/integration qualification remains reserved for the final release gate.
+env:
+  B1_FOCUSED: ${{ (github.event_name == 'pull_request' && github.head_ref == 'feat/biocall-01-released-spectrogram') || (github.event_name == 'push' && contains(github.event.head_commit.message, 'feat/biocall-01-released-spectrogram')) }}
+  QT_QPA_PLATFORM: offscreen
+
 jobs:
   unit:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     strategy:
       matrix:
         python-version: ['3.11', '3.12', '3.13']
@@ -22,10 +28,104 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: python -m pip install -e '.[test]'
-      - run: python scripts/verify_handoff.py
-      - run: python scripts/check_fixtures.py
-      - run: python -m pytest -q tests/unit
-      - run: python -m ruff check src tests scripts
-      - run: python -m ruff format --check src tests scripts
-      - run: python scripts/audit_test_ids.py
+      - name: Install Linux libraries for offscreen Qt imports
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libxkbcommon-x11-0 libpulse0
+      - name: Download published upstream release wheels
+        env:
+          # Standard Studio Actions token; only public upstream releases are read.
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .release-wheels
+          # Use the GitHub release API rather than the browser asset URL.
+          gh release download v0.1.0a1 \
+            --repo darizae/alp-ui \
+            --pattern 'alp_ui-0.1.0a1-py3-none-any.whl' \
+            --dir .release-wheels
+          gh release download v0.3.0 \
+            --repo darizae/bioacoustics-dl-toolbox \
+            --pattern 'bioacoustics_dl_toolbox-0.3.0-py3-none-any.whl' \
+            --dir .release-wheels
+          python - <<'PY'
+          import hashlib
+          import tomllib
+          from pathlib import Path
+
+          science = tomllib.loads(Path("pyproject.toml").read_text())["tool"]["biocall-studio"]["science"]
+          for project, version, filename in (
+              ("alp-ui", "0.1.0a1", "alp_ui-0.1.0a1-py3-none-any.whl"),
+              ("bioacoustics-dl-toolbox", "0.3.0", "bioacoustics_dl_toolbox-0.3.0-py3-none-any.whl"),
+          ):
+              assert science[f"{project}-version"] == version
+              assert science[f"{project}-wheel-url"] == (
+                  f"https://github.com/darizae/{project}/releases/download/v{version}/{filename}"
+              )
+              wheel = Path(".release-wheels") / filename
+              digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
+              assert digest == science[f"{project}-wheel-sha256"], f"{project} wheel SHA-256 mismatch"
+              print(f"Verified {project}=={version}, sha256:{digest}")
+          PY
+      - name: Install verified non-editable upstream wheels and Studio dependencies
+        shell: bash
+        run: |
+          python -m pip install --no-deps \
+            .release-wheels/alp_ui-0.1.0a1-py3-none-any.whl \
+            .release-wheels/bioacoustics_dl_toolbox-0.3.0-py3-none-any.whl
+          # The focused spectrogram/Qt tests do not need CUDA. Preinstall an
+          # official CPU-only wheel to avoid downloading multi-GB GPU runtimes.
+          python -m pip install --no-deps \
+            --index-url https://download.pytorch.org/whl/cpu 'torch==2.9.1+cpu'
+          python -m pip install -e '.[test,integration]'
+          python -m pip check
+          python - <<'PY'
+          from importlib import metadata, util
+          from pathlib import Path
+
+          for distribution, import_name, version in (
+              ("alp-ui", "alp_ui", "0.1.0a1"),
+              ("bioacoustics-dl-toolbox", "bioacoustics_dl_toolbox", "0.3.0"),
+          ):
+              assert metadata.version(distribution) == version
+              spec = util.find_spec(import_name)
+              assert spec is not None and spec.origin is not None
+              assert "site-packages" in Path(spec.origin).resolve().parts
+              print(f"{distribution}=={version}: {spec.origin}")
+          from bioacoustics_dl_toolbox.visualization.spectrogram import (
+              calculate_stft_power,
+              rasterize_spectrogram,
+          )
+          assert callable(calculate_stft_power) and callable(rasterize_spectrogram)
+          PY
+      - name: Focused B1 spectrogram unit and affected integration regressions
+        if: ${{ env.B1_FOCUSED == 'true' }}
+        run: >-
+          python -m pytest -q
+          tests/unit/test_review_spectrograms.py
+          tests/integration/test_review_audio_spectrogram.py
+          tests/integration/test_review_cache_generation.py
+      - name: Focused B1 lint and format checks
+        if: ${{ env.B1_FOCUSED == 'true' }}
+        run: |
+          python -m ruff check src/biocall_studio/review/workflows/spectrograms.py tests/unit/test_review_spectrograms.py
+          python -m ruff format --check src/biocall_studio/review/workflows/spectrograms.py tests/unit/test_review_spectrograms.py
+      - name: Verify ordinary handoffs
+        if: ${{ env.B1_FOCUSED != 'true' }}
+        run: python scripts/verify_handoff.py
+      - name: Verify fixtures
+        if: ${{ env.B1_FOCUSED != 'true' }}
+        run: python scripts/check_fixtures.py
+      - name: Ordinary unit regressions (not the B1 PR)
+        if: ${{ env.B1_FOCUSED != 'true' }}
+        run: python -m pytest -q tests/unit
+      - name: Ordinary lint (not the B1 PR)
+        if: ${{ env.B1_FOCUSED != 'true' }}
+        run: python -m ruff check src tests scripts
+      - name: Ordinary format (not the B1 PR)
+        if: ${{ env.B1_FOCUSED != 'true' }}
+        run: python -m ruff format --check src tests scripts
+      - name: Ordinary test-ID audit (not the B1 PR)
+        if: ${{ env.B1_FOCUSED != 'true' }}
+        run: python scripts/audit_test_ids.py
