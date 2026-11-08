@@ -1,0 +1,161 @@
+name: B4 native Windows x64 installer (manual, unpublished)
+
+on:
+  workflow_dispatch:
+    inputs:
+      studio_release_sha:
+        description: Full 40-character frozen main commit SHA
+        required: true
+        type: string
+      local_suite_passed:
+        description: Confirm local Mac prompt 11 passed at this SHA
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  native-windows-x64:
+    runs-on: windows-2025
+    timeout-minutes: 120
+    env:
+      STUDIO_RELEASE_SHA: ${{ inputs.studio_release_sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Require main dispatch, exact SHA, and completed local Mac gate
+        shell: pwsh
+        env:
+          DISPATCH_REF: ${{ github.ref }}
+          LOCAL_SUITE_PASSED: ${{ inputs.local_suite_passed }}
+        run: |
+          if ($env:DISPATCH_REF -ne 'refs/heads/main') { throw 'Only dispatch from main.' }
+          if ($env:STUDIO_RELEASE_SHA -cnotmatch '^[a-f0-9]{40}$') { throw 'Expected full lowercase SHA.' }
+          if ($env:LOCAL_SUITE_PASSED -ne 'true') { throw 'First complete local Mac prompt 11.' }
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.studio_release_sha }}
+          fetch-depth: 0
+          lfs: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Check native x64 runner and frozen current main
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/biocall-evidence" | Out-Null
+          git fetch --no-tags origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot fetch main.' }
+          if ((git rev-parse HEAD).Trim() -cne $env:STUDIO_RELEASE_SHA) { throw 'Wrong checkout SHA.' }
+          if ((git rev-parse FETCH_HEAD).Trim() -cne $env:STUDIO_RELEASE_SHA) { throw 'main advanced since the local gate; requalify.' }
+          if (git status --porcelain) { throw 'Frozen checkout is dirty.' }
+          if (-not [Environment]::Is64BitOperatingSystem -or -not [Environment]::Is64BitProcess) { throw 'Native Windows x64 required.' }
+          python -c "import sys,platform; assert sys.version_info[:2] == (3,12) and platform.architecture()[0] == '64bit'"
+          if ($LASTEXITCODE -ne 0) { throw 'Python 3.12 x64 required.' }
+          [pscustomobject]@{ sha=$env:STUDIO_RELEASE_SHA; os=(Get-CimInstance Win32_OperatingSystem).Caption; python=(python --version); arch=$env:PROCESSOR_ARCHITECTURE; image=$env:ImageVersion; local_mac_gate='owner-confirmed only, not CI-proven' } | ConvertTo-Json | Set-Content "$env:RUNNER_TEMP/biocall-evidence/runner.json"
+      - name: Verify approved upstream annotated tag targets
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pins = python -c "import json,tomllib; print(json.dumps(tomllib.load(open('pyproject.toml','rb'))['tool']['biocall-studio']['science']))" | ConvertFrom-Json
+          foreach ($upstream in @(@('alp-ui','0.1.0a1'), @('bioacoustics-dl-toolbox','0.3.0'))) {
+            $name = $upstream[0]; $version = $upstream[1]
+            $tag = gh api "repos/darizae/$name/git/ref/tags/v$version" | ConvertFrom-Json
+            if ($LASTEXITCODE -ne 0) { throw "Cannot retrieve $name tag." }
+            $obj = $tag.object
+            while ($obj.type -eq 'tag') {
+              $obj = (gh api "repos/darizae/$name/git/tags/$($obj.sha)" | ConvertFrom-Json).object
+              if ($LASTEXITCODE -ne 0) { throw "Cannot resolve $name annotated tag." }
+            }
+            if ($obj.type -ne 'commit' -or $obj.sha -cne $pins."$name-revision") { throw "$name tag mismatch." }
+            "$name v$version $($obj.sha)" | Out-File "$env:RUNNER_TEMP/biocall-evidence/upstream-tags.txt" -Append
+          }
+      - name: Require existing Inno Setup 6 on windows-2025
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+          if (-not $iscc) {
+            foreach ($candidate in @("${env:ProgramFiles(x86)}\Inno Setup 6", "$env:ProgramFiles\Inno Setup 6")) {
+              if (Test-Path (Join-Path $candidate 'ISCC.exe')) {
+                $candidate | Out-File $env:GITHUB_PATH -Append -Encoding utf8
+                $iscc = Get-Item (Join-Path $candidate 'ISCC.exe')
+                break
+              }
+            }
+          }
+          if (-not $iscc) { throw 'Inno Setup 6 compiler missing.' }
+          $installed = choco list --limit-output
+          if ($LASTEXITCODE -ne 0 -or -not ($installed | Select-String '^innosetup\|6\.')) { throw 'Inno Setup 6 version not verified.' }
+          $installed | Select-String '^innosetup\|' | Out-File "$env:RUNNER_TEMP/biocall-evidence/inno-version.txt"
+      - name: Build genuine Windows PyInstaller binaries and Inno installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Start-Transcript "$env:RUNNER_TEMP/biocall-evidence/build.log"
+          try {
+            & ./packaging/windows/build.ps1
+            if ($LASTEXITCODE -ne 0) { throw 'Windows native build failed.' }
+            python packaging/shared/verify_inputs.py --frozen --wheelhouse build/release-wheels | Out-File "$env:RUNNER_TEMP/biocall-evidence/provenance.json"
+            if ($LASTEXITCODE -ne 0) { throw 'Upstream published wheel hash/origin verification failed.' }
+          } finally { Stop-Transcript }
+      - name: Install and test actual installed GUI/Workers then uninstall
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Start-Transcript "$env:RUNNER_TEMP/biocall-evidence/installed-smoke.log"
+          try {
+            $installer = Get-ChildItem dist/native-windows-installer/*.exe | Select-Object -First 1
+            if (-not $installer) { throw 'Missing installer.' }
+            $installed = Join-Path $env:RUNNER_TEMP 'BioCall Studio Installed'
+            $data = Join-Path $env:RUNNER_TEMP 'preserved-user-data'
+            New-Item -ItemType Directory -Force $data | Out-Null
+            'preserve' | Set-Content (Join-Path $data 'marker.txt')
+            $arguments = @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-',"/DIR=$installed","/LOG=$env:RUNNER_TEMP/biocall-evidence/install.log")
+            $result = Start-Process $installer.FullName -ArgumentList $arguments -Wait -PassThru
+            if ($result.ExitCode -ne 0) { throw "Installer exit $($result.ExitCode)" }
+            foreach ($file in @('BioCall Studio.exe','BioCall Studio Worker.exe','unins000.exe')) {
+              if (-not (Test-Path (Join-Path $installed $file))) { throw "Missing installed $file" }
+            }
+            & ./packaging/windows/smoke.ps1 $installed | Out-File "$env:RUNNER_TEMP/biocall-evidence/native-smoke.txt"
+            if ($LASTEXITCODE -ne 0) { throw 'Existing installed native smoke failed.' }
+            python packaging/windows/installed_positive_smoke.py --worker (Join-Path $installed 'BioCall Studio Worker.exe') --external-root $env:RUNNER_TEMP --receipt "$env:RUNNER_TEMP/biocall-evidence/positive-worker.json"
+            if ($LASTEXITCODE -ne 0) { throw 'Successful installed Worker Dataset check failed.' }
+            for ($i=0; $i -lt 2; $i++) {
+              $app = Start-Process (Join-Path $installed 'BioCall Studio.exe') -ArgumentList @('--settings-dir', $data) -WorkingDirectory $env:RUNNER_TEMP -PassThru
+              Start-Sleep -Seconds 7
+              if ($app.HasExited) { throw "Installed GUI failed to start/restart." }
+              Stop-Process -Id $app.Id -Force
+              $app.WaitForExit()
+              if ((Get-Content (Join-Path $data 'marker.txt') -Raw).Trim() -ne 'preserve') { throw 'Data was modified.' }
+            }
+            $uninstall = Start-Process (Join-Path $installed 'unins000.exe') -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/LOG=$env:RUNNER_TEMP/biocall-evidence/uninstall.log") -PassThru -Wait
+            if ($uninstall.ExitCode -ne 0) { throw "Uninstall exit $($uninstall.ExitCode)" }
+            Start-Sleep -Seconds 3
+            if (Test-Path (Join-Path $installed 'BioCall Studio.exe')) { throw 'Application was not removed.' }
+            if ((Get-Content (Join-Path $data 'marker.txt') -Raw).Trim() -ne 'preserve') { throw 'Uninstall modified external data.' }
+            'Installed GUI startup twice, positive Dataset worker, uninstall binary removal, and data marker checks passed; interactive GUI, Review export, signing, safe quit remain unqualified.' | Out-File "$env:RUNNER_TEMP/biocall-evidence/boundary.txt"
+          } finally { Stop-Transcript }
+      - name: Capture installer SHA-256, signing status, wheel environment
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/biocall-evidence" | Out-Null
+          foreach ($f in @(Get-ChildItem dist/native-windows-installer/*.exe -ErrorAction SilentlyContinue)) {
+            [pscustomobject]@{ name=$f.Name; sha256=(Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); authenticode=(Get-AuthenticodeSignature $f.FullName).Status.ToString(); published=$false } | ConvertTo-Json | Out-File "$env:RUNNER_TEMP/biocall-evidence/installer.json" -Append
+          }
+          git rev-parse HEAD | Out-File "$env:RUNNER_TEMP/biocall-evidence/checkout.txt"
+      - name: Upload unpublished installer and complete logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: unpublished-windows-x64-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            dist/native-windows-installer/*.exe
+            build/windows-installed-python-freeze.txt
+            ${{ runner.temp }}\biocall-evidence\
+          if-no-files-found: warn
+          retention-days: 14
