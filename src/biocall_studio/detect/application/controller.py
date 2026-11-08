@@ -85,7 +85,6 @@ from biocall_studio.detect.persistence.diagnostics import (
 from biocall_studio.detect.persistence.export_history import ExportHistoryStore
 from biocall_studio.detect.persistence.runs import DetectRunRepository
 from biocall_studio.detect.workflows.exports import verify_export_directory
-from biocall_studio.shared.worker_launch import worker_command
 from biocall_studio.shared.storage import (
     CapacityObservation,
     StorageEstimate,
@@ -94,6 +93,7 @@ from biocall_studio.shared.storage import (
     require_storage_admission,
     storage_input_digest,
 )
+from biocall_studio.shared.worker_launch import worker_command
 
 
 class InventoryState(StrEnum):

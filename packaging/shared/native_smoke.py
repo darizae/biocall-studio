@@ -86,7 +86,8 @@ def check(gui: Path, worker: Path, root: Path) -> dict[str, object]:
                 if response.returncode == 0:
                     raise AssertionError(f"{mode} accepted malformed request")
                 combined = response.stdout + response.stderr
-                if any(s in combined for s in ("ModuleNotFoundError", "ImportError", "DLL load failed", "No module named")):
+                missing = ("ModuleNotFoundError", "ImportError", "DLL load failed", "No module named")
+                if any(message in combined for message in missing):
                     raise AssertionError(f"Missing bundled module in {mode}: {combined[-1200:]}")
                 results[mode] = response.returncode
 
@@ -123,7 +124,10 @@ def check(gui: Path, worker: Path, root: Path) -> dict[str, object]:
             "worker_malformed_request_exit_codes": results,
             "gui_startup_survived_seconds": 6,
             "isolated_user_data_outside_bundle": True,
-            "qualification": "minimal native binary smoke only; no scientific output, safe quit or uninstall proof",
+            "qualification": (
+                "minimal native binary smoke only; "
+                "no scientific output, safe quit or uninstall proof"
+            ),
         }
 
 

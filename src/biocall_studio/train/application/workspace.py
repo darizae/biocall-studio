@@ -9,7 +9,6 @@ from threading import Event
 
 from PySide6.QtCore import QObject, QProcess, QStandardPaths, QThread, QTimer, Signal
 
-from biocall_studio.shared.worker_launch import worker_command
 from biocall_studio.shared.storage import (
     CapacityObservation,
     StorageEstimate,
@@ -17,6 +16,7 @@ from biocall_studio.shared.storage import (
     query_filesystem_capacity,
     require_storage_admission,
 )
+from biocall_studio.shared.worker_launch import worker_command
 from biocall_studio.train.application.collection_scan import (
     CollectionScanCancelled,
     ScanProgress,
