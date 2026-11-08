@@ -18,7 +18,6 @@ from biocall_studio.review.domain.spectrograms import (
     SPECTROGRAM_ALGORITHM_VERSION,
     SPECTROGRAM_RENDER_VERSION,
     CandidateContext,
-    Palette,
     SpectrogramImageTier,
     SpectrogramMetadata,
     SpectrogramRaster,
