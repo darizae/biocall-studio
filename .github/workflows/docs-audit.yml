@@ -1,0 +1,28 @@
+name: Documentation and provenance audit
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  docs-b2:
+    if: ${{ (github.event_name == 'pull_request' && github.head_ref == 'docs/biocall-02-human-readme') || (github.event_name == 'push' && contains(github.event.head_commit.message, 'docs/biocall-02-human-readme')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check local links, images, brand and genuine metadata
+        run: python scripts/audit_docs.py
+      - name: Check stable test-ID index mapping without importing tests
+        run: python scripts/audit_test_ids.py
+      - name: Check docs code compiles
+        run: python -m py_compile scripts/audit_docs.py
