@@ -5,6 +5,7 @@ Open [AGENTS.md](../../AGENTS.md) and the exact active contract only. Verify `ma
 | Need | Owning route |
 |---|---|
 | Product identity and user journey | [Vision](../VISION.md), [README](../../README.md), [architecture](../ARCHITECTURE.md) |
+| Public README content and presentation | [README-writing skill](readme-writing/SKILL.md), [real screenshot gallery](../design/evidence/release-real-data/README.md), [developer setup](../DEVELOPMENT.md) |
 | Train Collection, Dataset, Models | [workflow rules](../models/WORKFLOW_RULES.md), [model export](../science/MODEL_EXPORT_CONTRACT.md), [training catalog](../science/TRAINING_CONFIGURATION_CATALOG.md), owning Train source/tests |
 | Detect inference/results | [Detect contract](../PREDICTION.md), [model export](../science/MODEL_EXPORT_CONTRACT.md), owning Detect source/tests |
 | Review sessions/labels/export | [Review contract and decision table](../specs/review/README.md), [spectrogram decisions](../specs/review/SPECTROGRAM_DECISIONS.md), Review source/tests |
