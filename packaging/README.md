@@ -39,7 +39,7 @@ Do not change Studio source after freeze, run the complete suite, tag or release
   `BioCall Studio.exe` for the GUI and console
   `BioCall Studio Worker.exe` for QProcess JSON stdout/stderr.
 
-## Native lanes — only after A's merge and frozen SHA
+## Native lanes — after A's merge, source freeze and the local spec 05 suite
 
 | Genuine runner | Build and artifact | Installed preflight |
 |---|---|---|
@@ -84,6 +84,8 @@ qualification, including repeated complete science retraining, UI galleries,
 soaks and hard performance runs. The approved November 2026 **spec 04**
 reduces this stage to small native smoke and excludes new screenshots or
 full retraining, without relaxing real install, worker/runtime, data ownership,
-licenses, signatures or artifact hashes. The **one full Studio source suite,
-tag and promotion belong to spec 05**. A native source defect triggers a
-new reviewed fix PR, a new frozen SHA and **both** OS builds repeated.
+licenses, signatures or artifact hashes. The **one full Studio source suite runs first and locally under spec 05**.
+Only then run both genuine native installer lanes (spec 04). The **tag,
+publication and post-release Markdown retirement belong to spec 06**.
+A native source defect triggers a new reviewed fix PR, a new frozen SHA,
+a new **local spec 05 suite**, and **both** OS builds repeated.
