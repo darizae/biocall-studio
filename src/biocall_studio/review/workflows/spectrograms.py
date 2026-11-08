@@ -7,7 +7,6 @@ import json
 from dataclasses import asdict, dataclass
 
 import numpy as np
-
 from bioacoustics_dl_toolbox.visualization.spectrogram import (
     calculate_stft_power,
     rasterize_spectrogram,
