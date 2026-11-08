@@ -1,7 +1,6 @@
 """Collection selection, background Scan, and machine-local verified binding."""
 
 import logging
-import sys
 import time
 import uuid
 from collections.abc import Callable
@@ -17,6 +16,7 @@ from biocall_studio.shared.storage import (
     query_filesystem_capacity,
     require_storage_admission,
 )
+from biocall_studio.shared.worker_launch import worker_command
 from biocall_studio.train.application.collection_scan import (
     CollectionScanCancelled,
     ScanProgress,
@@ -792,12 +792,7 @@ class WorkspaceController(QObject):
         )
 
     def _worker_command(self, arguments: list[str]) -> tuple[str, list[str]]:
-        return (
-            sys.executable,
-            arguments
-            if getattr(sys, "frozen", False)
-            else ["-m", "biocall_studio", *arguments],
-        )
+        return worker_command(arguments)
 
     def cancel_active_run(self) -> None:
         state = self._active_run

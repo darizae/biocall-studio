@@ -1,5 +1,8 @@
 # 07 — Controlled Windows BioCall Studio installer and native qualification
 
+**Active November 2026 reduced scope:** [Spec 04](release-preparation-2026-11/04-installer-gates.md) supersedes this historical full-qualification/gallery scope for the alpha. Merge ONE Mac+Windows packaging PR, then build Windows from the SAME untagged frozen main SHA as macOS. Validate an actual installed x86-64 Inno Setup installer and small worker/load/export/restart/uninstall smokes; no full retraining or new gallery. ICO, private Worker stdout, per-user data, legal/signature gates and real installer SHA-256 remain required. Spec 05 owns the complete local source suite and tag/release.
+
+
 **Status:** revised by ST-11; Windows freezing, installer production, signing, clean-machine tests
 and publication are **deferred** to a separately approved packaging stage. macOS or offscreen Qt
 evidence cannot satisfy this specification.

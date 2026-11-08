@@ -1,0 +1,88 @@
+name: B4 installer packaging-source focused gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  installer-source:
+    if: ${{ (github.event_name == 'pull_request' && github.head_ref == 'release/biocall-v0.1.0a1-installers') || (github.event_name == 'push' && contains(github.event.head_commit.message, 'release/biocall-v0.1.0a1-installers')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Linux offscreen Qt prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libxkbcommon-x11-0 libpulse0
+      - name: Install pinned freezer and source-build tools
+        run: |
+          python -m pip install -r packaging/requirements-build.txt
+          python -m pip install 'pytest>=8.4,<10' 'ruff>=0.14,<1'
+      - name: Fetch exact published upstream assets, not siblings
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/release-wheels
+          gh release download v0.1.0a1 --repo darizae/alp-ui --pattern 'alp_ui-0.1.0a1-py3-none-any.whl' --dir build/release-wheels
+          gh release download v0.3.0 --repo darizae/bioacoustics-dl-toolbox --pattern 'bioacoustics_dl_toolbox-0.3.0-py3-none-any.whl' --dir build/release-wheels
+      - name: Build and install only the Studio wheel with real upstream artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --no-deps build/release-wheels/*.whl
+          python -m pip install --no-deps --index-url https://download.pytorch.org/whl/cpu 'torch==2.9.1+cpu'
+          python -m build --wheel --outdir build/source-dist
+          python -m pip install -c packaging/constraints-native.txt build/source-dist/biocall_studio-0.1.0a1-*.whl
+          python -m pip check
+      - name: Verify version, published wheel hashes, noneditable origins and icons
+        run: python packaging/shared/verify_inputs.py --wheelhouse build/release-wheels
+      - name: Validate PyInstaller module resource inventory without freezing OS installers
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, str(Path("packaging/shared").resolve()))
+          from freezer import collect_bundle, WORKER_ENTRYPOINTS
+          data, hidden = collect_bundle()
+          paths = {dest + "/" + Path(src).name for src, dest in data}
+          required = (
+              "biocall_studio/resources/branding/icon-256.png",
+              "biocall_studio/resources/branding/icon.icns",
+              "biocall_studio/resources/branding/icon.ico",
+              "biocall_studio/resources/legal/THIRD_PARTY_NOTICES.md",
+              "biocall_studio/train/data/TRAINING_CONFIGURATION_FIELDS.json",
+              "alp_ui/theme/resources/fonts/DM-Sans-OFL.txt",
+              "alp_ui/theme/resources/fonts/JetBrains-Mono-OFL.txt",
+          )
+          for path in required:
+              assert path in paths, f"Frozen resources omit {path}"
+          for worker in WORKER_ENTRYPOINTS:
+              assert worker in hidden, f"Missing Worker module: {worker}"
+          assert any("license" in x.lower() for x in paths), "Upstream legal files missing"
+          print(f"PyInstaller preflight: {len(data)} data files, {len(hidden)} hidden imports; native freezer not run")
+          PY
+      - name: Only focused new packaging and retained CLI/package regressions
+        run: python -m pytest -q tests/unit/test_installer_packaging.py tests/unit/test_cli.py tests/integration/test_training_packaging.py
+      - name: Static checks for changed source, native scripts and docs links
+        run: |
+          python -m compileall -q packaging/shared src/biocall_studio/shared/worker_launch.py
+          python -m ruff check packaging/shared tests/unit/test_installer_packaging.py src/biocall_studio/shared/worker_launch.py src/biocall_studio/train/application/workspace.py src/biocall_studio/detect/application/controller.py
+          python -m ruff format --check packaging/shared tests/unit/test_installer_packaging.py src/biocall_studio/shared/worker_launch.py
+          python scripts/audit_docs.py
+      - name: Stage boundary
+        run: echo 'B4A packaging source only; Linux is not Mac/Windows installer qualification. No full suite, freeze, native build, tag or release.'

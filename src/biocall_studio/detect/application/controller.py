@@ -93,6 +93,7 @@ from biocall_studio.shared.storage import (
     require_storage_admission,
     storage_input_digest,
 )
+from biocall_studio.shared.worker_launch import worker_command
 
 
 class InventoryState(StrEnum):
@@ -1840,10 +1841,7 @@ class DetectWorkspaceController(QObject):
             "--worker-step-delay",
             str(self._worker_step_delay_seconds),
         ]
-        return (
-            sys.executable,
-            arguments if getattr(sys, "frozen", False) else ["-m", "biocall_studio", *arguments],
-        )
+        return worker_command(arguments)
 
     def _cache_run(self, record: DetectRunRecord, *, persist: bool = True) -> None:
         repository = self._run_repository

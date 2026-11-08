@@ -1,5 +1,8 @@
 # Controlled BioCall Studio native releases
 
+**Active November 2026 override:** [Spec 04](specs/release-preparation-2026-11/04-installer-gates.md) and [VERSION_CONTROL](specs/release-preparation-2026-11/VERSION_CONTROL.md) supersede the older tag-first/full-installed-science requirements below for this alpha. Merge ONE reviewed Mac+Windows packaging PR first; then freeze an untagged main SHA for both genuine native installers. Spec 04 uses small installed worker/load/export/restart/uninstall smokes, not new UI galleries or full retraining. Spec 05 alone owns the complete local Studio source suite and any tag/Release. License/signing, data preservation and actual installer SHA-256 remain non-negotiable.
+
+
 **Status (2026-11-08):** this is the release gate, not a release record. Train, Detect and Review source workflows are implemented on `main`; Studio's final local suite and native installers are **not** qualified. No installer was built,
 installed, signed, notarized, uploaded or promoted. All `IT-MAC-*`, `IT-WIN-*` and installed
 `IT-E2E-*` checks remain deferred until a separately approved packaging stage executes
