@@ -10,10 +10,7 @@ import argparse
 import hashlib
 import importlib.metadata as metadata
 import importlib.util
-import io
 import json
-import os
-import sys
 import tarfile
 import tomllib
 import zipfile
