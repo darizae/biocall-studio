@@ -1,6 +1,6 @@
 # Review prototype acceptance checklist
 
-**Gate:** owner inspection is pending. This is a **browser design/prototype audit**, not a declaration that RV-01–RV-08 or native `alp-ui` GUI tests have passed. Native Review remains unimplemented.
+**Gate:** owner inspection is pending. This is a **browser design/prototype audit**, not a declaration that RV-01–RV-08 or native `alp-ui` GUI tests have passed. At the time of this historical prototype audit, native Review had not been implemented. It is now present on Studio `main`; that later source implementation does **not** retroactively turn browser prototype checks into owner-approved native or installed-app proof.
 
 ## Investigation baseline
 

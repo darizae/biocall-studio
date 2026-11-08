@@ -8,7 +8,7 @@ evidence cannot satisfy this specification.
 
 On a clean supported Windows x86-64 machine, a non-developer installs one versioned **BioCall
 Studio** `.exe`, opens the Studio launchpad, runs real Train and Detect workflows, restarts/relinks
-and uninstalls cleanly. Review remains an explicit placeholder. No Python, venv, source checkout,
+and uninstalls cleanly. Review is source-implemented; actual installed Windows Review sessions, spectrogram/audio and export behavior still require platform qualification. No Python, venv, source checkout,
 shell, network access or sibling repository is required.
 
 The package includes Qt/`alp-ui`, fonts, icons and every Train Dataset/CNN/RF and Detect CNN/RF
