@@ -12,6 +12,7 @@ from bioacoustics_dl_toolbox.visualization.spectrogram import (
     calculate_stft_power,
     rasterize_spectrogram,
 )
+
 from biocall_studio.review.domain.intake import EligibleCandidate
 from biocall_studio.review.domain.sessions import DEFAULT_PRESET_ID, SpectrogramSettingsSnapshot
 from biocall_studio.review.domain.spectrograms import (
