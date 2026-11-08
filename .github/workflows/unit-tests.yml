@@ -11,7 +11,7 @@ permissions:
 # B1 changes are tested only with focused regressions. The complete Studio
 # unit/integration qualification remains reserved for the final release gate.
 env:
-  B1_FOCUSED: ${{ github.event_name == 'pull_request' && github.head_ref == 'feat/biocall-01-released-spectrogram' }}
+  B1_FOCUSED: ${{ (github.event_name == 'pull_request' && github.head_ref == 'feat/biocall-01-released-spectrogram') || (github.event_name == 'push' && contains(github.event.head_commit.message, 'feat/biocall-01-released-spectrogram')) }}
   QT_QPA_PLATFORM: offscreen
 
 jobs:
