@@ -1,0 +1,62 @@
+name: B3 provisional release-candidate focused gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  candidate:
+    if: ${{ (github.event_name == 'pull_request' && github.head_ref == 'release/biocall-v0.1.0a1-candidate') || (github.event_name == 'push' && contains(github.event.head_commit.message, 'release/biocall-v0.1.0a1-candidate')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Linux offscreen Qt libraries
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libegl1 libopengl0 libxkbcommon-x11-0 libpulse0
+      - name: Download exact published upstream release wheels
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .release-wheels
+          gh release download v0.1.0a1 --repo darizae/alp-ui --pattern 'alp_ui-0.1.0a1-py3-none-any.whl' --dir .release-wheels
+          gh release download v0.3.0 --repo darizae/bioacoustics-dl-toolbox --pattern 'bioacoustics_dl_toolbox-0.3.0-py3-none-any.whl' --dir .release-wheels
+      - name: Install wheelhouse and focused source dependencies
+        run: |
+          python -m pip install --no-deps .release-wheels/alp_ui-0.1.0a1-py3-none-any.whl .release-wheels/bioacoustics_dl_toolbox-0.3.0-py3-none-any.whl
+          python -m pip install --no-deps --index-url https://download.pytorch.org/whl/cpu 'torch==2.9.1+cpu'
+          python -m pip install 'build>=1.3,<2'
+          python -m pip install -e '.[test,integration]'
+          python -m pip check
+      - name: Build provisional Studio source and wheel archives (not installers)
+        run: python -m build --sdist --wheel --outdir dist
+      - name: Inspect wheelhouse SHA-256, import origins, archive resources and private modes
+        run: python scripts/verify_release_candidate.py --dist dist --wheelhouse .release-wheels
+      - name: Focused packaging, CLI and handoff regressions only
+        run: python -m pytest -q tests/unit/test_cli.py tests/unit/test_handoff_audit.py tests/integration/test_training_packaging.py
+      - name: Audit fixtures, handoff, indexed tests and documentation
+        run: |
+          python scripts/check_fixtures.py
+          python scripts/verify_handoff.py
+          python scripts/audit_test_ids.py
+          python scripts/audit_docs.py
+      - name: Static Ruff check and formatting only
+        run: |
+          python -m ruff check src tests scripts
+          python -m ruff format --check src tests scripts
+      - name: Report provisional qualification boundary
+        run: echo 'B3 focused source candidate only; no full Studio suite, native installers, final source SHA, tag or publication.'
