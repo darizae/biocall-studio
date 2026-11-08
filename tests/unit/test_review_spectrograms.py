@@ -7,7 +7,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-
 from bioacoustics_dl_toolbox.visualization.spectrogram import (
     calculate_stft_power,
     rasterize_spectrogram,
