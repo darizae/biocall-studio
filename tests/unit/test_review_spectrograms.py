@@ -93,9 +93,10 @@ def test_context_clamps_exact_frames_and_preserves_one_coordinate_transform():
     assert odd.context_start_frame == 0
     assert odd.context_end_frame == 176_414
     assert odd.candidate_start_time_ns == 1_000_000_000
-    assert odd.context_end_time_ns == (
-        odd.context_end_frame * 1_000_000_000 + odd.sample_rate_hz // 2
-    ) // odd.sample_rate_hz
+    assert (
+        odd.context_end_time_ns
+        == (odd.context_end_frame * 1_000_000_000 + odd.sample_rate_hz // 2) // odd.sample_rate_hz
+    )
 
     with pytest.raises(ValueError, match="context"):
         plan_candidate_context(left_candidate, context_seconds=0)
@@ -169,13 +170,16 @@ def test_explicit_stft_matches_r_reference_and_keys_every_rendering_input():
         render_version=SPECTROGRAM_RENDER_VERSION,
         effective_settings=request.settings.to_mapping(),
     )
-    assert SpectrogramRenderRequest.from_snapshot(
-        candidate_id=candidate.candidate_id,
-        source_sha256=candidate.source_sha256,
-        context=context,
-        snapshot=snapshot,
-        tier=SpectrogramImageTier.THUMBNAIL,
-    ) == request
+    assert (
+        SpectrogramRenderRequest.from_snapshot(
+            candidate_id=candidate.candidate_id,
+            source_sha256=candidate.source_sha256,
+            context=context,
+            snapshot=snapshot,
+            tier=SpectrogramImageTier.THUMBNAIL,
+        )
+        == request
+    )
     legacy_snapshot = SpectrogramSettingsSnapshot.create(
         preset_id=DEFAULT_PRESET_ID,
         preset_name="Default",
