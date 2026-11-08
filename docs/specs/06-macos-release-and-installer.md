@@ -1,6 +1,6 @@
 # 06 — Controlled macOS BioCall Studio packaging and installable DMG
 
-**Active November 2026 reduced scope:** [Spec 04](release-preparation-2026-11/04-installer-gates.md) supersedes this historical full-qualification/gallery scope for the alpha. The ONE Mac+Windows packaging PR must merge before freezing the untagged main SHA. Install the genuine macOS .app/.dmg outside source and perform small worker/load/export/restart/uninstall smokes; no full retraining or new gallery. Developer ID/hardened runtime, notarization/stapling/Gatekeeper, licenses, source/data preservation and real artifact SHA-256 remain public-distribution gates. Spec 05 owns the full local source suite and tag/release.
+**Active November 2026 reduced scope:** the completed 2026-11 packaging work (preserved in Git history and the release tag) superseded this historical full-qualification/gallery scope for the alpha. The ONE Mac+Windows packaging PR merged before freezing the untagged main SHA. Install the genuine macOS .app/.dmg outside source and perform small worker/load/export/restart/uninstall smokes; no full retraining or new gallery. Developer ID/hardened runtime, notarization/stapling/Gatekeeper, licenses, source/data preservation and real artifact SHA-256 remain public-distribution gates. The shipped `v0.1.0a1` alpha provenance is in [release process](../RELEASE_PROCESS.md).
 
 
 **Status:** revised by ST-11; every installer, signing, notarization, clean-machine and

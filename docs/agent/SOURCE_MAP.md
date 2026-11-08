@@ -10,6 +10,6 @@ Read only the relevant installed API and owning Studio source/tests. Neither a s
 | Review spectrogram **display** API | Released `bioacoustics_dl_toolbox.visualization.spectrogram`; Studio-owned `src/biocall_studio/review/domain/spectrograms.py` and `review/workflows/spectrograms.py`; [decisions](../specs/review/SPECTROGRAM_DECISIONS.md) |
 | Review labeling, source provenance, exports | `src/biocall_studio/review/`, [Review contract](../specs/review/README.md), [vision](../VISION.md) |
 | Tests and sample files | [test skill](indexed-integration-tests/SKILL.md), [unit index](../UNIT_TESTING.md), [integration index](../INTEGRATION_TEST_BEHAVIORS.md), [fixture contract](../INTEGRATION_TEST_DATA.md) |
-| Release source/CI/native qualification | [2026-11 version control](../specs/release-preparation-2026-11/VERSION_CONTROL.md), [release process](../RELEASE_PROCESS.md) |
+| Release source/CI/native qualification | [release process](../RELEASE_PROCESS.md) |
 
 A reusable upstream defect needs its own library change, publication and downstream qualification. Do not silently patch library internals in Studio or change CNN feature semantics while modifying the Review display renderer. Never infer true model accuracy or installer approval from the example UI screenshots.

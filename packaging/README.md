@@ -1,10 +1,10 @@
-# Spec 04A — reviewed native packaging source; no installer release
+# Packaging — reviewed native packaging source (shipped in the v0.1.0a1 alpha)
 
-**Authority:** [04 installer gates](../docs/specs/release-preparation-2026-11/04-installer-gates.md) and
-[VERSION_CONTROL](../docs/specs/release-preparation-2026-11/VERSION_CONTROL.md).
-This implementation PR must merge to Studio `main` before choosing
-`STUDIO_RELEASE_SHA`. Do not build the final OS binaries from this branch.
-Do not change Studio source after freeze, run the complete suite, tag or release in spec 04A.
+**Authority:** [release process](../docs/RELEASE_PROCESS.md); the completed 2026-11
+installer-gates spec and version-control instructions are preserved in Git history and at
+the [release tag](https://github.com/darizae/biocall-studio/tree/v0.1.0a1).
+This packaging source merged to Studio `main` before the release SHA `8354089cc7f0878e3dd594ca3620e90c4f16b6f8`
+was frozen; both installers were built from it and published as the `v0.1.0a1` unsigned alpha.
 
 ## Shared wheel + freezer contract
 
