@@ -85,7 +85,8 @@ def main() -> int:
     readme = README.read_text(encoding="utf-8")
     required = {
         "assets/branding/on-background/readme-header.png",
-        "00-studio.png",
+        # Three genuine workflow screenshots are enough for the researcher README.
+        # The Studio launchpad remains tracked and provenance-checked below.
         "02a-train-training-in-progress.png",
         "05-detect-results.png",
         "09-review-one-by-one.png",
