@@ -2,6 +2,10 @@
 
 **Execution position: prompt 14.** This is the final administrative/release and documentation-cleanup spec, **only in BioCall Studio**. The *last build/qualification tasks* are the macOS and Windows native installer lanes (prompts 12 and 13, in parallel). The complete BioCall Studio source suite must already have run **locally before them** under [spec 05](05-final-upstream-release-qualification.md). Do **not** rerun the full Studio suite merely because installers completed with the exact unchanged inputs.
 
+## Execution boundary
+
+**Primarily ChatGPT web + GitHub connector:** verify prior local Mac test receipts and both native installer logs, compare immutable SHAs/wheel hashes, prepare release notes, review/create and merge the three documentation-only cleanup PRs after publication. **Not** a request to rerun the local Mac suite, package either OS installer inside ChatGPT's VM, or infer a release exists. GitHub's actual annotated tag creation, release upload/attachments and any signing/notarization must be performed through a verified release-capable GitHub action, `gh` on a trusted runner, or the owner's GitHub UI/terminal, with explicit owner approval. This connected GitHub API may not expose workflow-dispatch/release-publication actions. If unavailable, give minimal exact manual commands and report publication **BLOCKED/PENDING** until verified.
+
 ## Mandatory promotion gate — do not publish prematurely
 
 1. Inspect the *actual* published [alp-ui](https://github.com/darizae/alp-ui/releases) and [toolbox](https://github.com/darizae/bioacoustics-dl-toolbox/releases) releases and tagged commit SHAs and the SHA-256 of their released wheel/sdist assets. Read the Studio `pyproject.toml` version and exact upstream pin/provenance and recorded `STUDIO_RELEASE_SHA`; ensure it is a reviewed commit currently reachable from Studio `main`.
