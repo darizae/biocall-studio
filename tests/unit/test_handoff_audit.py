@@ -13,9 +13,10 @@ _SPEC.loader.exec_module(handoff)
 
 
 def test_current_handoff_is_audited_without_removed_stages():
-    assert len(handoff.REVIEW_SPECS) == 8
+    assert handoff.REVIEW_CONTRACTS == ("README.md", "SPECTROGRAM_DECISIONS.md")
     assert all(not name.startswith("SPEC_01") for name in handoff.REQUIRED)
     assert all("UX_PARITY_MATRIX.md" not in name for name in handoff.REQUIRED)
+    assert all("GIT_DELIVERY.md" not in name for name in handoff.REQUIRED)
     assert handoff.audit_repository(ROOT) == []
 
 
@@ -32,8 +33,8 @@ def test_broken_live_markdown_link_remains_a_failure(tmp_path):
 def test_required_current_review_contract_cannot_disappear(tmp_path):
     problems = handoff.audit_repository(tmp_path)
     assert (
-        "Missing active Review stage contract: "
-        "docs/specs/review/RV-03-audio-and-spectrograms.md"
+        "Missing current Review contract: "
+        "docs/specs/review/SPECTROGRAM_DECISIONS.md"
     ) in problems
     assert "Missing current handoff file: docs/agent/ROUTING.md" in problems
 

@@ -44,4 +44,4 @@ Launch it from your checkout:
 
 ## License
 
-The application license has not yet been specified. Redistribution terms will be clarified before an official release.
+The application license has not yet been specified. The [third-party redistribution notices](docs/legal/THIRD_PARTY_NOTICES.md) identify the released GPL-3.0-only scientific toolbox, MIT UI library, Qt and font obligations. They do **not** grant a BioCall Studio application license or approve public binaries.

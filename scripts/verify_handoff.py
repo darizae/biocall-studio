@@ -25,7 +25,6 @@ REQUIRED = (
     ".gitattributes",
     ".gitignore",
     "docs/agent/ROUTING.md",
-    "docs/agent/GIT_DELIVERY.md",
     "docs/agent/SOURCE_MAP.md",
     "docs/agent/SPEC_WRITING_AND_IMPLEMENTATION_PRINCIPLES.md",
     "docs/IMPLEMENTATION_SEQUENCE.md",
@@ -50,19 +49,10 @@ REQUIRED = (
     "docs/specs/06-macos-release-and-installer.md",
     "docs/specs/07-windows-release-and-installer.md",
     "docs/specs/manual_revision_specs/REV-05-output-size-preflight.md",
-    "docs/specs/review/README.md",
-    "docs/specs/review/SPECTROGRAM_DECISIONS.md",
-    "docs/specs/review/SPECTROGRAM_GENERATION_INVESTIGATION.md",
 )
-REVIEW_SPECS = (
-    "RV-01-result-intake.md",
-    "RV-02-sessions-and-annotations.md",
-    "RV-03-audio-and-spectrograms.md",
-    "RV-04-cache-generation-and-preflight.md",
-    "RV-05-native-review-ui.md",
-    "RV-06-corpus-export.md",
-    "RV-07-studio-detect-migration.md",
-    "RV-08-qualification.md",
+REVIEW_CONTRACTS = (
+    "README.md",
+    "SPECTROGRAM_DECISIONS.md",
 )
 PRIVATE_REQUIRED = (
     "docs/priv/hpc-source-access/SKILL.md",
@@ -120,10 +110,10 @@ def audit_repository(
     for rel in REQUIRED:
         if not (root / rel).is_file():
             errors.append(f"Missing current handoff file: {rel}")
-    for name in REVIEW_SPECS:
+    for name in REVIEW_CONTRACTS:
         rel = f"docs/specs/review/{name}"
         if not (root / rel).is_file():
-            errors.append(f"Missing active Review stage contract: {rel}")
+            errors.append(f"Missing current Review contract: {rel}")
     if require_private:
         for rel in PRIVATE_REQUIRED:
             if not (root / rel).is_file():
@@ -173,7 +163,7 @@ def main() -> int:
     for item in errors:
         print(item, file=sys.stderr)
     print(
-        f"Handoff audit: {len(REQUIRED)} current files; {len(REVIEW_SPECS)} Review stages; "
+        f"Handoff audit: {len(REQUIRED)} current files; {len(REVIEW_CONTRACTS)} Review contracts; "
         f"private={args.require_private}; ST-11 native evidence={args.require_native_ux}; "
         f"{len(errors)} errors. This is not an RV-03 scientific/owner sign-off."
     )

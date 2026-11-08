@@ -34,6 +34,34 @@ Check actual installed versions/import origins:
 .venv/bin/python -c 'from importlib.metadata import version; import alp_ui, bioacoustics_dl_toolbox; print(version("alp-ui"), alp_ui.__file__); print(version("bioacoustics-dl-toolbox"), bioacoustics_dl_toolbox.__file__)'
 ```
 
+## Provisional source and wheel verification (spec 03 only)
+
+The release-tagged `alp-ui` and toolbox wheels are **GitHub Release assets**, not
+a promise that a public package index resolves `pip install biocall-studio`.
+Keep the two validated wheels in `.release-wheels/` and verify the hashes in
+`pyproject.toml` **before** using them. Do not silently replace them with an
+index build, an editable sibling or a locally rebuilt upstream wheel.
+
+For the **focused** spec 03 candidate only (after the wheelhouse install above):
+
+```bash
+.venv/bin/python -m pip install 'build>=1.3,<2'
+.venv/bin/python -m build --sdist --wheel --outdir dist
+.venv/bin/python scripts/verify_release_candidate.py --dist dist --wheelhouse .release-wheels
+.venv/bin/python -m pytest -q tests/unit/test_cli.py tests/unit/test_handoff_audit.py tests/integration/test_training_packaging.py
+.venv/bin/python scripts/check_fixtures.py
+.venv/bin/python scripts/verify_handoff.py
+.venv/bin/python scripts/audit_test_ids.py
+.venv/bin/python scripts/audit_docs.py
+.venv/bin/python -m ruff check src tests scripts
+.venv/bin/python -m ruff format --check src tests scripts
+```
+
+The candidate verifier audits archive resources and five Worker mode references,
+and prints local icon SHA-256 and installed dependency versions. A wheel build
+and offscreen focused test **are not** native installer qualification; spec 04
+must merge freezer code before a single final source SHA is selected.
+
 ## Tests and audit
 
 For owner-authorized development on an interactive macOS machine, `scripts/run_tests.py background` forces offscreen Qt. For a focused test (ordinary full suite is reserved for spec 05 during the current release series):
