@@ -7,7 +7,7 @@ name = "biocall-studio"
 version = "0.1.0a1"
 description = "Native bioacoustics workspace for model training and call detection"
 readme = "README.md"
-# No BioCall Studio application license is declared; see the redistribution gate.
+# Studio source license: GPL-3.0-only (root LICENSE); frozen 0.1.0a1 wheels carry no license metadata.
 requires-python = ">=3.11,<3.14"
 dependencies = [
   "bioacoustics-dl-toolbox[rf]==0.3.0",
